@@ -124,6 +124,18 @@ const NETWORK_PREVIEW = [
     ops: "transfer · vote · custom_json",
     limit: "100.000 SAOS", offline: false,
   },
+  {
+    id: "ethereum", name: "ETHEREUM", tone: "var(--eth)",
+    roles: "active (single-key)",
+    ops: "transfer · erc20_transfer · erc20_approve",
+    limit: "0.100 ETH", offline: true,
+  },
+  {
+    id: "solana", name: "SOLANA", tone: "var(--sol)",
+    roles: "active (single-key)",
+    ops: "transfer · spl_transfer · memo",
+    limit: "1.000 SOL", offline: true,
+  },
 ] as const;
 
 const SOLDIER_COUNT = 13;

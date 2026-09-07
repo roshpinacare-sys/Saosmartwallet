@@ -14,7 +14,7 @@ import type { OperationType, StorageKind } from "@/lib/vault-runtime";
 
 export const dynamic = "force-dynamic";
 
-const NETWORK_IDS: ReadonlySet<string> = new Set(["steem", "hive", "tron", "blurt", "saos-net"]);
+const NETWORK_IDS: ReadonlySet<string> = new Set(["steem", "hive", "tron", "blurt", "saos-net", "ethereum", "solana"]);
 const STORAGE_KINDS: ReadonlySet<string> = new Set(["hot", "cold", "air-gapped"]);
 
 export async function POST(req: Request) {

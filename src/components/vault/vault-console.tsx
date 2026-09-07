@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 import type { ImportKeyMode, NetworkId } from "@/lib/vault-contracts";
 import type { KeyRole } from "../../../packages/core/src/types";
 
-const NETWORKS: NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net"];
+const NETWORKS: NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net", "ethereum", "solana"];
 const ROLES: KeyRole[] = ["owner", "active", "posting", "memo"];
 const PURPOSES = ["trading", "bridging", "governance", "treasury"] as const;
 
@@ -98,6 +98,14 @@ function VaultKeysCard() {
 
   const [network, setNetwork] = useState<NetworkId>("steem");
   const [roles, setRoles] = useState<KeyRole[]>(["active"]);
+  // Single-key chains (M3): the engine accepts "active" only — mirror that
+  // in the UI instead of letting the request fail server-side.
+  const singleKeyNetwork = network === "ethereum" || network === "solana";
+  const availableRoles: KeyRole[] = singleKeyNetwork ? ["active"] : ROLES;
+  const changeNetwork = (n: NetworkId) => {
+    setNetwork(n);
+    if (n === "ethereum" || n === "solana") setRoles(["active"]);
+  };
   const [mode, setMode] = useState<ImportKeyMode>("derive");
   const [account, setAccount] = useState("");
   const [masterPassword, setMasterPassword] = useState("");
@@ -237,7 +245,7 @@ function VaultKeysCard() {
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Network">
-              <Select value={network} onValueChange={(v) => setNetwork(v as NetworkId)}>
+              <Select value={network} onValueChange={(v) => changeNetwork(v as NetworkId)}>
                 <SelectTrigger className="h-9 text-[11px]" aria-label="network">
                   <SelectValue />
                 </SelectTrigger>
@@ -319,7 +327,7 @@ function VaultKeysCard() {
 
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="flex items-center gap-2.5" role="group" aria-label="key roles">
-              {ROLES.map((r) => (
+              {availableRoles.map((r) => (
                 <label key={r} className="flex cursor-pointer items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-secondary)]">
                   <input
                     type="checkbox"
@@ -411,7 +419,13 @@ function HierarchyCard() {
                       borderColor: `color-mix(in srgb, ${netTone(n)} 35%, transparent)`,
                       background: `color-mix(in srgb, ${netTone(n)} 8%, transparent)`,
                     }}
-                    title={n === "blurt" ? "ships offline by default config" : undefined}
+                    title={
+                      n === "blurt"
+                        ? "ships offline by default config"
+                        : n === "ethereum" || n === "solana"
+                          ? "M3 — ships offline until a key is imported"
+                          : undefined
+                    }
                   >
                     {n}
                     {n === "blurt" ? " · offline" : ""}

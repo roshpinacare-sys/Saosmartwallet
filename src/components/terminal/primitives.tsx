@@ -16,6 +16,8 @@ export const CHAIN_TONE: Record<string, string> = {
   blurt: "var(--info)",
   tron: "var(--down)",
   "saos-net": "var(--saos)",
+  ethereum: "var(--eth)",
+  solana: "var(--sol)",
 };
 
 export function chainTone(id: string): string {

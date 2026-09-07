@@ -111,7 +111,7 @@ export interface RevealResult {
 // Ecosystem defaults (M2 spec tables)
 // ---------------------------------------------------------------------------
 
-const ALL_NETWORK_IDS: readonly NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net"];
+const ALL_NETWORK_IDS: readonly NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net", "ethereum", "solana"];
 const STEEM_FAMILY_ROLES: readonly KeyRole[] = ["owner", "active", "posting", "memo"];
 
 const DEFAULT_NETWORK_ROLES: Record<NetworkId, readonly KeyRole[]> = {
@@ -120,6 +120,9 @@ const DEFAULT_NETWORK_ROLES: Record<NetworkId, readonly KeyRole[]> = {
   tron: ["owner"],
   blurt: STEEM_FAMILY_ROLES,
   "saos-net": ["owner", "active", "posting"],
+  // Single-key chains: the frozen role vocabulary's funds-authority role.
+  ethereum: ["active"],
+  solana: ["active"],
 };
 
 const DEFAULT_NETWORK_OPS: Record<NetworkId, readonly OperationType[]> = {
@@ -146,15 +149,19 @@ const DEFAULT_NETWORK_OPS: Record<NetworkId, readonly OperationType[]> = {
   tron: ["transfer", "trigger_smart_contract"],
   blurt: ["transfer", "vote", "comment"],
   "saos-net": ["transfer", "vote", "custom_json"],
+  ethereum: ["transfer", "erc20_transfer", "erc20_approve"],
+  solana: ["transfer", "spl_transfer", "memo"],
 };
 
-/** Daily spend ceilings in satoshi strings, per token symbol. */
+/** Daily spend ceilings in base-unit strings (satoshi/wei/lamports), per token symbol. */
 const DEFAULT_NETWORK_LIMITS: Record<NetworkId, Record<string, string>> = {
   steem: { STEEM: "10000000" },
   hive: { HIVE: "10000000" },
   tron: { TRX: "100000000000" },
   blurt: { BLURT: "10000000" },
   "saos-net": { SAOS: "100000000" },
+  ethereum: { ETH: "100000000000000000" }, // 0.1 ETH in wei
+  solana: { SOL: "1000000000" }, // 1 SOL in lamports
 };
 
 /** Networks every soldier is bound to (only vaults that actually exist). */
@@ -324,6 +331,10 @@ export class SovereignVault {
         { network: "saos-net", special: { soldierManagement: true, oracleFeeds: true } },
         now,
       ),
+      // M3: EVM + Solana vaults — born offline until a key is imported,
+      // exactly like blurt (honest until funded + keyed).
+      this.buildNetworkConfig({ network: "ethereum", status: "offline" }, now),
+      this.buildNetworkConfig({ network: "solana", status: "offline" }, now),
     ];
     for (const cfg of networkConfigs) networks[cfg.id] = cfg;
 

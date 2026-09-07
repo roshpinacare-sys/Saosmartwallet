@@ -17,9 +17,9 @@
 // Networks & operations
 // ---------------------------------------------------------------------------
 
-export type NetworkId = "steem" | "hive" | "tron" | "blurt" | "saos-net";
+export type NetworkId = "steem" | "hive" | "tron" | "blurt" | "saos-net" | "ethereum" | "solana";
 
-export const NETWORK_IDS: readonly NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net"];
+export const NETWORK_IDS: readonly NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net", "ethereum", "solana"];
 
 /** Operation types the ecosystem actually issues today (open string for forks). */
 export type OperationType =
@@ -34,7 +34,11 @@ export type OperationType =
   | "witness_vote"
   | "delegate_vesting_shares"
   | "account_update"
-  | "trigger_smart_contract";
+  | "trigger_smart_contract"
+  | "erc20_transfer"
+  | "erc20_approve"
+  | "spl_transfer"
+  | "memo";
 
 /** How a vault's key material is stored. */
 export type StorageKind = "hot" | "cold" | "air-gapped";
