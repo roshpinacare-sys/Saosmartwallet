@@ -1,6 +1,6 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-> **סטטוס: M0 Core מומש ואומת מול ה-chain · keystore/policy ממתינים ל-M1**
+> **סטטוס: M0+M1 מומשו ואומתו מול ה-chain · keystore/policy ממתינים ל-M2**
 > עדכון אחרון: 2026-09-07 (Asia/Jerusalem)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
@@ -36,8 +36,9 @@
 |---|---|---|
 | [`packages/crypto/`](./packages/crypto/README.md) | PrivateKey/PublicKey/חתימות, WIF + "STM", גזירת מפתחות מ-password/brain-key | ✅ מומש ואומת |
 | [`packages/chains/steem/`](./packages/chains/steem/README.md) | מנוע serialization בינארי (varint/asset/ops/tx) + SteemAdapter עם broadcast נעול | ✅ מומש ואומת |
-| [`packages/core/`](./packages/core/README.md) | Keystore AES-256-GCM + Policy Engine | ⬜ M1 |
+| [`packages/core/`](./packages/core/README.md) | Keystore AES-256-GCM + Policy Engine | ⬜ M2 |
 | `tools/serialize-test.ts` | סוויטת אימות מול chain חי | ✅ **30/30 PASS** |
+| `tools/m1-op-test.ts` | סוויטת limit_order_create מול oracle | ✅ **27/27 PASS** |
 
 **קריטריוני קבלה שעברו מול ה-chain האמיתי** (קריאה-בלבד): serialization **זהה ביט-אחר-ביט** ל-serializer של הצומת עצמו (10/10 עסקאות) · sha256 על ה-bytes שלנו = `transaction_id` מה-chain (10/10) · חתימות אמיתיות מה-chain משוחזרות בדיוק למפתחות ה-authority של החותם — הוכחת מסלול חתימה מלא בלי שידור.
 
@@ -46,6 +47,29 @@
 ```bash
 bun tools/serialize-test.ts --rpc https://api.steemit.com --samples 10   # הוכחה חוזרת (קריאה-בלבד)
 bun tools/chain-health-check.ts --rpc https://api.steemit.com           # בדיקת תקינות צומת
+bun tools/m1-op-test.ts                                                # M1: limit_order_create מול oracle
+```
+
+## 🖥️ M1 DEX Terminal — מומש ואומת חי (2026-09-07)
+
+שכבת האפליקציה חיה: **טרמינל מסחר לשוק הפנימי STEEM/SBD** עם נתוני chain חיים בלבד (אפס mock data).
+
+| נכס | תיאור | סטטוס |
+|---|---|---|
+| `src/app/page.tsx` | SAOSMART TERMINAL — dark-only, Bloomberg×Cyberpunk (glassmorphism, mono numbers, Framer Motion) | ✅ חי |
+| Order Book + Tape | ספר פקודות חי (get_order_book) + fills (get_trade_history) עם depth bars ואנימציות | ✅ חי מול הצומת |
+| Trading Terminal | בונה limit_order_create: BigInt math → adapter → serializer → preview (hex + digest + tx_id) | ✅ bit-exact מול oracle |
+| Wallet Dashboard | יתרות STEEM/SBD/SP (המרת VESTS בשלמים), מד RC, פקודות פתוחות | ✅ חי |
+| `/api/steem/*` | 5 routes שעוטפים את ה-adapter/client מ-M0/M1 — ללא מפתחות, ללא שידור | ✅ |
+| `packages/chains/steem/src/market.ts` | SteemMarketClient (קריאה-בלבד): orderbook/ticker/history/dgp/open-orders | ✅ |
+| `tools/m1-op-test.ts` | limit_order_create מול get_transaction_hex (3 וקטורי oracle) | ✅ **27/27 PASS** |
+
+**ראיית קצה:** פקודה שנבנתה דרך ה-API (BUY 100 STEEM @ 0.098) חזרה **bit-exact** מול serializer הצומת — אומת ב-wire ב-2026-09-07. באג M0 שהתגלה ב-M1 ותוקן: `max_rc` ברמת החשבון (לא בתוך rc_manabar).
+
+**שער בטיחות נשמר:** הטרמינל בונה, מסדר ומאמת — חתימה נעולה עד keystore (packages/core, M2); broadcast fail-closed.
+
+```bash
+bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.steemit.com
 ```
 
 ## 🔐 הערות אבטחה למאגר זה

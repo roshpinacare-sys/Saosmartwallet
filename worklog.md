@@ -141,3 +141,30 @@ Stage Summary:
 - אבטחה: אפס סודות בקוד; broadcast נעול כברירת מחדל; policy מונע transfer עם posting key; כלי האימות קריאה-בלבד ולא שולח שום חתימה.
 - פתוח ל-M1: packages/core (keystore AES-256-GCM + Policy Engine/Aurora Modes), ולאחר מכן indexer + apps/web-wallet.
 - פעולה שעדיין תלויה בבעלים: הטוקן הרחב נשאר חי לפי החלטתו — הסיכון מתועד, מומלץ לצמצם היקף ל-repo בלבד.
+
+---
+Task ID: M1-impl
+Agent: Z.ai Code (main)
+Task: Phase M1 — DEX UI & Wallet Dashboard: live STEEM/SBD trading terminal on the M0 engine (limit_order_create serialization, market client, API routes, terminal UI), verification with live chain data, docs, commit & push.
+
+Work Log:
+- החלטת ארכיטקטורה מסומנת: הבקשה המקורית דיברה על apps/web (Vite), אבל הסנדבוקס חושף רק את אפליקציית Next.js בפורט 3000 דרך Preview Panel — ה-DEX נבנה בתוך ה-Next.js הקיים עם בדיוק הסטאק המבוקש (React+TS+Tailwind+shadcn/ui+Framer Motion+TanStack Query, כבר ב-deps).
+- ראיות לפני קוד (עיקרון "אין ניחושים", אותה מתודולוגיית M0): עשרות probes חיים מול api.steemit.com — get_order_book (asks/bids עם order_price/real_price/steem/sbd ב-satoshis, ממוינים best-first) · get_ticker · get_trade_history דורש 2-3 ארגומנטים בלבד (לא 5 כמו ב-API ישן) וחלון [start=ישן, stop=חדש] · get_account_history = 3 ארגומנטים · get_open_orders.
+- ראית serialization ל-limit_order_create: שני וקטורים סינתטיים דרך condenser_api.get_transaction_hex (ה-serializer הקנוני של הצומת) פוענחו ביט-אחר-ביט: varint(5) ‖ owner ‖ u32 orderid ‖ Asset×2 (16B) ‖ u8 fill_or_kill ‖ u32 expiration — כולל boundary (orderid=0xffffffff, fok=true, אמאונט-אפס).
+- הורחב מנוע M0: operations.ts (LimitOrderCreateOperation + pack/unpack עם fail-closed על fok byte>1) · adapter.ts (buildOperations מקבל limit_order_create עם ולידציה מלאה: שמות, orderid uint32, STEEM/SBD בלבד, צדדים מנוגדים, חיי פקודה 1min..7d; sign() ממפה by-type דרך toWireOperation; policy: פקודות כספים דורשות ACTIVE — posting נדחה; broadcast מוכלל לשני סוגי ops ונשאר fail-closed).
+- tools/m1-op-test.ts — סוויטת קבלה: 3 וקטורי oracle (כולל וקטור sell גדול עם סכומים אי-זוגיים) — bit-exact vs צומת + round-trip מה-hex של ה-oracle + tx-id anchors + self-tests של assets. תוצאה: **27/27 PASS** (אחרי תיקון: oracle hex כולל וקטור חתימות ריק בסוף — מוסר לפני round-trip).
+- packages/chains/steem/src/market.ts (חדש, קריאה-בלבד): SteemMarketClient — orderbook/ticker/history/chainStatus/openOrders, מנורמל מהראיות; אמאונטים בשלמים (satoshis) עם פורמט עשרוני ללא floats; ה-seam הקפוא chain-adapter.ts לא שונה.
+- API routes (Next.js App Router): /api/steem/market (ticker+dgp) · /api/steem/orderbook · /api/steem/history · /api/steem/wallet (יתרות+RC+SP בהמרת שלמים+פקודות פתוחות) · POST /api/steem/trade/build (BigInt math: BUY=ceil/SELL=floor על 1e6 price scale, orderid מ-timestamp, ref-block fields מה-adapter, serializedHex+digestHex+txId; אין מפתחות, אין שידור).
+- באגי סביבה שתוקנו: Turbopack לא פותר relative imports עמוקים ל-packages — נוצר src/lib/steem-engine.ts (re-export barrel) ו-steem-server.ts (adapter fail-closed singleton); סיומות .js הוסרו מ-imports יחסיים (ושוחזרו על bare imports של @noble v2 שמחייבים אותן ב-exports map); dev server הופעל מחדש עם ניקוי .next.
+- UI (דארק-אונלי, Bloomberg×Cyberpunk): globals.css (פלטת oklch ירוקה-כהה, .glass glassmorphism, .num mono tabular, flash-up/down keyframes, led-pulse, גריד blueprint, scanlines, scrollbars) · DexHeader (quote strip עם FlashNumber+chain vitals) · OrderBook (סולם asks/bids עם depth bars, לחיצה מזריקה מחיר לטרמינל, AnimatePresence) · TradeHistory (tape חי ממוין newest-first) · TradeTerminal (BUY/SELL tabs, BID/MID/ASK presets, % יתרה, lifetime select, fill-or-kill, Dialog preview: op payload+envelope+hex+digest+txId+שער "SIGNING LOCKED — M2") · WalletPanel (4 כרטיסים כולל RC gauge מונפש + טבלת פקודות פתוחות) · StatusFooter דביק (mt-auto, min-h-screen flex-col).
+- באגים שאימות הדפדפן תפס ותוקנו: (1) מפתחות React כפולים בספר (שתי פקודות באותו מחיר+שעה) — אינדקס נוסף ל-key; (2) ReferenceError ב-BookRow (onClick קרא ל-onPickPrice במקום onPick) — ה-prefill לא עבד; (3) **באג M0 אמיתי**: getRcManabar קרא max_rc מתוך rc_manabar אבל ב-wire הוא ברמת החשבון — percent היה תמיד 0; תוקן ואומת (@steem: 24.8%); (4) sync של zustand persist אחרי rehydration (adjust-during-render, בלי effects — עומד בכלל react-hooks/set-state-in-effect); (5) אי-עקביות עיגול Cost/Receive — floor לגריד satoshi כמו השרת.
+- אימות מקצה לקצה ב-agent-browser: page render תקין, אפס שגיאות קונסולה, נתונים חיים זורמים (ticker/orderbook/history/wallet/RC), golden path מלא: track @steem → לחיצה על שורה בספר → הזרקת מחיר+היפוך צד → SELL 500 STEEM @0.096555 → preview dialog עם payload/hex/digest → ראיית השער; מובייל 390px ודסקטופ 1440px נבדקו ויזואלית; footer דביק נבדק.
+- ראיית קצה: פקודה שנבנתה דרך ה-API (BUY 100 STEEM @ 0.098 → 9.800 SBD → 100.000 STEEM, 60 בייטים) נשלחה ל-oracle וחזרה **BIT-EXACT** מול ה-serializer של הצומת.
+- lint נקי · serialize-test 30/30 · m1-op-test 27/27 · READMEs עודכנו (ראשי + packages + steem) עם סעיף M1 וראיות.
+
+Stage Summary:
+- M1 מושלם: ה-DEX חי בדפדפן עם נתוני chain אמיתיים בלבד — אפס mock data; כל מספר במסך מגיע מ-api.steemit.com דרך ה-packages שלנו.
+- שרשרת הראיות הוארכה: limit_order_create מאומת bit-exact (3 וקטורי oracle + בדיקת קצה של פקודה שנבנתה ב-API) — מנוע הסריאליזציה מוכן לחתימה בפועל ברגע שה-keystore (M2) יסופק.
+- באג M0 נתגלה ותוקן בזכות ה-UI חושף-הנתונים (RC manabar) — העיקרון "ה-UI מאמת את ה-backend" שוב שילם.
+- אבטחה נשמרת: אפס מפתחות בכל שרשרת ה-M1; ה-adapter ב-API נבנה fail-closed; הטרמינל מציג את השער במפורש.
+- פתוח ל-M2: packages/core (keystore AES-256-GCM + Policy Engine/Aurora Modes) — ברגע שיסופק, כפתור החתימה מתחבר ל-digestHex שכבר מוצג.

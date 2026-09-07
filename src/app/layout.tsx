@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
+
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,25 +15,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
-  openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-  },
+  title: "SAOSMART TERMINAL — STEEM/SBD Internal DEX",
+  description:
+    "Live trading terminal for the Steem internal market (STEEM/SBD): order book, recent fills, limit-order builder and wallet dashboard. Built on the M0 chain adapter and oracle-verified binary serializer.",
+  keywords: ["Steem", "SBD", "DEX", "order book", "trading terminal", "blockchain wallet"],
+  authors: [{ name: "Saosmartwallet" }],
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b100e",
 };
 
 export default function RootLayout({
@@ -41,12 +32,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         {children}
-        <Toaster />
+        <Toaster
+          theme="dark"
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "oklch(0.17 0.014 175)",
+              border: "1px solid oklch(0.85 0.02 165 / 12%)",
+              color: "oklch(0.94 0.008 165)",
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: "12px",
+            },
+          }}
+        />
       </body>
     </html>
   );

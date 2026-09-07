@@ -2,14 +2,31 @@
  * Saosmartwallet — Steem operations registry
  * ==========================================
  * Wire-exact operation packing. M0 implements `transfer` end-to-end (the op a
- * wallet must never get wrong); the registry documents standard op ids so the
+ * wallet must never get wrong); M1 adds `limit_order_create` for the internal
+ * DEX (STEEM/SBD market); the registry documents standard op ids so the
  * deserializer can fail loudly on everything else instead of corrupting bytes.
  *
- * The transfer body layout { from, to, amount, memo } was validated against
- * live-chain canonical hex (see serializer.ts evidence notes).
+ * Evidence (live-chain canonical hex via condenser_api.get_transaction_hex,
+ * the node's own serializer — the same oracle methodology as M0, 2026-09-07):
+ *
+ *   transfer          { from, to, amount, memo }            — M0, bit-verified
+ *                       against 10/10 real transactions (see serialize-test.ts).
+ *   limit_order_create { owner, orderid, amount_to_sell,     — M1, oracle-verified
+ *                       min_to_receive, fill_or_kill, expiration }
+ *                       Oracle vector 1: orderid 77 / "10.000 SBD"→"101.000 STEEM"
+ *                       / fok=false produced
+ *                       …05 08"testacct" 4d000000 <asset SBD> <asset STEEM> 00 <u32 exp>.
+ *                       Oracle vector 2: orderid 0xffffffff / fok=true / 0-amounts
+ *                       confirmed bool 0x01 and u32 LE expiration encoding.
+ *                       Field order: owner(varint-string), orderid(u32 LE),
+ *                       amount_to_sell(asset 16B), min_to_receive(asset 16B),
+ *                       fill_or_kill(u8 bool), expiration(u32 LE unix).
+ *
+ * Asset layout (16 bytes) and the tx envelope were validated in M0 — see
+ * serializer.ts evidence notes.
  */
 
-import { ByteReader, ByteWriter, type Asset, packAsset, unpackAsset } from "./serializer.js";
+import { ByteReader, ByteWriter, type Asset, packAsset, unpackAsset } from "./serializer";
 
 /** Standard Steem operation ids (graphene op tag order). */
 export const OP_IDS = {
@@ -74,8 +91,25 @@ export interface TransferOperation {
   memo?: string;
 }
 
-export type SteemOperationBody = TransferOperation;
-export type SteemOperationName = "transfer";
+/**
+ * Internal-market limit order (M1 DEX). Sell `amount_to_sell`, receive at
+ * least `min_to_receive`. Buying STEEM with SBD ⇒ amount_to_sell=SBD,
+ * min_to_receive=STEEM (and vice versa). `expiration` is the ORDER lifetime
+ * on the book (unix seconds), NOT the transaction expiration.
+ */
+export interface LimitOrderCreateOperation {
+  owner: string;
+  /** Caller-chosen order identifier (uint32); used later for cancel. */
+  orderid: number;
+  amount_to_sell: Asset;
+  min_to_receive: Asset;
+  fill_or_kill: boolean;
+  /** Unix epoch seconds (uint32) — when the order dies if unfilled. */
+  expiration: number;
+}
+
+export type SteemOperationBody = TransferOperation | LimitOrderCreateOperation;
+export type SteemOperationName = "transfer" | "limit_order_create";
 
 export function packOperation(w: ByteWriter, name: SteemOperationName, body: SteemOperationBody): void {
   switch (name) {
@@ -86,6 +120,17 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
       w.string(t.to);
       packAsset(w, t.amount);
       w.string(t.memo ?? "");
+      return;
+    }
+    case "limit_order_create": {
+      const o = body as LimitOrderCreateOperation;
+      w.varint(OP_IDS.limit_order_create);
+      w.string(o.owner);
+      w.u32(o.orderid); // uint32 LE — oracle-confirmed, 0xffffffff preserved
+      packAsset(w, o.amount_to_sell);
+      packAsset(w, o.min_to_receive);
+      w.u8(o.fill_or_kill ? 1 : 0); // fc::raw bool — 0x00/0x01 only
+      w.u32(o.expiration); // time_point_sec, u32 LE unix
       return;
     }
     default: {
@@ -112,8 +157,21 @@ export function unpackOperation(r: ByteReader): UnpackedOperation {
     const memo = r.string();
     return { id, name: "transfer", body: { from, to, amount, memo } };
   }
+  if (id === OP_IDS.limit_order_create) {
+    const owner = r.string();
+    const orderid = r.u32();
+    const amount_to_sell = unpackAsset(r);
+    const min_to_receive = unpackAsset(r);
+    const fokByte = r.u8();
+    if (fokByte > 1) {
+      throw new Error(`limit_order_create: fill_or_kill byte must be 0|1, got 0x${fokByte.toString(16)}`);
+    }
+    const fill_or_kill = fokByte === 1;
+    const expiration = r.u32();
+    return { id, name: "limit_order_create", body: { owner, orderid, amount_to_sell, min_to_receive, fill_or_kill, expiration } };
+  }
   throw new Error(
-    `unsupported operation id ${id} — deserializer implements "transfer" (2) only in M0; ` +
+    `unsupported operation id ${id} — deserializer implements "transfer" (2) and "limit_order_create" (5); ` +
       `extend packOperation/unpackOperation before parsing other op types`,
   );
 }

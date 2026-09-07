@@ -21,7 +21,7 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 
-import { EncodingError, steemPublicKeyDecode, steemPublicKeyEncode, wifDecode, wifEncode } from "./encoding.js";
+import { EncodingError, steemPublicKeyDecode, steemPublicKeyEncode, wifDecode, wifEncode } from "./encoding";
 
 export const STEEM_ROLES = ["owner", "active", "posting", "memo"] as const;
 export type SteemRole = (typeof STEEM_ROLES)[number];
