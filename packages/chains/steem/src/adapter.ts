@@ -24,9 +24,10 @@ import {
   type TokenBalances,
   type UnsignedTx,
   type BroadcastResult,
-} from "../../chain-adapter.js";
-import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index.js";
-import { SerializationError, parseAsset } from "./serializer.js";
+} from "../../chain-adapter";
+import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index";
+import { SerializationError, parseAsset } from "./serializer";
+import type { LimitOrderCreateOperation, SteemOperationName } from "./operations";
 import {
   STEEM_CHAIN_ID,
   SIGNATURE_SIZE,
@@ -34,7 +35,7 @@ import {
   appendSignatures,
   serializeTransaction,
   transactionDigest,
-} from "./transaction.js";
+} from "./transaction";
 
 // ---------------------------------------------------------------------------
 // Account naming (observed chain rules; the chain remains the final arbiter)
@@ -185,41 +186,93 @@ export class SteemAdapter implements ChainAdapter {
 
   async getRcManabar(name: string): Promise<RcManabar | null> {
     validateAccountName(name);
+    // Wire shape (verified live 2026-09-07): max_rc sits on the ACCOUNT level,
+    // current_mana inside rc_manabar. (M0 read max_rc from rc_manabar — a
+    // latent bug surfaced by the M1 dashboard: percent always computed 0.)
     const res = await this.rpc<{
-      rc_accounts: Array<{ rc_manabar: { current_mana: string; max_rc: string } }>;
+      rc_accounts: Array<{ rc_manabar?: { current_mana: string }; max_rc?: string }>;
     }>("rc_api.find_rc_accounts", { accounts: [name] });
-    const mana = res.rc_accounts?.[0]?.rc_manabar;
+    const acc = res.rc_accounts?.[0];
+    const mana = acc?.rc_manabar;
     if (!mana) return null;
     const cur = Number(mana.current_mana);
-    const max = Number(mana.max_rc);
+    const max = Number(acc?.max_rc ?? "0");
     return {
       currentMana: mana.current_mana,
-      maxRc: mana.max_rc,
+      maxRc: acc?.max_rc ?? "0",
       percent: max > 0 && Number.isFinite(cur) ? Math.round((cur / max) * 1000) / 10 : 0,
     };
   }
 
   // -- ChainAdapter: write paths --------------------------------------------
 
+  /** Ops that move/commit funds — always require an ACTIVE (or owner) signature. */
+  private static readonly FUNDS_OPS: ReadonlySet<string> = new Set(["transfer", "limit_order_create"]);
+
   /**
-   * Builds a transfer transaction with fresh ref-block fields and expiration.
-   * Only "transfer" is accepted in M0 — anything else fails closed.
+   * Validates and stamps a limit_order_create payload (M1 DEX). Asset strings
+   * are parsed fail-closed; only STEEM/SBD are accepted for internal-market
+   * orders, and the two sides must be opposite symbols.
+   */
+  private validateLimitOrderPayload(p: Record<string, unknown>): void {
+    if (typeof p.owner !== "string") throw new SerializationError("limit_order_create requires string owner");
+    validateAccountName(p.owner);
+    if (!Number.isInteger(p.orderid) || (p.orderid as number) < 0 || (p.orderid as number) > 0xffffffff) {
+      throw new SerializationError("limit_order_create orderid must be an integer in [0, 4294967295]");
+    }
+    if (typeof p.amount_to_sell !== "string" || typeof p.min_to_receive !== "string") {
+      throw new SerializationError('limit_order_create requires asset strings like "1.000 STEEM"');
+    }
+    const sell = parseAsset(p.amount_to_sell);
+    const receive = parseAsset(p.min_to_receive);
+    if (sell.amount <= 0n) throw new SerializationError("amount_to_sell must be positive");
+    if (receive.amount < 0n) throw new SerializationError("min_to_receive must be non-negative");
+    const bookSymbols = new Set(["STEEM", "SBD"]);
+    if (!bookSymbols.has(sell.symbol) || !bookSymbols.has(receive.symbol)) {
+      throw new SerializationError(`internal-market orders trade STEEM/SBD only (got ${sell.symbol}/${receive.symbol})`);
+    }
+    if (sell.symbol === receive.symbol) {
+      throw new SerializationError("amount_to_sell and min_to_receive must be opposite symbols");
+    }
+    if (typeof p.fill_or_kill !== "boolean") {
+      throw new SerializationError("limit_order_create fill_or_kill must be boolean");
+    }
+    if (!Number.isInteger(p.expiration)) {
+      throw new SerializationError("limit_order_create expiration must be unix seconds (integer)");
+    }
+    const exp = p.expiration as number;
+    const now = Math.floor(Date.now() / 1000);
+    // Client-side sanity guard (the chain remains the final arbiter): an order
+    // must outlive the signing window but not linger absurdly.
+    if (exp <= now + 60) throw new SerializationError("order expiration must be at least 60s in the future");
+    if (exp > now + 7 * 86400) throw new SerializationError("order expiration capped at 7 days (client guard)");
+  }
+
+  /**
+   * Builds an unsigned transaction with fresh ref-block fields and expiration.
+   * M0: transfer. M1: + limit_order_create (the DEX op). Anything else fails
+   * closed.
    */
   async buildOperations(ops: Array<{ type: string; payload: Record<string, unknown> }>): Promise<UnsignedTx> {
     for (const op of ops) {
-      if (op.type !== "transfer") {
-        throw new SerializationError(`operation "${op.type}" is not supported in M0 (transfer only)`);
-      }
-      const p = op.payload as { from?: unknown; to?: unknown; amount?: unknown; memo?: unknown };
-      if (typeof p.from !== "string" || typeof p.to !== "string") {
-        throw new SerializationError("transfer requires string from/to");
-      }
-      validateAccountName(p.from);
-      validateAccountName(p.to);
-      if (typeof p.amount !== "string") throw new SerializationError("transfer amount must be an asset string like \"1.000 STEEM\"");
-      parseAsset(p.amount); // validates symbol/precision/decimals — fail closed
-      if (p.memo !== undefined && typeof p.memo !== "string") {
-        throw new SerializationError("memo must be a string (encryption arrives with Memo Vault)");
+      if (op.type === "transfer") {
+        const p = op.payload as { from?: unknown; to?: unknown; amount?: unknown; memo?: unknown };
+        if (typeof p.from !== "string" || typeof p.to !== "string") {
+          throw new SerializationError("transfer requires string from/to");
+        }
+        validateAccountName(p.from);
+        validateAccountName(p.to);
+        if (typeof p.amount !== "string") throw new SerializationError('transfer amount must be an asset string like "1.000 STEEM"');
+        parseAsset(p.amount); // validates symbol/precision/decimals — fail closed
+        if (p.memo !== undefined && typeof p.memo !== "string") {
+          throw new SerializationError("memo must be a string (encryption arrives with Memo Vault)");
+        }
+      } else if (op.type === "limit_order_create") {
+        this.validateLimitOrderPayload(op.payload);
+      } else {
+        throw new SerializationError(
+          `operation "${op.type}" is not supported (transfer, limit_order_create)`,
+        );
       }
     }
     const dgp = await this.rpc<{ head_block_number: number; head_block_id: string }>(
@@ -240,18 +293,64 @@ export class SteemAdapter implements ChainAdapter {
   }
 
   /**
+   * Maps an adapter-level operation payload to its wire-exact body.
+   * Asset strings are re-parsed here — the payload crosses the API boundary
+   * as strings and must never be trusted.
+   */
+  private toWireOperation(op: { type: string; payload: Record<string, unknown> }): {
+    name: SteemOperationName;
+    body: SteemTransaction["operations"][number]["body"];
+  } {
+    if (op.type === "transfer") {
+      const p = op.payload as { from: unknown; to: unknown; amount: unknown; memo?: unknown };
+      return {
+        name: "transfer",
+        body: {
+          from: String(p.from),
+          to: String(p.to),
+          amount: parseAsset(String(p.amount)),
+          memo: p.memo as string | undefined,
+        },
+      };
+    }
+    if (op.type === "limit_order_create") {
+      this.validateLimitOrderPayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as {
+        owner: string;
+        orderid: number;
+        amount_to_sell: string;
+        min_to_receive: string;
+        fill_or_kill: boolean;
+        expiration: number;
+      };
+      const body: LimitOrderCreateOperation = {
+        owner: p.owner,
+        orderid: p.orderid,
+        amount_to_sell: parseAsset(p.amount_to_sell),
+        min_to_receive: parseAsset(p.min_to_receive),
+        fill_or_kill: p.fill_or_kill,
+        expiration: p.expiration,
+      };
+      return { name: "limit_order_create", body };
+    }
+    throw new SerializationError(`operation "${op.type}" cannot be signed (unsupported)`);
+  }
+
+  /**
    * Signs the transaction digest locally. Key material never leaves this call.
-   * Role policy (fail closed): transfer requires an ACTIVE role signature;
-   * posting keys are accepted only for posting-family ops (none in M0).
+   * Role policy (fail closed): funds-moving ops (transfer, limit_order_create)
+   * require an ACTIVE role signature; posting keys are accepted only for
+   * posting-family ops (none in M0/M1).
    */
   async sign(tx: UnsignedTx, keys: SigningKeys, roles: KeyRole[]): Promise<SignedTx> {
     if (!Array.isArray(roles) || roles.length === 0) throw new SerializationError("at least one signing role required");
     for (const role of roles) {
       if (!STEEM_ROLES.includes(role as SteemRole)) throw new SerializationError(`unknown role: ${role}`);
     }
-    if (roles.includes("posting") && !roles.includes("active") && tx.operations.some((o) => o.type === "transfer")) {
-      // Explicit policy: a posting key must never authorize a transfer.
-      throw new SerializationError("policy violation: transfer cannot be signed with a posting key");
+    const touchesFunds = tx.operations.some((o) => SteemAdapter.FUNDS_OPS.has(o.type));
+    if (roles.includes("posting") && !roles.includes("active") && touchesFunds) {
+      // Explicit policy: a posting key must never authorize a funds-moving op.
+      throw new SerializationError("policy violation: funds operations cannot be signed with a posting key");
     }
     const { refBlockNum, refBlockPrefix, expiration } = (tx.metadata ?? {}) as {
       refBlockNum?: number;
@@ -265,15 +364,7 @@ export class SteemAdapter implements ChainAdapter {
       refBlockNum,
       refBlockPrefix,
       expiration,
-      operations: tx.operations.map((o) => ({
-        name: "transfer" as const,
-        body: {
-          from: String((o.payload as { from: unknown }).from),
-          to: String((o.payload as { to: unknown }).to),
-          amount: parseAsset(String((o.payload as { amount: unknown }).amount)),
-          memo: (o.payload as { memo?: unknown }).memo as string | undefined,
-        },
-      })),
+      operations: tx.operations.map((o) => this.toWireOperation(o)),
     };
 
     const digest = transactionDigest(steemTx, this.chainIdBytes);
@@ -315,7 +406,7 @@ export class SteemAdapter implements ChainAdapter {
       expiration: new Date(
         ((tx.metadata as { expiration: number }).expiration) * 1000,
       ).toISOString().slice(0, 19),
-      operations: tx.operations.map((o) => ["transfer", o.payload]),
+      operations: tx.operations.map((o) => [o.type, o.payload] as const),
       extensions: [],
       signatures: tx.signatures,
     };

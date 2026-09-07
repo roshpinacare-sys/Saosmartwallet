@@ -34,9 +34,9 @@ import {
   derivePrivateKeys,
   generateMasterPassword,
   normalizeBrainKey,
-} from "../packages/crypto/src/index.js";
-import { SteemAdapter } from "../packages/chains/steem/src/adapter.js";
-import { SerializationError, formatAsset, parseAsset } from "../packages/chains/steem/src/serializer.js";
+} from "../packages/crypto/src/index";
+import { SteemAdapter } from "../packages/chains/steem/src/adapter";
+import { SerializationError, formatAsset, parseAsset } from "../packages/chains/steem/src/serializer";
 import {
   STEEM_CHAIN_ID,
   type SteemTransaction,
@@ -44,7 +44,7 @@ import {
   deserializeTransaction,
   serializeTransaction,
   transactionDigest,
-} from "../packages/chains/steem/src/transaction.js";
+} from "../packages/chains/steem/src/transaction";
 
 // ---------------------------------------------------------------------------
 // Harness

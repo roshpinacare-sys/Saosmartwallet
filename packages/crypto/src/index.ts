@@ -26,7 +26,7 @@ export {
   steemPublicKeyEncode,
   wifDecode,
   wifEncode,
-} from "./encoding.js";
+} from "./encoding";
 
 export {
   STEEM_ROLES,
@@ -40,4 +40,4 @@ export {
   generateMasterPassword,
   normalizeBrainKey,
   recoverFromCompact,
-} from "./keys.js";
+} from "./keys";

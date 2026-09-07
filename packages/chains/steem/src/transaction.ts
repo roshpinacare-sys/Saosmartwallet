@@ -19,8 +19,8 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 
-import { ByteReader, ByteWriter, SerializationError } from "./serializer.js";
-import { type SteemOperationBody, type SteemOperationName, packOperation, unpackOperation } from "./operations.js";
+import { ByteReader, ByteWriter, SerializationError } from "./serializer";
+import { type SteemOperationBody, type SteemOperationName, packOperation, unpackOperation } from "./operations";
 
 /** Steem mainnet chain id — 32 zero bytes (reference: steem-js/dhive hardcoded default). */
 export const STEEM_CHAIN_ID = new Uint8Array(32);
