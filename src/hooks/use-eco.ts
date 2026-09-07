@@ -132,11 +132,13 @@ export interface AnchorsResponse {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
-  const body = (await res.json()) as T | { ok: false; error: string };
-  if (!res.ok || !("ok" in body) || body.ok !== true) {
-    throw new Error(("error" in body && body.error) || `request failed (${res.status})`);
+  const body: unknown = await res.json();
+  const probe = body as { ok?: unknown; error?: unknown } | null;
+  if (!res.ok || !probe || probe.ok !== true) {
+    const message = typeof probe?.error === "string" && probe.error ? probe.error : `request failed (${res.status})`;
+    throw new Error(message);
   }
-  return body;
+  return body as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,6 +169,105 @@ export function useEcoAnchors() {
     queryKey: ["eco", "anchors"],
     queryFn: () => getJson<AnchorsResponse>("/api/eco/anchors"),
     refetchInterval: 30000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// M3 — bridges + multi-chain accounts
+// ---------------------------------------------------------------------------
+
+export interface BridgePath {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  route: Array<{ network: string; contract: string | null; action: string }>;
+  estimatedTime: number;
+  fee: {
+    legs: Array<{ network: string; amount: string; currency: string; source: string }>;
+    allMeasured: boolean;
+  };
+  readiness: "live" | "gated";
+  gateReason: string | null;
+  trustLevel: string;
+  trustDetail: string;
+}
+
+export interface BridgeRoutesResponse {
+  ok: true;
+  from: string;
+  to: string;
+  asset: string;
+  amount: string;
+  paths: BridgePath[];
+  quotedAt: string;
+}
+
+export function useBridgeRoutes(params: { from: string; to: string; asset: string; amount: string; enabled: boolean }) {
+  return useQuery({
+    queryKey: ["bridge", "routes", params.from, params.to, params.asset, params.amount],
+    queryFn: () =>
+      getJson<BridgeRoutesResponse>(
+        `/api/bridge/routes?from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}&asset=${encodeURIComponent(params.asset)}&amount=${encodeURIComponent(params.amount)}`,
+      ),
+    enabled: params.enabled && params.from !== params.to,
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface BridgeStatusResponse {
+  ok: true;
+  statuses: Array<{
+    id: string;
+    rail: string;
+    mechanism: string;
+    status: "live" | "gated" | "offline";
+    evidence: string;
+    explorer: string | null;
+    lastActivityAt: string | null;
+  }>;
+  analytics: {
+    anchoredTotal: number | null;
+    checkpointsVerified: number | null;
+    checkpointsTotal: number | null;
+    lastAnchor: { at: string | null; txid: string | null; chain: string | null; cpHeight: number | null } | null;
+    wrapped: Array<{ asset: string; supply: number; locked: number; holders: number }>;
+    sourcedAt: string;
+  };
+  fetchedAt: string;
+}
+
+export function useBridgeStatus() {
+  return useQuery({
+    queryKey: ["bridge", "status"],
+    queryFn: () => getJson<BridgeStatusResponse>("/api/bridge/status"),
+    refetchInterval: 45_000,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface EcoAccountResponse {
+  ok: true;
+  network: "ethereum" | "solana";
+  account: { address: string; balance: string; nonce?: number; ownerProgram?: string | null; isContract?: boolean; codeKind?: "none" | "eip7702" | "contract" };
+  native: { symbol: string; decimals: number; amount: string };
+  token?: { token: string; symbol: string | null; decimals: number | null; amount: string; formatted: string | null } | null;
+  tokens?: Array<{ mint: string; amount: string; decimals: number | null; formatted: string | null; tokenProgram: string }>;
+  probedAt: string;
+}
+
+export function useEcoAccount(network: "ethereum" | "solana" | null, address: string) {
+  return useQuery({
+    queryKey: ["eco", "account", network, address],
+    queryFn: () =>
+      getJson<EcoAccountResponse>(
+        `/api/eco/account?network=${network}&address=${encodeURIComponent(address)}`,
+      ),
+    enabled: Boolean(network && address),
+    refetchInterval: 30_000,
+    retry: false,
     placeholderData: keepPreviousData,
   });
 }

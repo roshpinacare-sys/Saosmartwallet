@@ -39,7 +39,7 @@ export function StatusFooter() {
 
         <p className="num ml-auto text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
           chains <span className="text-[var(--up)]">{online}</span>/{total} · build{" "}
-          <span className="text-foreground/70">GRID·ENTERPRISE·M1</span>
+          <span className="text-foreground/70">GRID·ENTERPRISE·M3</span>
         </p>
       </div>
     </footer>

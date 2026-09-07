@@ -51,7 +51,7 @@ export function TerminalHeader() {
               </span>
             </div>
             <p className="text-[9px] uppercase tracking-[0.3em] text-[var(--text-tertiary)]">
-              8 repos · 5 chains · 1 sovereign economy
+              8 repos · 7 chains · 1 sovereign economy
             </p>
           </div>
         </div>
@@ -92,7 +92,7 @@ export function TerminalHeader() {
           </div>
           <div className="hidden text-right sm:block">
             <p className="num text-[11px] font-semibold text-foreground/90">
-              {online > 0 ? `${online}/${chains.length || 5}` : "—"}
+              {online > 0 ? `${online}/${chains.length || 7}` : "—"}
             </p>
             <p className="text-[9px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">CHAINS UP</p>
           </div>

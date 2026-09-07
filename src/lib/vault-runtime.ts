@@ -38,6 +38,7 @@ import {
   type PolicyOperation,
 } from "../../packages/core/src/index";
 import { SteemAdapter } from "../../packages/chains/steem/src/adapter";
+import { ETHEREUM_RPC_URLS, SOLANA_RPC_URLS, EthereumAdapter, SolanaAdapter } from "../../packages/chains";
 import type { ApiError } from "@/lib/vault-contracts";
 import { PrismaAuditStore, PrismaVaultStorage } from "./vault-stores";
 
@@ -59,6 +60,9 @@ export interface VaultRuntime {
   audit: AuditSystem;
   policy: PolicyEngine;
   steemSigningAdapter: SteemAdapter;
+  /** M3 — sign-capable, broadcast fail-closed (no "broadcast" capability). */
+  ethereumAdapter: EthereumAdapter;
+  solanaAdapter: SolanaAdapter;
   orchestrator: SigningOrchestrator;
   /** Resolves once the persisted state doc is loaded into memory. */
   ready: Promise<void>;
@@ -114,6 +118,11 @@ export function getVaultRuntime(): VaultRuntime {
     allowBroadcast: true,
     requestTimeoutMs: 15_000,
   });
+  // M3 adapters — SIGN-capable only: constructed WITHOUT allowBroadcast so
+  // their capabilities lack "broadcast" and the orchestrator's broadcast
+  // gate fails closed (honest "not broadcast-capable", never a silent send).
+  const ethereumAdapter = new EthereumAdapter({ rpcUrls: [...ETHEREUM_RPC_URLS] });
+  const solanaAdapter = new SolanaAdapter({ rpcUrls: [...SOLANA_RPC_URLS] });
 
   const getInstanceId = (): string => {
     const state = vault.getState();
@@ -127,7 +136,7 @@ export function getVaultRuntime(): VaultRuntime {
     getVault: () => vault,
     getPolicy: () => policy,
     getAudit: () => audit,
-    getAdapters: () => ({ steem: steemSigningAdapter }),
+    getAdapters: () => ({ steem: steemSigningAdapter, ethereum: ethereumAdapter, solana: solanaAdapter }),
     getInstanceId,
   });
 
@@ -136,6 +145,8 @@ export function getVaultRuntime(): VaultRuntime {
     audit,
     policy,
     steemSigningAdapter,
+    ethereumAdapter,
+    solanaAdapter,
     orchestrator,
     ready: vault.load(),
   };

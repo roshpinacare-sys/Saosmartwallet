@@ -192,6 +192,22 @@ export const ECO_NETWORKS: EcoNetworkInfo[] = [
     role: "Our own deterministic chain — 3s pulse blocks, checkpoints every 12 blocks, soldiers as validators",
     adapterStatus: "ENGINE LIVE (steem repo) — kernel replay + state-root lineage",
   },
+  {
+    id: "ethereum",
+    name: "ETHEREUM",
+    family: "EVM",
+    kind: "L1 public",
+    role: "Settlement layer + future ERC-20 wrapped economy — live gas-aware adapter (M3)",
+    adapterStatus: "ADAPTER DONE (M3) — EIP-1559 build/sign, ERC-20 read, EIP-55 derivation; broadcast fail-closed",
+  },
+  {
+    id: "solana",
+    name: "SOLANA",
+    family: "PoH + PoS",
+    kind: "L1 public",
+    role: "High-throughput rail + future SPL wrapped economy — live adapter (M3)",
+    adapterStatus: "ADAPTER DONE (M3) — legacy build/sign (Ed25519), SPL token read; broadcast fail-closed",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -242,6 +258,20 @@ export const ECO_BRIDGES: EcoBridgeInfo[] = [
     status: "live",
     evidence: "cp#33612 → txid 1db5006b… @ TRON blk 86,019,974 · live pulse monitored in Bridge tab",
   },
+  {
+    id: "bridge-steem-ethereum",
+    rail: "STEEM → ETHEREUM",
+    mechanism: "custom_json saos_bridge_lock (active authority) + oracle-signed ERC-20 mint against a bridge contract",
+    status: "gated",
+    evidence: "M3: adapter + BRIDGE_ABI ready, live gas quoting — mint leg awaits verified contract deployment on mainnet",
+  },
+  {
+    id: "bridge-steem-solana",
+    rail: "STEEM → SOLANA",
+    mechanism: "custom_json saos_bridge_lock (active authority) + oracle-signed SPL mint against a Solana program",
+    status: "gated",
+    evidence: "M3: adapter + program IDs staged, live fee quoting — mint leg awaits program deployment",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -266,7 +296,8 @@ export const ECO_SERVICES: EcoServiceInfo[] = [
 // ---------------------------------------------------------------------------
 
 export const ECO_GAPS: EcoGap[] = [
-  { title: "No Hive/Blurt/TRON adapters in Saosmartwallet", detail: "M0 proves the adapter pattern on Steem. The Graphene twins are cheap ports; TRON needs an TVM adapter. Until then this wallet trades STEEM/SBD only.", severity: "high" },
+  { title: "No Hive/Blurt/TRON adapters in Saosmartwallet", detail: "M0 proves the adapter pattern on Steem; M3 added Ethereum + Solana. The Graphene twins remain cheap ports; TRON needs a TVM adapter. Until then this wallet signs STEEM-family + EVM + SPL only.", severity: "high" },
+  { title: "No bridge contract/program deployed (ETH/SOL)", detail: "M3 ships the adapters, the router and the lock-op spec, but the mint side of STEEM→ETHEREUM / STEEM→SOLANA awaits a deployed + verified bridge contract/program. Routes quote honestly as gated.", severity: "high" },
   { title: "Signing keys held hot in sandbox", detail: "M2 keystore seals keys (AES-256-GCM under Argon2id) and gates every signature through policy + audit, but key material still lives on the app server. Hardware/air-gapped signing is the next hardening step.", severity: "medium" },
   { title: "Hive RC regen wait", detail: "Fleet soldiers RC-starved (2–5% manabar); heal loop allocates HP, ETA measured ~5 days. Anchors honestly gated meanwhile.", severity: "medium" },
   { title: "Blurt nodes down (0/6)", detail: "saboin RPC 'down for maintenance' — probes fail; anchors on Blurt paused honestly with 30min cooldown.", severity: "medium" },
@@ -274,10 +305,10 @@ export const ECO_GAPS: EcoGap[] = [
 ];
 
 export const SCAN_META = {
-  scannedAt: "2026-09-07",
+  scannedAt: "2026-09-08",
   method: "GitHub API (repos list, trees, READMEs, live state files) + live RPC probes",
   reposScanned: 8,
-  networksFound: 5,
+  networksFound: 7,
   tokensTracked: 25,
-  liveSources: ["api.steemit.com", "api.hive.blog", "rpc.blurt.world", "api.trongrid.io", "steem repo (SAOS-NET state.json — daemon-pushed)"],
+  liveSources: ["api.steemit.com", "api.hive.blog", "rpc.blurt.world", "api.trongrid.io", "ethereum-rpc.publicnode.com", "api.mainnet-beta.solana.com", "steem repo (SAOS-NET state.json — daemon-pushed)"],
 };

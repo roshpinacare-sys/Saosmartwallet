@@ -5,12 +5,12 @@
  * ===============================================
  * The whole ecosystem on one professional surface:
  *
- *   GRID      — KPI strip · Network Grid (5 live-probed chains) · Pairs Matrix
+ *   GRID      — KPI strip · Network Grid (7 live-probed chains) · Pairs Matrix
  *   DEX       — live STEEM/SBD internal market (depth chart · ladder · terminal · tape)
  *   SAOS-NET  — our sovereign chain: engine, sovereign book depth, oracle, pools
- *   BRIDGES   — anchor rails + live anchor feed with real txids + TRON pulse
+ *   BRIDGES   — M3 explorer (route finder, live-quoted fees) + anchor rails with real txids + TRON pulse
  *   REGISTRY  — the repo/scan catalog + honest gaps
- *   WALLET    — balances, Steem Power, RC manabar, open orders, vault status
+ *   WALLET    — balances, Steem Power, RC manabar, open orders + M3 ETH/SOL lookups, vault status
  *   VAULT     — Sovereign Key Vault: wizard, policy engine, backup, audit
  *
  * Every market number is chain-sourced — zero mock data. Keyboard: 1–7
@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { GitBranch, Grid3x3, Landmark, Server, ShieldCheck, Table2, Wallet2 } from "lucide-react";
 
+import { BridgeExplorer } from "@/components/terminal/bridge-explorer";
 import { BridgeMonitor } from "@/components/terminal/bridge-monitor";
 import { TerminalHeader } from "@/components/terminal/eco-header";
 import { KpiStrip } from "@/components/terminal/kpi-strip";
@@ -31,6 +32,7 @@ import { RegistryPanel } from "@/components/terminal/registry-panel";
 import { SaosNetPanel } from "@/components/terminal/saosnet-panel";
 import { StatusFooter } from "@/components/terminal/status-footer";
 import { WalletPanel } from "@/components/terminal/wallet-panel";
+import { MultiChainWallet } from "@/components/terminal/multichain-wallet";
 import { VaultConsole } from "@/components/vault/vault-console";
 import { VaultStatusWidget } from "@/components/vault/vault-status-widget";
 import { DexView } from "@/components/trading/dex-view";
@@ -131,7 +133,9 @@ export default function Home() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25 }}
+                className="flex flex-col gap-4 md:gap-6"
               >
+                <BridgeExplorer />
                 <BridgeMonitor />
               </motion.div>
             </TabsContent>
@@ -155,6 +159,7 @@ export default function Home() {
               >
                 <VaultStatusWidget compact />
                 <WalletPanel />
+                <MultiChainWallet />
               </motion.div>
             </TabsContent>
 

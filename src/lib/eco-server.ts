@@ -262,6 +262,101 @@ async function probeSteem(): Promise<EcoChain> {
   }
 }
 
+async function probeEthereum(): Promise<EcoChain> {
+  const base = {
+    id: "ethereum",
+    name: "ETHEREUM",
+    family: "EVM",
+    kind: "L1 public — settlement + ERC-20 wrapped economy (M3)",
+    stateAgeSeconds: null,
+    probedAt: new Date().toISOString(),
+  };
+  const urls = ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org", "https://eth-mainnet.public.blastapi.io"];
+  let lastErr = "unknown";
+  for (const url of urls) {
+    try {
+      // Raw JSON-RPC — no SDK in the probe path; eth_getBlockByNumber(false)
+      // gives head height + timestamp + baseFee in ONE call.
+      const r = (await fetchJson(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false] }),
+        timeoutMs: 6_000,
+      })) as { result?: { number?: string; timestamp?: string; baseFeePerGas?: string } };
+      const block = r.result;
+      if (!block?.number) throw new Error("no block");
+      const head = Number.parseInt(block.number, 16);
+      const ts = block.timestamp ? Number.parseInt(block.timestamp, 16) * 1000 : Date.now();
+      const baseFeeWei = block.baseFeePerGas ? BigInt(block.baseFeePerGas) : null;
+      return {
+        ...base,
+        status: "online",
+        headHeight: head,
+        lagSeconds: Math.max(0, Math.round((Date.now() - ts) / 1000)),
+        headId: null,
+        version: baseFeeWei ? `${Number(baseFeeWei) / 1e9} gwei baseFee` : null,
+        note: `live probe ${url.replace("https://", "")}`,
+      };
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : "unknown";
+    }
+  }
+  return {
+    ...base,
+    status: "offline",
+    headHeight: null,
+    lagSeconds: null,
+    headId: null,
+    version: null,
+    note: `probe failed: ${lastErr}`,
+  };
+}
+
+async function probeSolana(): Promise<EcoChain> {
+  const base = {
+    id: "solana",
+    name: "SOLANA",
+    family: "PoH + PoS",
+    kind: "L1 public — SPL wrapped economy (M3)",
+    stateAgeSeconds: null,
+    probedAt: new Date().toISOString(),
+  };
+  const urls = ["https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com"];
+  let lastErr = "unknown";
+  for (const url of urls) {
+    try {
+      const r = (await fetchJson(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getEpochInfo" }),
+        timeoutMs: 6_000,
+      })) as { result?: { absoluteSlot?: number; epoch?: number; slotIndex?: number; slotsInEpoch?: number } };
+      const ep = r.result;
+      if (!ep?.absoluteSlot) throw new Error("no epoch info");
+      return {
+        ...base,
+        status: "online",
+        headHeight: ep.absoluteSlot,
+        lagSeconds: null, // slots carry no wall-clock timestamp in this response — honest null
+        headId: null,
+        version: `epoch ${ep.epoch} · slot ${ep.slotIndex ?? "—"}/${ep.slotsInEpoch ?? "—"}`,
+        note: `live probe ${url.replace("https://", "")}`,
+      };
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : "unknown";
+    }
+  }
+  return {
+    ...base,
+    status: "offline",
+    headHeight: null,
+    lagSeconds: null,
+    headId: null,
+    version: null,
+    note: `probe failed: ${lastErr}`,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // SAOS-NET sovereign state (daemon-pushed into the `steem` repo)
 // ---------------------------------------------------------------------------
@@ -558,7 +653,7 @@ async function probeSaosNet(): Promise<EcoChain> {
 
 export async function ecoNetworks(): Promise<{ ok: true; chains: EcoChain[]; fetchedAt: string }> {
   return withCache("eco-networks", 6_000, async () => {
-    const [steem, hive, blurt, tron, saosnet] = await Promise.all([
+    const [steem, hive, blurt, tron, saosnet, ethereum, solana] = await Promise.all([
       probeSteem(),
       probeGraphene(
         "hive",
@@ -576,8 +671,10 @@ export async function ecoNetworks(): Promise<{ ok: true; chains: EcoChain[]; fet
       ),
       probeTron(),
       probeSaosNet(),
+      probeEthereum(),
+      probeSolana(),
     ]);
-    return { ok: true, chains: [steem, hive, blurt, tron, saosnet], fetchedAt: new Date().toISOString() };
+    return { ok: true, chains: [steem, hive, blurt, tron, saosnet, ethereum, solana], fetchedAt: new Date().toISOString() };
   });
 }
 

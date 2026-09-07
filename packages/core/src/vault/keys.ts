@@ -19,6 +19,10 @@
  */
 
 import { PrivateKey } from "../../../crypto/src/index";
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { secp256k1 } from "@noble/curves/secp256k1.js";
+import { keccak_256 as keccak256 } from "@noble/hashes/sha3.js";
+import { base58 } from "@scure/base";
 
 import { seal, open } from "../crypto/cipher";
 import { fromUtf8, utf8 } from "../encoding";
@@ -29,9 +33,11 @@ import { VaultError, type CipherAlgorithm, type EncryptedKey, type KeyRole, type
  *
  * steem / hive / saos-net share the STM-style "PREFIX + base58(key ‖
  * ripemd160-check)" identity (hive intentionally kept the STM prefix; saos-
- * net is a steem-family fork). blurt uses BLT. tron has a completely
- * different identity scheme (keccak/keystore) — we honestly report `null`
- * instead of inventing a fake STM-family string for it.
+ * net is a steem-family fork). blurt uses BLT. tron / ethereum / solana have
+ * completely different identity schemes — we honestly report `null` for the
+ * STM-family prefix and derive their NATIVE identity strings below:
+ *   ethereum → EIP-55 checksum address (keccak256 of the uncompressed pubkey)
+ *   solana   → base58 Ed25519 public key of the seed (see keyScheme below)
  */
 const NETWORK_PUBKEY_PREFIX: Record<NetworkId, string | null> = {
   steem: "STM",
@@ -39,7 +45,39 @@ const NETWORK_PUBKEY_PREFIX: Record<NetworkId, string | null> = {
   blurt: "BLT",
   tron: null,
   "saos-net": "STM",
+  ethereum: null,
+  solana: null,
 };
+
+/**
+ * M3 unified key scheme (documented):
+ *   The WIF pipeline stores 32 secp256k1 scalar bytes. Those SAME bytes are
+ *   the cross-chain identity source:
+ *     · steem-family — secp256k1 + STM/BLT encoding (unchanged)
+ *     · ethereum     — same secp256k1 key, EIP-55 address = keccak(pub)[-20:]
+ *     · solana       — the same 32 bytes interpreted as an Ed25519 SEED
+ *   One vault secret, per-chain interpretation — no cross-chain key reuse
+ *   of signatures, only of the seed material.
+ */
+
+/** EIP-55 checksum address from a 32-byte secp256k1 private key. */
+function eip55AddressFromKeyBytes(privBytes: Uint8Array): string {
+  const pub = secp256k1.getPublicKey(privBytes, false); // 65-byte uncompressed
+  const addrBytes = keccak256(pub.slice(1)).slice(-20);
+  const hex = Buffer.from(addrBytes).toString("hex");
+  const hash = Buffer.from(keccak256(new TextEncoder().encode(hex))).toString("hex");
+  let out = "0x";
+  for (let i = 0; i < hex.length; i++) {
+    const nibble = Number.parseInt(hash[i]!, 16);
+    out += nibble >= 8 ? hex[i]!.toUpperCase() : hex[i];
+  }
+  return out;
+}
+
+/** Solana address (base58 Ed25519 pubkey) from the 32-byte seed. */
+function solanaAddressFromSeedBytes(seed: Uint8Array): string {
+  return base58.encode(ed25519.getPublicKey(seed));
+}
 
 /** Input for VaultKeys.addKey — the WIF travels in memory only, never persisted. */
 export interface AddKeyInput {
@@ -69,6 +107,7 @@ export class VaultKeys {
    *   • steem | hive | blurt → one of owner / active / posting / memo
    *   • tron                 → null or "owner"
    *   • saos-net             → one of owner / active / posting
+   *   • ethereum | solana    → "active" only (single-key chains)
    *
    * Returns the new EncryptedKey record AND the next state (pure: the caller
    * — SovereignVault — owns persistence).
@@ -96,12 +135,26 @@ export class VaultKeys {
     }
 
     let publicKey: string | null = null;
-    const prefix = NETWORK_PUBKEY_PREFIX[input.network];
-    if (prefix !== null) {
+    if (input.network === "ethereum") {
       try {
-        publicKey = priv.publicKey.toString(prefix);
+        publicKey = eip55AddressFromKeyBytes(priv.bytes);
       } catch {
         publicKey = null; // honest degradation — never invent an identity string
+      }
+    } else if (input.network === "solana") {
+      try {
+        publicKey = solanaAddressFromSeedBytes(priv.bytes);
+      } catch {
+        publicKey = null;
+      }
+    } else {
+      const prefix = NETWORK_PUBKEY_PREFIX[input.network];
+      if (prefix !== null) {
+        try {
+          publicKey = priv.publicKey.toString(prefix);
+        } catch {
+          publicKey = null; // honest degradation — never invent an identity string
+        }
       }
     }
 
@@ -193,6 +246,12 @@ function validateRoleForNetwork(network: NetworkId, role: KeyRole | null): void 
   if (network === "tron") {
     if (role !== null && role !== "owner") {
       throw new VaultError("VALIDATION", "tron keys accept role null or owner");
+    }
+    return;
+  }
+  if (network === "ethereum" || network === "solana") {
+    if (role !== "active") {
+      throw new VaultError("VALIDATION", `${network} is a single-key chain — role must be "active"`);
     }
     return;
   }

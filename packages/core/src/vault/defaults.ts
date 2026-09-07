@@ -30,6 +30,8 @@ export function defaultPolicyRuleSet(): PolicyRuleSet {
           TRX: "500000000000",
           HIVE: "50000000",
           BLURT: "50000000",
+          ETH: "5000000000000000000", // 5 ETH (wei)
+          SOL: "50000000000", // 50 SOL (lamports)
         },
       },
       {
@@ -42,6 +44,8 @@ export function defaultPolicyRuleSet(): PolicyRuleSet {
           TRX: "50000000000",
           HIVE: "5000000",
           BLURT: "5000000",
+          ETH: "500000000000000000", // 0.5 ETH (wei)
+          SOL: "5000000000", // 5 SOL (lamports)
         },
         requireApprovalCount: 1,
       },

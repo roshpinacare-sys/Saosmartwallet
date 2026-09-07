@@ -42,6 +42,8 @@
   --color-warning: var(--warning);
   --color-info: var(--info);
   --color-saos: var(--saos);
+  --color-eth: var(--eth);
+  --color-sol: var(--sol);
   --color-success: var(--up);
   --color-danger: var(--down);
   --radius-sm: calc(var(--radius) - 4px);
@@ -72,6 +74,8 @@
   --warning: #f59e0b;                  /* amber-500 — stale, gated, notice */
   --info: #3b82f6;                     /* blue-500 — informational         */
   --saos: #8b5cf6;                     /* violet-500 — sovereign chain     */
+  --eth: #627eea;                      /* ethereum brand — M3              */
+  --sol: #14f195;                      /* solana brand — M3                */
 
   /* ---- background layers ---- */
   --bg-primary: #0a0a0a;

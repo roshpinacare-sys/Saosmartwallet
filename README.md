@@ -1,7 +1,7 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-> **סטטוס: M0+M1+M2 מומשו ואומתו מול ה-chain · ה-Sovereign Key Vault חי — ה-DEX חותם דרך keystore+policy**
-> עדכון אחרון: 2026-09-07 (Asia/Jerusalem)
+> **סטטוס: M0+M1+M2+M3 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · Sovereign Key Vault חי · שכבת גשרים עם router+quotes חיים**
+> עדכון אחרון: 2026-09-08 (Asia/Jerusalem)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
 
@@ -37,8 +37,12 @@
 | [`packages/crypto/`](./packages/crypto/README.md) | PrivateKey/PublicKey/חתימות, WIF + "STM", גזירת מפתחות מ-password/brain-key | ✅ מומש ואומת |
 | [`packages/chains/steem/`](./packages/chains/steem/README.md) | מנוע serialization בינארי (varint/asset/ops/tx) + SteemAdapter עם broadcast נעול | ✅ מומש ואומת |
 | [`packages/core/`](./packages/core/README.md) | Sovereign Key Vault — Argon2id + AES-GCM/ChaCha20 + Shamir + ZK · Policy Engine · Signing Orchestrator · Backup · Audit hash-chain | ✅ M2 |
+| [`packages/chains/ethereum/`](./packages/chains/ethereum/) | EthereumAdapter (EIP-1559) — build/sign + ERC-20 + EIP-55 נגזרת ממפתח ה-vault · broadcast נעול | ✅ M3 |
+| [`packages/chains/solana/`](./packages/chains/solana/) | SolanaAdapter (Ed25519) — build/sign + SPL read · broadcast נעול | ✅ M3 |
+| [`packages/bridges/`](./packages/bridges/) | שכבת גשרים: router (מציאת-נתיב + quotes עמלות חיות) · monitor (סטטוס-מסילות מה-state החי) | ✅ M3 |
 | `tools/serialize-test.ts` | סוויטת אימות מול chain חי | ✅ **30/30 PASS** |
 | `tools/m1-op-test.ts` | סוויטת limit_order_create מול oracle | ✅ **27/27 PASS** |
+| `tools/m3-adapter-check.ts` | סוויטת ETH/SOL מול mainnet חי (health/info/ERC20/SPL/build/sign/fail-closed) | ✅ **23/23 PASS** |
 
 **קריטריוני קבלה שעברו מול ה-chain האמיתי** (קריאה-בלבד): serialization **זהה ביט-אחר-ביט** ל-serializer של הצומת עצמו (10/10 עסקאות) · sha256 על ה-bytes שלנו = `transaction_id` מה-chain (10/10) · חתימות אמיתיות מה-chain משוחזרות בדיוק למפתחות ה-authority של החותם — הוכחת מסלול חתימה מלא בלי שידור.
 
@@ -78,17 +82,37 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 
 | טאב | תוכן | מקור נתונים (חי) |
 |---|---|---|
-| **GRID** | KPI strip · Network Grid (5 כרטיסי רשת + drill-down) · Pairs Matrix (sortable, כל ה-venues) | probes חיים לכל השרשראות |
+| **GRID** | KPI strip · Network Grid (**7 כרטיסי רשת** + drill-down) · Pairs Matrix (sortable, כל ה-venues) | probes חיים לכל השרשראות |
 | **DEX** | Order Book + Trading Terminal + Tape — השוק האמיתי STEEM/SBD | api.steemit.com (M0/M1) |
 | **SAOS-NET** | מנוע הרשת הריבונית שלנו: bench 130K tx/s, treasury P&L, הספר-הריבוני, ציטוטי oracle חתומים, wrapped assets, delegations | `state.json` + `grid98-state.json` (daemon-push ל-repo `steem`) |
-| **BRIDGES** | מטריצת עוגנים (STEEM 🟢/HIVE ⏳/BLURT ⏳/TRON 🟢) + Live Anchor Feed עם txids אמיתיים + attests | SAOS-NET checkpoints |
-| **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON · חתימה cold/hardware) | סריקה 2026-09-07 |
-| **WALLET** | יתרות/SP/RC/פקודות פתוחות + סטטוס הכספת (score/נעילה/audit) | api.steemit.com |
-| **VAULT** | Sovereign Key Vault: wizard 6-שלבי · Policy Engine · Backup/Shamir/Social/Dead-man · Audit chain עם דוחות json/csv/pdf | packages/core (M2) |
+| **BRIDGES** | **M3 Bridge Explorer** (מציאת-נתיב 7×7 · עמלות מנומקות-מקור · שערי-readiness כנים) + מטריצת עוגנים + Live Anchor Feed + TRON Pulse + Analytics מה-state החי | router + SAOS-NET checkpoints |
+| **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON · חוזה-גשר לא פרוס · חתימה cold/hardware) | סריקה 2026-09-08 |
+| **WALLET** | יתרות/SP/RC/פקודות פתוחות + **M3: חיפוש כתובות ETH (native+ERC-20) ו-SOL (native+SPL)** + סטטוס הכספת | api.steemit.com + adapters |
+| **VAULT** | Sovereign Key Vault: wizard 6-שלבי (**7 רשתות**) · Policy Engine · Backup/Shamir/Social/Dead-man · Audit chain עם דוחות json/csv/pdf | packages/core (M2+M3) |
 
-**מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · daemon-state של SAOS-NET (גובה 52,000+, 1,112 checkpoints מאומתים, oracle חתום-שעתי). כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
+**מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · `ethereum-rpc.publicnode.com` (+fallbacks) · `api.mainnet-beta.solana.com` (+fallbacks) · daemon-state של SAOS-NET. כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 
 **קיצורי מקלדת:** מקשים 1–7 מחליפים מסכים (7 = VAULT).
+
+## 🌉 M3 — Multi-Chain Sovereign Ecosystem (2026-09-08)
+
+**7 רשתות, מנוע-אחד.** האדפטרים החדשים מממשים את ה-seam הקפוא (`packages/chains/chain-adapter.ts`) מבלי לשנות אותו:
+
+| רשת | סוג | חתימה | read מורחב | broadcast |
+|---|---|---|---|---|
+| ETHEREUM (eip155:1) | EVM · EIP-1559 | secp256k1 — **אותו מפתח vault**, כתובת EIP-55 (keccak) | `getChainInfo` (עמלות חיות) · ERC-20 balance · receipt | 🔒 fail-closed |
+| SOLANA (solana:mainnet-beta) | PoH+PoS | Ed25519 — **אותם 32 בייטים כ-seed** (סכימת-מפתח מאוחדת) | `getChainInfo` (epoch) · SPL token accounts · signature status | 🔒 fail-closed |
+
+**סכימת-המפתח המאוחדת (M3):** ה-WIF של ה-vault הוא 32 בייטים של secp256k1 — אותם בייטים משמשים כמו שהם ב-Ethereum (אותה עקומה, קידוד-כתובת שונה) וכ-**seed** של Ed25519 ב-Solana. סוד-אחד, פרשנות-פר-שרשרת; אפס שיתוף-חתימות בין-שרשראות.
+
+**שכבת-הגשרים (`packages/bridges`):**
+- **Router** — מציאת-נתיב על קטלוג-מסילות כן (2 חיות: SAOS-NET→Steem/TRON · 4 gated: Hive RC / Blurt nodes / ETH+SOL ממתינים לחוזה-פרוס). כל רגל-עמלה נושאת שדה `source` — מאיפה המספר הגיע (עמלות ETH חיות מהצומת · קבועות-פרוטוקול של Solana · "0 TRX נמדד"). אין-נתיב = מערך ריק, לעולם לא נתיב מומצא.
+- **Monitor** — סטטוס-מסילות + analytics מה-state החי (anchors, verified checkpoints, wrapped collateral 1:1). מה שלא נמדח = `null`, לעולם לא מומצא.
+- **API** — `GET /api/bridge/routes?from&to&asset&amount` · `GET /api/bridge/status` · `GET /api/eco/account?network=ethereum\|solana&address=`.
+
+**אימות חי (23/23, `bun tools/m3-adapter-check.ts`):** health+height מול mainnet · יתרות מדויקות-BigInt (BigInt-lamports לעולם לא float) · ERC-20 (USDT) · SPL (4,287 חשבונות) · build+sign EIP-1559/legacy עם אימות-ed25519 מהצומת · גזירת-כתובות EIP-55/Base58 · broadcast fail-closed · מדיניות-תפקידים fail-closed.
+
+**כנות (ראו REGISTRY):** אין חוזה-גשר פרוס ב-Ethereum ואין תוכנית ב-Solana — מסילות ה-mint מדווחות `gated` עם הסיבה; ה-lock-op מוגדר ומוכן. שידור ב-ETH/SOL נשאר נעול (M0 gate) עד להחלטה מפורשת.
 
 ### 🎨 Enterprise redesign (2026-09-07) — design system מקצועי מלא
 

@@ -17,9 +17,11 @@ import type { KeyRole } from "@/lib/vault-runtime";
 
 export const dynamic = "force-dynamic";
 
-const NETWORK_IDS: ReadonlySet<string> = new Set(["steem", "hive", "tron", "blurt", "saos-net"]);
+const NETWORK_IDS: ReadonlySet<string> = new Set(["steem", "hive", "tron", "blurt", "saos-net", "ethereum", "solana"]);
 const STEEM_ROLES: ReadonlySet<string> = new Set(["owner", "active", "posting", "memo"]);
 const STORAGE_KINDS: ReadonlySet<string> = new Set(["hot", "cold", "air-gapped"]);
+/** Single-key chains (M3) — the engine accepts "active" only. */
+const SINGLE_KEY_NETWORKS: ReadonlySet<string> = new Set(["ethereum", "solana"]);
 
 /** Strips the sealed payload — metadata only leaves the vault. */
 function toMetadata(record: Omit<EncryptedKey, "payload">): Omit<EncryptedKey, "payload"> {
@@ -79,7 +81,10 @@ export async function POST(req: Request) {
     const mode = body.mode === "derive" || body.mode === "wif" ? body.mode : null;
     if (mode === null) throw new VaultError("VALIDATION", 'mode must be "derive" or "wif"');
     if (typeof body.network !== "string" || !NETWORK_IDS.has(body.network)) {
-      throw new VaultError("VALIDATION", "network must be one of: steem, hive, tron, blurt, saos-net");
+      throw new VaultError("VALIDATION", "network must be one of: steem, hive, tron, blurt, saos-net, ethereum, solana");
+    }
+    if (SINGLE_KEY_NETWORKS.has(body.network) && (body.roles?.length !== 1 || body.roles[0] !== "active")) {
+      throw new VaultError("VALIDATION", "ethereum/solana keys accept exactly role: active");
     }
     if (!Array.isArray(body.roles) || body.roles.length === 0 || !body.roles.every((r) => typeof r === "string" && STEEM_ROLES.has(r))) {
       throw new VaultError("VALIDATION", "roles must be a non-empty array of: owner, active, posting, memo");
