@@ -123,3 +123,23 @@ Stage Summary:
 - הליבה עתה עם-כיפות-אוויר: כל-רגל-מילוי וכל-חותם עוברים assertions fail-closed; הפרה = HALT מוכרז — המערכת מסרבת-למצב-לא-מוגדר
 - רשימת-ההשקה מחייבת: 1:1 מוכח לפני-מסחר-חיצוני, התראות-חוץ על-שלושת-אותות-האזעקה, L1 מהאסטרטגיה, ביקורת-חוץ כשער
 - המערכת-החייה ללא-הפרעה: h4836+, 0 mismatches, breakers closed — האריזה לא נגעה בשום-דבר-חי
+
+---
+Task ID: UI-NUCLEAR-1..6 (UI Nuclear Override — visual proof mandate)
+Agent: Z.ai Code (SAOS-DEX UI/terminal agent)
+Task: שכתוב מוחלט של ה-UI + הוכחה ויזואלית בדפדפן. המפעיל דיווח: "שום דבר לא מוצג בפועל".
+
+Work Log:
+- N1 (root cause, אמפירי): השער מעביר רק-בקשות עם XTransformPort — HTML של הטרמינל הגיע, אך כל-chunks-‎/_next‏ 404-וו נגד-השרת-המארח → מסך-ריק. אומת: asset בלי-param‏=404, עם-param=200. ה-RTL-‏"eight]"‏ בפלט-כלים התברר כ-artifact-תצוגה (bidi) — הקבצים מעולם לא היו שבורים (tsc/TS-parser/lexer שלושה-כולם ירוקים)
+- N2 (bridge): basePath /saos-dex ב-saos-dex/next.config + beforeFiles-rewrite בשרת-האם (next.config.ts — נקודת-הגשר ההיסטורית) → origin-אחד נושא page+assets+HMR+API (html 200 / chunk 200 / api 200 דרך-השער)
+- N3 (nuclear reset): .next נמחק, daemon קר, no-cache meta, הידור-מלא-מחדש
+- N4 (rebuild): page.tsx מחדש (~800 שורות) — Header (לוגו-טקסטואלי, מחיר-זהב-גדול monospace, נורת-מערכת), גרף 60% (testid lightweight-charts-container + placeholder-כשל + console.error), ספר-ויזואלי עם פסי-עומק ירוק/אדום (testid orderbook-row), System Health & Relay (testid system-health-panel: TPS/breakers/מאומתים/מיסמאצ'ים/HALT), טופס-מסחר (testid trading-form: BUY/SELL, LIMIT/MARKET, אימות, Slippage Guard ויזואלי מהליכה-על-הספר), SWAP+minOut, tape, proofs, footer-דביק כנה; אפס אימוג'ים
+- N5 (הגולה-הגדולה — HALT אמת): האתחול-המחודש חשף **INVARIANT-VIOLATION: escrow-underflow:taker-quote** — באג-כלכלי-אמת ב-kernel order no-cross (פקודה נחה בלי-ערבות → שחרורי-נעילות-פנטום). תוקן: מנוחה-עם-נעילה, שחרור-שארית-בלבד, gas-לפני-מוטציה (סתימת-חור-ריפליי), assertion-גם-ב-cancel. ואז HALT שני: seal-digest — הבדיקה-העצמית שלי הייתה self-referential (האש שכולל-את-עצמו) — תוקף לcanon(digest=""). שני-הבאגים נתפסו-ע"י-שכבת-ה-assertions בדיוק כמתוכנן; snapshot-המושחת הועבר-לארכיון-פורנזי (state-snapshot.corrupt-h5281-forensic.json), ג'נזיס-טרי
+- N6 (הוכחה ויזואלית): דפדפן-דרך-השער (origin-יחיד): chart live+canvas, orderbook rows, health NOMINAL (TPS/h/verified/0-mismatches), 0 console errors · פעולת-משתמש-אמת: הזמנת-לימיט מהטופס → queued → **fill 2,465 · 20 · operator → soldier-1** ב-tape (נתיב-ה-escrow-החדש עבר-ניקיון) · צילומי-מסך desktop+mobile 390px
+- git: 3 קומיטים — db41892 fix(core) · 5866b31 feat(ui) · 5b1ae6f chore(audit) → push מוצלח 225b1f6..5b1ae6f ל-main @ roshpinacare-sys/saos-dex (טוקן inline-בלבד) · סריקת-סודות על 12 קבצי-הטווח: 0 פגיעות · audit-package הותאם-מחדש לליבה-המתוקנת (עדיין-שורה-אחת, typecheck-עצמאי ירוק)
+
+Stage Summary:
+- הטרמינל עתה **נראה בפועל** בדפדפן-המפעיל (origin-יחיד, /saos-dex) — הבעיה-האמת הייתה תשתיתית (gateway), לא קוסמטית
+- שכבת-ה-invariants צדה **באג-כלכלי-אמת** (ערבות-חסרות) + באג-בבדיקה-עצמה (self-hash) — ה-fail-fast עבר-מבחן-ייצור-ראשון בהצלחה: עצירה-מוכרזת, אפס-המשך-במצב-לא-מוגדר
+- הליבה המתוקנת: מנוחה-מגובה-מלאה, locks מדויקים-לאדיטיביות-floor, gas-לפני-מוטציה — קונסנזוס-חזק-משמעותית-מקודם
+- השרשרת חיה: ג'נזיס-טרי → h60+, seals עוברים (12/24/36…), steem מעגן כל-חותם, 0 HALT מאז-התיקון
