@@ -104,3 +104,22 @@ Stage Summary:
 - 2 באגי-אמת נתפסו-ותוקנו ע"י הסוויטה עצמה (שער-מעל-ה-try; מדד-breakerTrips מת) + הקשחת-UI — זו הראיה שהסוויטה עובדת
 - נקי-לביקורת: אפס TODO/FIXME/console.log; SECURITY INTENT מתועד בפונקציות-הקריטיות; typecheck+eslint ירוקים
 - פתוח-למסלול: ביקורת-חוץ כשער-לנזילות-אמת (LIQUIDITY_STRATEGY.md), /metrics ל-Prometheus (M1), Signer/HSM (M2)
+
+---
+Task ID: AUDIT-PKG-1..4 (External Audit Packaging + Mainnet Checklist)
+Agent: Z.ai Code (SAOS-DEX audit-prep agent)
+Task: שלב 4 — אריזת ביקורת חיצונית מבודדת (audit-package/ + AUDIT_SCOPE.md), אינווריאנטות fail-fast בליבה, רשימת-השקה ל-Mainnet, push + סריקת-סודות.
+
+Work Log:
+- AUDIT-1 (invariants first — so package copies carry them): src/lib/dex/invariant.ts (invariant() → InvariantViolation, asserts-cond, fail-fast) · matchBook: 4×2 assertions per fill leg (fill-worse-than-limit, maker-overfill, escrow-underflow:taker/maker, negative-balance:taker/maker — buy+sell symmetric) · seal(): 4 pre-publication assertions (seal-window-contiguity, seal-merkle-root, seal-state-root, seal-digest) fail-closed לפני-כל-פרסום (מדדים/DB/Relay) · tick(): InvariantViolation → HALT מוכרז (timer cleared, halted=true, ALERT) — הפרדה-מוסדית: כשל-תפעול ממשיך, הפרת-אינווריאנטה עוצרת · halted חשוף ב-/api/dex/state
+- AUDIT-2 (audit-package/): 10 קבצי-ליבה byte-identical (canonical, invariant, amm, book, kernel, mm, chaos, relay, steem.d.ts) + chain.ts עם שורת-ייבוא אחת מותאמת (@/lib/db → ./evidence-port — FIDELITY.diff מדויק) · evidence-port.ts: stub no-op עם אותו-שטח-קריאה, מוכיח שאף-נתיב-קונצנזוס לא תלוי ב-DB · tsconfig+package.json עצמאיים · bun install + tsc --noEmit — תקין בסטנדאלון (כולל גילוי: steem.d.ts דרוש מ-src/types — הועתק)
+- AUDIT-3 (AUDIT_SCOPE.md): היקף ראשי (7 קבצים קריטיים) + הקשר (mm סימולציה, chaos פורט-אינרטי מוכח, evidence-port) + מחוץ-להיקף (UI/DB/scripts) · 9 הנחות-קריפטוגרפיות (WIF ב-HSM כהנחה-תפעולית, sha256, canonical-serialization, odd-fold merkle, ערוץ-RPC ציבורי, atomic-rename...) · **13 אינווריאנטות** שהביקורת חייבת-לאמת: שימור-כספים, שלמות-ערבות, איסור-מילוי-גרוע-מה-limit, איסור-maker-overfill, איסור-מילוי-עצמי, גיבוי-1:1, דטרמיניזם+dedupe, קציר-מוגבל-מדידה, חותם-עקבי-עצמו, אי-אמון-עצמי (verifyOnChain), relay-שלעולם-לא-פוגע-בשרשרת, fail-fast, חסם-אספקה-גלובלי · Known limitations בכנות (סוכן-יחיד, SIM-ספר, קצב-Hive, extra_data-TRON)
+- AUDIT-4 (DEPLOYMENT_CHECKLIST.md): A-אבטחה (HSM/cold, ביטול-טוקנים, host-hardening, בדיקות-1:1+harvest על-מצב-חי) · B-תשתית (RPC-pinned, התראות על breaker-OPEN/verifyOnChain-mismatch/chain-HALT, drills) · C-נזילות (L1-gate: גיבוי-1:1 מוכח לפני-המסחר-החיצוני-הראשון, פרישת-בוטי-רעש, MM ממדד-עמלות) · D-ניטור (System Health, Prometheus /metrics) · E-Gate Go/No-Go עם רשומת-השקה
+- AUDIT-5 (git+אבטחה): 4 קומיטים Conventional — 60b2770 feat(core) invariants · cf95b41 chore(audit) package · 5d6f200 docs checklist · 225b1f6 chore(state) → push מוצלח 69ce609..225b1f6 ל-main @ roshpinacare-sys/saos-dex (טוקן inline-בלבד, remote נקי — אומת) · סריקת-סודות על 24 קבצי-הטווח: 0 פגיעות (WIF/tokens/hex-keys/env-paths) · audit-package/node_modules gitignored
+- AUDIT-6 (אימות-חי): tsc+eslint ירוקים בעץ-הראשי; הדמון-החי שרד hot-reload בלי-פגיעה — seal 4717→4836 בהמשך-זרימה, **0 HALT events**, 0 INVARIANT VIOLATION — האינווריאנטות חיות-בפרודקשן ועוברות על-כל-חותם; steem מעגן כל-חותם (txid 75089b30…), 182 anchored / 180 verified / 0 mismatches, breakers closed
+
+Stage Summary:
+- החבילה לביקורת-חוץ עגולה: self-contained (typecheck עצמאי), byte-identical לייצור פרט-לשורה-אחת-מתועדת (FIDELITY.diff + MANIFEST.sha256), 13 אינווריאנטות מוגדרות-כדרישות-ביקורת
+- הליבה עתה עם-כיפות-אוויר: כל-רגל-מילוי וכל-חותם עוברים assertions fail-closed; הפרה = HALT מוכרז — המערכת מסרבת-למצב-לא-מוגדר
+- רשימת-ההשקה מחייבת: 1:1 מוכח לפני-מסחר-חיצוני, התראות-חוץ על-שלושת-אותות-האזעקה, L1 מהאסטרטגיה, ביקורת-חוץ כשער
+- המערכת-החייה ללא-הפרעה: h4836+, 0 mismatches, breakers closed — האריזה לא נגעה בשום-דבר-חי
