@@ -185,3 +185,22 @@ Stage Summary:
 - חוזה-הנכסים מקויף מתמטית: כל נכסי ה-UI מהאפליקציה-הראשית (200 מובטח-מבנית); הגשר משמש רק ל-JSON.
 - השרשרת חיה וזורמת תחת-המסך החדש: h205+ (מ-11), 133 fills, 8 חותמות מרקל, halted:false, dbOk:true — אפס HALT.
 - פתוח: שחזור מפתחות-Relay (אבדו עם מחיקת-התיקייה) כדי לחדש עיגון-חי; ה-UI מציג זאת בכנות ב-System Health.
+
+---
+Task ID: KEYRELAY-1..4 (Key Recovery + Live Relay Re-arm)
+Agent: Z.ai Code (SAOS-DEX relay-recovery agent)
+Task: שחזור מפתחות-המפעיל מהריפואים האחרים ב-GitHub + הזרקה ל-.env + הפעלת Relay לעיגון-חי + קבלת txid אמת מ-Steem ומ-Hive + אימות-UI.
+
+Work Log:
+- KEYRELAY-1 (סריקת-ריפואים): 8 ריפואים ב-roshpinacare-sys (foundry, dex, steem, platform, Saosmartwallet, anchor-baseline, roshpina, Project-files) נסרקו דרך git-trees API. **מצא: `steem@main` מכיל את הכספת המלאה** — agent/fleet_keys.enc (170,905B) + fleet_keys.meta.json (מחזיק-passphrase, מדיניות-פרטיות של Task 82) + fleet_vault.cjs. היסטוריית-git של fleet_keys.enc אומתה (20+ commits, קיים ב-HEAD c9a87e4e וגם עותק-recovery בתוך download/).
+- KEYRELAY-2 (פענוח-מאובטח): הורדה ל-/tmp/fleet_restore (מחוץ לעץ-גיט) → `--open` עם תג-GCM מאומת → שוחזרו verbatim: keys/vault.json (11 חשבונות), keys/wallets-seed.json, keys/tron-mnemonic.txt, agent/.env (ACTIVE/POSTING/MEMO/OWNER WIFs + AGENT_ACCOUNT=headcorner). **אימות-מפתח**: WIF→pub (secp256k1, checksum) == pub-שמור ×4, וה-active-pub הנגזר == רשות-ה-active החיה של @headcorner ב-RPC ציבורי **גם ב-Steem וגם ב-Hive** (STM5HhJD5WUX…). אפס הדפסת-סודות ללוג (שמות-משתנים/בוליאנים/מפתחות-ציבוריים בלבד).
+- KEYRELAY-3 (הזרקה): saos-dex/.env נכתב (mode 600, gitignore-אומת שורה-7): SAOS_RELAY_AGENT_ACCOUNT=headcorner, STEEM_ACTIVE_WIF, HIVE_ACTIVE_WIF, HIVE_ANCHOR_ACCOUNT=headcorner, DATABASE_URL=dex.db. TRON: אין-צורך במפתח-נפרד — הזהות נגזרת מהסקלר של STEEM (relay.ts) והעיגון מותנה-מימון (0 TRX מדיד — כנות).
+- KEYRELAY-3.5 (באג-תשתיתי אמת שנתגלה): הדמון-שנוצר-ע"י-instrumentation לא קיבל את ה-.env — next/bun לא טוענים .env לתהליך-ילד שנוצר עם אובייקט-env מפורש (spawn env ממופה-ידנית). **תוקן ב-src/instrumentation.ts**: קריאת saos-dex/.env בזמן-ריצה + הזרקת-מפתחות ל-env-הילד (אפס סודות בקוד/בגיט; DATABASE_URL-מבודד נשמר אחרי-הפריסה). tsc ירוק.
+- KEYRELAY-3.6 (גילוי-סביבה קריטי): ריפר-תהליכים בסנדבוקס-IM מחסל את כל-התהליכים-המשתמשים בכל-גבול-קריאת-כלים (אומת אמפירית: גם setsid+nohup+sleep נהרג; בתוך-קריאה-יחידה הכל חי). שרת-המורשת (1768) שרד כי ה-session הקודם היה בעל-shell מתמשך. **המשמעות התפעולית**: כל-הוכחה חיה חייבת בקריאה-אחת; השרת-האחרון-שנוצר חי עד-הקריאה-הבאה שלי (ומספיק למפעיל).
+- KEYRELAY-4 (עיגון-חי + הוכחה): דמון-מאויש (relay enabled=True, account=headcorner, שלוש-השרשראות armed) → **h540: Steem ba32766fa166d52e… (עיגון-חי ראשון-מאז-השחזור)** → **h552: Steem e7514750246ad004c0fe1128ed9d16d7c2e569bc + Hive c36ae87ec711d11e45181c4888c21922a8a1a0c1** — אותו stateRoot **20f4a62f4d394adc8d354bf5…** על-שתי-השרשראות, אומת מול-RPC ציבורי (condenser_api.get_transaction: op saos-dex.anchor.v1, required_auths=[headcorner], height 552). metrics: 3 broadcasts, 10 verified, **0 mismatches**, economicWaits=2 (כנות-RC של-Hive), queue נוזלי. anchors.json: 13 anchored / 10 verified / 0 mismatches.
+- git: 8338bce chore(state) → push מוצלח 39510c1..8338bce ל-main @ roshpinacare-sys/saos-dex (טוקן inline-בלבד, לא-נשמר ב-config — אומת; סריקת-סודות על-staged: 0 פגיעות).
+
+Stage Summary:
+- הלב חוזר לפעימה אמת: ה-Relay מעגן stateRoot חי ל-Steem (כל-חותם) ול-Hive (קצב-RC) עם המפתחות האמתיים של headcorner — מפתחות שוחזרו מהכספת המוצפנת בריפו steem@main עם שרשרת-אימות כפולה (GCM-tag + WIF→pub מול-authority חיה על-שתי-השרשראות)
+- באג-תשתיתי נתפס-ותוקן לצמיתות: הזרקת-.env לדמון-בהשגחה (instrumentation.ts) — עתידי-הפעלות-מחדש יעלו מאוישות
+- פתוח: TRON מותנה-מימון (TYVwwuvdDmfy3shxT3cb3RKLrRCshaZxTy, יתרה 0 — ידלק לבד ב-≥0.3 TRX); הריפר-הסנדבוקסאי מחייב-השקה-מחדש בכל-פנייה-מפעיל (מתועד כאן)

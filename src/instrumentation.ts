@@ -18,12 +18,33 @@ export async function register() {
       });
     try {
       if (!(await portBusy(3010))) {
+        // סודות-הדמון: ה-.env של saos-dex (gitignored) נקרא בזמן-ריצה ומוזרק
+        // ישירות לסביבת-הילד — next/bun לא תמיד טוענים .env לתהליך-ילד
+        // שנוצר עם אובייקט-env מפורש (באג תשתיתי שחשף שחזור-המפתחות).
+        // אפס סודות בקוד/בגיט: הקריאה היא מקובץ-ריצה בלבד.
+        const childEnv: NodeJS.ProcessEnv = { ...process.env };
+        try {
+          const [{ readFileSync }] = await Promise.all([import("fs")]);
+          const envPath = "/home/z/my-project/saos-dex/.env";
+          const raw = readFileSync(envPath, "utf8");
+          for (const line of raw.split("\n")) {
+            const t = line.trim();
+            if (!t || t.startsWith("#")) continue;
+            const eq = t.indexOf("=");
+            if (eq <= 0) continue;
+            const k = t.slice(0, eq).trim();
+            const v = t.slice(eq + 1).trim();
+            if (k) childEnv[k] = v;
+          }
+        } catch {
+          console.log("[saos-bridge] no saos-dex/.env found — relay will wait (honest pending)");
+        }
         const child = spawn("bun", ["run", "dev"], {
           cwd: "/home/z/my-project/saos-dex",
           stdio: "ignore",
           // הפרדת-מסדי-נתונים מחייבת: הדמון מקבל את ה-DB שלו-עצמו (saos-dex/db/dex.db) —
           // לעולם לא את ה-DATABASE_URL של הפלטפורמה-האם (custom.db), שמתנגש איתה.
-          env: { ...process.env, DATABASE_URL: "file:/home/z/my-project/saos-dex/db/dex.db" },
+          env: { ...childEnv, DATABASE_URL: "file:/home/z/my-project/saos-dex/db/dex.db" },
         });
         child.unref();
         child.on("error", (e: Error) => console.log("[saos-bridge] dex spawn error:", e.message));
