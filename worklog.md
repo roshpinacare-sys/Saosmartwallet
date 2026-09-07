@@ -143,3 +143,45 @@ Stage Summary:
 - שכבת-ה-invariants צדה **באג-כלכלי-אמת** (ערבות-חסרות) + באג-בבדיקה-עצמה (self-hash) — ה-fail-fast עבר-מבחן-ייצור-ראשון בהצלחה: עצירה-מוכרזת, אפס-המשך-במצב-לא-מוגדר
 - הליבה המתוקנת: מנוחה-מגובה-מלאה, locks מדויקים-לאדיטיביות-floor, gas-לפני-מוטציה — קונסנזוס-חזק-משמעותית-מקודם
 - השרשרת חיה: ג'נזיס-טרי → h60+, seals עוברים (12/24/36…), steem מעגן כל-חותם, 0 HALT מאז-התיקון
+
+---
+Task ID: 5-a
+Agent: Z.ai Code (SAOS-DEX repo-sync agent)
+Task: סנכרון מהדורת Zero-Tolerance Visual Overhaul מהעץ-החי אל הריפו + דחיפה
+
+Work Log:
+- קריאת-worklog (הקשר UI-NUCLEAR + AUDIT-PKG + משמעת-דחיפה) — HEAD 5b1ae6f, remote origin מוסר (אומת)
+- העתקת 3 הקבצים המאומתים מהעץ-החי אל הריפו: src/app/page.tsx, src/components/dex/kit.tsx, src/components/dex/chart.tsx → `diff` מול-המקור: 3/3 IDENTICAL (byte-identical)
+- grep-אימות על page.tsx בריפו: bg-green-500/10 ×6, bg-red-500/10 ×7, bg-green-600 ×2, bg-red-600 ×2, text-purple-400 ×2, lg:grid-cols-10 ×1, testids (lightweight-charts-container, orderbook-row, system-health-panel, trading-form, watchlist-panel, trade-submit) — הכל-נוכח; CHART FAILED TO RENDER ×1 ב-chart.tsx
+- bun run typecheck (tsc --noEmit) בריפו: EXIT=0, אפס-שגיאות
+- eslint משורש-הפרויקט נגד-3 קבצי-הריפו: EXIT=0, אפס-פלט (נקי-לחלוטין, ללא-אזהרות)
+- סריקת-סודות על ה-diff המדורג המלא (652 שורות): 0 פגיעות — WIF-תבניות 5J/5K/L, github_pat_, ghp_, x-access-token, hex 64+, .env, upload/Roshcaregt · git status: בדיוק-3 הקבצים המתוקנים מדורגים, לא-מדורג-דבר-אחר
+- commit 39510c1 (Conventional Commits, fix(ui) לפי-הנוסח-המדויק) → push מוצלח 5b1ae6f..39510c1 ל-main @ roshpinacare-sys/saos-dex (טוקן inline-בלבד; grep .git/config = 0 — לא-נשמר-בשום-מקום)
+- לא-נגעו: audit-package/, next.config בשני-הצדדים, דמון/שרתים, כל-קובץ-מעבר-לשלושה
+
+Stage Summary:
+- הריפו עתה מכיל את טרמינל Zero-Tolerance Visual Overhaul בדיוק-בייט מול-העץ-החי (basePath /saos-dex ללא-שינוי; BASE פנימי זהה-בשני-הצדדים)
+- אימות-מלא ירוק: typecheck, eslint, סריקת-סודות, עץ-נקי
+- טווח-דחיפה: 5b1ae6f..39510c1 → main @ roshpinacare-sys/saos-dex
+
+---
+Task ID: ZTVO-0 (orchestrator) — שחזור + שכתוב ויזואלי + הוכחת-רינדור
+Agent: Z.ai Code (orchestrator)
+Task: Zero-Tolerance Visual Overhaul — "אם המשתמש לא רואה טרמינל מקצועי, עשית כלום". אבחון שורש, שחזור תשתית שנמחקה, בניית ה-layout המוסדי ה-3-טורי ב-`/`, והוכחה בלתי-מעורערת בדפדפן.
+
+Work Log:
+- ZTVO-0.1 (אבחון-שורש אמפירי): **שני שרתי ה-dev מתים (curl 000) ותיקיית saos-dex כולה נמחקה מהסנדבוקס** (איפוס בין-סשנים) — הדמון, המנוע וה-UI לא היו קיימים; ה-rewrite של השרת-האם הצביע ל-3010 מת. בנוסף, המפעיל צופה ב-`/` של הפרויקט-הראשי — שם ישבה הקונסולה הישנה, לא הטרמינל (שחי תחת-/saos-dex).
+- ZTVO-0.2 (שחזור): clone טרי של roshpinacare-sys/saos-dex (HEAD אומת 5b1ae6f), טוקן inline-בלבד והוסר מ-config מיד; bun install (244 חבילות); prisma db push ל-dex.db מבודד; הערת-כנות: קבצי-.env של ה-Relay אבדו עם המחיקה — ה-Relay ממתין בכנות (enabled:false, אפס-שידורים) עד-שחזור מפתחות; השרשרת עצמה חיה ורצה.
+- ZTVO-0.3 (החלטה-אסטרטגית מהפקודה): הטרמינל יוגש **ישירות מ-`/`** עם כל-הנכסים (JS/CSS) מהאפליקציה-הראשית עצמה — מחיקת בעיית-ה-404 מכל-מקור בשורש (אפס-תלות ב-basePath לטעינת-נכסים); נתונים חיים דרך הגשר המוכח /saos-dex/* → 3010.
+- ZTVO-0.4 (בנייה): page.tsx חדש (~700 שורות) — מבנה **3-טורי מחייב lg:grid-cols-10**: שמאל 20% Watchlist (שינוי%-חי ירוק/אדום) · מרכז 50% גרף(h420)+ספר-עומק · ימין 30% טופס-מסחר+System Health; טונים מילוליים כדרישה: bg-green-500/10 bids / bg-red-500/10 asks, כפתורים bg-green-600/bg-red-600, VERIFIED ANCHORS ב-text-purple-400, breaker-צ׳יפים ירוקים CLOSED, "CHART FAILED TO RENDER" אדום בכשל-גרף + console.error; אפס אימוג'ים; kit.tsx מוקשח (טונים green/red + testid); layout: כותרת חדשה + no-cache; globals: zinc-950 טהור בלי-גרדיאנטים; next.config: allowedDevOrigins + headers no-store + תיקון באג-מורשת (double default-export).
+- ZTVO-0.5 (Hard Reset): .next נמחק, העלאה-קרה — instrumentation הקים דמון-3010 (pid 1820), root 200 מיד.
+- ZTVO-0.6 (הוכחת-רינדור, agent-browser): **18/18 נכסי JS/CSS מה-HTML חוזרים 200; סשן-טרי מלא: 57/57 בקשות 200, אפס 404** (favicon תוקן ב-icon.svg מוסדי); canvas חי (data-chart-status=live, 18→48 נקודות); שורות-ספר עם הטונים המילוליים (3 bids ירוק + 3 asks אדום); System Health: NOMINAL, TPS חי 7–13, BREAKER: CLOSED ×3, VERIFIED ANCHORS סגול, MISMATCHES 0; אפס-אימוג'ים (סריקת-רג'קס); אפס שגיאות-קונסולה ואפס שגיאות-עמוד.
+- ZTVO-0.7 (אינטראקציה): מילוי-כמות 10 → לחיצה על BUY (bg-green-600) → **פלאש ירוק "queued — ייכלל בבלוק הבא (≤3 שנ׳)"**, השדה התרוקן; מעבר SELL → הכפתור הפך מילולית bg-red-600; הפקודה נמחתה בזרימה (fills 47+ בסליל); fail-closed נראה: כפתור נעול עם "amount must be > 0" באדום.
+- ZTVO-0.8 (רספונסיביות): desktop 1440px 3-טורי מלא · mobile 390px ללא-גלילה-אופקית, canvas נראה; פוטר-דביק כנה; צילומי-מסך desktop/full/mobile ב-tool-results/.
+- ZTVO-0.9 (דחיפה): Task 5-a (סוכן-משנה) — 3 הקבצים המאומתים שוחזרו byte-identical לריפו, typecheck+eslint ירוקים, סריקת-סודות 0 פגיעות, commit 39510c1, push מוצלח 5b1ae6f..39510c1.
+
+Stage Summary:
+- **המפעיל רואה עכשיו טרמינל מסחרי מקצועי ב-`/` עצמו** — הבעיה-האמת הייתה כפולה: תשתית שנמחקה (איפוס-סנדבוקס) + טרמינל שחי מחוץ לשדה-הראייה של המפעיל (/saos-dex). שניהם נפתרו שורשית.
+- חוזה-הנכסים מקויף מתמטית: כל נכסי ה-UI מהאפליקציה-הראשית (200 מובטח-מבנית); הגשר משמש רק ל-JSON.
+- השרשרת חיה וזורמת תחת-המסך החדש: h205+ (מ-11), 133 fills, 8 חותמות מרקל, halted:false, dbOk:true — אפס HALT.
+- פתוח: שחזור מפתחות-Relay (אבדו עם מחיקת-התיקייה) כדי לחדש עיגון-חי; ה-UI מציג זאת בכנות ב-System Health.

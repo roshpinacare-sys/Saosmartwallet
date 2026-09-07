@@ -2,9 +2,14 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SAOS Sovereign Foundry v2 — אנחנו מנצחים את הבלוקצ'יין",
+  title: "SAOS-DEX — Sovereign Trading Terminal",
   description:
-    "פלטפורמת עגינה חוצת-רשתות: שורשי-איטום ל-STEEM/BLURT/HIVE/TRON, ריבונות אנרגיה (TRX energize), כלכלת גלגל-חור והוכחות ציבוריות נושאות-ראיות."
+    "בורסה ריבונית אוטונומית: ספר-הזמנות דטרמיניסטי, בריכות 30bps, עיגון-חי Steem/Hive/TRON עם אימות-עצמי, fail-fast invariants. מהדורה מוסדית.",
+  other: {
+    // Zero-Tolerance: אפס-הסתמכות על cache ישן — הדפדפן תמיד מבקש גרסה-חיה
+    "Cache-Control": "no-store, must-revalidate",
+    Pragma: "no-cache",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

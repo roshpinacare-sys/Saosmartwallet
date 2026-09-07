@@ -1,28 +1,30 @@
 import type { NextConfig } from "next";
 
+/* saos-dex terminal bridge: /saos-dex/* → 3010 (basePath). The gateway exposes a
+ * single origin; without this rewrite the DEX page HTML loads but every /_next
+ * chunk 404s against the host app → blank screen. This rewrite carries the full
+ * page+assets+HMR+API surface of the terminal under one origin.
+ *
+ * Zero-Tolerance Visual Overhaul: the institutional terminal now lives at `/`
+ * itself (assets served by THIS app — always 200); the /saos-dex bridge remains
+ * for deep links and the daemon API surface. */
 const nextConfig: NextConfig = {
   output: "standalone",
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-};
-
-export default nextConfig;
-
-/* saos-dex bridge — reload marker */
-
-/* relay v2 reload */
-
-/* hive anchor tov */
-
-/* saos-dex terminal bridge: /saos-dex/* → 3010 (basePath). The gateway exposes a
- * single origin; without this rewrite the DEX page HTML loads but every /_next
- * chunk 404s against the host app → blank screen. This rewrite carries the full
- * page+assets+HMR+API surface of the terminal under one origin. */
-const nextConfigWithDexBridge: NextConfig = {
-  ...nextConfig,
+  /* Zero-Tolerance: dev-assets חייבים לעבור דרך-השער בלי-חסימת-מוצא (HMR + chunks) */
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
+  async headers() {
+    return [
+      {
+        // אפס-מטמון ל-HTML — הדפדפן תמיד מקבל גרסה-חיה
+        source: "/",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
+    ];
+  },
   async rewrites() {
     return {
       beforeFiles: [
@@ -35,4 +37,4 @@ const nextConfigWithDexBridge: NextConfig = {
   },
 };
 
-export default nextConfigWithDexBridge;
+export default nextConfig;
