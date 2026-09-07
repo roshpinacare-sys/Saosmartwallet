@@ -1,5 +1,9 @@
 # Environment Scan — Raw Output
 
+> ✏️ **הערת תיקון (2026-09-07, נוספה לאחר הסריקה — גוף הסריקה נשמר כפי שנוצר):**
+> (א) שורת "Remotes: none configured" למטה אינה נכונה עוד — מאז הוגדר remote אל `roshpinacare-sys/Saosmartwallet`.
+> (ב) שורת ה-upload מתייחסת ל-placeholder מחוסם — מאז הוחלף הקובץ בטוקן תקין ומאומת. עיינו ב-[`environment-scan.md`](./environment-scan.md).
+
 - Generated (UTC): 2026-09-07 12:37:44 UTC
 - Generated (Asia/Jerusalem): 2026-09-07 15:37:44 IDT
 - Scanner: engineering/zip-analysis-20260907-1520/07_scripts/environment-scan.sh (v4)

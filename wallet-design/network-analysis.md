@@ -22,7 +22,7 @@
 | ארכיונים (ZIP/תומכים) | 0 שהועלו ע"י משתמש |
 | שמות קבצים: steem/steemd/steem-main/steem_main/steem main/witness/blockchain/validator/consensus/bridge/wallet/rpc/hardfork | 0 התאמות |
 | תוכן: אותן מילות מפתח | 0 התאמות אמיתיות (כל ההתאמות הלא-אפסיות = substring ב-base64/בינארי, אומתו בהקשר בסריקה הקודמת) |
-| `upload/` | ללא שינוי — קובץ יחיד, 40 בייטים, placeholder טוקן מחוסם (לא צוטט מעולם) |
+| `upload/` | ✏️ עודכן 2026-09-07: קובץ יחיד, 40 בייטים — **טוקן GitHub תקין ומאומת** (ghp_, חשבון `roshpinacare-sys`, הרשאות push ל-repo היעד). בסריקה המקורית דווח placeholder מחוסם — הקובץ הוחלף לימים ע"י המשתמש. תוכנו לא צוטט ולא נשמר בשום מסמך |
 
 ---
 

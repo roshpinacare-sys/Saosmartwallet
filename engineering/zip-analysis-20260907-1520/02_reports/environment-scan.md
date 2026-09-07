@@ -82,7 +82,7 @@
 
 | קובץ | גודל | סטטוס |
 |---|---|---|
-| `/home/z/my-project/upload/Roshcaregt.txt` | 40 בייטים | נבדק בסשן קודם: מכיל placeholder של טוקן GitHub **שנחסם/redacted** על-ידי המערכת. התוכן אינו מצוטט כאן מתוך מדיניות סודות. אינו שמיש לגישה למאגרים |
+| `/home/z/my-project/upload/Roshcaregt.txt` | 40 בייטים | ✏️ עודכן 2026-09-07: בסריקה המקורית דווח placeholder מחוסם; מאז הוחלף הקובץ ע"י המשתמש וכעת מכיל טוקן GitHub תקין ומאומת (ghp_, חשבון `roshpinacare-sys`, הרשאות push ל-repo היעד). התוכן אינו מצוטט כאן מתוך מדיניות סודות |
 
 > נמצא גם snapshot של הפרויקט ב-`/tmp/my-project` (659KB, ללא node_modules) המכיל עותק זהה של קובץ ה-upload. לא נמצא בו דבר נוסף.
 
@@ -95,7 +95,7 @@
 | `/home/z/my-project/.env` (50 בייטים) | קיים; **תוכנו לא נקרא ולא הודפס** ע"י הסורק |
 | `/home/z/.npmrc` | לא מכיל מפתח `_authToken` (בדיקה בוליאנית) |
 | `/home/z/.gitconfig` | אין הגדרות credential (בדיקה בוליאנית) |
-| `upload/Roshcaregt.txt` | מדורג רגיש — תוכנו לא מוצג (מכיל placeholder טוקן מחוסם) |
+| `upload/Roshcaregt.txt` | מדורג רגיש — תוכנו לא מוצג (✏️ עודכן 2026-09-07: טוקן תקין ומאומת; במקור placeholder מחוסם) |
 | קבצים רגישים-לכאורה נוספים | 0 מחוץ לנתיבי toolchain |
 
 ---
@@ -105,7 +105,7 @@
 | פריט | ערך |
 |---|---|
 | Branch | `main` |
-| Remote | **לא מוגדר remote כלל** — push לא אפשרי ללא הגדרה |
+| Remote | ✏️ עודכן 2026-09-07: remote `origin` הוגדר אל `github.com/roshpinacare-sys/Saosmartwallet` (בסריקה המקורית: לא מוגדר) |
 | עץ עבודה לפני המשימה | נקי |
 
 ---

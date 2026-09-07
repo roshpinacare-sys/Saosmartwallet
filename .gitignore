@@ -33,6 +33,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# user uploads — may contain secrets (e.g. tokens); never commit
+/upload/
+
 # vercel
 .vercel
 
