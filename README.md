@@ -1,6 +1,6 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-> **סטטוס: עיצוב הושלם (מסמכים) · פיתוח ממתין לאישור רשת היעד (שער M0)**
+> **סטטוס: עיצוב הושלם · Groundwork ל-M0 מוכן ואומת · קוד חתימה ממתין לאישור רשת (שער M0)**
 > עדכון אחרון: 2026-09-07 (Asia/Jerusalem)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
@@ -27,6 +27,24 @@
 ## 🚦 מה נדרש להתקדמות (מבעל הפרויקט)
 
 - **D1:** אישור רשת יעד מדויקת + chain id · **D2:** RPC endpoint חי · **D3:** רישיון · **D4:** מיתוג · **D5:** תקציב ביקורת אבטחה. פירוט: [`final-proposal.md` §8](./wallet-design/final-proposal.md).
+
+## 🧪 Groundwork ל-M0 (מוכן עכשיו — ללא תלות ב-D1/D2)
+
+מה כבר קיים ורץ במאגר:
+
+| נכס | תיאור | סטטוס |
+|---|---|---|
+| `tools/chain-health-check.ts` | פרוב קריאה-בלבד ל-endpoint: זמינות, namespaces, chain id, head block, sync lag, RC — ללא מפתחות/סודות | ✅ רץ ואומת |
+| [`packages/chains/chain-adapter.ts`](./packages/chains/chain-adapter.ts) | ממשק ה-ChainAdapter (התפר היחיד שבו נכנסים פרטי רשת) — interface בלבד | ✅ קפוא, ללא מימוש |
+| [`packages/crypto/`](./packages/crypto/README.md) · [`packages/core/`](./packages/core/README.md) | הגדרת היקף, כללי איכות (test vectors חובה, אין קריפטו ביתי) ותנאי כניסה ל-M0 | ✅ מסמך בלבד |
+
+**ראיות אמפיריות ראשונות מהרשת המנוחה** (פרוב קריאה-בלבד מול `https://api.steemit.com`, 2026-09-07): הצומת חי ועונה JSON-RPC 2.0 · `blockchain_version 0.23.0` · head block ~109.4M · sync lag 2–3 שניות · namespaces חיים: `condenser_api` + `rc_api` · **chain id אינו נחשף** בשני ה-namespaces (פער ראיות מסומן — משפיע על D2). הרצה:
+
+```bash
+bun tools/chain-health-check.ts --rpc <endpoint> [--account <name>] [--json]
+```
+
+**לקח הנדסי מאומת שנשמר בקוד:** methods של `condenser_api` דורשים פרמטרים מערכיים (`[]`) — שליחת `{}` מחזיר `Bad Cast: Invalid cast from object_type to Array` (אומת מול צומת חי).
 
 ## 🔐 הערות אבטחה למאגר זה
 

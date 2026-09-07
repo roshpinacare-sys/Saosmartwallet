@@ -97,3 +97,23 @@ Stage Summary:
 - ✅ אפס סודות בהיסטוריה ובמרוחק: .env ו-upload/ חסרים מה-histogram ומה-commit הראשון ועד הראש.
 - ✅ wallet-design/ 5/5 מסמכים במאגר; README ראשי עם לינקים; commit message: "feat: add breakthrough wallet design based on network analysis".
 - מומלץ לבעל החשבון: לצמצם היקף הטוקן ל-repo או לשלול אותו לאחר האימות.
+
+---
+Task ID: M0-prep
+Agent: Z.ai Code (main)
+Task: אימות עצמאי של מצב הריפו לאחר הניקוי+push (על בסיס הודעת תיאום חיצונית — "לא סומך על טענות"), והכנת groundwork לשלב M0 שאינו תלוי בהחלטות D1/D2.
+
+Work Log:
+- אימות עצמאי מלא של טענות ההודעה: (א) אפס הופעות של ערך הטוקן האמיתי ושל צורת ghp_ מלאה בכל blob בהיסטוריה כולה (git grep על כל revs) ✓; (ב) אפס עצים היסטוריים המכילים .env או upload/ ✓; (ג) .gitignore מכסה .env* ו-/upload/ ✓; (ד) הריפו המרוחק עומד על d0e150f עם 5/5 מסמכי wallet-design בגדלים המדויקים ✓; (ה) עץ מקומי נקי, main מקומי מקדים את origin ב-commit אחד (f45dfdc — auto-commit של הפלטפורמה: tool-results + 19 שורות worklog, תוכן תמים, נסרק לסודות לפני push) ✓.
+- נמצא ודווח: הטוקן עדיין חי (HTTP 200 ל-repos + rate_limit) — פעולת ההיגיינה #1 (שלילת טוקן) טרם בוצעה על-ידי הבעלים.
+- נכתב tools/chain-health-check.ts — פרוב קריאה-בלבד (אין מפתחות/סודות/כתיבה): version, chain id (2 namespaces), dgp+lag, account, RC manabar; יציאות 0/1/2/3; פלט human + --json; אפס תלות חיצוניות.
+- ריצה אמיתית ראשונה מול https://api.steemit.com חשפה שני לקחים אמפיריים ותוקנו בקוד: (1) condenser_api דורש פרמטרים מערכיים — {} מחזיר "Bad Cast: Invalid cast from object_type to Array"; (2) שדה זמן הראש בצומת זה הוא time ולא head_block_time; בנוסף "method not found" ב-chain id מסווג warn (מגבלת צומת) ולא fail.
+- ריצה סופית מאומתת: HEALTHY (exit 0) — blockchain_version 0.23.0, head block ~109.4M, lag 2–3s, namespaces חיים condenser_api+rc_api, חשבון steem נמצא, RC manabar נשלף; chain id אינו נחשף בשני ה-namespaces — פער ראיות מסומן המשפיע על D2.
+- נכתב packages/chains/chain-adapter.ts — ממשק ChainAdapter קפוא (interface בלבד, ללא מימוש, מוגן שער M0); נכתבו packages/README.md, packages/crypto/README.md, packages/core/README.md (היקף, כללי איכות: test vectors חובה/אין קריפטו ביתי/איסור יבוא chains ב-core, תנאי כניסה ל-M0).
+- README ראשי עודכן: סעיף Groundwork ל-M0 עם טבלת נכסים, ראיות אמפיריות מתוארכות, פקודת הרצה, והלקח ההנדסי המאומת.
+
+Stage Summary:
+- כל טענות הודעת התיאום אומתו באופן עצמאי ומדויקות; הריפו נקי מסודות מקצה לקצה (ביקורת חוזרת שלי, לא רק התיעוד הקודם).
+- Groundwork ל-M0 חי במאגר: כלי health-check רץ ומאומת מול צומת אמיתי + ממשק ChainAdapter קפוא + סקפולד packages מתועד; כל הרכיבים מסומנים ASSUMPTION ומוגני שער M0 — אפס קוד חתימה לפני D1/D2.
+- ראיות רשת ראשונות בפועל (לא הנחה): צומת Steem ציבורי חי, ver 0.23.0, rc_api זמין — ו-chain id חסר בצומת הציבורי, רלוונטי להחלטת D2.
+- נותר פתוח אצל בעל הפרויקט: D1/D2 (רשת+RPC) לשחרור ה-M0 gate; שלילת/צמצום הטוקן הרחב (עדיין חי).
