@@ -49,7 +49,7 @@ export function StatusFooter() {
         <span className="num hidden md:inline">LAG {data?.chainStatus.lagSeconds ?? "—"}s</span>
         <span className="num ml-auto flex items-center gap-2">
           <span aria-hidden className="h-1 w-1 rounded-full bg-[var(--amberterminal)]" />
-          BUILD M1 · {utc ?? "--:--:--"} UTC
+          BUILD GRID·M1 · {utc ?? "--:--:--"} UTC
         </span>
       </div>
     </footer>

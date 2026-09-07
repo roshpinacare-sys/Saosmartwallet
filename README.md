@@ -72,6 +72,27 @@ bun tools/m1-op-test.ts                                                # M1: lim
 bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.steemit.com
 ```
 
+## 🌐 SAOS GRID — Ecosystem Command Center (2026-09-07)
+
+המסך הראשי הפך ל**מרכז-שליטה לכל האקוסיסטם** — סריקה מלאה של 8 הריפו של `roshpinacare-sys` (GitHub API: trees, READMEs, state files חיים) + 5 רשתות שנבדקות חי בכל רענון. אפס mock data: רשת שנופלת מוצגת בכנות כ-offline.
+
+| טאב | תוכן | מקור נתונים (חי) |
+|---|---|---|
+| **GRID** | KPI strip · Network Grid (5 כרטיסי רשת + drill-down) · Pairs Matrix (sortable, כל ה-venues) | probes חיים לכל השרשראות |
+| **DEX** | Order Book + Trading Terminal + Tape — השוק האמיתי STEEM/SBD | api.steemit.com (M0/M1) |
+| **SAOS-NET** | מנוע הרשת הריבונית שלנו: bench 130K tx/s, treasury P&L, הספר-הריבוני, ציטוטי oracle חתומים, wrapped assets, delegations | `state.json` + `grid98-state.json` (daemon-push ל-repo `steem`) |
+| **BRIDGES** | מטריצת עוגנים (STEEM 🟢/HIVE ⏳/BLURT ⏳/TRON 🟢) + Live Anchor Feed עם txids אמיתיים + attests | SAOS-NET checkpoints |
+| **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON, keystore M2) | סריקה 2026-09-07 |
+| **WALLET** | יתרות/SP/RC/פקודות פתוחות — מעקב חשבון חי | api.steemit.com |
+
+**מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · daemon-state של SAOS-NET (גובה 52,000+, 1,112 checkpoints מאומתים, oracle חתום-שעתי). כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
+
+**קיצורי מקלדת:** מקשים 1–6 מחליפים מסכים. עיצוב: Bloomberg×Cyberpunk, dark-only, glassmorphism, mono numbers.
+
+```bash
+bun run dev   # ה-Grid חי על / — כל הרשתות נבדקות חי בכל רענון
+```
+
 ## 🔐 הערות אבטחה למאגר זה
 
 - `.env` ו-`upload/` **אינם חלק מההיסטוריה** (נוקו לפני ה-push הראשון) ומוחרגים ב-`.gitignore`.
