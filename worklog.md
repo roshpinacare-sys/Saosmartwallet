@@ -59,3 +59,22 @@ Stage Summary:
 - שינוי מהותי מההכנה הקודמת: הטוקן אמיתי, תקין ובעל הרשאת push על ה-repo המטרה — החסם המרכזי מהדוחות הקודמים (remote/אימות) נפתר.
 - המלאי המלא: (א) טוקן תקין + repo ריק מאומת מקצה לקצה; (ב) אפס ZIP ואפס קוד בלוקצ'יין בסביבה (3 סריקות); (ג) תוצרים קיימים: engineering/ שלם + wallet-design/ חלקי (2/5 קבצים); (ד) חסרים לביצוע: breakthrough-ideas.md, wallet-architecture.md, final-proposal.md, עדכון README ראשי, remote+push.
 - הכנה הושלמה; ביצוע רק באישור המשתמש. המלצת אבטחה שהועברה: הטוקן בהיקף רחב מאוד — מומלץ לצמצם היקף או לשלול אותו לאחר השימוש.
+
+---
+Task ID: 3-execute
+Agent: Z.ai Code (main)
+Task: ביצוע מלא באישור המשתמש — כתיבת 3 המסמכים החסרים ב-wallet-design/, תיקון התייחסויות "placeholder מחוסם", README ראשי, commit, ניקוי סודות מהיסטוריה, remote+push ל-Saosmartwallet.
+
+Work Log:
+- שלב 1א: נכתב wallet-design/breakthrough-ideas.md — 15 רעיונות מדורגים (Impact×Feasibility, Score מקס' 25), עם מיפוי נכס-רשת-מנוצל לכל רעיון; המלצה על 5 Core (Aurora Modes 25, Zero-Gate Onboarding 20, Tri-Token Treasury 16, Memo Vault 15, Governance Cockpit 15) + 3 Rails (Password-First Keys, Policy Engine, In-app Signals); רשימת אי-הכללות מפורשת.
+- שלב 1ב: נכתב wallet-design/wallet-architecture.md — עקרונות (network-agnostic core + adapter, מפתחות בלקוח בלבד, least-privilege, fail closed), דיאגרמות ASCII (רכיבים + זרימת חתימה), מבנה מונורפו מלא (apps/packages/services/tools + חוקי תלות), סקיצת ChainAdapter, אבטחה (מחזור חיי מפתחות, Policy Engine, CSP/quorum, threat model 7 איומים, הצהרת אי-תחום), indexer קריאה-בלבד, תוכנית Phase 0–3 עם שער M0, בדיקות/CI, Open Questions.
+- שלב 1ג: נכתב wallet-design/final-proposal.md — חזון, MVP 5 Core+3 Rails עם ערך מדיד, סטאק, מבנה משלוח, מילסטונים M0–M4 (~12 שבועות צוות / 4–5 חודשים סולו), סיכונים 8 עם מיגון, מדדי הצלחה, נקודות החלטה D1–D5 לבעל הפרויקט, checklist.
+- שלב 2: תוקנו כל ההתייחסויות המיושנות ל"placeholder מחוסם" עם סימון ✏️ עודכן 2026-09-07 ב-6 מסמכים: network-analysis.md, engineering/README.md, environment-scan.md, missing-inputs.md, deployment-roadmap.md, final-recommendation.md; ב-2 קובצי raw scan (network-scan-raw-output.md, scan-raw-output.md) נוספה הערת תיקון מתוארכת בראש המסמך — גוף הראיות נשמר לא-משוכתב.
+- שלב 3: נוצר README.md ראשי בשורש — סטטוס, מפת מסמכים (5 לינקים), החלטות מרכזיות, דרישות D1–D5, הערות אבטחה למאגר. נוסף /upload/ ל-.gitignore.
+- שלב 4 (הכנות): זוהתה חשיפה — `.env` ו-`upload/Roshcaregt.txt` (הטוקן!) עוקבים ב-git מאז commit a1c0dd1; לפני push ינוקו מההיסטוריה כולה (git filter-branch, בטוח — ה-repo המרוחק ריק), reflog יפוג ו-gc ירוץ; hashes ישתנו וזה מתועד כאן.
+
+Stage Summary:
+- wallet-design/ הושלמה: 5/5 מסמכים (network-analysis, network-scan-raw-output, breakthrough-ideas, wallet-architecture, final-proposal).
+- שרשרת המסמכים עקבית: הנחה מסומנת בכולם; ליבה network-agnostic; שער M0 חוסם קוד חתימה עד אישור רשת/RPC.
+- אבטחה: .env + upload/ ינוקו מהיסטוריית git לפני push; הטוקן לא צוטט בשום מסמך; המלצה לצמצם/לשלול את הטוקן לאחר השימוש.
+- Push מתוכנן ל-origin = github.com/roshpinacare-sys/Saosmartwallet עם ההודעה: feat: add breakthrough wallet design based on network analysis; תוצאת ה-push תדווח כן/לא בכנות בסיום.
