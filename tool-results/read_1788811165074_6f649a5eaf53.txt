@@ -1,0 +1,1033 @@
+     1→# 🚀 Phase M2: SOVEREIGN KEY VAULT — Multi-Chain Security Architecture
+     2→
+     3→אתה ארכיטקט אבטחה ברמה של **מט"ח צבאי** ומומחה קריפטוגרפיה מתקדמת. 
+     4→
+     5→**המשימה: בניית `packages/core` — לא עוד "ארנק", אלא **כספת מפתחות ריבונית** שמנהלת את כל האקוסיסטם שלנו**
+     6→
+     7→## 🎯 החזון: מעבר מ"ארנק" ל"מרכז שליטה ריבוני"
+     8→
+     9→**הבעיה עם הגישה הרגילה:**
+    10→- ארנק רגיל = מפתח פרטי + חתימה
+    11→- זה לא מספיק עבור **5 רשתות, 25+ טוקנים, גשרים, ו-13 חיילים**
+    12→
+    13→**הפתרון שלנו:**
+    14→```
+    15→┌─────────────────────────────────────────────────────────┐
+    16→│                    SOVEREIGN KEY VAULT                   │
+    17→├─────────────────────────────────────────────────────────┤
+    18→│                                                          │
+    19→│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+    20→│  │   VAULTS     │  │   POLICY     │  │   SIGNING    │  │
+    21→│  │              │  │   ENGINE     │  │   ORCHESTRATOR│  │
+    22→│  │ • Per-network│  │              │  │              │  │
+    23→│  │ • Per-soldier│  │ • Rules      │  │ • Multi-sig  │  │
+    24→│  │ • Per-purpose│  │ • Thresholds │  │ • Batch      │  │
+    25→│  │ • Cold/Hot   │  │ • Time-locks │  │ • Cross-chain│  │
+    26→│  └──────────────┘  └──────────────┘  └──────────────┘  │
+    27→│                                                          │
+    28→│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+    29→│  │   BACKUP     │  │   RECOVERY   │  │   AUDIT      │  │
+    30→│  │              │  │              │  │              │  │
+    31→│  │ • Encrypted  │  │ • Social     │  │ • Immutable  │  │
+    32→│  │ • Sharded    │  │ • Time-lock  │  │ • Forensic   │  │
+    33→│  │ • Air-gapped │  │ • Dead-man   │  │ • Compliance │  │
+    34→│  └──────────────┘  └──────────────┘  └──────────────┘  │
+    35→│                                                          │
+    36→└─────────────────────────────────────────────────────────┘
+    37→```
+    38→
+    39→## 🔐 ארכיטקטורה: 6 שכבות אבטחה
+    40→
+    41→### **שכבה 1: Vault Hierarchy (היררכיית כספות)**
+    42→
+    43→```typescript
+    44→// לא מפתח אחד — אלא היררכיה שלמה
+    45→interface VaultHierarchy {
+    46→  // Master Vault — שולט בהכל
+    47→  master: {
+    48→    id: 'master';
+    49→    purpose: 'root-of-trust';
+    50→    keyType: 'ed25519';  // לא secp256k1 — יותר מהיר ובטוח
+    51→    requiresMultiSig: true;
+    52→    threshold: 3;  // 3 מתוך 5 שומרים
+    53→  };
+    54→  
+    55→  // Network Vaults — אחד לכל רשת
+    56→  networks: {
+    57→    steem: NetworkVault;
+    58→    hive: NetworkVault;
+    59→    tron: NetworkVault;
+    60→    blurt: NetworkVault;
+    61→    'saos-net': NetworkVault;
+    62→  };
+    63→  
+    64→  // Soldier Vaults — לכל אחד מ-13 החיילים
+    65→  soldiers: {
+    66→    [soldierId: string]: SoldierVault;
+    67→  };
+    68→  
+    69→  // Purpose Vaults — לכל שימוש
+    70→  purposes: {
+    71→    trading: PurposeVault;      // רק DEX operations
+    72→    bridging: PurposeVault;     // רק גשרים
+    73→    governance: PurposeVault;   // רק הצבעות
+    74→    treasury: PurposeVault;     // רק העברות גדולות
+    75→  };
+    76→}
+    77→
+    78→interface NetworkVault {
+    79→  id: string;
+    80→  network: NetworkId;
+    81→  
+    82→  // Keys per authority level (Steem-specific)
+    83→  keys: {
+    84→    owner: EncryptedKey;
+    85→    active: EncryptedKey;
+    86→    posting: EncryptedKey;
+    87→    memo: EncryptedKey;
+    88→  };
+    89→  
+    90→  // Access control
+    91→  allowedOperations: OperationType[];
+    92→  maxAmountPerDay: bigint;
+    93→  requiresApproval: boolean;
+    94→  approvers: string[];  // Vault IDs that must approve
+    95→  
+    96→  // Cold/Hot separation
+    97→  storage: 'hot' | 'cold' | 'air-gapped';
+    98→}
+    99→
+   100→interface SoldierVault {
+   101→  id: string;
+   102→  soldierName: string;  // e.g., 'saos-soldier-01'
+   103→  
+   104→  // Each soldier has limited permissions
+   105→  permissions: {
+   106→    canTrade: boolean;
+   107→    canVote: boolean;
+   108→    canComment: boolean;
+   109→    canTransfer: boolean;
+   110→    maxTransferAmount: bigint;
+   111→  };
+   112→  
+   113→  // Linked to network vaults
+   114→  linkedVaults: string[];
+   115→  
+   116→  // Activity monitoring
+   117→  lastActivity: number;
+   118→  anomalyDetection: boolean;
+   119→}
+   120→```
+   121→
+   122→### **שכבה 2: Cryptographic Engine (מנוע קריפטוגרפי)**
+   123→
+   124→```typescript
+   125→// לא רק AES-256-GCM — אלא שכבות הצפנה מרובות
+   126→interface CryptoEngine {
+   127→  // Master key derivation
+   128→  deriveMasterKey: (
+   129→    password: string,
+   130→    salt: Uint8Array,
+   131→    iterations?: number
+   132→  ) => Promise<Uint8Array>;
+   133→  
+   134→  // Multi-layer encryption
+   135→  encrypt: (
+   136→    plaintext: Uint8Array,
+   137→    options: {
+   138→      algorithm: 'aes-256-gcm' | 'chacha20-poly1305';
+   139→      keyId: string;
+   140→      additionalData?: Uint8Array;  // AAD
+   141→    }
+   142→  ) => Promise<EncryptedPayload>;
+   143→  
+   144→  // Threshold cryptography (Shamir's Secret Sharing)
+   145→  shardSecret: (
+   146→    secret: Uint8Array,
+   147→    threshold: number,
+   148→    totalShares: number
+   149→  ) => Promise<Share[]>;
+   150→  
+   151→  reconstructSecret: (
+   152→    shares: Share[]
+   153→  ) => Promise<Uint8Array>;
+   154→  
+   155→  // Zero-knowledge proofs (for authentication without revealing password)
+   156→  generateZKProof: (
+   157→    password: string,
+   158→    challenge: Uint8Array
+   159→  ) => Promise<ZKProof>;
+   160→  
+   161→  verifyZKProof: (
+   162→    proof: ZKProof,
+   163→    challenge: Uint8Array
+   164→  ) => Promise<boolean>;
+   165→}
+   166→
+   167→interface EncryptedPayload {
+   168→  version: number;
+   169→  algorithm: 'aes-256-gcm' | 'chacha20-poly1305';
+   170→  ciphertext: Uint8Array;
+   171→  iv: Uint8Array;
+   172→  authTag: Uint8Array;
+   173→  salt: Uint8Array;
+   174→  
+   175→  // Multi-layer: encrypted with multiple keys
+   176→  layers: {
+   177→    keyId: string;
+   178→    encryptedKey: Uint8Array;  // Key encrypted with master
+   179→  }[];
+   180→  
+   181→  // Integrity check
+   182→  checksum: Uint8Array;  // SHA-256 of plaintext
+   183→  
+   184→  // Metadata
+   185→  createdAt: number;
+   186→  expiresAt?: number;
+   187→}
+   188→```
+   189→
+   190→### **שכבה 3: Policy Engine 2.0 (מנוע מדיניות מתקדם)**
+   191→
+   192→```typescript
+   193→// לא רק rules פשוטים — אלא מנוע מדיניות שלם
+   194→interface PolicyEngine {
+   195→  // Rule types
+   196→  rules: {
+   197→    // Static rules (hard-coded, cannot be disabled)
+   198→    static: StaticRule[];
+   199→    
+   200→    // Dynamic rules (user-configurable)
+   201→    dynamic: DynamicRule[];
+   202→    
+   203→    // Contextual rules (based on time, location, behavior)
+   204→    contextual: ContextualRule[];
+   205→    
+   206→    // Composite rules (combinations of other rules)
+   207→    composite: CompositeRule[];
+   208→  };
+   209→  
+   210→  // Evaluation pipeline
+   211→  evaluate: (
+   212→    operation: Operation,
+   213→    context: OperationContext
+   214→  ) => Promise<PolicyDecision>;
+   215→  
+   216→  // Anomaly detection
+   217→  detectAnomalies: (
+   218→    operation: Operation,
+   219→    history: OperationHistory
+   220→  ) => Promise<AnomalyScore>;
+   221→}
+   222→
+   223→interface OperationContext {
+   224→  // Temporal context
+   225→  timestamp: number;
+   226→  dayOfWeek: number;
+   227→  hourOfDay: number;
+   228→  
+   229→  // Network context
+   230→  network: NetworkId;
+   231→  blockHeight: number;
+   232→  recentTransactions: Transaction[];
+   233→  
+   234→  // Behavioral context
+   235→  userBehavior: {
+   236→    averageTransferAmount: bigint;
+   237→    averageTransferFrequency: number;
+   238→    typicalRecipients: string[];
+   239→    lastLoginTime: number;
+   240→    loginAttempts: number;
+   241→  };
+   242→  
+   243→  // Risk context
+   244→  riskScore: number;  // 0-100
+   245→  trustedDevice: boolean;
+   246→  knownLocation: boolean;
+   247→}
+   248→
+   249→interface PolicyDecision {
+   250→  allowed: boolean;
+   251→  confidence: number;  // 0-1
+   252→  reasons: string[];
+   253→  
+   254→  // If not allowed, what's needed
+   255→  requirements?: {
+   256→    additionalApprovals?: string[];
+   257→    multiSigThreshold?: number;
+   258→    timeLock?: number;  // seconds to wait
+   259→    stepUpAuth?: boolean;  // require biometric/password re-entry
+   260→  };
+   261→  
+   262→  // Risk assessment
+   263→  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+   264→  anomalies: Anomaly[];
+   265→}
+   266→
+   267→// Example: Contextual rule
+   268→interface ContextualRule {
+   269→  id: string;
+   270→  name: string;
+   271→  
+   272→  condition: {
+   273→    // Time-based
+   274→    timeWindow?: { start: string; end: string };  // "09:00-17:00"
+   275→    
+   276→    // Amount-based
+   277→    amountThreshold?: bigint;
+   278→    
+   279→    // Frequency-based
+   280→    maxOperationsPerHour?: number;
+   281→    
+   282→    // Recipient-based
+   283→    newRecipientCooldown?: number;  // hours before new recipient is trusted
+   284→    
+   285→    // Location-based
+   286→    requireKnownLocation?: boolean;
+   287→  };
+   288→  
+   289→  action: 'allow' | 'deny' | 'require_approval' | 'step_up_auth';
+   290→}
+   291→```
+   292→
+   293→### **שכבה 4: Signing Orchestrator (מנצח חתימות)**
+   294→
+   295→```typescript
+   296→// לא רק חתימה בודדת — אלא תזמור שלם
+   297→interface SigningOrchestrator {
+   298→  // Single signature
+   299→  sign: (
+   300→    vaultId: string,
+   301→    message: Uint8Array,
+   302→    options?: SigningOptions
+   303→  ) => Promise<Signature>;
+   304→  
+   305→  // Multi-signature (for multi-sig vaults)
+   306→  multiSign: (
+   307→    vaultId: string,
+   308→    message: Uint8Array,
+   309→    requiredSigners: string[]
+   310→  ) => Promise<MultiSigResult>;
+   311→  
+   312→  // Batch signing (for multiple operations)
+   313→  batchSign: (
+   314→    vaultId: string,
+   315→    operations: Operation[]
+   316→  ) => Promise<BatchSignResult>;
+   317→  
+   318→  // Cross-chain signing (for bridge operations)
+   319→  crossChainSign: (
+   320→    sourceVaultId: string,
+   321→    targetNetwork: NetworkId,
+   322→    operation: BridgeOperation
+   323→  ) => Promise<CrossChainSignature>;
+   324→  
+   325→  // Transaction simulation (before actual signing)
+   326→  simulate: (
+   327→    operation: Operation
+   328→  ) => Promise<SimulationResult>;
+   329→}
+   330→
+   331→interface SigningOptions {
+   332→  // Require additional authentication
+   333→  requireBiometric?: boolean;
+   334→  requirePassword?: boolean;
+   335→  
+   336→  // Time-lock (transaction can only be broadcast after X time)
+   337→  timeLock?: number;
+   338→  
+   339→  // Fee limits
+   340→  maxFee?: bigint;
+   341→  
+   342→  // Confirmation callback
+   343→  onConfirmationRequired?: (details: ConfirmationDetails) => Promise<boolean>;
+   344→}
+   345→
+   346→interface SimulationResult {
+   347→  success: boolean;
+   348→  
+   349→  // What would happen
+   350→  expectedOutcome: {
+   351→    balanceChanges: { asset: string; amount: bigint }[];
+   352→    stateChanges: string[];
+   353→    events: string[];
+   354→  };
+   355→  
+   356→  // Risk assessment
+   357→  risks: {
+   358→    type: 'slippage' | 'front_running' | 'insufficient_balance' | 'policy_violation';
+   359→    severity: 'low' | 'medium' | 'high';
+   360→    description: string;
+   361→  }[];
+   362→  
+   363→  // Cost estimation
+   364→  estimatedFee: bigint;
+   365→  estimatedResourceCredits: number;
+   366→}
+   367→```
+   368→
+   369→### **שכבה 5: Backup & Recovery (גיבוי ושחזור)**
+   370→
+   371→```typescript
+   372→// לא רק export/import — אלא אסטרטגיית שחזור מלאה
+   373→interface BackupStrategy {
+   374→  // Encrypted backup
+   375→  createBackup: (
+   376→    options: {
+   377→      includeMasterKey: boolean;
+   378→      shardThreshold?: number;  // Shamir's Secret Sharing
+   379→      totalShards?: number;
+   380→    }
+   381→  ) => Promise<BackupPackage>;
+   382→  
+   383→  // Restore from backup
+   384→  restoreBackup: (
+   385→    backup: BackupPackage,
+   386→    shards?: Share[]  // If sharded
+   387→  ) => Promise<void>;
+   388→  
+   389→  // Social recovery (trusted contacts)
+   390→  setupSocialRecovery: (
+   391→    contacts: RecoveryContact[],
+   392→    threshold: number
+   393→  ) => Promise<void>;
+   394→  
+   395→  initiateSocialRecovery: () => Promise<RecoverySession>;
+   396→  
+   397→  // Dead-man switch (if no activity for X days)
+   398→  setupDeadManSwitch: (
+   399→    inactiveDays: number,
+   400→    beneficiaries: Beneficiary[]
+   401→  ) => Promise<void>;
+   402→  
+   403→  // Air-gapped backup (QR codes, paper wallets)
+   404→  createAirGappedBackup: () => Promise<QRCode[]>;
+   405→}
+   406→
+   407→interface BackupPackage {
+   408→  version: number;
+   409→  createdAt: number;
+   410→  
+   411→  // Encrypted with master password
+   412→  encryptedData: Uint8Array;
+   413→  
+   414→  // Sharded master key (if applicable)
+   415→  shards?: {
+   416→    index: number;
+   417→    data: Uint8Array;
+   418→  }[];
+   419→  
+   420→  // Metadata (unencrypted)
+   421→  metadata: {
+   422→    networks: NetworkId[];
+   423→    vaultCount: number;
+   424→    keyCount: number;
+   425→    checksum: string;
+   426→  };
+   427→  
+   428→  // Integrity verification
+   429→  signature: Uint8Array;  // Signed with master key
+   430→}
+   431→
+   432→interface RecoveryContact {
+   433→  id: string;
+   434→  name: string;
+   435→  
+   436→  // How to reach them
+   437→  contactMethod: 'email' | 'phone' | 'on_chain' | 'in_person';
+   438→  contactInfo: string;
+   439→  
+   440→  // Their public key for encryption
+   441→  publicKey: string;
+   442→  
+   443→  // Trust level
+   444→  trustLevel: 'high' | 'medium' | 'low';
+   445→  
+   446→  // Last verification
+   447→  lastVerified: number;
+   448→}
+   449→```
+   450→
+   451→### **שכבה 6: Audit & Compliance (ביקורת ותאימות)**
+   452→
+   453→```typescript
+   454→// כל פעולה מתועדת באופן בלתי הפיך
+   455→interface AuditSystem {
+   456→  // Log every operation
+   457→  log: (
+   458→    event: AuditEvent
+   459→  ) => Promise<void>;
+   460→  
+   461→  // Query logs
+   462→  query: (
+   463→    filters: AuditQueryFilters
+   464→  ) => Promise<AuditEvent[]>;
+   465→  
+   466→  // Generate compliance report
+   467→  generateReport: (
+   468→    options: {
+   469→      period: { start: number; end: number };
+   470→      format: 'json' | 'csv' | 'pdf';
+   471→      includeSensitive?: boolean;
+   472→    }
+   473→  ) => Promise<ComplianceReport>;
+   474→  
+   475→  // Tamper detection
+   476→  verifyIntegrity: () => Promise<boolean>;
+   477→}
+   478→
+   479→interface AuditEvent {
+   480→  id: string;
+   481→  timestamp: number;
+   482→  
+   483→  // What happened
+   484→  type: 'vault_created' | 'key_added' | 'signing_attempt' | 
+   485→        'policy_violation' | 'backup_created' | 'recovery_initiated';
+   486→  
+   487→  // Who did it
+   488→  actor: {
+   489→    vaultId?: string;
+   490→    ipAddress?: string;
+   491→    deviceId?: string;
+   492→    location?: string;
+   493→  };
+   494→  
+   495→  // What was affected
+   496→  target: {
+   497→    vaultId?: string;
+   498→    keyId?: string;
+   499→    operation?: Operation;
+   500→  };
+   501→  
+   502→  // Result
+   503→  result: 'success' | 'failure' | 'blocked';
+   504→  reason?: string;
+   505→  
+   506→  // Cryptographic proof
+   507→  previousEventHash: string;
+   508→  eventHash: string;  // SHA-256(prev_hash + event_data)
+   509→}
+   510→
+   511→// Blockchain-like integrity
+   512→interface AuditChain {
+   513→  genesisHash: string;
+   514→  events: AuditEvent[];
+   515→  
+   516→  // Each event's hash includes previous hash (tamper-evident)
+   517→  verifyChain: () => boolean;
+   518→}
+   519→```
+   520→
+   521→## 🎨 UX Flow: לא עוד דיאלוג פשוט
+   522→
+   523→### **Flow 1: First-Time Setup (Wizard)**
+   524→
+   525→```
+   526→Step 1: Welcome
+   527→┌─────────────────────────────────────────┐
+   528→│  Welcome to Sovereign Key Vault          │
+   529→│                                          │
+   530→│  This is not just a wallet.              │
+   531→│  This is your command center for         │
+   532→│  5 networks, 25+ tokens, and 13 soldiers.│
+   533→│                                          │
+   534→│  Let's set up your security.             │
+   535→│                                          │
+   536→│  [Get Started]                           │
+   537→└─────────────────────────────────────────┘
+   538→
+   539→Step 2: Master Password
+   540→┌─────────────────────────────────────────┐
+   541→│  Create Master Password                  │
+   542→│                                          │
+   543→│  ┌─────────────────────────────────┐    │
+   544→│  │ ••••••••••••••••               │    │
+   545→│  └─────────────────────────────────┘    │
+   546→│                                          │
+   547→│  Strength: ████████████████████ 95%     │
+   548→│  ✓ 12+ characters                        │
+   549→│  ✓ Uppercase + lowercase                 │
+   550→│  ✓ Numbers                               │
+   551→│  ✓ Special characters                    │
+   552→│  ✓ Not a common password                 │
+   553→│                                          │
+   554→│  [Continue]                              │
+   555→└─────────────────────────────────────────┘
+   556→
+   557→Step 3: Recovery Setup
+   558→┌─────────────────────────────────────────┐
+   559→│  Recovery Options                        │
+   560→│                                          │
+   561→│  Choose at least one:                    │
+   562→│                                          │
+   563→│  ☐ Encrypted Backup File                 │
+   564→│    Download a .vault file                │
+   565→│                                          │
+   566→│  ☐ Recovery Phrase (24 words)            │
+   567→│    Write down and store safely           │
+   568→│                                          │
+   569→│  ☐ Social Recovery                       │
+   570→│    Add 3-5 trusted contacts              │
+   571→│                                          │
+   572→│  ☐ Air-Gapped QR Codes                   │
+   573→│    Print and store offline               │
+   574→│                                          │
+   575→│  [Continue]                              │
+   576→└─────────────────────────────────────────┘
+   577→
+   578→Step 4: Network Vaults
+   579→┌─────────────────────────────────────────┐
+   580→│  Import Your Keys                        │
+   581→│                                          │
+   582→│  Detected networks:                      │
+   583→│                                          │
+   584→│  STEEM    [Import] [Create New]          │
+   585→│  HIVE     [Import] [Create New]          │
+   586→│  TRON     [Import] [Create New]          │
+   587→│  BLURT    [Import] [Create New]          │
+   588→│  SAOS-NET [Import] [Create New]          │
+   589→│                                          │
+   590→│  [Skip for now] [Continue]               │
+   591→└─────────────────────────────────────────┘
+   592→
+   593→Step 5: Soldier Setup (Optional)
+   594→┌─────────────────────────────────────────┐
+   595→│  Configure Your Soldiers                 │
+   596→│                                          │
+   597→│  You have 13 soldier accounts.           │
+   598→│  Set permissions for each:               │
+   599→│                                          │
+   600→│  saos-soldier-01                         │
+   601→│  ☑ Can trade   ☑ Can vote               │
+   602→│  ☐ Can transfer (max: 100 STEEM)        │
+   603→│                                          │
+   604→│  [Configure all] [Skip] [Continue]       │
+   605→└─────────────────────────────────────────┘
+   606→
+   607→Step 6: Complete
+   608→┌─────────────────────────────────────────┐
+   609→│  Setup Complete! 🎉                      │
+   610→│                                          │
+   611→│  Your Sovereign Key Vault is ready.      │
+   612→│                                          │
+   613→│  Security Score: 87/100                  │
+   614→│  ┌─────────────────────────────────┐    │
+   615→│  │ ████████████████████░░░░        │    │
+   616→│  └─────────────────────────────────┘    │
+   617→│                                          │
+   618→│  Recommendations:                        │
+   619→│  • Enable biometric unlock               │
+   620→│  • Add social recovery                   │
+   621→│  • Configure 2FA for large transfers     │
+   622→│                                          │
+   623→│  [Go to Dashboard]                       │
+   624→└─────────────────────────────────────────┘
+   625→```
+   626→
+   627→### **Flow 2: Signing with Policy Check**
+   628→
+   629→```
+   630→User clicks "Sign" on DEX
+   631→         ↓
+   632→┌─────────────────────────────────────────┐
+   633→│  Signing Request                         │
+   634→│                                          │
+   635→│  Operation: limit_order_create           │
+   636→│  Network: STEEM                          │
+   637→│  Amount: 100 STEEM @ 0.098 SBD           │
+   638→│  Vault: trading (hot)                    │
+   639→│                                          │
+   640→│  ⚠️  Policy Check:                       │
+   641→│  ✓ Operation type allowed                │
+   642→│  ✓ Amount within daily limit             │
+   643→│  ✓ Recipient is whitelisted              │
+   644→│  ✓ Time is within trading hours          │
+   645→│  ⚠️  Risk Score: 23/100 (low)            │
+   646→│                                          │
+   647→│  [Cancel] [Sign with Password]           │
+   648→│           [Sign with Biometric]          │
+   649→└─────────────────────────────────────────┘
+   650→         ↓
+   651→User enters password/biometric
+   652→         ↓
+   653→┌─────────────────────────────────────────┐
+   654→│  Signing...                              │
+   655→│                                          │
+   656→│  ┌─────────────────────────────────┐    │
+   657→│  │ ████████████████░░░░░░░░ 67%    │    │
+   658→│  └─────────────────────────────────┘    │
+   659→│                                          │
+   660→│  1. ✓ Policy verified                    │
+   661→│  2. ✓ Transaction built                  │
+   662→│  3. ✓ Digest computed                    │
+   663→│  4. ⏳ Signing with vault key...          │
+   664→│  5. ⏸️  Waiting for broadcast            │
+   665→│                                          │
+   666→└─────────────────────────────────────────┘
+   667→         ↓
+   668→┌─────────────────────────────────────────┐
+   669→│  Transaction Signed! ✅                  │
+   670→│                                          │
+   671→│  Transaction ID:                         │
+   672→│  a1b2c3d4e5f6...                         │
+   673→│                                          │
+   674→│  Status: Broadcasting...                 │
+   675→│  Estimated confirmation: ~3 seconds      │
+   676→│                                          │
+   677→│  [View on Explorer] [Done]               │
+   678→└─────────────────────────────────────────┘
+   679→```
+   680→
+   681→### **Flow 3: Policy Violation**
+   682→
+   683→```
+   684→User tries to transfer 1000 STEEM with posting key
+   685→         ↓
+   686→┌─────────────────────────────────────────┐
+   687→│  ⛔ Policy Violation                     │
+   688→│                                          │
+   689→│  Operation: transfer                     │
+   690→│  Amount: 1000 STEEM                      │
+   691→│  Key: posting                            │
+   692→│                                          │
+   693→│  ❌ Rule: "no-transfer-with-posting-key" │
+   694→│                                          │
+   695→│  Transfer operations require active key. │
+   696→│                                          │
+   697→│  Options:                                │
+   698→│  • Switch to active key                  │
+   699→│  • Reduce amount (posting limit: 10)     │
+   700→│  • Request approval from master vault    │
+   701→│                                          │
+   702→│  [Switch Key] [Reduce Amount] [Cancel]   │
+   703→└─────────────────────────────────────────┘
+   704→```
+   705→
+   706→## 🧪 Testing Strategy: Beyond Unit Tests
+   707→
+   708→### **1. Penetration Testing**
+   709→
+   710→```typescript
+   711→describe('Penetration Tests', () => {
+   712→  it('should resist timing attacks on password verification', async () => {
+   713→    const vault = new SovereignVault();
+   714→    await vault.initialize('correct-password');
+   715→    
+   716→    const timings: number[] = [];
+   717→    
+   718→    for (let i = 0; i < 1000; i++) {
+   719→      const start = performance.now();
+   720→      try {
+   721→        await vault.unlock(i % 2 === 0 ? 'correct-password' : 'wrong-password');
+   722→      } catch {}
+   723→      timings.push(performance.now() - start);
+   724→    }
+   725→    
+   726→    // Timing should be constant regardless of password correctness
+   727→    const variance = calculateVariance(timings);
+   728→    expect(variance).toBeLessThan(0.01);  // < 1% variance
+   729→  });
+   730→  
+   731→  it('should resist brute force attacks', async () => {
+   732→    const vault = new SovereignVault();
+   733→    await vault.initialize('correct-password');
+   734→    await vault.lock();
+   735→    
+   736→    // Argon2id with m=65536, t=3 should take ~1 second per attempt
+   737→    const start = performance.now();
+   738→    try {
+   739→      await vault.unlock('wrong-password');
+   740→    } catch {}
+   741→    const duration = performance.now() - start;
+   742→    
+   743→    expect(duration).toBeGreaterThan(500);  // > 500ms per attempt
+   744→  });
+   745→  
+   746→  it('should detect memory scraping attempts', async () => {
+   747→    const vault = new SovereignVault();
+   748→    await vault.initialize('password');
+   749→    
+   750→    // Simulate memory dump
+   751→    const memoryDump = await simulateMemoryDump();
+   752→    
+   753→    // Private keys should never appear in plaintext
+   754→    expect(memoryDump).not.toContain('PRIVATE_KEY_HEX');
+   755→    expect(memoryDump).not.toContain('MASTER_PASSWORD');
+   756→  });
+   757→});
+   758→```
+   759→
+   760→### **2. Chaos Engineering**
+   761→
+   762→```typescript
+   763→describe('Chaos Engineering', () => {
+   764→  it('should handle IndexedDB corruption gracefully', async () => {
+   765→    const vault = new SovereignVault();
+   766→    await vault.initialize('password');
+   767→    await vault.addKey('test', 'steem', PRIVATE_KEY);
+   768→    
+   769→    // Corrupt IndexedDB
+   770→    await corruptIndexedDB();
+   771→    
+   772→    // Should detect corruption and offer recovery
+   773→    const status = await vault.getStatus();
+   774→    expect(status.corrupted).toBe(true);
+   775→    expect(status.recoveryOptions).toContain('backup');
+   776→    expect(status.recoveryOptions).toContain('social_recovery');
+   777→  });
+   778→  
+   779→  it('should handle network failure during broadcast', async () => {
+   780→    const orchestrator = new SigningOrchestrator();
+   781→    
+   782→    // Simulate network failure
+   783→    mockNetworkFailure();
+   784→    
+   785→    const result = await orchestrator.signAndBroadcast(vaultId, operation);
+   786→    
+   787→    expect(result.status).toBe('signed_not_broadcast');
+   788→    expect(result.retryOptions).toBeDefined();
+   789→  });
+   790→});
+   791→```
+   792→
+   793→### **3. Formal Verification (Critical Paths)**
+   794→
+   795→```typescript
+   796→// Use TLA+ or similar for critical state machines
+   797→describe('Formal Verification', () => {
+   798→  it('vault state machine should never reach invalid state', () => {
+   799→    const states = ['locked', 'unlocked', 'signing', 'broadcasting'];
+   800→    const transitions = [
+   801→      { from: 'locked', to: 'unlocked', action: 'unlock' },
+   802→      { from: 'unlocked', to: 'locked', action: 'lock' },
+   803→      { from: 'unlocked', to: 'signing', action: 'sign' },
+   804→      { from: 'signing', to: 'broadcasting', action: 'broadcast' },
+   805→      { from: 'broadcasting', to: 'unlocked', action: 'complete' },
+   806→    ];
+   807→    
+   808→    // Model check: no invalid transitions
+   809→    const modelChecker = new ModelChecker(states, transitions);
+   810→    expect(modelChecker.verify()).toBe(true);
+   811→  });
+   812→});
+   813→```
+   814→
+   815→## 📦 Integration עם האקוסיסטם הקיים
+   816→
+   817→### **חיבור ל-5 רשתות:**
+   818→
+   819→```typescript
+   820→// src/lib/vault-integration.ts
+   821→export async function initializeEcosystemVaults(): Promise<void> {
+   822→  const vault = await SovereignVault.getInstance();
+   823→  
+   824→  // STEEM (already have M0/M1)
+   825→  await vault.createNetworkVault('steem', {
+   826→    keys: ['owner', 'active', 'posting', 'memo'],
+   827→    allowedOperations: ['transfer', 'vote', 'comment', 'limit_order_create'],
+   828→    maxAmountPerDay: BigInt(10000) * BigInt(1000),  // 10,000 STEEM
+   829→  });
+   830→  
+   831→  // HIVE (similar to Steem)
+   832→  await vault.createNetworkVault('hive', {
+   833→    keys: ['owner', 'active', 'posting', 'memo'],
+   834→    allowedOperations: ['transfer', 'vote', 'comment', 'limit_order_create'],
+   835→    maxAmountPerDay: BigInt(10000) * BigInt(1000),
+   836→  });
+   837→  
+   838→  // TRON (different key structure)
+   839→  await vault.createNetworkVault('tron', {
+   840→    keys: ['owner', 'active'],
+   841→    allowedOperations: ['transfer', 'trigger_smart_contract'],
+   842→    maxAmountPerDay: BigInt(100000) * BigInt(1000000),  // 100,000 TRX
+   843→  });
+   844→  
+   845→  // BLURT (currently offline, but prepare)
+   846→  await vault.createNetworkVault('blurt', {
+   847→    keys: ['owner', 'active', 'posting', 'memo'],
+   848→    allowedOperations: ['transfer', 'vote', 'comment'],
+   849→    maxAmountPerDay: BigInt(10000) * BigInt(1000),
+   850→    status: 'offline',  // Will activate when network is back
+   851→  });
+   852→  
+   853→  // SAOS-NET (our sovereign chain)
+   854→  await vault.createNetworkVault('saos-net', {
+   855→    keys: ['owner', 'active', 'posting'],
+   856→    allowedOperations: ['transfer', 'vote', 'custom_json'],
+   857→    maxAmountPerDay: BigInt(100000) * BigInt(1000),
+   858→    special: {
+   859→      // SAOS-NET specific features
+   860→      soldierManagement: true,
+   861→      oracleFeeds: true,
+   862→    },
+   863→  });
+   864→  
+   865→  // Soldier vaults (13 accounts)
+   866→  for (let i = 1; i <= 13; i++) {
+   867→    const soldierId = `saos-soldier-${i.toString().padStart(2, '0')}`;
+   868→    await vault.createSoldierVault(soldierId, {
+   869→      permissions: {
+   870→        canTrade: i <= 5,  // Only first 5 soldiers can trade
+   871→        canVote: true,
+   872→        canComment: true,
+   873→        canTransfer: false,
+   874→        maxTransferAmount: BigInt(0),
+   875→      },
+   876→      linkedVaults: ['steem', 'hive', 'saos-net'],
+   877→    });
+   878→  }
+   879→}
+   880→```
+   881→
+   882→### **חיבור ל-Grid Dashboard:**
+   883→
+   884→```typescript
+   885→// src/components/VaultStatusWidget.tsx
+   886→export function VaultStatusWidget() {
+   887→  const { vaultStatus } = useVaultStatus();
+   888→  
+   889→  return (
+   890→    <Card>
+   891→      <CardHeader>
+   892→        <CardTitle>Sovereign Key Vault</CardTitle>
+   893→      </CardHeader>
+   894→      <CardContent>
+   895→        {/* Security Score */}
+   896→        <div className="security-score">
+   897→          <AnimatedNumber value={vaultStatus.securityScore} />
+   898→          <span>/100</span>
+   899→        </div>
+   900→        
+   901→        {/* Vault Status */}
+   902→        <div className="vault-status">
+   903→          <StatusIndicator status={vaultStatus.locked ? 'locked' : 'unlocked'} />
+   904→          <span>{vaultStatus.locked ? 'Locked' : 'Unlocked'}</span>
+   905→        </div>
+   906→        
+   907→        {/* Keys Count */}
+   908→        <div className="keys-count">
+   909→          <span>{vaultStatus.totalKeys} keys</span>
+   910→          <span>{vaultStatus.networks.length} networks</span>
+   911→          <span>{vaultStatus.soldiers.length} soldiers</span>
+   912→        </div>
+   913→        
+   914→        {/* Last Activity */}
+   915→        <div className="last-activity">
+   916→          Last signing: {formatRelativeTime(vaultStatus.lastSigningTime)}
+   917→        </div>
+   918→        
+   919→        {/* Quick Actions */}
+   920→        <div className="quick-actions">
+   921→          <Button onClick={() => vaultStatus.locked ? unlock() : lock()}>
+   922→            {vaultStatus.locked ? 'Unlock' : 'Lock'}
+   923→          </Button>
+   924→          <Button variant="outline" onClick={openSettings}>
+   925→            Settings
+   926→          </Button>
+   927→        </div>
+   928→      </CardContent>
+   929→    </Card>
+   930→  );
+   931→}
+   932→```
+   933→
+   934→## 🎯 ביצוע — שלב אחר שלב
+   935→
+   936→### **שלב 1: תשתית קריפטוגרפית**
+   937→1. צור `packages/core/crypto/`
+   938→2. ממש `deriveMasterKey` (Argon2id)
+   939→3. ממש `encrypt`/`decrypt` (AES-256-GCM)
+   940→4. ממש `shardSecret`/`reconstructSecret` (Shamir's Secret Sharing)
+   941→5. כתוב unit tests (100% coverage)
+   942→
+   943→### **שלב 2: ניהול כספות**
+   944→1. צור `packages/core/vault/`
+   945→2. ממש `VaultHierarchy`
+   946→3. ממש `createNetworkVault`, `createSoldierVault`
+   947→4. ממש `addKey`, `removeKey`, `listKeys`
+   948→5. כתוב unit tests + integration tests
+   949→
+   950→### **שלב 3: מנוע מדיניות**
+   951→1. צור `packages/core/policy/`
+   952→2. ממש `PolicyEngine` עם 4 סוגי rules
+   953→3. ממש `evaluate` pipeline
+   954→4. ממש `detectAnomalies`
+   955→5. כתוב unit tests + property-based tests
+   956→
+   957→### **שלב 4: תזמור חתימות**
+   958→1. צור `packages/core/signing/`
+   959→2. ממש `SigningOrchestrator`
+   960→3. ממש `sign`, `multiSign`, `batchSign`, `crossChainSign`
+   961→4. ממש `simulate` (transaction simulation)
+   962→5. כתוב unit tests + integration tests עם testnet
+   963→
+   964→### **שלב 5: גיבוי ושחזור**
+   965→1. צור `packages/core/backup/`
+   966→2. ממש `createBackup`, `restoreBackup`
+   967→3. ממש `setupSocialRecovery`, `initiateSocialRecovery`
+   968→4. ממש `setupDeadManSwitch`
+   969→5. כתוב unit tests + disaster recovery tests
+   970→
+   971→### **שלב 6: ביקורת ותאימות**
+   972→1. צור `packages/core/audit/`
+   973→2. ממש `AuditSystem` עם blockchain-like integrity
+   974→3. ממש `log`, `query`, `generateReport`
+   975→4. ממש `verifyIntegrity`
+   976→5. כתוב unit tests + tamper detection tests
+   977→
+   978→### **שלב 7: אינטגרציה עם UI**
+   979→1. צור `src/components/vault/`
+   980→2. בנה `VaultSetupWizard` (6 steps)
+   981→3. בנה `SigningDialog` (עם policy check)
+   982→4. בנה `VaultStatusWidget` (ל-Grid Dashboard)
+   983→5. בנה `PolicyManagementDialog`
+   984→6. בנה `BackupRecoveryDialog`
+   985→
+   986→### **שלב 8: חיבור ל-DEX**
+   987→1. עדכן `src/lib/signing.ts`
+   988→2. החלף "SIGNING LOCKED (M2)" ב-"Sign" button
+   989→3. הוסף `SigningDialog` ל-`TradeTerminal`
+   990→4. הוסף `SimulationResult` ל-preview
+   991→5. בדוק end-to-end: build → policy check → sign → broadcast → verify on-chain
+   992→
+   993→### **שלב 9: בדיקות מקיפות**
+   994→1. הרץ את כל ה-unit tests
+   995→2. הרץ integration tests עם testnet
+   996→3. הרץ penetration tests
+   997→4. הרץ chaos engineering tests
+   998→5. הרץ formal verification (אם אפשרי)
+   999→
+  1000→### **שלב 10: תיעוד ודחיפה**
+  1001→1. עדכן `README.md` עם ארכיטקטורה
+  1002→2. עדכן `docs/security.md` עם threat model
+  1003→3. עדכן `docs/vault.md` עם user guide
+  1004→4. כתוב `worklog.md` entry
+  1005→5. Commit + Push
+  1006→
+  1007→## 📏 קריטריוני הצלחה
+  1008→
+  1009→M2 ייחשב מוצלח אם:
+  1010→- ✅ **Vault Hierarchy**: master + 5 networks + 13 soldiers + purposes
+  1011→- ✅ **Cryptographic Engine**: AES-256-GCM + Argon2id + Shamir's Secret Sharing
+  1012→- ✅ **Policy Engine**: 4 סוגי rules + anomaly detection
+  1013→- ✅ **Signing Orchestrator**: single, multi-sig, batch, cross-chain
+  1014→- ✅ **Backup & Recovery**: encrypted, sharded, social recovery, dead-man switch
+  1015→- ✅ **Audit & Compliance**: blockchain-like integrity, tamper detection
+  1016→- ✅ **UX**: 6-step wizard, signing dialog with policy check, status widget
+  1017→- ✅ **Integration**: מחובר ל-5 רשתות, ל-13 חיילים, ל-DEX, ל-Grid Dashboard
+  1018→- ✅ **Testing**: 100% coverage, penetration tests, chaos engineering
+  1019→- ✅ **Zero console errors**: מאומת ב-agent-browser
+  1020→- ✅ **Mobile responsive**: 390px + 1440px
+  1021→- ✅ **Lighthouse accessibility**: > 90
+  1022→
+  1023→## 🎯 התחל עכשיו
+  1024→
+  1025→**זה לא עוד ארנק. זה מרכז שליטה ריבוני שמנהל את כל האקוסיסטם שלנו.**
+  1026→
+  1027→המשתמש מצפה לפתרון ברמה של **מט"ח צבאי**, לא עוד ארנק קריפטו רגיל.
+  1028→
+  1029→**אל תאכזב.**
+  1030→
+  1031→---
+  1032→
+  1033→העתק את הפרומפט הזה לסוכן. הוא יבנה את ה-**Sovereign Key Vault** — לא עוד ארנק, אלא מרכז שליטה ריבוני עם 6 שכבות אבטחה, היררכיית כספות, מנוע מדיניות מתקדם, תזמור חתימות, גיבוי ושחזור, וביקורת מלאה.
