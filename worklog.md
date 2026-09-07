@@ -191,3 +191,25 @@ Stage Summary:
 - החוק "רשת שנופלת = נתון" נשמר: offline מוצג באדום עם הסיבה, לעולם לא מוסתר או מומצא.
 - ארכיטקטורה מוכנה ל-המשך: adapters ל-Hive/Blurt (Graphene תאומים) ו-TRON מסומנים כפערים ב-REGISTRY; keystore M2 עדיין השער לחתימה.
 - מקורות חיים מנוטרים: 4 RPC ציבוריים + daemon-state (GitHub raw) — כולם עם cache/TTL ו-fallbacks.
+
+---
+Task ID: M1-grid-redesign
+Agent: Z.ai Code (main)
+Task: Redesign מלא של ה-Grid Dashboard לרמת Enterprise/Professional (Bloomberg Terminal × TradingView × dYdX) — מחיקת כל ה-UI הקיים ובנייה מחדש עם design system, אנימציות, data visualization ו-micro-interactions; שכבת הנתונים נשארת נעולה; push לריפו.
+
+Work Log:
+- ארכיטקטורה לפני קוד: נקראו כל hook-י הנתונים (use-eco, use-steem-market), ה-registry הסטטי, dex-store ו-API routes — החלטה: החוזים (types + polling intervals + zero-mock) קפואים; רק שכבת ה-presentation נבנית מחדש. נמחקו src/components/grid + src/components/dex (14 קבצים) ונכתבו מחדש 16 קבצי UI.
+- Design system מהאפס (globals.css): כל הטוקנים מהמפרט — semantic colors (#10b981/#ef4444/#f59e0b/#3b82f6 + saos violet), bg layers ×4, text ×3, borders ×3, gradients ×4, elevation shadows ×4, spacing 8px, מודולר type scale; מיפוי shadcn bridge מלא על הפלטה החדשה (כל רכיבי shadcn ממשיכים לעבוד); glassmorphism אמיתי blur(12px)+saturate(180%)+inset-light; glow-card עם gradient-border (mask-composite xor) + translateY(-2px) ב-hover; skeleton shimmer; flow-line לגשרים; focus-visible + prefers-reduced-motion.
+- טיפוגרפיה: הוחלף Geist ב-Inter (--font-inter) + JetBrains Mono (--font-jetbrains) דרך next/font; כל מספר במסך ב-.num עם tabular-nums.
+- primitives.tsx: StatusDot/StatusBadge/EcoChip/LiveBadge/PanelHeader/StatCell/ChainGlyph (מונוגרם per-chain tone: steem=green, hive=amber, blurt=blue, tron=red, saos=violet)/Skeleton/PanelSkeleton/ErrorNote.
+- motion-bits.tsx: AnimatedNumber (tween דרך useMotionValue+useTransform — עדכון DOM ישיר בלי re-render לפריים); FlashValue (adjust-during-render, הבזק ירוק/אדום מחזורי); Delta; useRollingHistory — ring buffer ב-module store חיצוני (useSyncExternalStore) שנדחף מ-effect — דוגם ערכי poll חיים (גבהים, מחירים) לספארק-ליין session אמיתי, עומד על כללי react-hooks (בלי setState-in-effect).
+- charts.tsx (Recharts): Sparkline (Area+gradient, honest "sampling…" <2 נקודות) ו-DepthChart — עומק צבירה אמיתי: bids ירוק משמאל/asks אדום מימין, tooltip כהה, ציר מחיר mono; שימוש בספר STEEM/SBD ובספר הריבוני SAOS/STEEM.
+- מסכים חדשים: TerminalHeader (brand + LED strip + quote flash + UTC + chains-up) · KpiStrip (6 כרטיסי KPI עם AnimatedNumber + ספארק מחיר חי + treasury P&L) · NetworkGrid (auto-fit 230px, hero height מונפש, ספארק גובה, מדדים 2×2, שורת שוק ל-STEEM, drill-down Sheet עם role/adapter/evidence) · PairsMatrix (15 שורות, sort לכל עמודה, חיפוש, null-as-"—", שורות קליקביליות שמקפיצות ל-DEX/SAOS-NET) · BridgeMonitor (4 רכבות עם קו זרימה מונפש, Last Checkpoint, TRON Pulse, Live Anchor Feed עם txids+explorer) · SaosNetPanel (core/engine/leaderboard-bars/ספר ריבוני depth/oracle/pools/wrapped/delegations) · RegistryPanel (scan-meta, 8 ריפו, שירותים, 5 פערים כנים) · WalletPanel (יתרות מונפשות, RC manabar gradient לפי סף, פקודות פתוחות) · DEX (OrderBook: depth chart + ladder + mid flash; TradeTerminal: כל הלוגיקה של M1 במוחה חדשה עם gradient buttons; TradeHistory: tape מונפש) · StatusFooter (sticky, safe-area, zero-mock pledge).
+- באגים שהאימות בדפדפן תפס ותיקן: (1) 5× "two children with the same key ''" — TabsContent לא-keyed כילדי AnimatePresence(mode=wait); הוסר AnimatePresence, נשמרו entrance animations; (2) אזהרת multiple-children-in-wait — נעלמת עם אותו תיקון; (3) 24H VOLUME תקוע על skeleton — steemVolume הוא "44.259" בלי סיומת; עבר ל-steemVolumeSatoshis/1000 (מתמטיקה שלמה) גם ב-KPI וגם ב-PairsMatrix; (4) KPI grid נשבר ל-5+1 — price card span-2 ⇒ grid-cols-7; (5) שמות רשת נחתכו בכרטיסים צרים — הוסר family chip (מופיע ב-drill-down); (6) טאבים במובייל ללא accessible name — aria-label עם רמז מקלדת.
+- אימות מלא ב-agent-browser: אפס errors/warnings בקונסולה; 6 טאבים נבדקו ויזואלית ב-1440px + 390px; drill-down sheet; golden path (לחיצת מחיר → prefill+היפוך צד → track @steem → build → דיאלוג: payload/envelope/hex/digest/tx_id 60B + toast); קיצורי 1–6 (כולל מובייל); footer דביק; BLURT offline מוצג בכנות "probe failed: HTTP 503".
+- lint נקי · README עודכן (סעיף Enterprise redesign) · dev.log ללא שגיאות.
+
+Stage Summary:
+- המשתמש מקבל מסך ברמת trading platform אמיתית: design system עקבי מטוקנים, כל מספר מתעדכן באנימציה, כל כרטיס עם hover glow, גרפי עומק וספארק-ליין על נתוני session אמיתיים, skeleton בכל טעינה, responsive מושלם 390→1440px.
+- שכבת הנתונים לא נגעה: packages/hooks/API routes זהים — החוק "zero mock" נשמר; offline/offline-values מוצגים כ"—" או הודעת כישלון, לעולם לא מומצאים.
+- תיקוני הקונסולה מתועדים כאן לדורות; אפס סודות בקוד; signing עדיין נעול (M2).

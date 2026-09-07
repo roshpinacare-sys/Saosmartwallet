@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrains = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -33,7 +35,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b100e",
+  themeColor: "#0a0a0a",
 };
 
 export default function RootLayout({
@@ -44,7 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
+        className={`${inter.variable} ${jetbrains.variable} min-h-screen flex flex-col bg-background font-sans text-foreground antialiased`}
       >
         {children}
         <Toaster
@@ -52,11 +54,12 @@ export default function RootLayout({
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "oklch(0.17 0.014 175)",
-              border: "1px solid oklch(0.85 0.02 165 / 12%)",
-              color: "oklch(0.94 0.008 165)",
-              fontFamily: "var(--font-geist-mono), monospace",
+              background: "rgba(23, 23, 23, 0.92)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              color: "#fafafa",
+              fontFamily: "var(--font-jetbrains), monospace",
               fontSize: "12px",
+              backdropFilter: "blur(12px)",
             },
           }}
         />

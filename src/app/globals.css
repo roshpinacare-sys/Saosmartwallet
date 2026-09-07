@@ -6,8 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", "Fira Code", "Courier New", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,7 +39,11 @@
   --color-card: var(--card);
   --color-up: var(--up);
   --color-down: var(--down);
-  --color-amberterminal: var(--amberterminal);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-saos: var(--saos);
+  --color-success: var(--up);
+  --color-danger: var(--down);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -47,47 +51,98 @@
 }
 
 /*
- * SAOSMART TERMINAL — dark-only trading surface.
- * "Bloomberg meets Cyberpunk": near-black green-tinted base, glass panels,
- * emerald/rose market colors, amber system accents. The page never switches
- * themes — the terminal IS dark.
+ * SAOS GRID — ENTERPRISE TERMINAL DESIGN SYSTEM
+ * =============================================
+ * Dark-only professional trading surface (Bloomberg × TradingView × dYdX):
+ *   · near-black neutral base with layered elevation
+ *   · semantic colors: green=buy/up, red=sell/down, amber=warning, blue=info
+ *   · Inter (UI) + JetBrains Mono (every number) with tabular figures
+ *   · real glassmorphism: blur + saturate + inset top highlight
+ *   · gradient-border glow on interactive cards (mask-composite trick)
+ *   · 8px spacing grid, 1px hairline borders, 4-step elevation
+ * The page never switches themes — the terminal IS dark.
  */
 :root {
-  --radius: 0.5rem;
-  --up: oklch(0.765 0.17 163);       /* emerald 400 — buys/bids */
-  --down: oklch(0.66 0.23 17);       /* rose 500 — sells/asks  */
-  --amberterminal: oklch(0.83 0.15 85);
-  --background: oklch(0.135 0.012 175);
-  --foreground: oklch(0.94 0.008 165);
-  --card: oklch(0.175 0.014 175);
-  --card-foreground: oklch(0.94 0.008 165);
-  --popover: oklch(0.17 0.014 175);
-  --popover-foreground: oklch(0.94 0.008 165);
-  --primary: oklch(0.765 0.17 163);
-  --primary-foreground: oklch(0.15 0.02 165);
-  --secondary: oklch(0.23 0.016 175);
-  --secondary-foreground: oklch(0.94 0.008 165);
-  --muted: oklch(0.21 0.014 175);
-  --muted-foreground: oklch(0.64 0.014 170);
-  --accent: oklch(0.25 0.02 175);
-  --accent-foreground: oklch(0.94 0.008 165);
-  --destructive: oklch(0.66 0.23 17);
-  --border: oklch(0.85 0.02 165 / 9%);
-  --input: oklch(0.85 0.02 165 / 13%);
-  --ring: oklch(0.765 0.17 163 / 55%);
-  --chart-1: oklch(0.765 0.17 163);
-  --chart-2: oklch(0.83 0.15 85);
-  --chart-3: oklch(0.66 0.23 17);
-  --chart-4: oklch(0.8 0.12 195);
-  --chart-5: oklch(0.7 0.15 300);
-  --sidebar: oklch(0.16 0.014 175);
-  --sidebar-foreground: oklch(0.94 0.008 165);
-  --sidebar-primary: oklch(0.765 0.17 163);
-  --sidebar-primary-foreground: oklch(0.15 0.02 165);
-  --sidebar-accent: oklch(0.23 0.016 175);
-  --sidebar-accent-foreground: oklch(0.94 0.008 165);
-  --sidebar-border: oklch(0.85 0.02 165 / 9%);
-  --sidebar-ring: oklch(0.765 0.17 163 / 55%);
+  /* ---- radius ---- */
+  --radius: 0.75rem;
+
+  /* ---- semantic colors ---- */
+  --up: #10b981;                       /* success / buy / bid   (green-500) */
+  --down: #ef4444;                     /* danger  / sell / ask  (red-500)   */
+  --warning: #f59e0b;                  /* amber-500 — stale, gated, notice */
+  --info: #3b82f6;                     /* blue-500 — informational         */
+  --saos: #8b5cf6;                     /* violet-500 — sovereign chain     */
+
+  /* ---- background layers ---- */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #171717;
+  --bg-tertiary: #262626;
+  --bg-elevated: #404040;
+
+  /* ---- text ---- */
+  --text-primary: #fafafa;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #737373;
+
+  /* ---- borders (hairlines) ---- */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  /* ---- gradients ---- */
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --gradient-saos: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+
+  /* ---- elevation shadows ---- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+
+  /* ---- spacing scale (8px grid, reference tokens) ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---- shadcn bridge (mapped onto this palette) ---- */
+  --background: var(--bg-primary);
+  --foreground: var(--text-primary);
+  --card: var(--bg-secondary);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-secondary);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--up);
+  --primary-foreground: #052e22;
+  --secondary: var(--bg-tertiary);
+  --secondary-foreground: var(--text-primary);
+  --muted: #1c1c1c;
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--bg-tertiary);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--down);
+  --border: var(--border-subtle);
+  --input: var(--border-default);
+  --ring: rgba(16, 185, 129, 0.55);
+  --chart-1: var(--up);
+  --chart-2: var(--warning);
+  --chart-3: var(--down);
+  --chart-4: var(--info);
+  --chart-5: var(--saos);
+  --sidebar: var(--bg-secondary);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--up);
+  --sidebar-primary-foreground: #052e22;
+  --sidebar-accent: var(--bg-tertiary);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: rgba(16, 185, 129, 0.55);
 }
 
 @layer base {
@@ -96,80 +151,115 @@
   }
   html {
     color-scheme: dark;
+    scrollbar-color: var(--bg-elevated) transparent;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Inter character tweaks */
     background-image:
-      radial-gradient(1100px 540px at 85% -8%, oklch(0.42 0.1 165 / 0.14), transparent 62%),
-      radial-gradient(900px 480px at 0% 8%, oklch(0.4 0.07 195 / 0.09), transparent 58%),
-      radial-gradient(760px 520px at 50% 112%, oklch(0.38 0.08 150 / 0.1), transparent 62%);
+      radial-gradient(1100px 540px at 85% -8%, rgba(16, 185, 129, 0.07), transparent 62%),
+      radial-gradient(900px 480px at 0% 8%, rgba(59, 130, 246, 0.05), transparent 58%),
+      radial-gradient(760px 520px at 50% 112%, rgba(139, 92, 246, 0.05), transparent 62%);
     background-attachment: fixed;
   }
   ::selection {
-    background: oklch(0.765 0.17 163 / 30%);
+    background: rgba(16, 185, 129, 0.28);
+  }
+  :focus-visible {
+    outline: 2px solid rgba(16, 185, 129, 0.65);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-/* ---------- terminal utilities ---------- */
+/* ---------- glassmorphism (real: blur + saturate + inner light) ---------- */
 
-/* glassmorphism panel */
 .glass {
-  background: color-mix(in oklab, var(--card) 62%, transparent);
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  border: 1px solid color-mix(in oklab, var(--foreground) 9%, transparent);
+  background: rgba(23, 23, 23, 0.7);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
   box-shadow:
-    0 1px 0 0 color-mix(in oklab, var(--foreground) 5%, transparent) inset,
-    0 18px 40px -24px oklch(0 0 0 / 0.65);
+    var(--shadow-lg),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* interactive card: gradient-border glow + lift on hover */
+.glow-card {
+  position: relative;
+}
+.glow-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: calc(var(--radius) + 1px);
+  padding: 1px;
+  background: linear-gradient(135deg, transparent 20%, rgba(16, 185, 129, 0.5) 50%, transparent 80%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+.glow-card:hover {
+  border-color: var(--border-strong);
+  box-shadow:
+    var(--shadow-xl),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+}
+.glow-card:hover::before {
+  opacity: 1;
+}
+.glow-card:focus-within {
+  border-color: var(--border-strong);
+}
+
+/* ---------- furniture ---------- */
 
 /* faint blueprint grid behind the market area */
 .bg-grid {
   background-image:
-    linear-gradient(color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklab, var(--foreground) 4%, transparent) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 30%, transparent 100%);
 }
 
-/* scanline strip for the header — CRT hint, very subtle */
-.scanlines {
-  position: relative;
-}
-.scanlines::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    transparent 0 3px,
-    color-mix(in oklab, var(--foreground) 1.6%, transparent) 3px 4px
-  );
-  mix-blend-mode: overlay;
-}
-
 /* monospace numbers — every figure in the terminal */
 .num {
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-jetbrains), "JetBrains Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
 .text-glow-up {
-  text-shadow: 0 0 14px color-mix(in oklab, var(--up) 55%, transparent);
+  text-shadow: 0 0 14px rgba(16, 185, 129, 0.55);
 }
 .text-glow-down {
-  text-shadow: 0 0 14px color-mix(in oklab, var(--down) 55%, transparent);
+  text-shadow: 0 0 14px rgba(239, 68, 68, 0.55);
 }
 
-/* price flash — applied for ~700ms when a quoted value ticks */
+/* price flash — replayed by re-keying the span on change */
 @keyframes flash-up {
-  0% { color: var(--up); text-shadow: 0 0 16px color-mix(in oklab, var(--up) 80%, transparent); }
+  0% { color: var(--up); text-shadow: 0 0 16px rgba(16, 185, 129, 0.8); }
   100% { text-shadow: none; }
 }
 @keyframes flash-down {
-  0% { color: var(--down); text-shadow: 0 0 16px color-mix(in oklab, var(--down) 80%, transparent); }
+  0% { color: var(--down); text-shadow: 0 0 16px rgba(239, 68, 68, 0.8); }
   100% { text-shadow: none; }
 }
 .flash-up { animation: flash-up 0.75s ease-out; }
@@ -177,28 +267,54 @@
 
 /* live LED pulse */
 @keyframes led-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in oklab, var(--up) 55%, transparent); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
   50% { opacity: 0.55; box-shadow: 0 0 0 5px transparent; }
 }
 .led-live { animation: led-pulse 1.6s ease-in-out infinite; }
 
+/* skeleton shimmer */
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* flowing dash for bridge rails */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -16; }
+}
+.flow-line {
+  stroke-dasharray: 4 4;
+  animation: flow-dash 1s linear infinite;
+}
+
 /* thin terminal scrollbars */
-.scroll-thin { scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent; }
+.scroll-thin { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }
 .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--foreground) 20%, transparent);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 9999px;
 }
 .scroll-thin::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in oklab, var(--primary) 45%, transparent);
+  background: rgba(16, 185, 129, 0.45);
 }
 
 /* hex digits rendered in the preview dialog */
 .hex-string {
   word-break: break-all;
-  font-family: var(--font-mono), ui-monospace, monospace;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-size: 11px;
   line-height: 1.7;
-  color: color-mix(in oklab, var(--foreground) 78%, var(--primary));
+  color: rgba(250, 250, 250, 0.78);
 }
