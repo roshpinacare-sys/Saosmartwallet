@@ -87,7 +87,22 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 
 **מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · daemon-state של SAOS-NET (גובה 52,000+, 1,112 checkpoints מאומתים, oracle חתום-שעתי). כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 
-**קיצורי מקלדת:** מקשים 1–6 מחליפים מסכים. עיצוב: Bloomberg×Cyberpunk, dark-only, glassmorphism, mono numbers.
+**קיצורי מקלדת:** מקשים 1–6 מחליפים מסכים.
+
+### 🎨 Enterprise redesign (2026-09-07) — design system מקצועי מלא
+
+ה-UI נבנה מחדש מאפס ברמת Bloomberg Terminal / TradingView / dYdX — לא שיפור של הקיים, בנייה מחדש גמורה. שכבת הנתונים (packages, hooks, API routes) נותרה נעולה וללא שינוי.
+
+| שכבה | תוכן |
+|---|---|
+| **Design tokens** (`globals.css`) | צבעים סמנטיים (success `#10b981` / danger `#ef4444` / warning `#f59e0b` / info `#3b82f6` / saos `#8b5cf6`), 4 שכבות רקע, hairline borders ב-3 עוצמות, gradients, elevation shadows (4 מדרגות), סקאלת typographic מודולרית, גריד 8px — הכל CSS variables; Inter (UI) + JetBrains Mono (כל מספר, tabular figures) |
+| **Glassmorphism אמיתי** | `blur(12px) saturate(180%)` + inset top-light; כרטיסים אינטראקטיביים עם gradient-border glow (mask-composite) + lift ב-hover |
+| **Motion** (`motion-bits.tsx`) | `AnimatedNumber` — tween דרך MotionValue (עדכון DOM ישיר, אפס re-render לפריים); `FlashValue` — הבזק ירוק/אדום בכל tick; `Delta` — שבבי אחוז; `useRollingHistory` — ring buffer חיצוני (useSyncExternalStore) שדוגם ערכים חיים לספארק-ליין (נתוני session אמיתיים, לא סינתטיים) |
+| **Charts** (`charts.tsx`) | `Sparkline` — מיקרו-גרף עם gradient fill לכל כרטיס רשת/KPI; `DepthChart` — עומק צבירה אמיתי (bids ירוק משמאל, asks אדום מימין, tooltip, ציר מחיר) לספר ה-STEEM/SBD ולספר הריבוני |
+| **Data-viz בכל מסך** | KPI strip (6 כרטיסים + ספארק), כרטיסי רשת עם ספארק גובה חי, leaderboard עם bars מונפשים, RC manabar gradient, skeleton shimmer בכל טעינה |
+| **A11y** | aria-labels לכל הטאבים (כולל רמז מקלדת), role/labels למדדים, focus-visible rings, `prefers-reduced-motion` כבוי-אנימציות, HTML סמנטי (header/main/section/footer) |
+
+**אימות דפדפן (agent-browser):** אפס שגיאות קונסולה אחרי תיקון duplicate-keys (TabsContent לא-keyed בתוך AnimatePresence) + תיקון פורמט ווליום (`steemVolumeSatoshis/1000` במקום regex על מחרוזת). Golden path אומת מקצה לקצה: לחיצה על מחיר בספר → prefill + היפוך צד → build → דיאלוג payload/envelope/hex/digest + tx_id 60 בייטים. 6 טאבים נבדקו ויזואלית בדסקטופ 1440px ומובייל 390px; קיצורי 1–6 עובדים; footer דביק בשני המסכים.
 
 ```bash
 bun run dev   # ה-Grid חי על / — כל הרשתות נבדקות חי בכל רענון

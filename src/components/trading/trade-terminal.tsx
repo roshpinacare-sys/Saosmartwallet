@@ -2,12 +2,12 @@
 
 /**
  * TradeTerminal — limit-order builder wired to the M0/M1 engine.
- * Flow: user picks side/price/amount → POST /api/steem/trade/build → the
- * server computes the limit_order_create payload with BigInt math, stamps
- * ref-block fields via SteemAdapter.buildOperations, serializes with the
- * oracle-verified engine, and returns an UNSIGNED preview. The dialog shows
- * the exact bytes + digest. Signing is gated (keystore ships in packages/core,
- * M2) — this terminal cannot broadcast, by construction.
+ * Flow: side/price/amount → POST /api/steem/trade/build → the server computes
+ * the limit_order_create payload with BigInt math, stamps ref-block fields via
+ * SteemAdapter.buildOperations, serializes with the oracle-verified engine and
+ * returns an UNSIGNED preview. The dialog shows the exact bytes + digest.
+ * Signing is gated (keystore ships in packages/core, M2) — this terminal
+ * cannot broadcast, by construction.
  */
 
 import { useMutation } from "@tanstack/react-query";
@@ -26,7 +26,7 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { LiveBadge, PanelHeader } from "@/components/dex/terminal-furniture";
+import { LiveBadge, PanelHeader } from "@/components/terminal/primitives";
 import {
   buildOrder,
   fmtPrice,
@@ -146,22 +146,18 @@ export function TradeTerminal() {
   };
 
   return (
-    <section className="glass flex flex-col overflow-hidden rounded-xl" aria-label="Trading terminal">
+    <section className="glass flex flex-col overflow-hidden" aria-label="Trading terminal">
       <PanelHeader
         title="Trading Terminal"
-        subtitle="LIMIT_ORDER_CREATE · M0 ENGINE"
+        subtitle="limit_order_create · M0 engine"
         icon={<TerminalSquare className="h-4 w-4" />}
-        right={
-          <div className="flex items-center gap-2">
-            {wallet ? <LiveBadge active label="SYNCED" /> : null}
-          </div>
-        }
+        right={wallet ? <LiveBadge active label="SYNCED" /> : null}
       />
 
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 p-5">
         {/* account */}
         <div className="space-y-1.5">
-          <Label htmlFor="terminal-account" className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          <Label htmlFor="terminal-account" className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             Account (owner)
           </Label>
           <div className="flex gap-2">
@@ -191,7 +187,7 @@ export function TradeTerminal() {
             </Button>
           </div>
           {account && wallet ? (
-            <p className="num text-[10px] text-muted-foreground">
+            <p className="num text-[10px] text-[var(--text-tertiary)]">
               liquid <span className="text-[var(--up)]">{steemBalance.toLocaleString("en-US", { maximumFractionDigits: 3 })} STEEM</span>
               {" · "}
               <span className="text-foreground/80">{sbdBalance.toLocaleString("en-US", { maximumFractionDigits: 3 })} SBD</span>
@@ -201,16 +197,16 @@ export function TradeTerminal() {
 
         {/* side tabs */}
         <Tabs value={side} onValueChange={(v) => setSide(v as Side)}>
-          <TabsList className="grid h-11 w-full grid-cols-2 bg-secondary/60 p-1">
+          <TabsList className="grid h-11 w-full grid-cols-2 bg-white/[0.04] p-1">
             <TabsTrigger
               value="buy"
-              className="gap-1.5 rounded-md text-[12px] font-bold uppercase tracking-[0.14em] data-[state=active]:bg-[var(--up)]/15 data-[state=active]:text-[var(--up)] data-[state=active]:shadow-[inset_0_0_0_1px_var(--up)]/40"
+              className="gap-1.5 rounded-md text-[12px] font-bold uppercase tracking-[0.14em] data-[state=active]:bg-[var(--up)]/15 data-[state=active]:text-[var(--up)]"
             >
               <ArrowUpFromLine className="h-3.5 w-3.5" /> Buy STEEM
             </TabsTrigger>
             <TabsTrigger
               value="sell"
-              className="gap-1.5 rounded-md text-[12px] font-bold uppercase tracking-[0.14em] data-[state=active]:bg-[var(--down)]/15 data-[state=active]:text-[var(--down)] data-[state=active]:shadow-[inset_0_0_0_1px_var(--down)]/40"
+              className="gap-1.5 rounded-md text-[12px] font-bold uppercase tracking-[0.14em] data-[state=active]:bg-[var(--down)]/15 data-[state=active]:text-[var(--down)]"
             >
               <ArrowDownToLine className="h-3.5 w-3.5" /> Sell STEEM
             </TabsTrigger>
@@ -220,7 +216,7 @@ export function TradeTerminal() {
         {/* price */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="terminal-price" className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <Label htmlFor="terminal-price" className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
               Limit price · SBD per STEEM
             </Label>
             <div className="flex gap-1">
@@ -233,7 +229,7 @@ export function TradeTerminal() {
                   key={p.label}
                   type="button"
                   onClick={() => Number.isFinite(p.v) && p.v > 0 && setPrice(p.v.toFixed(6))}
-                  className="num rounded border border-border/70 px-1.5 py-0.5 text-[9px] tracking-wider text-muted-foreground transition-colors hover:border-[var(--up)]/40 hover:text-[var(--up)]"
+                  className="num rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--text-tertiary)] transition-colors hover:border-[var(--up)]/40 hover:text-[var(--up)]"
                 >
                   {p.label}
                 </button>
@@ -253,7 +249,7 @@ export function TradeTerminal() {
         {/* amount */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="terminal-amount" className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <Label htmlFor="terminal-amount" className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
               Amount · STEEM
             </Label>
             <div className="flex gap-1">
@@ -263,7 +259,7 @@ export function TradeTerminal() {
                   type="button"
                   onClick={() => quickFill(p)}
                   disabled={!account || !wallet}
-                  className="num rounded border border-border/70 px-1.5 py-0.5 text-[9px] tracking-wider text-muted-foreground transition-colors hover:border-[var(--up)]/40 hover:text-[var(--up)] disabled:opacity-30"
+                  className="num rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[9px] tracking-wider text-[var(--text-tertiary)] transition-colors hover:border-[var(--up)]/40 hover:text-[var(--up)] disabled:opacity-30"
                 >
                   {p}%
                 </button>
@@ -281,17 +277,19 @@ export function TradeTerminal() {
         </div>
 
         {/* total */}
-        <div className="flex items-center justify-between rounded-lg border border-border/60 bg-secondary/40 px-3 py-2">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-white/[0.03] px-3 py-2.5">
+          <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
             {side === "buy" ? "Cost" : "Receive"} · SBD
           </span>
-          <span className="num text-sm font-bold text-foreground">{total > 0 ? total.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "0.000"}</span>
+          <span className="num text-sm font-bold text-foreground">
+            {total > 0 ? total.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "0.000"}
+          </span>
         </div>
 
         {/* options row */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Order lifetime</Label>
+            <Label className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Order lifetime</Label>
             <Select value={ttl} onValueChange={setTtl}>
               <SelectTrigger className="h-9 text-[12px]">
                 <SelectValue placeholder="lifetime" />
@@ -305,10 +303,10 @@ export function TradeTerminal() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end justify-between gap-2 rounded-lg border border-border/60 px-3 py-2">
+          <div className="flex items-end justify-between gap-2 rounded-lg border border-[var(--border-subtle)] px-3 py-2">
             <div>
-              <Label className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Fill-or-kill</Label>
-              <p className="text-[9px] text-muted-foreground">die instead of resting</p>
+              <Label className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Fill-or-kill</Label>
+              <p className="text-[9px] text-[var(--text-tertiary)]">die instead of resting</p>
             </div>
             <Switch checked={fillOrKill} onCheckedChange={setFillOrKill} aria-label="fill or kill" />
           </div>
@@ -320,11 +318,14 @@ export function TradeTerminal() {
           disabled={!valid || build.isPending}
           onClick={() => build.mutate()}
           className={cn(
-            "h-12 gap-2 text-[13px] font-bold uppercase tracking-[0.18em]",
+            "h-12 gap-2 text-[13px] font-bold uppercase tracking-[0.18em] text-white",
             side === "buy"
-              ? "bg-[var(--up)] text-[oklch(0.15_0.02_165)] hover:bg-[var(--up)]/85"
-              : "bg-[var(--down)] text-white hover:bg-[var(--down)]/85",
+              ? "hover:opacity-90"
+              : "hover:opacity-90",
           )}
+          style={{
+            background: side === "buy" ? "var(--gradient-success)" : "var(--gradient-danger)",
+          }}
         >
           {build.isPending ? (
             <>
@@ -339,7 +340,7 @@ export function TradeTerminal() {
         </Button>
 
         {!valid && account && (amountNum > 0 || priceNum > 0) ? (
-          <p className="flex items-center gap-1.5 text-[10px] text-[var(--amberterminal)]">
+          <p className="flex items-center gap-1.5 text-[10px] text-[var(--warning)]">
             <Ban className="h-3 w-3" />
             {side === "buy"
               ? total > sbdBalance && sbdBalance > 0
@@ -380,7 +381,7 @@ function OrderPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="glass max-h-[85vh] overflow-y-auto border-border/70 sm:max-w-xl">
+      <DialogContent className="glass max-h-[85vh] overflow-y-auto border-[var(--border-default)] sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[13px] uppercase tracking-[0.18em]">
             <Check className="h-4 w-4 text-[var(--up)]" />
@@ -400,8 +401,8 @@ function OrderPreviewDialog({
         {preview ? (
           <div className="space-y-4">
             {/* op payload */}
-            <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
-              <p className="mb-2 text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-white/[0.03] p-3">
+              <p className="mb-2 text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                 operation · limit_order_create
               </p>
               <div className="num space-y-1 text-[11.5px]">
@@ -415,8 +416,8 @@ function OrderPreviewDialog({
             </div>
 
             {/* tx envelope */}
-            <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
-              <p className="mb-2 text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-white/[0.03] p-3">
+              <p className="mb-2 text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                 unsigned transaction envelope
               </p>
               <div className="num space-y-1 text-[11.5px]">
@@ -430,9 +431,9 @@ function OrderPreviewDialog({
             </div>
 
             {/* serialized hex */}
-            <div className="rounded-lg border border-border/60 bg-secondary/40 p-3">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-white/[0.03] p-3">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
                   serialized (sha256 digest preimage) · hex
                 </p>
                 <Button
@@ -445,7 +446,7 @@ function OrderPreviewDialog({
                   copy
                 </Button>
               </div>
-              <div className="scroll-thin max-h-24 overflow-y-auto rounded border border-border/50 bg-background/60 p-2">
+              <div className="scroll-thin max-h-24 overflow-y-auto rounded border border-[var(--border-subtle)] bg-[rgba(10,10,10,0.6)] p-2">
                 <p className="hex-string">{preview.serializedHex}</p>
               </div>
             </div>
@@ -467,13 +468,13 @@ function OrderPreviewDialog({
                 </Button>
               </div>
               <p className="hex-string">{preview.digestHex}</p>
-              <p className="mt-2 text-[10px] text-muted-foreground">required role: ACTIVE key · policy-checked</p>
+              <p className="mt-2 text-[10px] text-[var(--text-tertiary)]">required role: ACTIVE key · policy-checked</p>
             </div>
 
             {/* gate notice */}
-            <div className="flex items-start gap-2.5 rounded-lg border border-[var(--amberterminal)]/30 bg-[var(--amberterminal)]/8 p-3">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--amberterminal)]" aria-hidden />
-              <p className="text-[11px] leading-relaxed text-[var(--amberterminal)]/90">
+            <div className="flex items-start gap-2.5 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 p-3">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" aria-hidden />
+              <p className="text-[11px] leading-relaxed text-[var(--warning)]/90">
                 <span className="font-bold uppercase tracking-wider">Signing locked.</span>{" "}
                 Keystore + Policy Engine ship with packages/core (M2). This terminal builds,
                 serializes and verifies — it physically cannot broadcast. Nothing moved.
@@ -484,7 +485,7 @@ function OrderPreviewDialog({
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="num text-center text-[9px] uppercase tracking-[0.2em] text-muted-foreground"
+                className="num text-center text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]"
               >
                 {preview.signingStatus}
               </motion.p>
@@ -507,7 +508,7 @@ function Row({
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="shrink-0 text-muted-foreground">{k}</span>
+      <span className="shrink-0 text-[var(--text-tertiary)]">{k}</span>
       <span className="flex min-w-0 items-center gap-1.5 text-right">
         <span className="truncate text-foreground/90" title={v}>
           {v}
@@ -516,7 +517,7 @@ function Row({
           <button
             type="button"
             onClick={() => copy.onCopy(copy.label, copy.value)}
-            className="shrink-0 text-muted-foreground transition-colors hover:text-[var(--up)]"
+            className="shrink-0 text-[var(--text-tertiary)] transition-colors hover:text-[var(--up)]"
             aria-label={`copy ${copy.label}`}
           >
             {copy.copied ? <Check className="h-3 w-3 text-[var(--up)]" /> : <Copy className="h-3 w-3" />}
