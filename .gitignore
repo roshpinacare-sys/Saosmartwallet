@@ -62,3 +62,6 @@ agent/keys/
 *.db-journal
 **/*.pem
 !.env.example
+
+# SAOS-DEX — independent sub-project (own git repo, port 3010)
+/saos-dex/

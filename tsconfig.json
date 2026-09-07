@@ -43,6 +43,7 @@
     "tests",
     "scripts",
     "upload",
-    "download"
+    "download",
+    "saos-dex"
   ]
 }
