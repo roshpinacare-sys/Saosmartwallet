@@ -18,6 +18,7 @@ import {
   Ban,
   Check,
   Copy,
+  Fingerprint,
   Loader2,
   ShieldAlert,
   TerminalSquare,
@@ -26,7 +27,9 @@ import {
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { SigningDialog } from "@/components/vault/signing-dialog";
 import { LiveBadge, PanelHeader } from "@/components/terminal/primitives";
+import { useVaultStatus } from "@/hooks/use-vault";
 import {
   buildOrder,
   fmtPrice,
@@ -36,6 +39,7 @@ import {
 } from "@/hooks/use-steem-market";
 import { useDexStore } from "@/lib/dex-store";
 import { cn } from "@/lib/utils";
+import type { SignOrderRequest } from "@/lib/vault-contracts";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,6 +55,23 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Side = "buy" | "sell";
+
+/** Builds the M2 SignOrderRequest from the M1 unsigned preview (STEEM leg, SBD-per-STEEM price). */
+function signRequestFromPreview(preview: BuildOrderResponse): SignOrderRequest {
+  const leg = (s: string) => /^([\d.]+)/.exec(s)?.[1] ?? "0";
+  const p = preview.operation.payload;
+  return {
+    network: "steem",
+    account: p.owner,
+    side: preview.side,
+    amount: preview.side === "buy" ? leg(p.min_to_receive) : leg(p.amount_to_sell),
+    price: (Number(preview.effectivePrice) / 1e6).toFixed(6),
+    fillOrKill: p.fill_or_kill,
+    orderid: p.orderid,
+    orderExpiration: Math.floor(new Date(p.expiration).getTime() / 1000),
+    broadcast: true,
+  };
+}
 
 const TTL_OPTIONS = [
   { value: "3600", label: "1 hour" },
@@ -368,6 +389,10 @@ function OrderPreviewDialog({
   preview: BuildOrderResponse | null;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [signOpen, setSignOpen] = useState(false);
+  const { data: vaultStatusData } = useVaultStatus();
+  const vault = vaultStatusData?.status ?? null;
+  const signRequest = preview ? signRequestFromPreview(preview) : null;
   const copy = async (label: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -471,14 +496,45 @@ function OrderPreviewDialog({
               <p className="mt-2 text-[10px] text-[var(--text-tertiary)]">required role: ACTIVE key · policy-checked</p>
             </div>
 
-            {/* gate notice */}
-            <div className="flex items-start gap-2.5 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 p-3">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" aria-hidden />
-              <p className="text-[11px] leading-relaxed text-[var(--warning)]/90">
-                <span className="font-bold uppercase tracking-wider">Signing locked.</span>{" "}
-                Keystore + Policy Engine ship with packages/core (M2). This terminal builds,
-                serializes and verifies — it physically cannot broadcast. Nothing moved.
-              </p>
+            {/* M2 signing entry */}
+            <div className="space-y-2.5 rounded-lg border border-[var(--border-subtle)] bg-white/[0.03] p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                  sign &amp; broadcast · sovereign vault
+                </p>
+                {vault && vault.initialized ? (
+                  <span className="num text-[9px] uppercase tracking-[0.14em]" style={{ color: vault.locked ? "var(--warning)" : "var(--up)" }}>
+                    {vault.locked ? "locked · step-up" : "unlocked"}
+                  </span>
+                ) : null}
+              </div>
+
+              {vault && !vault.initialized ? (
+                <div className="flex items-start gap-2.5 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 p-3">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" aria-hidden />
+                  <p className="text-[11px] leading-relaxed text-[var(--warning)]/90">
+                    <span className="font-bold uppercase tracking-wider">Vault not initialized.</span>{" "}
+                    Set up the Sovereign Key Vault in the VAULT tab (7), then return to sign. Nothing moved.
+                  </p>
+                </div>
+              ) : vault && vault.locked ? (
+                <div className="flex items-start gap-2.5 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 p-3">
+                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--warning)]" aria-hidden />
+                  <p className="text-[11px] leading-relaxed text-[var(--warning)]/90">
+                    <span className="font-bold uppercase tracking-wider">Vault locked.</span>{" "}
+                    Unlock in the VAULT tab (7) — or sign with a step-up password inside the signing dialog. Nothing moved.
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  size="lg"
+                  className="h-11 w-full gap-2 text-[12px] font-bold uppercase tracking-[0.18em] text-white hover:opacity-90"
+                  style={{ background: "var(--gradient-success)" }}
+                  onClick={() => setSignOpen(true)}
+                >
+                  <Fingerprint className="h-4 w-4" /> Sign with Vault
+                </Button>
+              )}
             </div>
 
             <AnimatePresence>
@@ -492,6 +548,8 @@ function OrderPreviewDialog({
             </AnimatePresence>
           </div>
         ) : null}
+
+      <SigningDialog open={signOpen} onOpenChange={setSignOpen} request={signRequest} />
       </DialogContent>
     </Dialog>
   );

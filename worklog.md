@@ -213,3 +213,111 @@ Stage Summary:
 - המשתמש מקבל מסך ברמת trading platform אמיתית: design system עקבי מטוקנים, כל מספר מתעדכן באנימציה, כל כרטיס עם hover glow, גרפי עומק וספארק-ליין על נתוני session אמיתיים, skeleton בכל טעינה, responsive מושלם 390→1440px.
 - שכבת הנתונים לא נגעה: packages/hooks/API routes זהים — החוק "zero mock" נשמר; offline/offline-values מוצגים כ"—" או הודעת כישלון, לעולם לא מומצאים.
 - תיקוני הקונסולה מתועדים כאן לדורות; אפס סודות בקוד; signing עדיין נעול (M2).
+
+---
+Task ID: 2-a
+Agent: general-purpose (crypto+vault) — finished by main agent after agent deadline
+Task: packages/core layers 1–2 — CryptoEngine (Argon2id KDF, AES-256-GCM/ChaCha20-Poly1305 envelope, Shamir SSS, ZK Schnorr) + SovereignVault hierarchy
+
+Work Log:
+- crypto/kdf.ts: Argon2id via hash-wasm (64 MiB / t=3 / p=1 / 32B — the M2 brute-force budget ~1s), PasswordVerifier build + timingSafeEqual verify (never throws).
+- crypto/cipher.ts: envelope AEAD — AES-256-GCM + ChaCha20-Poly1305 (node:crypto, with pure-TS RFC 8439 fallback), content-CEK wrapped under master key (layers), SHA-256 checksum, AAD roundtrip, tamper → VaultError DECRYPTION_FAILED.
+- crypto/shamir.ts: GF(256) Shamir SSS (AES field 0x11B, log/exp tables, Lagrange@0), 1≤t≤n≤254.
+- crypto/zk.ts: Fiat–Shamir Schnorr identification over secp256k1 (@noble/curves v2) + deriveCommitment enrollment anchor.
+- vault/defaults.ts: emptyState + default rule sets (deny-huge / approve-large / step-up dynamic; rate-limit + new-counterparty contextual; high-risk composite).
+- vault/keys.ts: VaultKeys — seal/reveal WIF material under derived key, STM public keys persisted, revoke semantics.
+- vault/vault.ts: SovereignVault — initialize (master 3-of-5 + 5 network + 13 soldier + 4 purpose vaults per M2 spec), unlock/lock (volatile key, zero-fill), auto-lock, addKey step-up, exportState, getStatus + computeSecurityScore heuristics.
+- FIXED post-agent (main): shamir polyEval Horner missing final multiply (all shares identical → detection via 2-of-3 single-byte trace); initialize() requireState on first boot → fresh emptyState; ZK verify anchored to stored enrollment commitment (self-consistent foreign transcripts no longer pass); cipher union-type overloads removed.
+
+Stage Summary:
+- packages/core typechecks clean (0 errors); 25/25 functional sanity checks pass (cipher roundtrips both algs, tamper detection, shamir subsets, verifier accept/reject, ZK accept + 3 reject paths, vault lifecycle 5N/13S/4P, security score, persistence, policy rules, audit chain, pdf/csv/json reports).
+
+---
+Task ID: 2-b
+Agent: general-purpose (policy+audit) — verified by main agent after agent deadline
+Task: packages/core layers 3+6 — PolicyEngine (static/dynamic/contextual/composite + anomaly detection) + AuditSystem (hash-chain, query, json/csv/pdf reports)
+
+Work Log:
+- policy/defaults.ts: 6 compiled-in static rules (no-transfer-with-posting-key, memo-key-cannot-sign, operation-allowlist, daily-limit, owner-key-step-up, soldier-permissions) with detail-injected config; default dynamic/contextual/composite rule data.
+- policy/engine.ts: evaluate() pipeline — static → dynamic → contextual (time window/rate/new-counterparty) → composite (depth-1 refs) → anomalies (frequency_spike/unusual_amount/new_counterparty/odd_hour/rapid_fire/failed_history); PolicyDecision with full checks[] trace for the signing dialog; step-up satisfied-session suppression.
+- audit/audit.ts: hash-chained events (eventHash = sha256(prev ‖ canonicalJson)), genesis from vaultInstanceId, query/count/head, verifyIntegrity walk (firstBadSeq), generateReport json/csv/pdf, buildOperationContext (history + behavior aggregates for the policy engine).
+- audit/pdf.ts: minimal valid multi-page PDF writer (Helvetica, exact xref offsets, %%EOF).
+- Verified: chain of 5 verifies OK, newest-first paging, PDF decodes to valid %PDF…%%EOF with xref+startxref, CSV rows, JSON counts.
+
+Stage Summary:
+- Policy deny-paths proven: posting-key transfer, daily-limit exceed, soldier transfer block, 70-ops/hour rate limit; allow-path: active-key limit_order_create.
+- pdf report body contract: base64 of PDF bytes (documented in types.ts + audit.ts).
+
+---
+Task ID: 3
+Agent: general-purpose (signing+backup) — verified+fixed by main agent
+Task: packages/core layers 4+5 — SigningOrchestrator (sign/multiSign/batchSign/crossChainSign/simulate) + BackupManager (encrypted/sharded/social/dead-man/QR) + root barrel
+
+Work Log:
+- signing/orchestrator.ts: SigningOrchestrator — buildContext (audit history + vault-derived policy config injection: allowedOperations/dailyLimit/spentToday/soldierPermissions), evaluateAndCheck (fail-closed gate, POLICY_DENIED/POLICY_STEP_UP_REQUIRED with decision in error.details), sign (unlock → gate → key reveal via SovereignVault.revealKeyFor → adapter.sign → optional broadcast via capabilities check + timeLock + confirm gate → audit signing_attempt/key_used/broadcast), simulate (honest: missing_adapter/offline/insufficient_balance/policy risks, RC percent, "0" fee for steem — no invented numbers), multiSign (pre-chain primitive, master threshold 3), batchSign (per-entry isolation), crossChainSign (no adapter → errors[] + null signature — never fabricated).
+- backup/backup.ts: BackupManager — createBackup (password-sealed state + optional Shamir wrapping layer), restoreBackup (HMAC timing-safe + checksum + fresh-vault fail-closed), setupSocialRecovery (recovery key R seals state; R split to contacts; recoveryPackage returned to caller — shares/payload never persist server-side), recoverFromSocial (t shares + package + NEW password → fresh vault), setupDeadManSwitch + deadManOverdue + heartbeat, createAirGappedBackup (qrcode → data-URL frames "SAOSVAULT|1|i/n|chunk").
+- Root barrel packages/core/src/index.ts + layer barrels.
+- FIXED post-agent (main): sharded restore demanded the backup password on top of shards — wrapping key now seals the state document DIRECTLY (shards alone restore; password-only path kept for unsharded packages; legacy dual-layer packages still accepted). Verified: unsharded password-only ✓, sharded shards-only 2-of-3 subset ✓, too-few shards ✓, tampered signature ✓.
+
+Stage Summary:
+- 14/14 end-to-end sanity checks pass: policy allow/deny gates, honest missing-adapter simulation, fail-closed sign without key, backup roundtrips (unsharded + sharded + social recovery full flow), dead-man math + heartbeat, ≥1 QR data-URL frames, audit chain integrity after the whole flow.
+- packages/core typechecks clean (0 errors). The signing route (task 4-a) needs only: orchestrator + broadcast-enabled SteemAdapter + the vault runtime singleton.
+
+---
+Task ID: 4-a
+Agent: general-purpose (vault API routes) — verified by main agent
+Task: /api/vault/* routes + Prisma stores + vault runtime singleton + broadcast-enabled SteemAdapter + steem-order extraction
+
+Work Log:
+- src/lib/steem-order.ts: deterministic order-build extracted from the M1 build route (buildSteemOrderTx with exact orderid/orderExpiration passthrough for signing rebuilds); build route refactored onto it with byte-identical response shape.
+- src/lib/vault-stores.ts: PrismaVaultStorage (VaultState singleton) + PrismaAuditStore (AuditEvent rows, seq-ordered, JS-side exact vaultId containment).
+- src/lib/vault-runtime.ts: getVaultRuntime() — SovereignVault + AuditSystem + PolicyEngine + SigningOrchestrator wired to a broadcast-enabled SteemAdapter (only path to broadcast), 30s auto-lock/heartbeat sweep, VaultError→HTTP status mapping (423 locked / 403 policy / 401 wrong-password / …).
+- 14 routes under /api/vault/: status, init, unlock, lock, keys (GET/POST/DELETE), networks, soldiers, policy (GET/PUT), simulate, sign, backup (POST/PUT), social-recovery (POST/PUT), deadman (PUT), audit (query/verify/report json+csv+raw pdf).
+- FIXED post-agent (main): AuditEvent.timestamp Int→BigInt (epoch ms overflows Int32 — Prisma read failed with "Conversion failed"); schema pushed, store converts BigInt↔Number.
+
+Stage Summary:
+- Live-verified through the browser + curl: status/init/unlock/keys/sign/audit all green; signature over the real tx digest recovers the vault public key (crypto-verified); audit chain integrity 8/8; ?report=pdf serves a valid %PDF.
+
+---
+Task ID: 4-b
+Agent: general-purpose (vault UI) — verified by main agent
+Task: Vault UI layer — use-vault hooks + wizard/signing/policy/backup/audit components + DEX signing gate integration
+
+Work Log:
+- src/hooks/use-vault.ts: TanStack Query hooks for every /api/vault/* surface (status 15s poll, keys 30s, audit 10s) + 14 typed mutations with status invalidation + ApiError-aware toast handling.
+- components/vault/: vault-status-widget (score/session countdown/audit-integrity/findings/unlock-lock), vault-setup-wizard (6 steps: welcome → password+strength meter → recovery → networks → soldiers → complete+auto-backup), signing-dialog (policy-gated signing: summary grid → simulate panel with balance legs/risks/RC → progress checklist → signed/broadcast result → red policy-violation panel per Flow 3), policy-management-dialog, backup-recovery-dialog (backup/shards/QR/restore/social/dead-man tabs, client-side SAOSVAULT QR frames), audit-panel (live feed + VERIFY + report downloads), vault-console (VAULT tab assembly), index barrel.
+- trade-terminal.tsx: "Signing locked (M2)" gate replaced by real SIGN WITH VAULT — builds SignOrderRequest from the preview payload (deterministic orderid/orderExpiration), SigningDialog wired in; unsigned hex/digest display preserved.
+- FIXED post-agent (main): unused eslint-disable removed.
+
+Stage Summary:
+- Browser-verified end-to-end: wizard full run → initialized (5N/13S/4P, score live); unlock → 300s countdown ticks; DEX build → SIGN WITH VAULT → policy PASS → progress checklist → SIGNED (signed-only) + copyable txid; fail-closed KEY_NOT_FOUND before key seal — honest error panel + toast; simulation panel shows -0.960 SBD / +10.000 STEEM legs with PASS badge; audit feed live (vault_created → … → signing_attempt), VERIFY = intact; 390px mobile layout clean.
+
+---
+Task ID: 5
+Agent: Z.ai Code (main)
+Task: Integration, verification, hardening — page.tsx VAULT tab, wallet widget, audit BigInt fix, state reset, full E2E verification
+
+Work Log:
+- page.tsx: VAULT section added (tab 7, ShieldCheck icon, keyboard 7) rendering VaultConsole; compact VaultStatusWidget mounted above WalletPanel in the WALLET tab; header comment + keyboard hint updated to 1–7.
+- Fixed AuditEvent.timestamp Int32 overflow (schema BigInt + db push + store conversion).
+- Reset vault state (dev DB) for a clean user handoff after agent-era test data (@qaaccount key) polluted it; restarted dev server to flush the stale runtime singleton.
+- eco-registry.ts: "Keystore M2" moved from gated/planned to live with the real layer list; honest new gap "Signing keys held hot in sandbox" replaces the resolved "keystore missing" gap.
+- Full E2E in agent-browser (1440px + 390px): 7 tabs, wizard golden path, unlock countdown, DEX sign flow, crypto verification (recoverFromCompact(sig, digest) == vault pubkey via bun probe), audit integrity, PDF report bytes (%PDF-1.4 … %%EOF), zero console/page errors, dev.log clean.
+
+Stage Summary:
+- The M2 gate is OPEN: signing flows through packages/core with policy + audit on every attempt; broadcast stays user-explicit. Success criteria: hierarchy ✓, crypto engine ✓ (all roundtrips + tamper paths), policy engine ✓ (static/dynamic/contextual/composite + anomalies), orchestrator ✓ (sign proven live; multi/batch/crossChain fail-honest), backup ✓ (password + shards-only + social + dead-man + QR), audit ✓ (tamper-evident, reports), UX ✓ (wizard/signing/widget/policy/backup), integration ✓ (5 networks config, 13 soldiers, DEX signing, dashboard), zero-mock ✓ (simulate reports missing adapters honestly; no fabricated numbers).
+
+---
+Task ID: 6
+Agent: Z.ai Code (main)
+Task: Documentation + push
+
+Work Log:
+- packages/core/README.md rewritten from scaffold placeholder to the live 6-layer architecture doc with security invariants + verification record.
+- docs/security.md: threat model (assets, 12-row adversary/control matrix, residual risks: hot-server custody / gateway trust / no biometrics yet, incident playbook).
+- docs/vault.md: user guide (wizard, daily operation, policy, backup/recovery, audit, REST surface).
+- README.md: status → M0+M1+M2, packages table, M2 gate section, VAULT tab row, keyboard 1–7.
+- worklog.md: this + prior entries; no secrets anywhere (token file remains gitignored).
+
+Stage Summary:
+- M2 SHIPPED: Sovereign Key Vault live end-to-end, browser-verified, docs complete → commit + push to origin main.

@@ -10,16 +10,17 @@
  *   SAOS-NET  — our sovereign chain: engine, sovereign book depth, oracle, pools
  *   BRIDGES   — anchor rails + live anchor feed with real txids + TRON pulse
  *   REGISTRY  — the repo/scan catalog + honest gaps
- *   WALLET    — balances, Steem Power, RC manabar, open orders
+ *   WALLET    — balances, Steem Power, RC manabar, open orders, vault status
+ *   VAULT     — Sovereign Key Vault: wizard, policy engine, backup, audit
  *
- * Every market number is chain-sourced — zero mock data. Keyboard: 1–6
- * switch sections. Signing/broadcast remain gated by design (M2).
+ * Every market number is chain-sourced — zero mock data. Keyboard: 1–7
+ * switch sections. Signing flows through the M2 keystore + policy engine.
  */
 
 import { useEffect, useState } from "react";
 
 import { motion } from "framer-motion";
-import { GitBranch, Grid3x3, Landmark, Server, Table2, Wallet2 } from "lucide-react";
+import { GitBranch, Grid3x3, Landmark, Server, ShieldCheck, Table2, Wallet2 } from "lucide-react";
 
 import { BridgeMonitor } from "@/components/terminal/bridge-monitor";
 import { TerminalHeader } from "@/components/terminal/eco-header";
@@ -30,11 +31,13 @@ import { RegistryPanel } from "@/components/terminal/registry-panel";
 import { SaosNetPanel } from "@/components/terminal/saosnet-panel";
 import { StatusFooter } from "@/components/terminal/status-footer";
 import { WalletPanel } from "@/components/terminal/wallet-panel";
+import { VaultConsole } from "@/components/vault/vault-console";
+import { VaultStatusWidget } from "@/components/vault/vault-status-widget";
 import { DexView } from "@/components/trading/dex-view";
 import { Providers } from "@/components/providers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type SectionId = "grid" | "dex" | "saosnet" | "bridges" | "registry" | "wallet";
+type SectionId = "grid" | "dex" | "saosnet" | "bridges" | "registry" | "wallet" | "vault";
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: React.ReactNode }> = [
   { id: "grid", label: "GRID", icon: <Grid3x3 className="h-3.5 w-3.5" aria-hidden /> },
@@ -43,6 +46,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: React.ReactNode }> =
   { id: "bridges", label: "BRIDGES", icon: <GitBranch className="h-3.5 w-3.5" aria-hidden /> },
   { id: "registry", label: "REGISTRY", icon: <Landmark className="h-3.5 w-3.5" aria-hidden /> },
   { id: "wallet", label: "WALLET", icon: <Wallet2 className="h-3.5 w-3.5" aria-hidden /> },
+  { id: "vault", label: "VAULT", icon: <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> },
 ];
 
 export default function Home() {
@@ -147,8 +151,20 @@ export default function Home() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25 }}
+                className="flex flex-col gap-5"
               >
+                <VaultStatusWidget compact />
                 <WalletPanel />
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="vault" className="mt-0 outline-none">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <VaultConsole />
               </motion.div>
             </TabsContent>
           </Tabs>
