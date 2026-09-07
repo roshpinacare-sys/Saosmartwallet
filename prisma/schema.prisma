@@ -30,3 +30,36 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ---------------------------------------------------------------------------
+// Sovereign Key Vault (M2 — packages/core persistence)
+// ---------------------------------------------------------------------------
+
+/// Singleton row ("vault") holding the full non-secret vault state document:
+/// hierarchy metadata, policy rule sets, EncryptedKey envelopes (ciphertext +
+/// iv + tag — safe at rest; plaintext keys exist only in volatile memory while
+/// unlocked). The master-password verifier is an Argon2id parameter hash.
+model VaultState {
+  id          String   @id @default("vault")
+  version     Int      @default(1)
+  stateJson   String
+  genesisHash String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Tamper-evident audit chain. eventHash = SHA-256(previousEventHash ‖ canonical
+/// event). seq is a dense sequence assigned by the audit engine. timestamp is
+/// epoch MILLISECONDS — BigInt, because Int32 overflows in 1970+68 years.
+model AuditEvent {
+  id                String  @id @default(cuid())
+  seq               Int     @unique
+  timestamp         BigInt
+  type              String
+  actorJson         String
+  targetJson        String
+  result            String
+  reason            String?
+  previousEventHash String
+  eventHash         String
+}

@@ -1,6 +1,6 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-> **סטטוס: M0+M1 מומשו ואומתו מול ה-chain · keystore/policy ממתינים ל-M2**
+> **סטטוס: M0+M1+M2 מומשו ואומתו מול ה-chain · ה-Sovereign Key Vault חי — ה-DEX חותם דרך keystore+policy**
 > עדכון אחרון: 2026-09-07 (Asia/Jerusalem)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
@@ -36,7 +36,7 @@
 |---|---|---|
 | [`packages/crypto/`](./packages/crypto/README.md) | PrivateKey/PublicKey/חתימות, WIF + "STM", גזירת מפתחות מ-password/brain-key | ✅ מומש ואומת |
 | [`packages/chains/steem/`](./packages/chains/steem/README.md) | מנוע serialization בינארי (varint/asset/ops/tx) + SteemAdapter עם broadcast נעול | ✅ מומש ואומת |
-| [`packages/core/`](./packages/core/README.md) | Keystore AES-256-GCM + Policy Engine | ⬜ M2 |
+| [`packages/core/`](./packages/core/README.md) | Sovereign Key Vault — Argon2id + AES-GCM/ChaCha20 + Shamir + ZK · Policy Engine · Signing Orchestrator · Backup · Audit hash-chain | ✅ M2 |
 | `tools/serialize-test.ts` | סוויטת אימות מול chain חי | ✅ **30/30 PASS** |
 | `tools/m1-op-test.ts` | סוויטת limit_order_create מול oracle | ✅ **27/27 PASS** |
 
@@ -66,7 +66,7 @@ bun tools/m1-op-test.ts                                                # M1: lim
 
 **ראיית קצה:** פקודה שנבנתה דרך ה-API (BUY 100 STEEM @ 0.098) חזרה **bit-exact** מול serializer הצומת — אומת ב-wire ב-2026-09-07. באג M0 שהתגלה ב-M1 ותוקן: `max_rc` ברמת החשבון (לא בתוך rc_manabar).
 
-**שער בטיחות נשמר:** הטרמינל בונה, מסדר ומאמת — חתימה נעולה עד keystore (packages/core, M2); broadcast fail-closed.
+**שער M2 נפתח:** החתימה עוברת דרך ה-Sovereign Key Vault — מפתחות חתומים (Argon2id + AES-256-GCM), כל חתימה עוברת Policy Engine (fail-closed) ונרשמת בשרשרת audit בלתי-הפיכה; broadcast רק בהתערבות מפורשת של המשתמש.
 
 ```bash
 bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.steemit.com
@@ -82,12 +82,13 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 | **DEX** | Order Book + Trading Terminal + Tape — השוק האמיתי STEEM/SBD | api.steemit.com (M0/M1) |
 | **SAOS-NET** | מנוע הרשת הריבונית שלנו: bench 130K tx/s, treasury P&L, הספר-הריבוני, ציטוטי oracle חתומים, wrapped assets, delegations | `state.json` + `grid98-state.json` (daemon-push ל-repo `steem`) |
 | **BRIDGES** | מטריצת עוגנים (STEEM 🟢/HIVE ⏳/BLURT ⏳/TRON 🟢) + Live Anchor Feed עם txids אמיתיים + attests | SAOS-NET checkpoints |
-| **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON, keystore M2) | סריקה 2026-09-07 |
-| **WALLET** | יתרות/SP/RC/פקודות פתוחות — מעקב חשבון חי | api.steemit.com |
+| **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON · חתימה cold/hardware) | סריקה 2026-09-07 |
+| **WALLET** | יתרות/SP/RC/פקודות פתוחות + סטטוס הכספת (score/נעילה/audit) | api.steemit.com |
+| **VAULT** | Sovereign Key Vault: wizard 6-שלבי · Policy Engine · Backup/Shamir/Social/Dead-man · Audit chain עם דוחות json/csv/pdf | packages/core (M2) |
 
 **מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · daemon-state של SAOS-NET (גובה 52,000+, 1,112 checkpoints מאומתים, oracle חתום-שעתי). כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 
-**קיצורי מקלדת:** מקשים 1–6 מחליפים מסכים.
+**קיצורי מקלדת:** מקשים 1–7 מחליפים מסכים (7 = VAULT).
 
 ### 🎨 Enterprise redesign (2026-09-07) — design system מקצועי מלא
 

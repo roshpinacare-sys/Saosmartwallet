@@ -258,7 +258,7 @@ export const ECO_SERVICES: EcoServiceInfo[] = [
   { name: "CHAINTALK CHL-1", what: "Cross-network command language — predict→act→measure→match, ECDH memos", where: "steem repo", status: "live" },
   { name: "Evidence Packs", what: "Merkle verify-packs — independent recomputation of every seal", where: "saos-dex + foundry", status: "live" },
   { name: "Roshpina Kernel", what: "Passports (Ed25519), escrow, RBAC, risk, settlement rails — 17 modules", where: "roshpina repo", status: "active" },
-  { name: "Keystore M2", what: "AES-256-GCM vault + Policy Engine (Aurora Modes) — the missing signing gate", where: "THIS repo (planned)", status: "gated" },
+  { name: "Keystore M2", what: "Sovereign Key Vault — Argon2id + AES-256-GCM/ChaCha20 + Shamir + ZK, 3-of-5 master, policy-gated signing, hash-chain audit", where: "THIS repo (packages/core)", status: "live" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ export const ECO_SERVICES: EcoServiceInfo[] = [
 
 export const ECO_GAPS: EcoGap[] = [
   { title: "No Hive/Blurt/TRON adapters in Saosmartwallet", detail: "M0 proves the adapter pattern on Steem. The Graphene twins are cheap ports; TRON needs an TVM adapter. Until then this wallet trades STEEM/SBD only.", severity: "high" },
-  { title: "Keystore (M2) missing", detail: "The DEX terminal builds and previews real limit_order_create payloads (bit-exact) but cannot sign — packages/core keystore + policy engine is the gate.", severity: "high" },
+  { title: "Signing keys held hot in sandbox", detail: "M2 keystore seals keys (AES-256-GCM under Argon2id) and gates every signature through policy + audit, but key material still lives on the app server. Hardware/air-gapped signing is the next hardening step.", severity: "medium" },
   { title: "Hive RC regen wait", detail: "Fleet soldiers RC-starved (2–5% manabar); heal loop allocates HP, ETA measured ~5 days. Anchors honestly gated meanwhile.", severity: "medium" },
   { title: "Blurt nodes down (0/6)", detail: "saboin RPC 'down for maintenance' — probes fail; anchors on Blurt paused honestly with 30min cooldown.", severity: "medium" },
   { title: "TRON identity funding", detail: "Bridge identity derived and proven but auto-anchoring waits on ≥0.3 TRX funding; ring runs free-bandwidth only.", severity: "low" },
