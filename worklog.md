@@ -168,3 +168,26 @@ Stage Summary:
 - באג M0 נתגלה ותוקן בזכות ה-UI חושף-הנתונים (RC manabar) — העיקרון "ה-UI מאמת את ה-backend" שוב שילם.
 - אבטחה נשמרת: אפס מפתחות בכל שרשרת ה-M1; ה-adapter ב-API נבנה fail-closed; הטרמינל מציג את השער במפורש.
 - פתוח ל-M2: packages/core (keystore AES-256-GCM + Policy Engine/Aurora Modes) — ברגע שיסופק, כפתור החתימה מתחבר ל-digestHex שכבר מוצג.
+
+---
+Task ID: M1-grid
+Agent: Z.ai Code (main)
+Task: Grid Dashboard — סריקה מלאה של כל האקוסיסטם (8 ריפו של roshpinacare-sys) ובניית מרכז-שליטה מקצועי שמציג את כל הרשתות/טוקנים/צמדים/גשרים — הכל חי, אפס mock data.
+
+Work Log:
+- סריקה חיה מול GitHub API (טוקן מ-upload, מעולם לא צוטט): 8 ריפו — steem (181MB, SAOS AI Agent OS: fleet 13/28, SAOS-NET, grid98), saos-dex (בורסה ריבונית SIM + relay), saos-sovereign-platform (Foundry v3), saos-sovereign-foundry (v2 מתועד), Saosmartwallet (M0/M1), roshpina (kernel 17 מודולים), anchor-baseline + Project-files (ארכיונים).
+- ניתוח עומק: READMEs, עצים, package.json, STATUS.md, state files חיים — זוהו 5 רשתות (STEEM/HIVE/BLURT/TRON/SAOS-NET), ~25 טוקנים (כולל 9 עטיפות TRC20 + עטיפות חוץ), 3 גשרים עם txids אמיתיים, 10 שירותים.
+- גילוי מפתח: SAOS-NET חיה דרך daemon-push — state.json + grid98-state.json נדחפים ל-repo steem ונקראים כאן חי (גובה 52,522, 64 cps בחלון, 1,112 verified, bench 130,541 tx/s, treasury 18,440.8 SAOS, oracle חתום-שעתי 15 נכסים, 11 בריכות, 20 עטיפות, 18 delegations, TRON pulse חי).
+- שכבת שרת חדשה: src/lib/eco-server.ts (TTL cache, probes fail-soft עם fallbacks ל-Hive×3 ו-Blurt×2, קריאת GitHub raw עם טוקן בצד-שרת בלבד) + 3 routes: /api/eco/networks · /api/eco/saosnet · /api/eco/anchors.
+- ראיות אמפיריות: verified הוא מערך (לא אובייקט) — תוקף לספירה נכונה (1112); Blurt חי דווקא דרך blurt-rpc.saboin.com (fallback הפריך את "nodes 0/6" מהסריקה — החי מנצח); px ב-oracle = nano-USD (1e9=$1).
+- registry סטטי מהסריקה: src/lib/eco-registry.ts (8 ריפו, 5 רשתות, 8 צמדים, 4 גשרים, 10 שירותים, 5 פערים כנים) — עובדות-קוד בלבד, אפס נתוני-שוק.
+- UI חדש: src/components/grid/ (eco-header עם LED-strip חי לכל שרשרת + שעון UTC, kpi-strip, network-grid עם Sheet drill-down, pairs-matrix sortable עם source-badges, bridge-monitor עם Live Anchor Feed של txids אמיתיים + TRON pulse, saosnet-panel (מנוע/ספר/oracle/pools/wrapped/delegations), registry-panel, eco-bits) — הכל על שפת העיצוב של M1 (glass, num, LEDs, Framer Motion).
+- page.tsx מוקם מחדש כמרכז-טאבים: GRID / DEX (רכיבי M1 קיימים) / SAOS-NET / BRIDGES / REGISTRY / WALLET (WalletPanel קיים) + קיצורי מקלדת 1–6; layout metadata עודכן; footer BUILD GRID·M1.
+- אימות דפדפן מקצה לקצה (agent-browser): 5/5 שרשראות ONLINE עם גבהים חיים מתגלגלים (STEEM #109,376,4xx · HIVE #109,710,8xx · BLURT #63,440,2xx · TRON #86,042,4xx · SAOS-NET #52,522); כל 6 הטאבים נבדקו ויזואלית; drill-down sheet נפתח; wallet golden path (@steem: 1740.618 STEEM / 5627.804 SBD / 14.19M SP / RC 24.7%); קיצורי מקלדת עובדים; מובייל 390px תקין; אפס שגיאות קונסולה.
+- lint נקי · README עודכן (סעיף SAOS GRID) · dev.log בלי שגיאות.
+
+Stage Summary:
+- המשתמש רואה את כל האקוסיסטם במסך אחד: 5 רשתות חיות, 8 שווקים במטריצה, עוגנים חיים עם txids, הרשת הריבונית שלנו עם מנוע/oracle/עטיפות — הכל מה-chain, אפס mock.
+- החוק "רשת שנופלת = נתון" נשמר: offline מוצג באדום עם הסיבה, לעולם לא מוסתר או מומצא.
+- ארכיטקטורה מוכנה ל-המשך: adapters ל-Hive/Blurt (Graphene תאומים) ו-TRON מסומנים כפערים ב-REGISTRY; keystore M2 עדיין השער לחתימה.
+- מקורות חיים מנוטרים: 4 RPC ציבוריים + daemon-state (GitHub raw) — כולם עם cache/TTL ו-fallbacks.

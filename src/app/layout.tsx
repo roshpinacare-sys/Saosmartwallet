@@ -15,10 +15,20 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SAOSMART TERMINAL — STEEM/SBD Internal DEX",
+  title: "SAOS GRID — Ecosystem Command Center",
   description:
-    "Live trading terminal for the Steem internal market (STEEM/SBD): order book, recent fills, limit-order builder and wallet dashboard. Built on the M0 chain adapter and oracle-verified binary serializer.",
-  keywords: ["Steem", "SBD", "DEX", "order book", "trading terminal", "blockchain wallet"],
+    "Professional grid dashboard for the SAOS ecosystem: five live-probed chains (STEEM, HIVE, BLURT, TRON, SAOS-NET), trading pairs matrix, cross-chain bridge monitor, sovereign chain explorer, and the STEEM/SBD internal-market DEX. Zero mock data.",
+  keywords: [
+    "SAOS",
+    "Steem",
+    "Hive",
+    "TRON",
+    "SAOS-NET",
+    "DEX",
+    "grid dashboard",
+    "trading terminal",
+    "blockchain wallet",
+  ],
   authors: [{ name: "Saosmartwallet" }],
 };
 
