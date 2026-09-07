@@ -82,3 +82,25 @@ Stage Summary:
 - SAOS-DEX מהדורה-מוסדית חיה על 3010: גרף TradingView-סטנדרט זורם, long-poll מבוסס-אירוע, System Health עם מדדים-אמת, Relay מאומת-עצמית (30 verified/0 mismatches מול-RPC ציבורי, h3036+), breakers closed, אפס אימוג'ים
 - הפרדת-מסדי-נתונים תקיפה ולצמיתות: לדמון-3010 יש dex.db משלו; הגשר-מוסיף-זאת גם-לעתיד
 - פתוח-למסלול: /metrics ל-Prometheus (M1), הפרדת-Signer/Executor+HSM (M2), WS-אמת (M3) — מתועד ב-ARCHITECTURE_ROADMAP.md
+
+---
+Task ID: CHAOS-1..5 (Pre-Mainnet Hardening — Chaos & Audit Prep)
+Agent: Z.ai Code (SAOS-DEX chaos/audit agent)
+Task: מבחן-כאוס מבוקר (60ש׳ ניתוק-RPC + הזרקת-stateRoot מזויף), ניקיון-קוד לביקורת, אסטרטגיית-נזילות, push.
+
+Work Log:
+- CHAOS-1: סריקת-ביקורת — 0 TODO/FIXME; 3 `console.log` (relay/chain) אותרו לטיפול; וקטורי-בדיקה אמת זוהו ב-state/anchors.json (עיגונים-מאומתים עם txid)
+- CHAOS-2: `src/lib/dex/chaos.ts` — מודול-הזרקה אינרטי (מחיצת-רשת פר-שרשרת, פקיעה-עצמית, globalThis); שער-הזרקה ב-relay.ts (בתוך-נתיב-הכשל הרגיל: catch → breakerOnFailure → backoff); `SAOS_DEX_STATE_DIR` לבידוד-מצב כלי-בדיקה; `relayAuditVerify` — ערוץ-אימות מלא-נתיב (ALERT+מדדים) לכלי-ביקורת/צד-שלישי
+- CHAOS-3: `scripts/chaos-test.ts` — תרחיש A: מחיצה 60ש׳ על steem+hive+tron עם 5 חותמות בזמן-אמת; תרחיש B: stateRoot מזויף מול-txid אמת דרך RPC ציבורי (קריאה-בלבד) + בקרה-חיובית; תרחיש C: txid רפאים → "not indexed" כנה; לכידת-ALERT דרך עטיפת-console.error
+- CHAOS-4: 3 ריצות — ריצה-1 חשפה באג אמת (שער-ההזרקה היה מעל-ה-try → נבלע ב-processQueue, breaker לא נספר); ריצה-2 חשפה מדד-מת (`breakerTrips` גלובלי מעולם לא קושר); ריצה-סופית **13/13 PASS**: כל-3 ה-breakers OPEN ב-31–46ש׳, תור-כנה (queue=5), אפס-תעבורת-רשת (11 רשומות 'chaos:'), הזרקה זוהתה+ALERT+מיסמאץ'+סירוב-אישור, not-indexed לא-נספר. `CHAOS_TEST_RESULTS.md` נכתב אוטומטית מהריצה
+- CHAOS-5 (audit): console.log→console.info ×3; JSDoc SECURITY INTENT ל-matchBook (אינווריאנטות-escrow, איסור-מילוי-עצמי, דטרמיניזם) / verifyOnChain (אמון-אפס בעצמנו) / seal (עדות-קריפטוגרפית, relay-לעולם-לא-חוסם); ARCHITECTURE_ROADMAP.md — סעיף Chaos & Audit Readiness; `LIQUIDITY_STRATEGY.md` — L1-זרע/60-40, L2-מייקר-מתומרץ מעמלות-מדודות בלבד, L3-שילובים מאחורי-ביקורת, גיבוי-1:1 + כנות-כלכלית כאבני-יסוד
+- אימות-דפדן: TypeError ב-SystemHealthPanel (`breakerTrips` של-undefined) התגלה — בודד כ-stale-dev-chunk-cache בסשן-דפדן ישן (סשן-טרי: 0 שגיאות, הפאנל תקין); בכל-זאת הוקשחו כל-קריאות-המדדים ל-shape-safe (`fix(ui)`) — ביקורת-הדפדן מצאה ותיקנה
+- git: 5 קומיטים Conventional — 4c377ef test(chaos) · 4053f47 chore(audit) · 6a66d31 docs(liquidity) · 1bc74e9 chore(state) · 69ce609 fix(ui) → push מוצלח ×2 ל-main @ roshpinacare-sys/saos-dex (625816f..69ce609, טוקן inline-בלבד)
+- בידוד-אומת: הדמון-החי (3010) לא-נפגע — h3985+ ממשיך, breakers closed, steem מעגן כל-חותם (txid 25a86520… h3984), 0 mismatches; המצב-החי state/anchors.json רוענן כראיה
+
+Stage Summary:
+- ה-Relay הוכיח חוסן-כאוס בריצה-אמת: ניתוק-מלא → OPEN מבוקר → תור-כנה → אפס-קריסה, ואפס-שידורים-בפועל (הוכחה: כל-השגיאות 'chaos:')
+- verifyOnChain הוכיח אי-אמון-עצמי: stateRoot מזויף נתפס, ALERT, mismatch במדדים, סירוב-אישור — עם בקרה-חיובית על אותו-txid
+- 2 באגי-אמת נתפסו-ותוקנו ע"י הסוויטה עצמה (שער-מעל-ה-try; מדד-breakerTrips מת) + הקשחת-UI — זו הראיה שהסוויטה עובדת
+- נקי-לביקורת: אפס TODO/FIXME/console.log; SECURITY INTENT מתועד בפונקציות-הקריטיות; typecheck+eslint ירוקים
+- פתוח-למסלול: ביקורת-חוץ כשער-לנזילות-אמת (LIQUIDITY_STRATEGY.md), /metrics ל-Prometheus (M1), Signer/HSM (M2)
