@@ -1,0 +1,612 @@
+     1→═══ Section 4: generic counts ═══
+     2→- `node`: matches in 1 file(s)
+     3→- `validator`: matches in 1 file(s)
+     4→- `consensus`: matches in 1 file(s)
+     5→- `bridge`: matches in 1 file(s)
+     6→- `wallet`: matches in 1 file(s)
+     7→- `rpc`: matches in 1 file(s)
+     8→- `api`: matches in 1 file(s)
+     9→- `token`: matches in 1 file(s)
+    10→═══ Section 5: secrets (names only) ═══
+    11→## 5. Potential secret-bearing files (names only — content intentionally NOT printed)
+    12→
+    13→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pdfrw/tokens.py
+    14→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/bleach/_vendor/html5lib/_tokenizer.py
+    15→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/openpyxl/formula/tokenizer.py
+    16→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials-1.0.8.dist-info/WHEEL
+    17→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials-1.0.8.dist-info/top_level.txt
+    18→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials-1.0.8.dist-info/METADATA
+    19→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials-1.0.8.dist-info/INSTALLER
+    20→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials-1.0.8.dist-info/REQUESTED
+    21→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials-1.0.8.dist-info/RECORD
+    22→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/tornado/test/test.key
+    23→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/prompt_toolkit/token.py
+    24→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/mcp/client/auth/extensions/client_credentials.py
+    25→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/mcp/server/auth/handlers/token.py
+    26→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/bokeh/command/subcommands/secret.py
+    27→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/bokeh/util/token.py
+    28→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/bokeh/server/static/js/lib/models/widgets/password_input.d.ts
+    29→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/bokeh/server/static/js/lib/styles/widgets/password_input.css.d.ts
+    30→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/Crypto/SelfTest/Protocol/test_SecretSharing.py
+    31→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/Crypto/Protocol/SecretSharing.py
+    32→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/Crypto/Protocol/SecretSharing.pyi
+    33→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/cyclopts/token.py
+    34→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/sha256.pem
+    35→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/ssl_key.passwd.pem
+    36→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/nullcert.pem
+    37→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/keycert.pem
+    38→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/dh512.pem
+    39→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/nokia.pem
+    40→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/ssl_cert.pem
+    41→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/ssl_key.pem
+    42→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/https_svn_python_org_root.pem
+    43→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/keycert.passwd.pem
+    44→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/badkey.pem
+    45→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/badcert.pem
+    46→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/nullbytecert.pem
+    47→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/future/backports/test/keycert2.pem
+    48→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/WHEEL
+    49→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/top_level.txt
+    50→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/METADATA
+    51→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/INSTALLER
+    52→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/licenses/LICENSE
+    53→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/REQUESTED
+    54→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens-3.0.1.dist-info/RECORD
+    55→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/certifi/cacert.pem
+    56→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/parso/python/token.py
+    57→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/parso/python/tokenize.py
+    58→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth2/rfc6749/endpoints/token.py
+    59→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth2/rfc6749/grant_types/refresh_token.py
+    60→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth2/rfc6749/grant_types/client_credentials.py
+    61→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth2/rfc6749/grant_types/resource_owner_password_credentials.py
+    62→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth2/rfc6749/tokens.py
+    63→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth1/rfc5849/endpoints/access_token.py
+    64→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/oauth1/rfc5849/endpoints/request_token.py
+    65→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/openid/connect/core/grant_types/refresh_token.py
+    66→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/oauthlib/openid/connect/core/tokens.py
+    67→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jeepney/tests/secrets_introspect.xml
+    68→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/patsy/tokens.py
+    69→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/snowflake/connector/secret_detector.py
+    70→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/snowflake/connector/aio/auth/_oauth_credentials.py
+    71→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/snowflake/connector/aio/auth/_idtoken.py
+    72→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/snowflake/connector/auth/oauth_credentials.py
+    73→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/snowflake/connector/auth/idtoken.py
+    74→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/snowflake/connector/token_cache.py
+    75→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pip/_vendor/certifi/cacert.pem
+    76→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pip/_vendor/pygments/token.py
+    77→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pip/_vendor/pygments/__pycache__/token.cpython-312.pyc
+    78→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pip/_vendor/packaging/_tokenizer.py
+    79→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pip/_vendor/packaging/__pycache__/_tokenizer.cpython-312.pyc
+    80→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/setuptools/_vendor/packaging/_tokenizer.py
+    81→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/utils/parameter_helper.py
+    82→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/utils/auth_util.py
+    83→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/utils/auth_constant.py
+    84→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/utils/__init__.py
+    85→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/models.py
+    86→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/exceptions.py
+    87→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/credentials.py
+    88→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/providers.py
+    89→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/http/_options.py
+    90→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/http/__init__.py
+    91→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/__init__.py
+    92→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/client.py
+    93→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/ram_role_arn.py
+    94→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/cli_profile.py
+    95→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/refreshable.py
+    96→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/oauth.py
+    97→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/profile.py
+    98→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/env.py
+    99→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/default.py
+   100→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/cloud_sso.py
+   101→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/static_sts.py
+   102→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/static_ak.py
+   103→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/rsa_key_pair.py
+   104→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/__init__.py
+   105→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/uri.py
+   106→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/oidc.py
+   107→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials/provider/ecs_ram_role.py
+   108→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/srsly/ruamel_yaml/tokens.py
+   109→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span.pyi
+   110→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/_retokenize.cpython-312-x86_64-linux-gnu.so
+   111→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/doc.cpython-312-x86_64-linux-gnu.so
+   112→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/_dict_proxies.py
+   113→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/token.pyi
+   114→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/morphanalysis.cpython-312-x86_64-linux-gnu.so
+   115→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/_retokenize.pyx
+   116→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span.cpython-312-x86_64-linux-gnu.so
+   117→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/token.pxd
+   118→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/doc.pyi
+   119→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/morphanalysis.pyi
+   120→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/morphanalysis.pxd
+   121→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/graph.cpython-312-x86_64-linux-gnu.so
+   122→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span_group.cpython-312-x86_64-linux-gnu.so
+   123→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/token.cpython-312-x86_64-linux-gnu.so
+   124→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/doc.pyx
+   125→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/_serialize.py
+   126→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/graph.pyx
+   127→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/graph.pxd
+   128→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/_retokenize.pyi
+   129→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/underscore.py
+   130→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span_group.pyi
+   131→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span_group.pxd
+   132→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/__init__.py
+   133→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/doc.pxd
+   134→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/morphanalysis.pyx
+   135→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span.pyx
+   136→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/__init__.pxd
+   137→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span.pxd
+   138→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/span_group.pyx
+   139→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokens/token.pyx
+   140→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ti/tokenizer_exceptions.py
+   141→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ar/tokenizer_exceptions.py
+   142→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/lt/tokenizer_exceptions.py
+   143→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/nl/tokenizer_exceptions.py
+   144→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/sv/tokenizer_exceptions.py
+   145→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/tl/tokenizer_exceptions.py
+   146→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/nb/tokenizer_exceptions.py
+   147→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/gd/tokenizer_exceptions.py
+   148→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/pt/tokenizer_exceptions.py
+   149→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/mk/tokenizer_exceptions.py
+   150→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/tr/tokenizer_exceptions.py
+   151→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/th/tokenizer_exceptions.py
+   152→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/grc/tokenizer_exceptions.py
+   153→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ky/tokenizer_exceptions.py
+   154→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/sr/tokenizer_exceptions.py
+   155→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/bg/tokenizer_exceptions.py
+   156→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/tt/tokenizer_exceptions.py
+   157→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/it/tokenizer_exceptions.py
+   158→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/id/tokenizer_exceptions.py
+   159→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/id/_tokenizer_exceptions_list.py
+   160→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/el/tokenizer_exceptions.py
+   161→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/sl/tokenizer_exceptions.py
+   162→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/hsb/tokenizer_exceptions.py
+   163→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/hu/tokenizer_exceptions.py
+   164→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/fr/tokenizer_exceptions.py
+   165→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/fr/_tokenizer_exceptions_list.py
+   166→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/am/tokenizer_exceptions.py
+   167→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/la/tokenizer_exceptions.py
+   168→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/bn/tokenizer_exceptions.py
+   169→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/uk/tokenizer_exceptions.py
+   170→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ru/tokenizer_exceptions.py
+   171→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/lb/tokenizer_exceptions.py
+   172→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/es/tokenizer_exceptions.py
+   173→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ga/tokenizer_exceptions.py
+   174→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ca/tokenizer_exceptions.py
+   175→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ms/tokenizer_exceptions.py
+   176→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ms/_tokenizer_exceptions_list.py
+   177→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/fa/tokenizer_exceptions.py
+   178→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/en/tokenizer_exceptions.py
+   179→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/de/tokenizer_exceptions.py
+   180→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/da/tokenizer_exceptions.py
+   181→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/tokenizer_exceptions.py
+   182→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ro/tokenizer_exceptions.py
+   183→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/fi/tokenizer_exceptions.py
+   184→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/ht/tokenizer_exceptions.py
+   185→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/nn/tokenizer_exceptions.py
+   186→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/fo/tokenizer_exceptions.py
+   187→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/lang/lij/tokenizer_exceptions.py
+   188→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokenizer.pyx
+   189→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokenizer.cpython-312-x86_64-linux-gnu.so
+   190→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tokenizer.pxd
+   191→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/hy/test_tokenizer.py
+   192→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/et/test_tokenizer.py
+   193→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/zh/test_tokenizer.py
+   194→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/sv/test_tokenizer.py
+   195→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/nb/test_tokenizer.py
+   196→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/is/test_tokenizer.py
+   197→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/lg/test_tokenizer.py
+   198→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/dsb/test_tokenizer.py
+   199→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/tr/test_tokenizer.py
+   200→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/th/test_tokenizer.py
+   201→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/sq/test_tokenizer.py
+   202→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/he/test_tokenizer.py
+   203→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/grc/test_tokenizer.py
+   204→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ky/test_tokenizer.py
+   205→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ta/test_tokenizer.py
+   206→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/sr/test_tokenizer.py
+   207→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/tt/test_tokenizer.py
+   208→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/sl/test_tokenizer.py
+   209→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/sk/test_tokenizer.py
+   210→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/xx/test_tokenizer.py
+   211→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/lv/test_tokenizer.py
+   212→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/hsb/test_tokenizer.py
+   213→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/hu/test_tokenizer.py
+   214→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/bn/test_tokenizer.py
+   215→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/uk/test_tokenizer.py
+   216→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/uk/test_tokenizer_exc.py
+   217→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/vi/test_tokenizer.py
+   218→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ru/test_tokenizer.py
+   219→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ko/test_tokenizer.py
+   220→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ja/test_tokenizer.py
+   221→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ga/test_tokenizer.py
+   222→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/en/test_tokenizer.py
+   223→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/en/test_customized_tokenizer.py
+   224→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/hr/test_tokenizer.py
+   225→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/ro/test_tokenizer.py
+   226→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/af/test_tokenizer.py
+   227→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/fi/test_tokenizer.py
+   228→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/nn/test_tokenizer.py
+   229→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/fo/test_tokenizer.py
+   230→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/lang/pl/test_tokenizer.py
+   231→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/serialize/test_serialize_tokenizer.py
+   232→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/test_explain.py
+   233→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/test_whitespace.py
+   234→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/test_exceptions.py
+   235→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/test_naughty_strings.py
+   236→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/test_urls.py
+   237→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/test_tokenizer.py
+   238→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/__init__.py
+   239→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/tokenizer/sun.txt
+   240→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/doc/test_retokenize_split.py
+   241→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/doc/test_token_api.py
+   242→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/spacy/tests/doc/test_retokenize_merge.py
+   243→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_oss_v2/credentials/provider_impl.py
+   244→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_oss_v2/credentials/__init__.py
+   245→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_reset_account_password_request.py
+   246→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_encryption_dbsecret_request.py
+   247→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_describe_encryption_dbsecret_request.py
+   248→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_reset_account_password_response.py
+   249→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_encryption_dbsecret_response.py
+   250→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_account_password_request.py
+   251→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_describe_encryption_dbsecret_response_body.py
+   252→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_account_password_response_body.py
+   253→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_describe_encryption_dbsecret_response.py
+   254→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_account_password_zonal_response.py
+   255→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_reset_account_password_response_body.py
+   256→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_account_password_response.py
+   257→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_encryption_dbsecret_response_body.py
+   258→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_account_password_zonal_response_body.py
+   259→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_polardb20170801/models/_modify_account_password_zonal_request.py
+   260→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/cacert.pem
+   261→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/data/secretsmanager/2017-10-17/endpoint-rule-set-1.json.gz
+   262→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/data/secretsmanager/2017-10-17/service-2.sdk-extras.json
+   263→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/data/secretsmanager/2017-10-17/paginators-1.json
+   264→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/data/secretsmanager/2017-10-17/examples-1.json
+   265→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/data/secretsmanager/2017-10-17/service-2.json.gz
+   266→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/credentials.py
+   267→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/botocore/tokens.py
+   268→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/coverage/phystokens.py
+   269→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/dns/tokenizer.py
+   270→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/WHEEL
+   271→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/top_level.txt
+   272→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/uv_build.json
+   273→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/METADATA
+   274→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/INSTALLER
+   275→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/REQUESTED
+   276→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api-1.0.0.dist-info/RECORD
+   277→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/playwright/driver/package/lib/utils/isomorphic/cssTokenizer.js
+   278→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/ezdxf/addons/hpgl2/tokenizer.py
+   279→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/tinyhtml5/tokenizer.py
+   280→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/IPython/utils/tokenutil.py
+   281→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/markdown_it/token.py
+   282→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/argon2/_password_hasher.py
+   283→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/django-stubs/django-stubs/contrib/auth/tokens.pyi
+   284→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/django-stubs/django-stubs/contrib/auth/password_validation.pyi
+   285→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/django-stubs/django-stubs/contrib/auth/management/commands/changepassword.pyi
+   286→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/third_party/2and3/yaml/tokens.pyi
+   287→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stdlib/2/tokenize.pyi
+   288→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stdlib/2and3/token.pyi
+   289→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stdlib/2and3/lib2to3/pgen2/token.pyi
+   290→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stdlib/2and3/lib2to3/pgen2/tokenize.pyi
+   291→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stdlib/3/secrets.pyi
+   292→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jedi/third_party/typeshed/stdlib/3/tokenize.pyi
+   293→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/pre_processors.py
+   294→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/tests/test_pre_processors.py
+   295→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/tests/test_core.py
+   296→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/tests/test_tokenizer_cases.py
+   297→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/core.py
+   298→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/__init__.py
+   299→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/symbols.py
+   300→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/gtts/tokenizer/tokenizer_cases.py
+   301→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/huggingface_hub/utils/_git_credential.py
+   302→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/huggingface_hub/inference/_generated/types/token_classification.py
+   303→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/keyring/backends/SecretService.py
+   304→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/keyring/backends/libsecret.py
+   305→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/keyring/credentials.py
+   306→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/regexp.py
+   307→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/texttiling.py
+   308→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/destructive.py
+   309→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/mwe.py
+   310→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/repp.py
+   311→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/treebank.py
+   312→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/legality_principle.py
+   313→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/util.py
+   314→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/api.py
+   315→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/toktok.py
+   316→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/simple.py
+   317→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/nist.py
+   318→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/__init__.py
+   319→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/punkt.py
+   320→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/stanford_segmenter.py
+   321→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/sonority_sequencing.py
+   322→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/casual.py
+   323→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/stanford.py
+   324→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/tokenize/sexpr.py
+   325→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/test/unit/test_tokenize.py
+   326→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/nltk/test/tokenize.doctest
+   327→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/mammoth/styles/parser/token_iterator.py
+   328→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/mammoth/styles/parser/token_parser.py
+   329→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/mammoth/styles/parser/tokeniser.py
+   330→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/WHEEL
+   331→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/top_level.txt
+   332→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/METADATA
+   333→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/INSTALLER
+   334→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/licenses/LICENSE
+   335→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/REQUESTED
+   336→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage-3.5.0.dist-info/RECORD
+   337→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/weasyprint/css/tokens.py
+   338→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc6749/token_endpoint.py
+   339→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc6749/grants/refresh_token.py
+   340→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc6749/grants/client_credentials.py
+   341→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc6749/grants/resource_owner_password_credentials.py
+   342→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc6750/token.py
+   343→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc7523/token.py
+   344→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc9068/token.py
+   345→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc9068/token_validator.py
+   346→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/oauth2/rfc7662/token_validator.py
+   347→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/authlib/integrations/sqla_oauth2/tokens_mixins.py
+   348→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/nested_secrets.py
+   349→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pydantic_settings/sources/providers/secrets.py
+   350→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/pygments/token.py
+   351→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api/models.py
+   352→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/alibabacloud_credentials_api/__init__.py
+   353→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/redis/credentials.py
+   354→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/redis/auth/token.py
+   355→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/redis/auth/token_manager.py
+   356→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/line_numbers.py
+   357→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/py.typed
+   358→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/astroid_compat.py
+   359→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/version.py
+   360→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/asttokens.py
+   361→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/util.py
+   362→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/mark_tokens.py
+   363→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/asttokens/__init__.py
+   364→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/yaml/tokens.py
+   365→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/py.typed
+   366→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/exceptions.py
+   367→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/util.py
+   368→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/item.py
+   369→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/defines.py
+   370→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/dhcrypto.py
+   371→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/collection.py
+   372→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/secretstorage/__init__.py
+   373→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jupyterlab/tests/mock_packages/interop/token/package.json
+   374→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/jupyterlab/tests/mock_packages/interop/token/index.js
+   375→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/tinycss2/tokenizer.py
+   376→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/databricks/sql/auth/token_federation.py
+   377→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/ply/ctokens.py
+   378→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/packaging/_tokenizer.py
+   379→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/textblob/tokenizers.py
+   380→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/html5lib/_tokenizer.py
+   381→- SENSITIVE (skipped from content review): /home/z/.venv/lib/python3.12/site-packages/wordcloud/tokenization.py
+   382→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/include/python3.12/internal/pycore_token.h
+   383→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/token.py
+   384→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/__pycache__/tokenize.cpython-312.pyc
+   385→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/__pycache__/token.cpython-312.pyc
+   386→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/lib2to3/pgen2/token.py
+   387→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/lib2to3/pgen2/tokenize.py
+   388→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/tokenize.py
+   389→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/secrets.py
+   390→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/site-packages/pip/_vendor/certifi/cacert.pem
+   391→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/site-packages/pip/_vendor/pygments/token.py
+   392→- SENSITIVE (skipped from content review): /home/z/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/site-packages/pip/_vendor/packaging/_tokenizer.py
+   393→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/js-tokens@4.0.0@@@1/CHANGELOG.md
+   394→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/js-tokens@4.0.0@@@1/LICENSE
+   395→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/js-tokens@4.0.0@@@1/index.js
+   396→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/js-tokens@4.0.0@@@1/README.md
+   397→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/js-tokens@4.0.0@@@1/package.json
+   398→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/types/arbitrary/_internals/helpers/TokenizeString.d.ts
+   399→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/types/arbitrary/_internals/helpers/TokenizeRegex.d.ts
+   400→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/esm/types/arbitrary/_internals/helpers/TokenizeString.d.ts
+   401→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/esm/types/arbitrary/_internals/helpers/TokenizeRegex.d.ts
+   402→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/esm/arbitrary/_internals/helpers/TokenizeString.js
+   403→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/esm/arbitrary/_internals/helpers/TokenizeRegex.js
+   404→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/arbitrary/_internals/helpers/TokenizeString.js
+   405→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/fast-check@3.23.2@@@1/lib/arbitrary/_internals/helpers/TokenizeRegex.js
+   406→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/jose@4.15.9@@@1/dist/types/key/generate_secret.d.ts
+   407→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/jose@4.15.9@@@1/dist/browser/key/generate_secret.js
+   408→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/jose@4.15.9@@@1/dist/node/esm/key/generate_secret.js
+   409→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/jose@4.15.9@@@1/dist/node/cjs/key/generate_secret.js
+   410→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/caniuse-lite@1.0.30001764@@@1/data/features/passwordrules.js
+   411→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/caniuse-lite@1.0.30001764@@@1/data/features/credential-management.js
+   412→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@2.0.3@@@1/index.d.ts
+   413→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@2.0.3@@@1/readme.md
+   414→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@2.0.3@@@1/index.js
+   415→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@2.0.3@@@1/license
+   416→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@2.0.3@@@1/package.json
+   417→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/openid-client@5.7.1@@@1/lib/helpers/keystore.js
+   418→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/openid-client@5.7.1@@@1/lib/token_set.js
+   419→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint-plugin-react@7.37.5@@@1/lib/util/getTokenBeforeClosingBracket.d.ts
+   420→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint-plugin-react@7.37.5@@@1/lib/util/getTokenBeforeClosingBracket.js
+   421→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/postcss@8.4.31@@@1/lib/tokenize.js
+   422→- SENSITIVE (skipped from content review): /home/z/my-project/.env
+   423→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/src/Secret.ts
+   424→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/src/internal/secret.ts
+   425→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/dist/esm/Secret.js
+   426→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/dist/esm/internal/secret.js
+   427→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/dist/cjs/Secret.js
+   428→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/dist/cjs/internal/secret.js
+   429→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/dist/dts/internal/secret.d.ts
+   430→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/dist/dts/Secret.d.ts
+   431→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/effect@3.18.4@@@1/Secret/package.json
+   432→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/es5-ext@0.10.64@@@1/function/#/to-string-tokens.js
+   433→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/style-skills/default/tokens.css
+   434→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/rust@1.0.2@@@1/src/tokens.js
+   435→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/go@1.0.1@@@1/src/tokens.js
+   436→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/github/tokens.css
+   437→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/spotify/tokens.css
+   438→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/figma/tokens.css
+   439→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/python@1.1.18@@@1/src/tokens.js
+   440→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/cursor/tokens.css
+   441→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/notion/tokens.css
+   442→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/uber/tokens.css
+   443→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/sass@1.1.0@@@1/src/tokens.js
+   444→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/php@1.0.5@@@1/src/tokens.js
+   445→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/linear-app/tokens.css
+   446→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/apple/tokens.css
+   447→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/yaml@1.0.3@@@1/src/tokens.js
+   448→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/vercel/tokens.css
+   449→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/slack/tokens.css
+   450→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/javascript@1.5.4@@@1/src/tokens.js
+   451→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/airbnb/tokens.css
+   452→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/html@1.3.13@@@1/src/tokens.js
+   453→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/kami/tokens.css
+   454→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/openai/tokens.css
+   455→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/stripe/tokens.css
+   456→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/cpp@1.1.5@@@1/src/tokens.js
+   457→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/shopify/tokens.css
+   458→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/xml@1.0.6@@@1/src/tokens.js
+   459→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/discord/tokens.css
+   460→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@lezer/css@1.3.0@@@1/src/tokens.js
+   461→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/prop-types@15.8.1@@@1/lib/ReactPropTypesSecret.js
+   462→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/skip-cursor.js
+   463→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/utils.js
+   464→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/cursors.js
+   465→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/backward-token-comment-cursor.js
+   466→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/padded-token-cursor.js
+   467→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/forward-token-comment-cursor.js
+   468→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/limit-cursor.js
+   469→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/filter-cursor.js
+   470→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/backward-token-cursor.js
+   471→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/index.js
+   472→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/forward-token-cursor.js
+   473→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/cursor.js
+   474→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/eslint@9.39.2@@@1/lib/languages/js/source-code/token-store/decorative-cursor.js
+   475→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@2.0.2@@@1/index.d.ts
+   476→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@2.0.2@@@1/readme.md
+   477→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@2.0.2@@@1/index.js
+   478→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@2.0.2@@@1/license
+   479→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@2.0.2@@@1/package.json
+   480→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/oidc-token-hash@5.2.0@@@1/LICENSE.md
+   481→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/oidc-token-hash@5.2.0@@@1/README.md
+   482→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/oidc-token-hash@5.2.0@@@1/package.json
+   483→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/oidc-token-hash@5.2.0@@@1/lib/index.js
+   484→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/postcss@8.5.6@@@1/lib/tokenize.js
+   485→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/espree@10.4.0@@@1/lib/token-translator.js
+   486→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next@16.1.3@@@1/dist/compiled/jsonwebtoken/LICENSE
+   487→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next@16.1.3@@@1/dist/compiled/jsonwebtoken/index.js
+   488→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next@16.1.3@@@1/dist/compiled/jsonwebtoken/package.json
+   489→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@babel/generator@7.28.6@@@1/lib/token-map.js
+   490→- SENSITIVE (skipped from content review): /home/z/my-project/.env
+   491→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@1.1.5@@@1/readme.md
+   492→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@1.1.5@@@1/index.js
+   493→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@1.1.5@@@1/license
+   494→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/space-separated-tokens@1.1.5@@@1/package.json
+   495→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/style-skills/default/tokens.css
+   496→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/github/tokens.css
+   497→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/spotify/tokens.css
+   498→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/figma/tokens.css
+   499→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/@radix-ui/react-icons@1.3.2@@@1/dist/TokensIcon.d.ts
+   500→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/cursor/tokens.css
+   501→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/notion/tokens.css
+   502→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/uber/tokens.css
+   503→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/linear-app/tokens.css
+   504→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/apple/tokens.css
+   505→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/vercel/tokens.css
+   506→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/slack/tokens.css
+   507→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/airbnb/tokens.css
+   508→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/kami/tokens.css
+   509→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/openai/tokens.css
+   510→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/stripe/tokens.css
+   511→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/shopify/tokens.css
+   512→- SENSITIVE (skipped from content review): /home/z/my-project/skills/design/design-systems/brand-inspiration/discord/tokens.css
+   513→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark@4.0.2@@@1/lib/create-tokenizer.d.ts
+   514→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark@4.0.2@@@1/lib/create-tokenizer.js
+   515→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark@4.0.2@@@1/dev/lib/create-tokenizer.d.ts
+   516→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark@4.0.2@@@1/dev/lib/create-tokenizer.js
+   517→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next-auth@4.24.13@@@1/src/providers/credentials.ts
+   518→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next-auth@4.24.13@@@1/src/core/lib/csrf-token.ts
+   519→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next-auth@4.24.13@@@1/providers/credentials.d.ts
+   520→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next-auth@4.24.13@@@1/providers/credentials.js
+   521→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next-auth@4.24.13@@@1/core/lib/csrf-token.d.ts
+   522→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/next-auth@4.24.13@@@1/core/lib/csrf-token.js
+   523→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/index.d.ts
+   524→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/readme.md
+   525→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/index.js
+   526→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/license
+   527→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/package.json
+   528→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/lib/splice-buffer.d.ts
+   529→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/lib/splice-buffer.js
+   530→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/dev/index.d.ts
+   531→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/dev/index.js
+   532→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/dev/lib/splice-buffer.d.ts
+   533→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/micromark-util-subtokenize@2.1.0@@@1/dev/lib/splice-buffer.js
+   534→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/bun-types@1.3.6@@@1/docs/guides/util/hash-a-password.mdx
+   535→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/bun-types@1.3.6@@@1/docs/runtime/secrets.mdx
+   536→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@1.0.8@@@1/readme.md
+   537→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@1.0.8@@@1/index.js
+   538→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@1.0.8@@@1/license
+   539→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/comma-separated-tokens@1.0.8@@@1/package.json
+   540→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns-jalali@4.1.0-b8f8325b21a8a1e5@@@1/_lib/protectedTokens.cjs
+   541→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns-jalali@4.1.0-b8f8325b21a8a1e5@@@1/_lib/protectedTokens.js
+   542→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns-jalali@4.1.0-b8f8325b21a8a1e5@@@1/_lib/protectedTokens.d.ts
+   543→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns-jalali@4.1.0-b8f8325b21a8a1e5@@@1/_lib/protectedTokens.d.cts
+   544→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns-jalali@4.1.0-b8f8325b21a8a1e5@@@1/docs/unicodeTokens.md
+   545→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns@4.1.0@@@1/docs/unicodeTokens.md
+   546→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns@4.1.0@@@1/_lib/protectedTokens.cjs
+   547→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns@4.1.0@@@1/_lib/protectedTokens.js
+   548→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns@4.1.0@@@1/_lib/protectedTokens.d.ts
+   549→- SENSITIVE (skipped from content review): /home/z/.bun/install/cache/date-fns@4.1.0@@@1/_lib/protectedTokens.d.cts
+   550→
+   551→## 6. Environment overview
+   552→═══ Section 6: overview (project/upload/download) ═══
+   553→## 6. Environment overview
+   554→
+   555→### /home/z/my-project (top level)
+   556→- FILE /home/z/my-project/.env (50 bytes)
+   557→- DIR  /home/z/my-project/.git
+   558→- FILE /home/z/my-project/.gitignore (586 bytes)
+   559→- DIR  /home/z/my-project/.next
+   560→- DIR  /home/z/my-project/.zscripts
+   561→- FILE /home/z/my-project/Caddyfile (493 bytes)
+   562→- FILE /home/z/my-project/bun.lock (328127 bytes)
+   563→- FILE /home/z/my-project/components.json (430 bytes)
+   564→- DIR  /home/z/my-project/db
+   565→- FILE /home/z/my-project/dev.log (1364 bytes)
+   566→- DIR  /home/z/my-project/download
+   567→- DIR  /home/z/my-project/engineering
+   568→- FILE /home/z/my-project/eslint.config.mjs (1632 bytes)
+   569→- DIR  /home/z/my-project/examples
+   570→- DIR  /home/z/my-project/mini-services
+   571→- FILE /home/z/my-project/next-env.d.ts (251 bytes)
+   572→- FILE /home/z/my-project/next.config.ts (233 bytes)
+   573→- DIR  /home/z/my-project/node_modules
+   574→- FILE /home/z/my-project/package.json (3213 bytes)
+   575→- FILE /home/z/my-project/postcss.config.mjs (81 bytes)
+   576→- DIR  /home/z/my-project/prisma
+   577→- DIR  /home/z/my-project/public
+   578→- DIR  /home/z/my-project/skills
+   579→- DIR  /home/z/my-project/src
+   580→- FILE /home/z/my-project/tailwind.config.ts (1696 bytes)
+   581→- DIR  /home/z/my-project/tests
+   582→- FILE /home/z/my-project/tsconfig.json (730 bytes)
+   583→- DIR  /home/z/my-project/upload
+   584→
+   585→### /home/z/my-project/upload (uploaded inputs)
+   586→- FILE /home/z/my-project/upload/Roshcaregt.txt (40 bytes)
+   587→
+   588→### /home/z/my-project/download (generated files area)
+   589→- FILE /home/z/my-project/download/README.md (34 bytes)
+   590→
+   591→### /tmp/my-project (project snapshot copy)
+   592→- /tmp/my-project/.gitignore
+   593→- /tmp/my-project/.initial_snapshot.json
+   594→- /tmp/my-project/.zscripts
+   595→- /tmp/my-project/Caddyfile
+   596→- /tmp/my-project/bun.lock
+   597→- /tmp/my-project/components.json
+   598→- /tmp/my-project/db
+   599→- /tmp/my-project/eslint.config.mjs
+   600→- /tmp/my-project/examples
+   601→- /tmp/my-project/mini-services
+   602→- /tmp/my-project/next.config.ts
+   603→- /tmp/my-project/package.json
+   604→- /tmp/my-project/postcss.config.mjs
+   605→- /tmp/my-project/prisma
+   606→- /tmp/my-project/public
+   607→- /tmp/my-project/src
+   608→- /tmp/my-project/tailwind.config.ts
+   609→- /tmp/my-project/tests
+   610→- /tmp/my-project/tsconfig.json
+   611→- /tmp/my-project/upload
+   612→#### /tmp/my-project/upload

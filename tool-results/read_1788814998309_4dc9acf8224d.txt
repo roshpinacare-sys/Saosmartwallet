@@ -1,0 +1,938 @@
+     1→/**
+     2→ * Saosmartwallet — SovereignVault state machine (M2, layer 1)
+     3→ * ==========================================================
+     4→ * The layer-1 owner of the persisted vault hierarchy: master vault, network
+     5→ * vaults, soldier fleet, purpose vaults, sealed keys, policy rule data and
+     6→ * backup bookkeeping — all inside ONE JSON state document (VaultStateDoc).
+     7→ *
+     8→ * Session model (fail closed):
+     9→ *   • Locked (fresh construction): everything is readable via getStatus()/
+    10→ *     getState() — those surfaces are SECRET-FREE by construction — but any
+    11→ *     mutation, key operation or export requires unlock(password).
+    12→ *   • unlock() re-derives the Argon2id master key into VOLATILE memory only
+    13→ *     and arms the idle auto-lock timer. lock() zero-fills the key bytes.
+    14→ *   • addKey({password}) performs an OPTIONAL step-up: the password is
+    15→ *     verified AGAIN against the stored verifier before a seal happens.
+    16→ *   • The derived key never persists, never travels in errors, and is wiped
+    17→ *     on lock — a stolen process snapshot after lock() has nothing.
+    18→ *
+    19→ * Persistence: storage-agnostic (VaultStorage seam). The genesis hash binds
+    20→ * all saves of one vault instance (sha256 of the stable vaultInstanceId) so
+    21→ * the audit layer can anchor its chain to a specific state lineage.
+    22→ */
+    23→
+    24→import { createHash } from "node:crypto";
+    25→
+    26→import { STEEM_ROLES, PrivateKey } from "../../../crypto/src/index";
+    27→import { DEFAULT_KDF_PARAMS, deriveMasterKey, deriveVerifier, randomBytes, seal, verifyPassword } from "../crypto";
+    28→import { b64ToBytes, parseSats, utf8 } from "../encoding";
+    29→import type { AuditStore, VaultStateRecord, VaultStorage } from "../storage/types";
+    30→import {
+    31→  VaultError,
+    32→  type EncryptedKey,
+    33→  type EncryptedPayload,
+    34→  type KeyRole,
+    35→  type NetworkId,
+    36→  type NetworkVaultConfig,
+    37→  type OperationType,
+    38→  type PurposeId,
+    39→  type PurposeVaultConfig,
+    40→  type SoldierPermissions,
+    41→  type SoldierVaultConfig,
+    42→  type StorageKind,
+    43→  type VaultStateDoc,
+    44→  type VaultStatus,
+    45→} from "../types";
+    46→import { DEFAULT_AUTO_LOCK_SECONDS, emptyState } from "./defaults";
+    47→import { VaultKeys, type AddKeyInput } from "./keys";
+    48→
+    49→// ---------------------------------------------------------------------------
+    50→// Options & inputs
+    51→// ---------------------------------------------------------------------------
+    52→
+    53→export interface SovereignVaultOptions {
+    54→  /** Injectable clock for tests (defaults to Date.now). */
+    55→  now?: () => number;
+    56→}
+    57→
+    58→export interface InitializeOptions {
+    59→  /** Steem daily spend ceiling in satoshis (default 10000000 = 10 STEEM). */
+    60→  steemDailyLimitSatoshis?: string;
+    61→  /** Soldier fleet size (default 13). */
+    62→  soldierCount?: number;
+    63→  /** How many of the first soldiers may trade (default 5). */
+    64→  traderSoldiers?: number;
+    65→}
+    66→
+    67→/** Partial network-vault config for create/update (UpsertNetworkRequest shape). */
+    68→export interface UpsertNetworkInput {
+    69→  network: NetworkId;
+    70→  roles?: KeyRole[];
+    71→  allowedOperations?: OperationType[];
+    72→  maxAmountPerDay?: Record<string, string>;
+    73→  requiresApproval?: boolean;
+    74→  storage?: StorageKind;
+    75→  special?: { soldierManagement?: boolean; oracleFeeds?: boolean };
+    76→  status?: "active" | "offline";
+    77→  label?: string;
+    78→}
+    79→
+    80→/** Merge-by-name input for the soldier fleet. */
+    81→export interface SoldierUpsertInput {
+    82→  soldierName: string;
+    83→  permissions?: Partial<SoldierPermissions>;
+    84→  linkedVaults?: string[];
+    85→  anomalyDetection?: boolean;
+    86→  label?: string;
+    87→}
+    88→
+    89→/** Partial purpose-vault config for creation. */
+    90→export interface PurposeVaultInput {
+    91→  purpose: PurposeId;
+    92→  allowedOperations?: OperationType[];
+    93→  networkScope?: NetworkId[];
+    94→  storage?: StorageKind;
+    95→  label?: string;
+    96→}
+    97→
+    98→/** addKey with the optional step-up password. */
+    99→export type VaultAddKeyInput = AddKeyInput & { password?: string };
+   100→
+   101→/** The one and only plaintext key exit — consumed by the signing orchestrator. */
+   102→export interface RevealResult {
+   103→  privateKey: PrivateKey;
+   104→  record: EncryptedKey;
+   105→}
+   106→
+   107→// ---------------------------------------------------------------------------
+   108→// Ecosystem defaults (M2 spec tables)
+   109→// ---------------------------------------------------------------------------
+   110→
+   111→const ALL_NETWORK_IDS: readonly NetworkId[] = ["steem", "hive", "tron", "blurt", "saos-net"];
+   112→const STEEM_FAMILY_ROLES: readonly KeyRole[] = ["owner", "active", "posting", "memo"];
+   113→
+   114→const DEFAULT_NETWORK_ROLES: Record<NetworkId, readonly KeyRole[]> = {
+   115→  steem: STEEM_FAMILY_ROLES,
+   116→  hive: STEEM_FAMILY_ROLES,
+   117→  tron: ["owner"],
+   118→  blurt: STEEM_FAMILY_ROLES,
+   119→  "saos-net": ["owner", "active", "posting"],
+   120→};
+   121→
+   122→const DEFAULT_NETWORK_OPS: Record<NetworkId, readonly OperationType[]> = {
+   123→  steem: [
+   124→    "transfer",
+   125→    "vote",
+   126→    "comment",
+   127→    "limit_order_create",
+   128→    "limit_order_cancel",
+   129→    "custom_json",
+   130→    "delegate_vesting_shares",
+   131→    "witness_vote",
+   132→  ],
+   133→  hive: [
+   134→    "transfer",
+   135→    "vote",
+   136→    "comment",
+   137→    "limit_order_create",
+   138→    "limit_order_cancel",
+   139→    "custom_json",
+   140→    "delegate_vesting_shares",
+   141→    "witness_vote",
+   142→  ],
+   143→  tron: ["transfer", "trigger_smart_contract"],
+   144→  blurt: ["transfer", "vote", "comment"],
+   145→  "saos-net": ["transfer", "vote", "custom_json"],
+   146→};
+   147→
+   148→/** Daily spend ceilings in satoshi strings, per token symbol. */
+   149→const DEFAULT_NETWORK_LIMITS: Record<NetworkId, Record<string, string>> = {
+   150→  steem: { STEEM: "10000000" },
+   151→  hive: { HIVE: "10000000" },
+   152→  tron: { TRX: "100000000000" },
+   153→  blurt: { BLURT: "10000000" },
+   154→  "saos-net": { SAOS: "100000000" },
+   155→};
+   156→
+   157→/** Networks every soldier is bound to (only vaults that actually exist). */
+   158→const DEFAULT_SOLDIER_LINKS: readonly string[] = ["network-steem", "network-hive", "network-saos-net"];
+   159→
+   160→/**
+   161→ * Purpose-vault defaults. NOTE: the frozen PurposeVaultConfig type has no
+   162→ * requiresApproval field — treasury's approval gate is expressed through
+   163→ * policy rules (e.g. requireApprovalCount) evaluated by the policy engine,
+   164→ * not by per-vault flags.
+   165→ */
+   166→const PURPOSE_DEFAULTS: Record<PurposeId, { allowedOperations: readonly OperationType[]; networkScope: readonly NetworkId[]; storage: StorageKind }> = {
+   167→  trading: {
+   168→    allowedOperations: ["limit_order_create", "limit_order_cancel"],
+   169→    networkScope: ["steem", "hive"],
+   170→    storage: "hot",
+   171→  },
+   172→  bridging: {
+   173→    allowedOperations: ["transfer", "custom_json"],
+   174→    networkScope: ALL_NETWORK_IDS,
+   175→    storage: "hot",
+   176→  },
+   177→  governance: {
+   178→    allowedOperations: ["vote", "witness_vote", "comment"],
+   179→    networkScope: ["steem", "hive", "saos-net"],
+   180→    storage: "cold",
+   181→  },
+   182→  treasury: {
+   183→    allowedOperations: ["transfer", "transfer_to_vesting", "delegate_vesting_shares"],
+   184→    networkScope: ["steem", "hive"],
+   185→    storage: "air-gapped",
+   186→  },
+   187→};
+   188→
+   189→// ---------------------------------------------------------------------------
+   190→// SovereignVault
+   191→// ---------------------------------------------------------------------------
+   192→
+   193→export class SovereignVault {
+   194→  private readonly storage: VaultStorage;
+   195→  private readonly audit: AuditStore | null;
+   196→  private readonly nowFn: () => number;
+   197→
+   198→  /** Session master key — volatile, zero-filled on lock(). */
+   199→  private derivedKey: Uint8Array | null = null;
+   200→  private unlockedAt: number | null = null;
+   201→  private lastActivityAt: number | null = null;
+   202→  private autoLocksAt: number | null = null;
+   203→  /** Cached state document (persisted copy lives in the VaultStorage seam). */
+   204→  private state: VaultStateDoc | null = null;
+   205→  private genesisHashValue: string | null = null;
+   206→
+   207→  /**
+   208→   * @param storage the VaultStorage seam (memory store for tools/tests,
+   209→   *   Prisma-backed store in the app layer).
+   210→   * @param audit optional AuditStore — read-only here for status telemetry
+   211→   *   (head hash + event count); chain writing belongs to the audit layer.
+   212→   */
+   213→  constructor(storage: VaultStorage, audit?: AuditStore, opts?: SovereignVaultOptions) {
+   214→    this.storage = storage;
+   215→    this.audit = audit ?? null;
+   216→    this.nowFn = opts?.now ?? (() => Date.now());
+   217→  }
+   218→
+   219→  // -------------------------------------------------------------------------
+   220→  // Lifecycle
+   221→  // -------------------------------------------------------------------------
+   222→
+   223→  /**
+   224→   * Loads (or reloads) the state document from the storage seam. Safe to call
+   225→   * repeatedly; a missing record leaves the vault in the uninitialized state.
+   226→   *
+   227→   * @throws VaultError("STORAGE_FAILURE") on backend errors,
+   228→   *   VaultError("CORRUPT_STATE") when the stored document is not valid
+   229→   *   docVersion-1 JSON (fail closed — never run against a half-parsed state).
+   230→   */
+   231→  async load(): Promise<void> {
+   232→    let record: VaultStateRecord | null = null;
+   233→    try {
+   234→      record = await this.storage.load();
+   235→    } catch {
+   236→      throw new VaultError("STORAGE_FAILURE", "failed to read the vault state record");
+   237→    }
+   238→    if (record === null) {
+   239→      this.state = null;
+   240→      this.genesisHashValue = null;
+   241→      return;
+   242→    }
+   243→    let parsed: unknown;
+   244→    try {
+   245→      parsed = JSON.parse(record.stateJson);
+   246→    } catch {
+   247→      throw new VaultError("CORRUPT_STATE", "stored vault state is not valid JSON");
+   248→    }
+   249→    if (!isVaultStateDoc(parsed)) {
+   250→      throw new VaultError("CORRUPT_STATE", "stored vault state does not match the docVersion 1 schema");
+   251→    }
+   252→    this.state = parsed;
+   253→    this.genesisHashValue = null; // re-derived lazily from the loaded instance id
+   254→  }
+   255→
+   256→  /**
+   257→   * First-boot ceremony: installs the Argon2id password verifier and the full
+   258→   * M2 ecosystem — master vault (3-of-5 guardians, multi-sig), the five
+   259→   * network vaults (steem/hive/tron/blurt/saos-net), the soldier fleet
+   260→   * (13 by default, 5 traders), and the four purpose vaults
+   261→   * (trading/bridging/governance/treasury).
+   262→   *
+   263→   * The password itself is consumed here and never stored — only its verifier.
+   264→   *
+   265→   * @throws VaultError("VAULT_EXISTS") when already initialized,
+   266→   *   VaultError("VALIDATION") for malformed option amounts.
+   267→   */
+   268→  async initialize(password: string, opts?: InitializeOptions): Promise<VaultStatus> {
+   269→    await this.ensureLoaded();
+   270→    if (this.state === null) {
+   271→      // First boot — no persisted document yet: start from a fresh skeleton
+   272→      // with a stable random instance id (binds audit genesis + ZK contexts).
+   273→      this.state = emptyState(crypto.randomUUID());
+   274→    }
+   275→    const state = this.state;
+   276→    if (state.initialized) {
+   277→      throw new VaultError("VAULT_EXISTS", "vault is already initialized");
+   278→    }
+   279→    if (opts?.steemDailyLimitSatoshis !== undefined) {
+   280→      try {
+   281→        parseSats(opts.steemDailyLimitSatoshis);
+   282→      } catch {
+   283→        throw new VaultError("VALIDATION", "steemDailyLimitSatoshis is not a valid satoshi string");
+   284→      }
+   285→    }
+   286→    const soldierCount = opts?.soldierCount ?? 13;
+   287→    const traderSoldiers = opts?.traderSoldiers ?? 5;
+   288→    if (!Number.isInteger(soldierCount) || soldierCount < 1 || soldierCount > 999) {
+   289→      throw new VaultError("VALIDATION", "soldierCount must be an integer in [1, 999]");
+   290→    }
+   291→    if (!Number.isInteger(traderSoldiers) || traderSoldiers < 0 || traderSoldiers > soldierCount) {
+   292→      throw new VaultError("VALIDATION", "traderSoldiers must be an integer in [0, soldierCount]");
+   293→    }
+   294→
+   295→    const now = this.nowFn();
+   296→
+   297→    // Master vault — root of trust, ed25519, 3-of-5 guardian multi-sig.
+   298→    state.master = {
+   299→      id: "master",
+   300→      kind: "master",
+   301→      label: "Master vault",
+   302→      createdAt: now,
+   303→      approvers: ["master"],
+   304→      keyType: "ed25519",
+   305→      requiresMultiSig: true,
+   306→      threshold: 3,
+   307→      guardianCount: 5,
+   308→    };
+   309→
+   310→    // Network vaults — blurt ships offline; saos-net carries the sovereign flags.
+   311→    const networks: Record<string, NetworkVaultConfig> = {};
+   312→    const networkConfigs = [
+   313→      this.buildNetworkConfig(
+   314→        { network: "steem", maxAmountPerDay: { STEEM: opts?.steemDailyLimitSatoshis ?? "10000000" } },
+   315→        now,
+   316→      ),
+   317→      this.buildNetworkConfig({ network: "hive" }, now),
+   318→      this.buildNetworkConfig({ network: "tron" }, now),
+   319→      this.buildNetworkConfig({ network: "blurt", status: "offline" }, now),
+   320→      this.buildNetworkConfig(
+   321→        { network: "saos-net", special: { soldierManagement: true, oracleFeeds: true } },
+   322→        now,
+   323→      ),
+   324→    ];
+   325→    for (const cfg of networkConfigs) networks[cfg.id] = cfg;
+   326→
+   327→    // Soldier fleet — ids and names zero-padded; the first N are traders.
+   328→    const soldiers: Record<string, SoldierVaultConfig> = {};
+   329→    for (let i = 1; i <= soldierCount; i++) {
+   330→      const seq = String(i).padStart(2, "0");
+   331→      soldiers[`vault-soldier-${seq}`] = {
+   332→        id: `vault-soldier-${seq}`,
+   333→        kind: "soldier",
+   334→        label: `saos-soldier-${seq}`,
+   335→        createdAt: now,
+   336→        approvers: ["master"],
+   337→        soldierName: `saos-soldier-${seq}`,
+   338→        permissions: {
+   339→          canTrade: i <= traderSoldiers,
+   340→          canVote: true,
+   341→          canComment: true,
+   342→          canTransfer: false,
+   343→          maxTransferAmount: "0",
+   344→        },
+   345→        linkedVaults: [...DEFAULT_SOLDIER_LINKS],
+   346→        anomalyDetection: true,
+   347→        lastActivity: 0,
+   348→      };
+   349→    }
+   350→
+   351→    // Purpose vaults — treasury is air-gapped (approval via policy rules).
+   352→    const purposes: Record<string, PurposeVaultConfig> = {};
+   353→    for (const purpose of ["trading", "bridging", "governance", "treasury"] as const) {
+   354→      const d = PURPOSE_DEFAULTS[purpose];
+   355→      purposes[`purpose-${purpose}`] = {
+   356→        id: `purpose-${purpose}`,
+   357→        kind: "purpose",
+   358→        label: `${purpose} purpose vault`,
+   359→        createdAt: now,
+   360→        approvers: ["master"],
+   361→        purpose,
+   362→        allowedOperations: [...d.allowedOperations],
+   363→        networkScope: [...d.networkScope],
+   364→        storage: d.storage,
+   365→      };
+   366→    }
+   367→
+   368→    state.networks = networks;
+   369→    state.soldiers = soldiers;
+   370→    state.purposes = purposes;
+   371→    state.verifier = await deriveVerifier(password);
+   372→    state.initialized = true;
+   373→
+   374→    await this.persist();
+   375→    return this.getStatus();
+   376→  }
+   377→
+   378→  /**
+   379→   * Verifies the master password against the stored Argon2id verifier and, on
+   380→   * success, holds the derived 32-byte master key in VOLATILE memory until
+   381→   * lock() wipes it. Also arms the idle auto-lock timer.
+   382→   *
+   383→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("WRONG_PASSWORD") — the
+   384→   *   error reveals only that verification failed, never why or what was stored.
+   385→   */
+   386→  async unlock(password: string): Promise<VaultStatus> {
+   387→    await this.ensureLoaded();
+   388→    const state = this.requireState();
+   389→    if (!state.initialized || state.verifier === null) {
+   390→      throw new VaultError("VAULT_NOT_INITIALIZED", "vault has no password verifier — initialize() first");
+   391→    }
+   392→    const ok = await verifyPassword(password, state.verifier);
+   393→    if (!ok) {
+   394→      throw new VaultError("WRONG_PASSWORD", "password verification failed");
+   395→    }
+   396→    this.derivedKey = await deriveMasterKey(password, b64ToBytes(state.verifier.salt), state.verifier.params);
+   397→    const t = this.nowFn();
+   398→    this.unlockedAt = t;
+   399→    this.lastActivityAt = t;
+   400→    this.autoLocksAt = t + state.autoLockSeconds * 1000;
+   401→    return this.getStatus();
+   402→  }
+   403→
+   404→  /**
+   405→   * Locks the session: zero-fills the derived key bytes, clears all volatile
+   406→   * session timestamps. Idempotent and safe to call at any time.
+   407→   */
+   408→  lock(): void {
+   409→    if (this.derivedKey !== null) {
+   410→      this.derivedKey.fill(0);
+   411→      this.derivedKey = null;
+   412→    }
+   413→    this.unlockedAt = null;
+   414→    this.autoLocksAt = null;
+   415→  }
+   416→
+   417→  /**
+   418→   * Auto-lock check — call from a timer/poll. Locks and returns true when the
+   419→   * idle window has elapsed; otherwise a no-op returning false.
+   420→   */
+   421→  maybeAutoLock(now: number = Date.now()): boolean {
+   422→    if (this.derivedKey !== null && this.autoLocksAt !== null && now > this.autoLocksAt) {
+   423→      this.lock();
+   424→      return true;
+   425→    }
+   426→    return false;
+   427→  }
+   428→
+   429→  /**
+   430→   * Sliding-window activity bump: refreshes lastActivityAt and re-arms the
+   431→   * auto-lock deadline. Called automatically by ensureUnlocked().
+   432→   */
+   433→  touch(): void {
+   434→    const t = this.nowFn();
+   435→    this.lastActivityAt = t;
+   436→    this.autoLocksAt = t + this.autoLockSeconds() * 1000;
+   437→  }
+   438→
+   439→  /**
+   440→   * Session gate for every privileged operation: throws VaultError("VAULT_LOCKED")
+   441→   * unless the derived key is in memory, then refreshes the idle timer.
+   442→   */
+   443→  ensureUnlocked(): void {
+   444→    if (this.derivedKey === null) {
+   445→      throw new VaultError("VAULT_LOCKED", "vault is locked — unlock() required");
+   446→    }
+   447→    this.touch();
+   448→  }
+   449→
+   450→  /** Whether a derived key is currently held in memory. */
+   451→  get isUnlocked(): boolean {
+   452→    return this.derivedKey !== null;
+   453→  }
+   454→
+   455→  /**
+   456→   * Secret-free read of the state document (key payloads are sealed — the doc
+   457→   * is safe to hand to UI/policy layers). Returns null before initialization.
+   458→   */
+   459→  getState(): VaultStateDoc | null {
+   460→    return this.state;
+   461→  }
+   462→
+   463→  // -------------------------------------------------------------------------
+   464→  // Hierarchy mutations (all require an unlocked session)
+   465→  // -------------------------------------------------------------------------
+   466→
+   467→  /**
+   468→   * Creates a network vault (steem-family roles/ops/limits default from the
+   469→   * M2 tables; every field is overridable).
+   470→   *
+   471→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   472→   *   ("VAULT_EXISTS") when this network already has a vault.
+   473→   */
+   474→  async createNetworkVault(input: UpsertNetworkInput): Promise<NetworkVaultConfig> {
+   475→    await this.ensureLoaded();
+   476→    const state = this.requireState();
+   477→    this.ensureUnlocked();
+   478→    if (Object.values(state.networks).some((n) => n.network === input.network)) {
+   479→      throw new VaultError("VAULT_EXISTS", `a vault for network ${input.network} already exists`);
+   480→    }
+   481→    const config = this.buildNetworkConfig(input, this.nowFn());
+   482→    state.networks[config.id] = config;
+   483→    await this.persist();
+   484→    return config;
+   485→  }
+   486→
+   487→  /**
+   488→   * Merges a partial config into an existing network vault (unspecified
+   489→   * fields keep their current values).
+   490→   *
+   491→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   492→   *   ("VAULT_NOT_FOUND") when no vault exists for that network.
+   493→   */
+   494→  async updateNetworkVault(input: UpsertNetworkInput): Promise<NetworkVaultConfig> {
+   495→    await this.ensureLoaded();
+   496→    const state = this.requireState();
+   497→    this.ensureUnlocked();
+   498→    const existing = Object.values(state.networks).find((n) => n.network === input.network);
+   499→    if (!existing) {
+   500→      throw new VaultError("VAULT_NOT_FOUND", `no vault exists for network ${input.network}`);
+   501→    }
+   502→    const merged: NetworkVaultConfig = {
+   503→      ...existing,
+   504→      roles: input.roles ?? existing.roles,
+   505→      allowedOperations: input.allowedOperations ?? existing.allowedOperations,
+   506→      maxAmountPerDay: input.maxAmountPerDay ?? existing.maxAmountPerDay,
+   507→      requiresApproval: input.requiresApproval ?? existing.requiresApproval,
+   508→      storage: input.storage ?? existing.storage,
+   509→      special: input.special ?? existing.special,
+   510→      status: input.status ?? existing.status,
+   511→      label: input.label ?? existing.label,
+   512→    };
+   513→    state.networks[merged.id] = merged;
+   514→    await this.persist();
+   515→    return merged;
+   516→  }
+   517→
+   518→  /**
+   519→   * Creates new soldiers and merges permission updates into existing ones,
+   520→   * matched by soldierName (so fleet renames never orphan permissions).
+   521→   * Returns the affected configs.
+   522→   *
+   523→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   524→   *   ("VALIDATION") for empty soldier names.
+   525→   */
+   526→  async upsertSoldiers(inputs: SoldierUpsertInput[]): Promise<SoldierVaultConfig[]> {
+   527→    await this.ensureLoaded();
+   528→    const state = this.requireState();
+   529→    this.ensureUnlocked();
+   530→    const now = this.nowFn();
+   531→    const updated: SoldierVaultConfig[] = [];
+   532→    for (const input of inputs) {
+   533→      if (typeof input.soldierName !== "string" || input.soldierName.length === 0) {
+   534→        throw new VaultError("VALIDATION", "soldierName is required");
+   535→      }
+   536→      const existing = Object.values(state.soldiers).find((s) => s.soldierName === input.soldierName);
+   537→      if (existing) {
+   538→        const merged: SoldierVaultConfig = {
+   539→          ...existing,
+   540→          label: input.label ?? existing.label,
+   541→          permissions: { ...existing.permissions, ...input.permissions },
+   542→          linkedVaults: input.linkedVaults ?? existing.linkedVaults,
+   543→          anomalyDetection: input.anomalyDetection ?? existing.anomalyDetection,
+   544→        };
+   545→        state.soldiers[merged.id] = merged;
+   546→        updated.push(merged);
+   547→      } else {
+   548→        const id = `vault-soldier-${crypto.randomUUID()}`;
+   549→        const config: SoldierVaultConfig = {
+   550→          id,
+   551→          kind: "soldier",
+   552→          label: input.label ?? input.soldierName,
+   553→          createdAt: now,
+   554→          approvers: ["master"],
+   555→          soldierName: input.soldierName,
+   556→          permissions: {
+   557→            canTrade: false,
+   558→            canVote: true,
+   559→            canComment: true,
+   560→            canTransfer: false,
+   561→            maxTransferAmount: "0",
+   562→            ...input.permissions,
+   563→          },
+   564→          linkedVaults: input.linkedVaults ?? [...DEFAULT_SOLDIER_LINKS],
+   565→          anomalyDetection: input.anomalyDetection ?? true,
+   566→          lastActivity: 0,
+   567→        };
+   568→        state.soldiers[id] = config;
+   569→        updated.push(config);
+   570→      }
+   571→    }
+   572→    await this.persist();
+   573→    return updated;
+   574→  }
+   575→
+   576→  /**
+   577→   * Creates a purpose vault with the M2 defaults (trading/bridging hot,
+   578→   * governance cold, treasury air-gapped).
+   579→   *
+   580→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   581→   *   ("VAULT_EXISTS") when the purpose vault already exists.
+   582→   */
+   583→  async createPurposeVault(input: PurposeVaultInput): Promise<PurposeVaultConfig> {
+   584→    await this.ensureLoaded();
+   585→    const state = this.requireState();
+   586→    this.ensureUnlocked();
+   587→    const id = `purpose-${input.purpose}`;
+   588→    if (state.purposes[id] !== undefined) {
+   589→      throw new VaultError("VAULT_EXISTS", `purpose vault ${input.purpose} already exists`);
+   590→    }
+   591→    const d = PURPOSE_DEFAULTS[input.purpose];
+   592→    const config: PurposeVaultConfig = {
+   593→      id,
+   594→      kind: "purpose",
+   595→      label: input.label ?? `${input.purpose} purpose vault`,
+   596→      createdAt: this.nowFn(),
+   597→      approvers: ["master"],
+   598→      purpose: input.purpose,
+   599→      allowedOperations: input.allowedOperations ?? [...d.allowedOperations],
+   600→      networkScope: input.networkScope ?? [...d.networkScope],
+   601→      storage: input.storage ?? d.storage,
+   602→    };
+   603→    state.purposes[id] = config;
+   604→    await this.persist();
+   605→    return config;
+   606→  }
+   607→
+   608→  // -------------------------------------------------------------------------
+   609→  // Key lifecycle
+   610→  // -------------------------------------------------------------------------
+   611→
+   612→  /**
+   613→   * Seals a WIF into the vault under the session master key (see VaultKeys).
+   614→   *
+   615→   * Step-up: when `input.password` is provided it is verified AGAIN against
+   616→   * the stored verifier — a failed step-up aborts the seal with
+   617→   * VaultError("WRONG_PASSWORD").
+   618→   *
+   619→   * Returns metadata WITHOUT the sealed payload (the caller never needs the
+   620→   * ciphertext; reveal goes through revealKeyFor).
+   621→   *
+   622→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   623→   *   ("WRONG_PASSWORD"), ("VALIDATION") for bad WIFs/roles.
+   624→   */
+   625→  async addKey(input: VaultAddKeyInput): Promise<Omit<EncryptedKey, "payload">> {
+   626→    await this.ensureLoaded();
+   627→    const state = this.requireState();
+   628→    this.ensureUnlocked();
+   629→    if (input.password !== undefined) {
+   630→      if (state.verifier === null) {
+   631→        throw new VaultError("VAULT_NOT_INITIALIZED", "vault has no password verifier");
+   632→      }
+   633→      const ok = await verifyPassword(input.password, state.verifier);
+   634→      if (!ok) {
+   635→        throw new VaultError("WRONG_PASSWORD", "step-up password verification failed");
+   636→      }
+   637→    }
+   638→    const { record, state: nextState } = VaultKeys.addKey(state, this.requireDerivedKey(), input);
+   639→    this.state = nextState;
+   640→    await this.persist();
+   641→    return {
+   642→      keyId: record.keyId,
+   643→      vaultId: record.vaultId,
+   644→      network: record.network,
+   645→      role: record.role,
+   646→      account: record.account,
+   647→      label: record.label,
+   648→      algorithm: record.algorithm,
+   649→      publicKey: record.publicKey,
+   650→      storage: record.storage,
+   651→      createdAt: record.createdAt,
+   652→      lastUsedAt: record.lastUsedAt,
+   653→      status: record.status,
+   654→    };
+   655→  }
+   656→
+   657→  /**
+   658→   * The ONLY sanctioned plaintext exit for a sealed key: unlock + policy +
+   659→   * revocation checks happen HERE, before VaultKeys.revealKey ever runs.
+   660→   * Refreshes session activity (idle-timer discipline for signing flows).
+   661→   *
+   662→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   663→   *   ("KEY_NOT_FOUND"), ("KEY_REVOKED"), ("DECRYPTION_FAILED").
+   664→   */
+   665→  async revealKeyFor(keyId: string): Promise<RevealResult> {
+   666→    await this.ensureLoaded();
+   667→    const state = this.requireState();
+   668→    this.ensureUnlocked();
+   669→    const record = state.keys[keyId];
+   670→    if (!record) {
+   671→      throw new VaultError("KEY_NOT_FOUND", "no such key in the vault");
+   672→    }
+   673→    if (record.status === "revoked") {
+   674→      throw new VaultError("KEY_REVOKED", "key has been revoked");
+   675→    }
+   676→    const privateKey = VaultKeys.revealKey(record, this.requireDerivedKey());
+   677→    return { privateKey, record };
+   678→  }
+   679→
+   680→  /**
+   681→   * Records a signing use (lastUsedAt) for audit + dead-man telemetry.
+   682→   * Metadata-only: deliberately does NOT require an unlocked session.
+   683→   *
+   684→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("KEY_NOT_FOUND").
+   685→   */
+   686→  async markKeyUsed(keyId: string): Promise<void> {
+   687→    await this.ensureLoaded();
+   688→    const state = this.requireState();
+   689→    const record = state.keys[keyId];
+   690→    if (!record) {
+   691→      throw new VaultError("KEY_NOT_FOUND", "no such key in the vault");
+   692→    }
+   693→    state.keys[keyId] = { ...record, lastUsedAt: this.nowFn() };
+   694→    await this.persist();
+   695→  }
+   696→
+   697→  // -------------------------------------------------------------------------
+   698→  // Backup
+   699→  // -------------------------------------------------------------------------
+   700→
+   701→  /**
+   702→   * Re-seals the ENTIRE state document JSON under a freshly Argon2id-derived
+   703→   * key (fresh 16-byte salt, default params). The payload's `salt` field
+   704→   * carries the REAL derivation salt, so a restorer needs only the password:
+   705→   *   key = deriveMasterKey(password, b64ToBytes(payload.salt))
+   706→   *   state = openJson(payload, key)
+   707→   *
+   708→   * This is the input format BackupManager (layer 5) wraps into a
+   709→   * BackupPackage with Shamir shards of the wrapping key.
+   710→   *
+   711→   * @throws VaultError("VAULT_NOT_INITIALIZED"), ("VAULT_LOCKED"),
+   712→   *   ("VALIDATION") for an empty password.
+   713→   */
+   714→  async exportState(password: string): Promise<EncryptedPayload> {
+   715→    await this.ensureLoaded();
+   716→    const state = this.requireState();
+   717→    this.ensureUnlocked();
+   718→    if (password.length === 0) {
+   719→      throw new VaultError("VALIDATION", "backup password must not be empty");
+   720→    }
+   721→    const salt = randomBytes(16);
+   722→    const key = await deriveMasterKey(password, salt, DEFAULT_KDF_PARAMS);
+   723→    try {
+   724→      return seal(utf8(JSON.stringify(state)), key, { keyId: "backup-v1", salt });
+   725→    } finally {
+   726→      key.fill(0);
+   727→    }
+   728→  }
+   729→
+   730→  // -------------------------------------------------------------------------
+   731→  // Status & security scoring
+   732→  // -------------------------------------------------------------------------
+   733→
+   734→  /**
+   735→   * Secret-free status snapshot — works while LOCKED (nothing derived, no
+   736→   * unsealing). Includes counts, security score, and audit telemetry
+   737→   * (head hash + event count from the AuditStore when one was provided).
+   738→   */
+   739→  async getStatus(): Promise<VaultStatus> {
+   740→    const auditStats = await this.auditStats();
+   741→    const state = this.state;
+   742→    if (state === null) {
+   743→      return {
+   744→        initialized: false,
+   745→        locked: true,
+   746→        autoLockSeconds: DEFAULT_AUTO_LOCK_SECONDS,
+   747→        autoLocksAt: null,
+   748→        createdAt: null,
+   749→        securityScore: 0,
+   750→        securityFindings: ["vault is not initialized — run initialize() to set a master password verifier"],
+   751→        counts: { networks: 0, soldiers: 0, purposes: 0, keys: 0, activeKeys: 0, guardians: 0 },
+   752→        networks: [],
+   753→        lastSigningAt: null,
+   754→        lastBackupAt: null,
+   755→        deadManSwitch: null,
+   756→        auditHeadHash: auditStats.headHash,
+   757→        auditEventCount: auditStats.count,
+   758→        auditIntegrityOk: true,
+   759→      };
+   760→    }
+   761→
+   762→    const keys = Object.values(state.keys);
+   763→    const activeKeys = keys.filter((k) => k.status === "active");
+   764→    let lastSigningAt: number | null = null;
+   765→    for (const k of keys) {
+   766→      if (k.lastUsedAt !== null && (lastSigningAt === null || k.lastUsedAt > lastSigningAt)) {
+   767→        lastSigningAt = k.lastUsedAt;
+   768→      }
+   769→    }
+   770→    const { score, findings } = this.computeSecurityScore(state);
+   771→
+   772→    return {
+   773→      initialized: state.initialized,
+   774→      locked: this.derivedKey === null,
+   775→      autoLockSeconds: state.autoLockSeconds,
+   776→      autoLocksAt: this.autoLocksAt,
+   777→      createdAt: state.createdAt,
+   778→      securityScore: score,
+   779→      securityFindings: findings,
+   780→      counts: {
+   781→        networks: Object.keys(state.networks).length,
+   782→        soldiers: Object.keys(state.soldiers).length,
+   783→        purposes: Object.keys(state.purposes).length,
+   784→        keys: keys.length,
+   785→        activeKeys: activeKeys.length,
+   786→        guardians: state.master?.guardianCount ?? 0,
+   787→      },
+   788→      networks: Object.values(state.networks).map((n) => n.network),
+   789→      lastSigningAt,
+   790→      lastBackupAt: state.backup.lastBackupAt,
+   791→      deadManSwitch: state.backup.deadManSwitch,
+   792→      auditHeadHash: auditStats.headHash,
+   793→      auditEventCount: auditStats.count,
+   794→      // Deep chain verification lives in the audit layer; an empty chain is
+   795→      // vacuously intact and a populated one is reported optimistically here.
+   796→      auditIntegrityOk: true,
+   797→    };
+   798→  }
+   799→
+   800→  /**
+   801→   * Honest security posture scoring (0–100) from REAL configuration only —
+   802→   * never defaults that make an uninitialized vault look good. Findings are
+   803→   * short, actionable, and contain no secrets.
+   804→   *
+   805→   * Budget: 20 base + 15 verifier + 10 keys + 10 steem role coverage +
+   806→   * 10 cold/air-gapped storage + 10 backup + 10 social recovery +
+   807→   * 10 dead-man switch + 5 tight auto-lock = 100.
+   808→   */
+   809→  computeSecurityScore(state: VaultStateDoc): { score: number; findings: string[] } {
+   810→    if (!state.initialized) {
+   811→      return {
+   812→        score: 0,
+   813→        findings: ["vault is not initialized — run initialize() to set a master password verifier"],
+   814→      };
+   815→    }
+   816→    const findings: string[] = [];
+   817→    let score = 20;
+   818→
+   819→    const keys = Object.values(state.keys);
+   820→    if (state.verifier !== null) score += 15;
+   821→    else findings.push("no master-password verifier present — the vault cannot verify unlock attempts");
+   822→
+   823→    if (keys.length > 0) score += 10;
+   824→    else findings.push("no keys sealed yet — add at least one network key");
+   825→
+   826→    const steemCfg = Object.values(state.networks).find((n) => n.network === "steem");
+   827→    const roles = new Set(steemCfg?.roles ?? []);
+   828→    if (STEEM_ROLES.every((r) => roles.has(r))) score += 10;
+   829→    else findings.push("steem vault lacks full role coverage (owner/active/posting/memo)");
+   830→
+   831→    if (keys.some((k) => k.storage !== "hot")) score += 10;
+   832→    else findings.push("all keys are hot-stored — seal at least one cold or air-gapped key");
+   833→
+   834→    if (state.backup.lastBackupAt !== null) score += 10;
+   835→    else findings.push("no backup created yet — export the state doc via exportState()");
+   836→
+   837→    const recovery = state.backup.socialRecovery;
+   838→    if (recovery !== null && recovery.threshold > 0 && recovery.contacts.length >= recovery.threshold) score += 10;
+   839→    else findings.push("social recovery is not configured — register recovery contacts up to a threshold");
+   840→
+   841→    if (state.backup.deadManSwitch?.enabled) score += 10;
+   842→    else findings.push("dead-man switch is disabled — configure beneficiaries and an inactivity window");
+   843→
+   844→    if (state.autoLockSeconds <= 300) score += 5;
+   845→    else findings.push(`auto-lock of ${state.autoLockSeconds}s exceeds the 300s budget`);
+   846→
+   847→    return { score: Math.max(0, Math.min(100, score)), findings };
+   848→  }
+   849→
+   850→  // -------------------------------------------------------------------------
+   851→  // Internals
+   852→  // -------------------------------------------------------------------------
+   853→
+   854→  /** Lazily loads state so every public method works on a fresh instance. */
+   855→  private async ensureLoaded(): Promise<void> {
+   856→    if (this.state === null) await this.load();
+   857→  }
+   858→
+   859→  private requireState(): VaultStateDoc {
+   860→    if (this.state === null) {
+   861→      throw new VaultError("VAULT_NOT_INITIALIZED", "vault state not initialized — call initialize() first");
+   862→    }
+   863→    return this.state;
+   864→  }
+   865→
+   866→  private requireDerivedKey(): Uint8Array {
+   867→    if (this.derivedKey === null) {
+   868→      throw new VaultError("VAULT_LOCKED", "vault is locked — unlock() required");
+   869→    }
+   870→    return this.derivedKey;
+   871→  }
+   872→
+   873→  private autoLockSeconds(): number {
+   874→    return this.state?.autoLockSeconds ?? DEFAULT_AUTO_LOCK_SECONDS;
+   875→  }
+   876→
+   877→  /** Persists the state doc under the instance's stable genesis hash. */
+   878→  private async persist(): Promise<void> {
+   879→    const state = this.state;
+   880→    if (state === null) {
+   881→      throw new VaultError("VAULT_NOT_INITIALIZED", "nothing to persist");
+   882→    }
+   883→    state.updatedAt = this.nowFn();
+   884→    await this.storage.save(JSON.stringify(state), this.genesisHash());
+   885→  }
+   886→
+   887→  /** sha256(vaultInstanceId) — stable across saves, anchors the audit chain. */
+   888→  private genesisHash(): string {
+   889→    if (this.genesisHashValue === null) {
+   890→      this.genesisHashValue = createHash("sha256").update(this.state?.vaultInstanceId ?? "").digest("hex");
+   891→    }
+   892→    return this.genesisHashValue;
+   893→  }
+   894→
+   895→  private async auditStats(): Promise<{ headHash: string | null; count: number }> {
+   896→    if (this.audit === null) return { headHash: null, count: 0 };
+   897→    const [head, count] = await Promise.all([this.audit.head(), this.audit.count({})]);
+   898→    return { headHash: head?.eventHash ?? null, count };
+   899→  }
+   900→
+   901→  private buildNetworkConfig(input: UpsertNetworkInput, now: number): NetworkVaultConfig {
+   902→    return {
+   903→      id: `network-${input.network}`,
+   904→      kind: "network",
+   905→      label: input.label ?? `${input.network.toUpperCase()} network vault`,
+   906→      createdAt: now,
+   907→      approvers: ["master"],
+   908→      network: input.network,
+   909→      roles: input.roles ?? [...DEFAULT_NETWORK_ROLES[input.network]],
+   910→      allowedOperations: input.allowedOperations ?? [...DEFAULT_NETWORK_OPS[input.network]],
+   911→      maxAmountPerDay: input.maxAmountPerDay ?? { ...DEFAULT_NETWORK_LIMITS[input.network] },
+   912→      requiresApproval: input.requiresApproval ?? false,
+   913→      storage: input.storage ?? "hot",
+   914→      special: input.special,
+   915→      status: input.status ?? "active",
+   916→    };
+   917→  }
+   918→}
+   919→
+   920→/** Structural guard for the persisted state document (docVersion 1). */
+   921→function isVaultStateDoc(v: unknown): v is VaultStateDoc {
+   922→  if (v === null || typeof v !== "object") return false;
+   923→  const o = v as Record<string, unknown>;
+   924→  return (
+   925→    o.docVersion === 1 &&
+   926→    typeof o.vaultInstanceId === "string" &&
+   927→    typeof o.initialized === "boolean" &&
+   928→    typeof o.createdAt === "number" &&
+   929→    typeof o.updatedAt === "number" &&
+   930→    typeof o.keys === "object" &&
+   931→    o.keys !== null &&
+   932→    typeof o.policies === "object" &&
+   933→    o.policies !== null &&
+   934→    typeof o.backup === "object" &&
+   935→    o.backup !== null
+   936→  );
+   937→}
+   938→
