@@ -21,7 +21,9 @@ export async function register() {
         const child = spawn("bun", ["run", "dev"], {
           cwd: "/home/z/my-project/saos-dex",
           stdio: "ignore",
-          env: process.env,
+          // הפרדת-מסדי-נתונים מחייבת: הדמון מקבל את ה-DB שלו-עצמו (saos-dex/db/dex.db) —
+          // לעולם לא את ה-DATABASE_URL של הפלטפורמה-האם (custom.db), שמתנגש איתה.
+          env: { ...process.env, DATABASE_URL: "file:/home/z/my-project/saos-dex/db/dex.db" },
         });
         child.unref();
         child.on("error", (e: Error) => console.log("[saos-bridge] dex spawn error:", e.message));

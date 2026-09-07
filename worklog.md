@@ -60,3 +60,25 @@ Stage Summary:
 - SAOS-DEX מעוגן חי: Steem 🟢 כל-חותם · Hive 🟡 חי-מואומת, קצב-נשלט-RC (כנות מלאה בפאנל/STATUS) · TRON 🟡 מותנה-מימון (המודול ידלק לבד ברגע שהזהות תמומן ב-≥0.3 TRX)
 - שרשרת-האם לא נפגעה: Relay כולו לא-חוסם; הקונסולה הראשית (3000) תקינה
 - אבטחה: אפס סודות בלוג/פלט/git; מפתחות בזיכרון מ-.env מקושח; הטוקן inline-בלבד
+
+---
+Task ID: TERM-1..T9 (Institutional Upgrade — Sovereign Terminal)
+Agent: Z.ai Code (SAOS-DEX institutional agent)
+Task: שדרוג ארכיטקטוני מפרוטוטייפ למוסדי — lightweight-charts, long-polling, System Health, verifyOnChain + circuit breakers, docs, push.
+
+Work Log:
+- T1: lightweight-charts@5.2.1 נכנס, recharts הוסר (package.json+bun.lock)
+- T2: /api/dex/state עם long-poll מבוסס-גרסה (?v= — מחזיר רק-כשהשרשרת התקדמה, keepalive 12ש׳) · chain.ts: TPS מדוד-אמת (opsPerSecRolling על-בלוקים-אמת) + chainVersion()
+- T3 (relay.ts): verifyOnChain — Steem/Hive get_transaction + השוואת stateRoot/height, TRON blockNumber+extra_data · ALERT בלוג על-מיסמאץ' · circuit breaker per-chain (closed/open/half-open, סף-4, צינון-5ד׳; תנאי-תקציב לא נספר) · backoff אקספוננציאלי+jitter ±20% · לולאת-פיוס (מחזור-ראשון 8ש׳, אחר-כך 90ש׳, batch 3) ששורדת-הפעלות-מחדש דרך שחזור anchors.json (public) · מדדים מלאים
+- T4 (UI): chart.tsx (lightweight-charts v5, AreaSeries זהב, dedupe-שניות, ResizeObserver) · useWorldStream (long-poll+AbortController; רענון-מיידי-אחרי-פעולה) · SystemHealthPanel (TPS/ראיות/Relay/Breakers/Verify — סגול-עמוק למערכת) · RelayPanel משודרג (V-נגדים, breaker states) · אפס אימוג'ים (StatusDot+lucide X/Check/ArrowLeftRight במקום ●/✓/✕/⇄) · רקע zinc-950 טהור, scrollbar ניטרלי · fmt/fmtInt ל-en-US (יציבות-מסחר)
+- T5: tsc + eslint (root config נגד saos-dex/src) — נקי לחלוטין (5 שגיאות set-state-in-effect תוקנו בגזירה-טהורה — בלי effects)
+- T6 (דפדפן): טרמינל חי — גרף זורם (70 נקודות), System Health (V 24+ ok/0 mismatch, breakers closed), ספר-לא-חצוי (spread 33bps חיובי), סליל-מסחר, מובייל 390px תקין + פוטר-דביק
+- תיקוני-עומק שהתגלו-באימות: (א) זיהום-DB — הדמון-3010 ירש DATABASE_URL מוחלט של הפלטפורמה-האם (custom.db) וכתב-שם ראיות; תוקן בשני-קצוות: instrumentation.ts-האם מזריק עתה DATABASE_URL מבודד (file:.../saos-dex/db/dex.db) לילד, ו-dex.db טרי נוצר; שאריות-טבלאות-שלנו ב-custom.db לא נמחקו (לא-נוגעים בטריטוריית-הסוכן-השני — מתועד כאן) · (ב) ספר-חצוי — placeOrder היה מנוחה-בלבד; order מוסדי עתה: נעילת-מראה → matchBook כ-taker במחיר-מייקר → שארית נחה (self-healing לספר) · (ג) בוטי-רעש: טייק-בגודל-תקציב-אמת + היגיינת-פקודות (עד-1 לימיט-רעש פר-בוט-פר-זוג) + קצבת-מלאי תחומה כל-24 טיקים — הזרימה-החופשית חיה על שני-הזוגות · (ד) purge של blockHeaders מעבר-לתמונת-מצב בעלייה (unique-height) · (ה) not-indexed ≠ mismatch — רשומה נשארת null ונכנסת-לפיוס
+- T7: ARCHITECTURE_ROADMAP.md (טבלת-פערים: מה-נסגר/חלקי/פתוח + M1-M4: Prometheus, Signer-Executor/HSM, WebSocket-אמת, CLI-אימות-צד-שלישי) · README.md: דיאגרמת-Mermaid מלאה (UI→API→Kernel→Relay→Steem/Hive/TRON + read-back) + עדכון-כנות (עיגון-אמת, SIM-ספר)
+- T8: 4 קומיטים Conventional — ee00ac3 feat(engine) · 66d5d88 refactor(ui): upgrade to institutional sovereign terminal standards · 438ba37 feat(relay): add on-chain verification and circuit breakers · 625816f docs(architecture) → push מוצלח b2d00f2..625816f → main @ roshpinacare-sys/saos-dex (טוקן inline-בלבד, לא-נשמר ב-config — אומת)
+- T9: סריקת-סודות על כל-טווח-הדחיפה (14 קבצים) — אפס-פגיעות; .env+db/dex.db gitignored-אומתים; אפס .env במעקב
+
+Stage Summary:
+- SAOS-DEX מהדורה-מוסדית חיה על 3010: גרף TradingView-סטנדרט זורם, long-poll מבוסס-אירוע, System Health עם מדדים-אמת, Relay מאומת-עצמית (30 verified/0 mismatches מול-RPC ציבורי, h3036+), breakers closed, אפס אימוג'ים
+- הפרדת-מסדי-נתונים תקיפה ולצמיתות: לדמון-3010 יש dex.db משלו; הגשר-מוסיף-זאת גם-לעתיד
+- פתוח-למסלול: /metrics ל-Prometheus (M1), הפרדת-Signer/Executor+HSM (M2), WS-אמת (M3) — מתועד ב-ARCHITECTURE_ROADMAP.md
