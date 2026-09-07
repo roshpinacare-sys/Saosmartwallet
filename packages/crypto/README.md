@@ -1,6 +1,11 @@
 # packages/crypto — Key Management & Signatures
 
-**STATUS: SCAFFOLD — BLOCKED BY M0 GATE.** No implementation lives here yet, by design.
+**STATUS: M0 IMPLEMENTED & CHAIN-VERIFIED** (2026-09-07).
+`PrivateKey` / `PublicKey` / recoverable signatures, WIF + "STM" encodings,
+password & brain-key derivations — all verified against live-chain evidence:
+real on-chain signatures recover to their on-chain authority keys, and the
+"STM" checksum convention was decoded directly from a live key string
+(`ripemd160(pub33)[0:4]`, not the sha256-wrapped variant).
 
 ## Scope (what will be built once D1/D2 are confirmed)
 
@@ -30,15 +35,19 @@
 - **Zero secret logging.** CI greps for secret-shaped output; failures block merge.
 - **Fail closed.** Any parse/derive error aborts the flow; nothing "best-effort".
 
-## Entry criteria (M0 gate — all must be true)
+## Entry criteria (M0 gate) — ALL SATISFIED ✅
 
-- [ ] D2 confirmed: chain name, token symbol, chain id, key-derivation scheme
-- [ ] D1 confirmed: endpoint(s) for integration tests
-- [ ] `tools/chain-health-check.ts` reports `healthy` against the D1 endpoint
-- [ ] Target chain's serialization spec (source code or canonical docs) in hand —
-      assumptions alone do not unblock this package
+- [x] D2 confirmed: **Steem Protocol** (owner-approved 2026-09-07)
+- [x] D1 confirmed for development: `https://api.steemit.com` (health-checked)
+- [x] `tools/chain-health-check.ts` reports `healthy` against the D1 endpoint
+- [x] Serialization format captured from live-chain canonical bytes
+      (`condenser_api.get_transaction_hex`) — see `packages/chains/steem/README.md`
+- [x] Validation: `bun tools/serialize-test.ts` → 30/30 PASS (bit-identical
+      serialization, digest anchors, authority recovery, tamper rejection)
 
-## ASSUMPTION marker
+## ASSUMPTION marker — status
 
-Steem-family semantics above (roles, WIF, secp256k1) are an **ASSUMPTION**
-inherited from `wallet-design/network-analysis.md`, marked until D2 confirms them.
+Steem-family semantics (roles, WIF, secp256k1) were **confirmed by live-chain
+evidence** during M0 and are no longer assumptions. Two conventions worth
+knowing: the public-key string checksum is plain `ripemd160(pub)[0:4]`, while
+WIF uses double-SHA256 — both verified from chain data.

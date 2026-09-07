@@ -117,3 +117,27 @@ Stage Summary:
 - Groundwork ל-M0 חי במאגר: כלי health-check רץ ומאומת מול צומת אמיתי + ממשק ChainAdapter קפוא + סקפולד packages מתועד; כל הרכיבים מסומנים ASSUMPTION ומוגני שער M0 — אפס קוד חתימה לפני D1/D2.
 - ראיות רשת ראשונות בפועל (לא הנחה): צומת Steem ציבורי חי, ver 0.23.0, rc_api זמין — ו-chain id חסר בצומת הציבורי, רלוונטי להחלטת D2.
 - נותר פתוח אצל בעל הפרויקט: D1/D2 (רשת+RPC) לשחרור ה-M0 gate; שלילת/צמצום הטוקן הרחב (עדיין חי).
+
+---
+Task ID: M0-impl
+Agent: Z.ai Code (main)
+Task: מימוש M0 Core באישור הבעלים (טוקן נשאר פעיל; רשת = Steem Protocol): חבילת crypto, מנוע serialization ל-Steem, SteemAdapter, סוויטת אימות מול chain חי, תיעוד, commit ו-push.
+
+Work Log:
+- deps קריפטוגרפיות אומתו: @noble/curves@2.4.0 + @noble/hashes@2.4.0 + @scure/base@2.4.0; נבנה על APIs בלבד (noble v2: sign מחזיר Uint8Array(64); 65B 'recovered' פורמט = [recid, r, s]).
+- לכידת ראיות מה-chain לפני כתיבת serializer (עקרון "אין ניחושים"): מיני-serializer זמני שיחזר עסקאות אמיתיות — 4/4 עסקאות vote עם עסקה-מעטפת מתאימות tx-id; שתי השערות Asset (15B/14B) נכשלו מול 20 עסקאות transfer; condenser_api.get_transaction_hex נמצא כ-oracle קנוני; ניתוח hex חשף: **Asset = 16 בייטים** (int64 + precision byte + 7-char ריפוד-אפס) — הראיה: `01…00 | 03 "STEEM" 00 00` + memo varint; get_transaction_hex = tx bytes + וקטור חתימות (varint 0 כשאין חתימות); checksum של מפתח ציבורי "STM" חולץ ממחרוזת on-chain אמיתית = **ripemd160(pub33)[0:4]** ישירות (לא ripemd160(sha256()) — זיכרון תוקן מול ראיות); header של חתימות אמיתיות = 0x1f/0x20 → recid = header−31; שמות חשבונות מכילים נקודות (wakeupkittty.pal נצפה).
+- נכתב packages/chains/steem/src/serializer.ts — ByteWriter/ByteReader (u8/u16/u32/i64/varint/string) + Asset pack/unpack (16B) + parseAsset/formatAsset ללא floats (BigInt בלבד), fail-closed על סימולים לא-ידועים.
+- נכתב packages/chains/steem/src/operations.ts — ריסטר op-ids סטנדרטי; transfer (id 2) ממומש pack/unpack; ops לא-נתמכים נזרקים בבירור.
+- נכתב packages/chains/steem/src/transaction.ts — מעטפת serialize/deserialize, transactionDigest = sha256(chain_id‖tx) (chain id Steem = 32 אפסים), transactionId (sha256[0:40]), appendSignatures (wire: tx + varint(count) + 65B sigs).
+- נכתב packages/crypto/src/{encoding,keys,index}.ts — WIF (0x80 + double-sha256 checksum), STM encode/decode (ripemd160(pub) checksum), PrivateKey/PublicKey, signRecoverable → [31+recid, r, s], verify = recovery-and-compare (כמו ה-chain), derivePrivateKey = sha256(account+role+password), generateMasterPassword = "P"+WIF, normalizeBrainKey + deriveFromBrainKey (cli_wallet סמנטיקה, flag ל-lowercase).
+- נכתב packages/chains/steem/src/adapter.ts — SteemAdapter implements ChainAdapter: health/getAccount/getBalances/getRcManabar (JSON-RPC), buildOperations (ref_block_num=head&0xFFFF, prefix=LE u32 של head_block_id[4:8], expiration=+60s), sign עם policy (אסור לחתום transfer עם posting key), broadcast **נעול** כברירת מחדל (allowBroadcast:true בלבד) — capability "broadcast" מפורסם רק אז.
+- נכתב tools/serialize-test.ts — קריטריוני קבלה מול chain חי: (1) זהות ביט-אחר-ביט מול get_transaction_hex (עם וקטור חתימות ריק), (2) sha256(bytes)=transaction_id, (3) round-trip deserialize→serialize, (4) recovery של חתימות אמיתיות מול authority on-chain, (5) self-tests: WIF/STM round-trip+tamper, חתימה/אימות, גזירות, assets.
+- איתור באגים תוך כדי: recid-first פורמט noble v2 (מכאן "invalid recovery id"), באג .result כפול ב-probe שגרם ל-false-fails, אורך STM משתנה (test תוקן לבדיקת payload 37B).
+- תוצאה סופית: **30/30 PASS, exit 0** — כולל 10/10 עסקאות BIT-IDENTICAL מול serializer הצומת, 10/10 tx-id anchors, ו-2/2 חתימות אמיתיות ששוחזרו ל-authority ה-on-chain; בדיקת adapter מקומית: sign→recover PASS, policy gate PASS, broadcast FAILS CLOSED.
+- READMEs עודכנו (packages/README.md, packages/crypto/README.md, packages/chains/steem/README.md חדש) + README ראשי (הצהרת תקפות מעודכנת — ההנחה הפכה למאומתת; סעיף M0).
+
+Stage Summary:
+- M0 Core שלם ומאומת: crypto + serialization + adapter, עם שרשרת ראיות מלאה מול chain חי; ההצהרה "אין ניחושים" הוכחה בפועל — 3 הנחות זיכרון שלי נפלו מול bytes אמיתיים ותוקנו מהראיות (Asset 16B, STM checksum, oracle-הכולל-חתימות-ריקות).
+- אבטחה: אפס סודות בקוד; broadcast נעול כברירת מחדל; policy מונע transfer עם posting key; כלי האימות קריאה-בלבד ולא שולח שום חתימה.
+- פתוח ל-M1: packages/core (keystore AES-256-GCM + Policy Engine/Aurora Modes), ולאחר מכן indexer + apps/web-wallet.
+- פעולה שעדיין תלויה בבעלים: הטוקן הרחב נשאר חי לפי החלטתו — הסיכון מתועד, מומלץ לצמצם היקף ל-repo בלבד.

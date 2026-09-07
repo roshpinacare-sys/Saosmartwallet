@@ -1,11 +1,11 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-> **סטטוס: עיצוב הושלם · Groundwork ל-M0 מוכן ואומת · קוד חתימה ממתין לאישור רשת (שער M0)**
+> **סטטוס: M0 Core מומש ואומת מול ה-chain · keystore/policy ממתינים ל-M1**
 > עדכון אחרון: 2026-09-07 (Asia/Jerusalem)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
 
-⚠️ **הצהרת תקפות:** העיצוב מותנה ב**הנחת עבודה מסומנת** — שרשת היעד היא ממשפחת Steem (Steem/Hive). ההנחה מבוססת על הקשר השיחה בלבד; **לא נמצא קוד רשת בסביבה לאימות** (אומת ב-3 סריקות עצמאיות). הליבה תוכננה network-agnostic כדי לשמר את ההשקעה גם אם הרשת המדויקת תשתנה.
+✅ **הצהרת תקפות (מעודכנת 2026-09-07):** בעל הפרויקט אישר את **פרוטוקול Steem** כרשת היעד, וההנחה עברה מ"הנחה מסומנת" ל"מאומתת מול chain חי" — כל פורמטי ה-wire במאגר נגזרו ואומתו מול bytes אמיתיים מ-`https://api.steemit.com` (ראו §M0 למטה). הליבה נשארת network-agnostic: פורקים ידרשו רק chain-id/סימול/prefix בקונפיגורציה.
 
 ## 📚 מפת המסמכים (סדר קריאה מומלץ)
 
@@ -28,23 +28,25 @@
 
 - **D1:** אישור רשת יעד מדויקת + chain id · **D2:** RPC endpoint חי · **D3:** רישיון · **D4:** מיתוג · **D5:** תקציב ביקורת אבטחה. פירוט: [`final-proposal.md` §8](./wallet-design/final-proposal.md).
 
-## 🧪 Groundwork ל-M0 (מוכן עכשיו — ללא תלות ב-D1/D2)
+## 🧪 M0 Core — מומש ואומת מול ה-chain החי (2026-09-07)
 
-מה כבר קיים ורץ במאגר:
+השער M0 נפתח: הבעלים אישר את **פרוטוקול Steem** כרשת היעד (D2); endpoint לפיתוח: `https://api.steemit.com` (D1). תוצרי ה-M0:
 
 | נכס | תיאור | סטטוס |
 |---|---|---|
-| `tools/chain-health-check.ts` | פרוב קריאה-בלבד ל-endpoint: זמינות, namespaces, chain id, head block, sync lag, RC — ללא מפתחות/סודות | ✅ רץ ואומת |
-| [`packages/chains/chain-adapter.ts`](./packages/chains/chain-adapter.ts) | ממשק ה-ChainAdapter (התפר היחיד שבו נכנסים פרטי רשת) — interface בלבד | ✅ קפוא, ללא מימוש |
-| [`packages/crypto/`](./packages/crypto/README.md) · [`packages/core/`](./packages/core/README.md) | הגדרת היקף, כללי איכות (test vectors חובה, אין קריפטו ביתי) ותנאי כניסה ל-M0 | ✅ מסמך בלבד |
+| [`packages/crypto/`](./packages/crypto/README.md) | PrivateKey/PublicKey/חתימות, WIF + "STM", גזירת מפתחות מ-password/brain-key | ✅ מומש ואומת |
+| [`packages/chains/steem/`](./packages/chains/steem/README.md) | מנוע serialization בינארי (varint/asset/ops/tx) + SteemAdapter עם broadcast נעול | ✅ מומש ואומת |
+| [`packages/core/`](./packages/core/README.md) | Keystore AES-256-GCM + Policy Engine | ⬜ M1 |
+| `tools/serialize-test.ts` | סוויטת אימות מול chain חי | ✅ **30/30 PASS** |
 
-**ראיות אמפיריות ראשונות מהרשת המנוחה** (פרוב קריאה-בלבד מול `https://api.steemit.com`, 2026-09-07): הצומת חי ועונה JSON-RPC 2.0 · `blockchain_version 0.23.0` · head block ~109.4M · sync lag 2–3 שניות · namespaces חיים: `condenser_api` + `rc_api` · **chain id אינו נחשף** בשני ה-namespaces (פער ראיות מסומן — משפיע על D2). הרצה:
+**קריטריוני קבלה שעברו מול ה-chain האמיתי** (קריאה-בלבד): serialization **זהה ביט-אחר-ביט** ל-serializer של הצומת עצמו (10/10 עסקאות) · sha256 על ה-bytes שלנו = `transaction_id` מה-chain (10/10) · חתימות אמיתיות מה-chain משוחזרות בדיוק למפתחות ה-authority של החותם — הוכחת מסלול חתימה מלא בלי שידור.
+
+**לקחים אמפיריים שנתגלו ותוקנו בזכות אימות מול bytes אמיתיים** (מתועדים ב-README של packages/chains/steem): שדה Asset הוא 16 בייטים (לא 15/14) · checksum של "STM" הוא `ripemd160(pub)` ישירות · header חתימה = 31+recid · `condenser_api` דורש פרמטרים מערכיים.
 
 ```bash
-bun tools/chain-health-check.ts --rpc <endpoint> [--account <name>] [--json]
+bun tools/serialize-test.ts --rpc https://api.steemit.com --samples 10   # הוכחה חוזרת (קריאה-בלבד)
+bun tools/chain-health-check.ts --rpc https://api.steemit.com           # בדיקת תקינות צומת
 ```
-
-**לקח הנדסי מאומת שנשמר בקוד:** methods של `condenser_api` דורשים פרמטרים מערכיים (`[]`) — שליחת `{}` מחזיר `Bad Cast: Invalid cast from object_type to Array` (אומת מול צומת חי).
 
 ## 🔐 הערות אבטחה למאגר זה
 
