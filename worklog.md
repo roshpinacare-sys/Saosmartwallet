@@ -499,3 +499,20 @@ Work Log:
 
 Stage Summary:
 - Model 1 Week 2 is DONE same-day: the identity verification now has its official SDK — a real, publish-ready npm package (strict build + declarations), proven not by claims but by executing the SDK itself AND its compiled artifact against the live metered API (PROVEN / FAILED-with-honest-metering / 401). The 3-line integration example in the console is generated from the real shipped API. Remaining honest gaps are owner actions: npm publish (registry credentials) and the 429 live-burn. Next step per plan: Week 3 — targeted outreach to 10 DeFi protocols with the live proof link. Pushed to main.
+
+---
+Task ID: MODEL1-W3
+Agent: Z.ai Code (main) — System Owner Mode
+Task: Model 1, Week 3 — targeted outreach: research 10 REAL protocols with Steem/Hive user exposure (Zero-Mock: web search, no invented names), per-target exposure vector + one ready-to-send email, live-proof appendix a prospect can check without trusting us, docs + push. Honest constraint: actual sending is an owner action (no SMTP/credentials in sandbox).
+
+Work Log:
+- Health patrol first: health 200, product endpoint fail-closed 401 (correct), git clean at 3205753 (Week 2 SDK shipped).
+- Research via z-ai web_search (11 queries saved to /tmp/s1..s11): Hive DeFi/DEX, Splinterlands, HIVE/STEEM exchanges (MEXC/Gate/SimpleSwap/Changelly/Godex), social frontends (Ecency/InLeo/PeakD), wrapped-HIVE-on-EVM bridges (incl. mahdiyari/hive-bridge-eth, HIVEfest wrapped-HIVE-on-ETH/BSC/BASE announcement), Steem dApps, NFT Showroom, Hive Keychain, dCity, DappRadar Hive category.
+- Reality-checked every candidate: liveness probe with curl on all 10 chosen domains — 6× HTTP 200 + 4× 403 (bot protection on live domains: MEXC/Gate/Changelly/Ecency) — all reachable, zero dead targets.
+- Selected 10 targets with grounded exposure vectors (each backed by a public search snippet): Splinterlands (game account linking, anti-sybil) · MEXC · Gate · SimpleSwap · Changelly · Godex (Graphene deposit attribution) · Ecency · InLeo · PeakD (sybil-resistant rewards, account-proof UX) · hive-bridge-eth (native↔EVM identity binding for wrapped HIVE — our exact cross-paradigm story). Bench documented: dCity, NFT Showroom, Keychain, 3Speak, Actifit.
+- Wrote docs/model1-week3-outreach.md: product one-liner + what's proven · targets table with evidence · 5 email drafts (master + CEX/game/social-fi/bridge variants, ≤120 words each) · Appendix A (public proof: steemworld anchor tx 53e4c7e4… block 109,389,994, independent EIP-191 reproduction incl. the array-parameters condenser note, pilot-key curl, SDK path) · public contact channels only (no invented emails — address gathering = owner action) · success metric unchanged from plan (3 integrations ≥100 verifs/day) · self-verification commands.
+- Docs: what-we-can-do-now.md Week 3 marked 🟡 prep-complete/sending-owner-action; README docs table gained the outreach row; honest note in Appendix A that a public BASE_URL (dedicated domain) is required before pilots — flagged as owner decision.
+- lint clean (docs-only change since last code pass), server healthy throughout.
+
+Stage Summary:
+- Week 3 is prepared to the maximum extent possible from inside the sandbox: 10 real, live-checked targets with evidence-backed angles and ready-to-send emails, plus a public-evidence appendix that turns "trust us" into "check it yourself". The remaining steps are inherently owner actions (SMTP sending, precise contact addresses, public BASE_URL/domain, pilot keys issuance). Metric and follow-up cadence documented. Pushed to main.
