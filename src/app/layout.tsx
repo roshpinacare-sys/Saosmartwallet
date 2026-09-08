@@ -17,18 +17,20 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SAOS GRID — Ecosystem Command Center",
+  title: "SAOS — Sovereign Identity Network",
   description:
-    "Professional grid dashboard for the SAOS ecosystem: five live-probed chains (STEEM, HIVE, BLURT, TRON, SAOS-NET), trading pairs matrix, cross-chain bridge monitor, sovereign chain explorer, and the STEEM/SBD internal-market DEX. Zero mock data.",
+    "SAOS is a sovereign network: SAOS-NET, our own deterministic chain, with checkpoints sealed to public chains (verifiable txids), same-key identity proven across Steem, Hive and EVM, a measured kernel, and a metered Identity API with an official SDK. Zero mock data — every number is chain-sourced.",
   keywords: [
     "SAOS",
+    "SAOS-NET",
+    "sovereign chain",
+    "identity proof",
     "Steem",
     "Hive",
     "TRON",
-    "SAOS-NET",
-    "DEX",
-    "grid dashboard",
-    "trading terminal",
+    "EVM",
+    "checkpoint anchors",
+    "metered API",
     "blockchain wallet",
   ],
   authors: [{ name: "Saosmartwallet" }],

@@ -78,26 +78,25 @@ bun tools/m1-op-test.ts                                                # M1: lim
 bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.steemit.com
 ```
 
-## 🌐 SAOS GRID — Ecosystem Command Center (2026-09-07)
+## 🌐 SAOS — Sovereign Identity Network · Command Surface (2026-09-08 UI overhaul)
 
-המסך הראשי הפך ל**מרכז-שליטה לכל האקוסיסטם** — סריקה מלאה של 8 הריפו של `roshpinacare-sys` (GitHub API: trees, READMEs, state files חיים) + 5 רשתות שנבדקות חי בכל רענון. אפס mock data: רשת שנופלת מוצגת בכנות כ-offline.
+**ה-UI התהפך SAOS-first (roast → מהפכה):** עד היום המסך הראשון נפתח כטרמינל-שוק של STEEM/SBD (המחיר הגדול ב-header, STEEM כרטיס #1) — ההיפוך: **SAOS היא המותג והרשת שלנו**, STEEM/SBD הוא רק רכבת-עוגן חיצונית. Header חדש: wordmark SAOS + "SOVEREIGN IDENTITY NETWORK", בלי טיקר STEEM/SBD בכלל; מסך-פתיחה חדש `SAOS` עם hero (משפט-זהות + ויטלים ריבוניים חיים + **checkpoint anchors אמיתיים עם txids ציבוריים** מ-`/api/eco/anchors`) · 10 טאבים → **9 טאבים** (SAOS · SAOS HUB · PROOFS · SAOS-NET · MARKETS · BRIDGES · WALLET · VAULT · DEVELOPER) — REGISTRY מוזג לתוך DEVELOPER, DEX הפך MARKETS (עם pairs matrix), וכל 9 הטאבים נגישים במקלדת 1–9.
 
 | טאב | תוכן | מקור נתונים (חי) |
 |---|---|---|
-| **GRID** | KPI strip · Network Grid (**7 כרטיסי רשת** + drill-down) · Pairs Matrix (sortable, כל ה-venues) | probes חיים לכל השרשראות |
-| **SAOS HUB** | **SAOS במרכז הבמה** (2026-09-08): Chain Core · grid98 (bench נמדד · סולם-רצפה גובה-צעד · שערי-כנות: skipped-for-edge/rejected/edge-leak) · **צי-החיילים אינטראקטיבי** (לחיצה על חייל = SP/VP/RC חי עכשיו + seq + PnL + scopes) · מפקד-לולאות (8 agent + 15 node daemons עם הוכחת-bytes) · 14 בריכות · 20 wrapped (supply==locked) · 15 ציטוטי-oracle חתומים · anchor rails עם txids ציבוריים · dex-facts כנים | `/api/eco/saos-hub` (state daemon-push + Steem RPC חי + GitHub contents API) |
-| **DEX** | Order Book + Trading Terminal + Tape — השוק האמיתי STEEM/SBD | api.steemit.com (M0/M1) |
-| **SAOS-NET** | מנוע הרשת הריבונית שלנו: bench **32.6K tx/s נמדד** (65,238 txs אמיתיים מהארכיון ב-replay — תקרת-מנגנון 2.82B/יום; ״130K״ שהיה-כתוב-כאן קודם לא היה מדידה), treasury P&L, הספר-הריבוני, ציטוטי oracle חתומים, wrapped assets, delegations | `state.json` + `grid98-state.json` (daemon-push ל-repo `steem`) |
-| **BRIDGES** | **M3 Bridge Explorer** (מציאת-נתיב 7×7 · עמלות מנומקות-מקור · שערי-readiness כנים) + מטריצת עוגנים + Live Anchor Feed + TRON Pulse + Analytics מה-state החי | router + SAOS-NET checkpoints |
-| **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON · חוזה-גשר לא פרוס · חתימה cold/hardware) | סריקה 2026-09-08 |
-| **WALLET** | יתרות/SP/RC/פקודות פתוחות + **M3: חיפוש כתובות ETH (native+ERC-20) ו-SOL (native+SPL)** + סטטוס הכספת | api.steemit.com + adapters |
-| **VAULT** | Sovereign Key Vault: wizard 6-שלבי (**7 רשתות**) · Policy Engine · Backup/Shamir/Social/Dead-man · Audit chain עם דוחות json/csv/pdf | packages/core (M2+M3) |
-| **PROOFS** | 3 demos חיים: Identity Anchor (EIP-191 + ecrecover — sameScalarProof חי) · Grid98 Live Benchmark (ה-engine האמיתי, TPS נמדד עכשיו) · Soldier Fleet 13/13 (SP/VP/RC + ops אחרונים, refresh 10s) | `/api/saos/anchor-verify` · `/api/saos/grid98-bench` · `/api/saos/fleet-status` |
-| **DEVELOPER** | **ה-API המסחרי המדוד (Model 1, שבוע 1 — חי):** API keys (plaintext פעם-אחת, רק SHA-256 ב-DB) · try-it על `POST /api/v1/identity/verify` (verdict + latency מדודה + quota) · usage ledger (PROVEN/FAILED/ERROR, גרף 24h) · free tier 1,000/יום UTC · **שבוע 2:** בלוק ה-SDK הרשמי `saos-id-verify` עם דוגמת 3-שורות חיה | `/api/developer/keys` · `/api/developer/usage` · SQLite (Prisma) |
+| **SAOS** (פתיחה) | **Hero ריבוני**: משפט-זהות + CTAs (RUN A LIVE IDENTITY PROOF → PROOFS · GET A METERED API KEY → DEVELOPER) · SAOS-NET height (sparkline) · 64 checkpoints · 1,831 txs verified · kernel bench · treasury · wrapped 20 (supply==locked) · pools 14 · rails 7/7 · **strip של checkpoint anchors עם txids קליקים ל-explorer** · Network Grid עם **SAOS-NET תמיד ראשון** (chip ״OUR CHAIN״) | `/api/eco/saosnet` · `/api/eco/anchors` · `/api/eco/networks` |
+| **SAOS HUB** | **SAOS במרכז הבמה**: Chain Core · grid98 (bench נמדד · סולם-רצפה · שערי-כנות) · **צי-החיילים אינטראקטיבי** (SP/VP/RC חי) · מפקד-לולאות · 14 בריכות · 20 wrapped · 15 ציטוטי-oracle חתומים · anchor rails · dex-facts כנים | `/api/eco/saos-hub` |
+| **PROOFS** | 3 demos חיים: Identity Anchor (EIP-191 + ecrecover — sameScalarProof חי) · Grid98 Live Benchmark · Soldier Fleet 13/13 | `/api/saos/*` |
+| **SAOS-NET** | המנוע הריבוני: bench נמדד, treasury P&L, הספר-הריבוני (depth chart), oracle חתום, wrapped, delegations | `state.json` (daemon-push) |
+| **MARKETS** | (לשעבר DEX — המקום הנכון למסחר) MarketStrip (STEEM/SBD + spread + SAOS/STEEM ספר-ריבוני + floor) · Pairs Matrix (18 markets) · Order Book + Terminal + Tape | api.steemit.com + `state.json` |
+| **BRIDGES** | M3 Bridge Explorer + מטריצת עוגנים + Live Anchor Feed + TRON Pulse | router + checkpoints |
+| **WALLET** | יתרות/SP/RC/פקודות + M3 ETH/SOL lookups + סטטוס הכספת | api.steemit.com + adapters |
+| **VAULT** | Sovereign Key Vault: wizard · Policy Engine · Backup/Shamir · Audit chain | packages/core (M2+M3) |
+| **DEVELOPER** | Model 1 המדוד: API keys · try-it · usage ledger · SDK `saos-id-verify` · **+ REGISTRY המוזגת לכאן** (8 ריפו · שירותים · פערים כנים) | `/api/developer/*` · SQLite (Prisma) |
 
 **מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · `ethereum-rpc.publicnode.com` (+fallbacks) · `api.mainnet-beta.solana.com` (+fallbacks) · daemon-state של SAOS-NET. כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 
-**קיצורי מקלדת:** מקשים 1–9 מחליפים מסכים (9 = VAULT); DEVELOPER בלחיצה בלבד (10 טאבים, בכנות — אין מקש 10).
+**קיצורי מקלדת:** מקשים **1–9** מחליפים **את כל 9 הטאבים** (כולל DEVELOPER — אין יותר טאב ״רק-לחיצה״).
 
 ## 🌉 M3 — Multi-Chain Sovereign Ecosystem (2026-09-08)
 

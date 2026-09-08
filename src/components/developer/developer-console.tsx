@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 
 import { PanelHeader, StatCell } from "@/components/terminal/primitives";
+import { RegistryPanel } from "@/components/terminal/registry-panel";
 import {
   useApiKeys,
   useCreateKey,
@@ -464,6 +465,13 @@ export function DeveloperConsole() {
       <TryItPanel />
       <KeysPanel />
       <UsagePanel />
+      {/* repo registry + honest gaps — dev meta belongs with the developer surface */}
+      <div className="flex flex-col gap-2">
+        <p className="num text-[9px] uppercase tracking-[0.24em] text-[var(--text-tertiary)]">
+          repo registry — what exists where · honest gaps
+        </p>
+        <RegistryPanel />
+      </div>
     </div>
   );
 }

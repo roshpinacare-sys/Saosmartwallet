@@ -35,11 +35,11 @@ export interface PairRow {
   volume: number | null;
   volumeUnit: string;
   spread: number | null;
-  jump?: "dex" | "saosnet";
+  jump?: "saosnet";
   note: string;
 }
 
-export function PairsMatrix({ onJump }: { onJump: (target: "dex" | "saosnet") => void }) {
+export function PairsMatrix({ onJump }: { onJump: (target: "saosnet") => void }) {
   const { data: market, isLoading: mktLoading } = useMarketFeed();
   const { data: book } = useOrderBook(10);
   const { data: saos, isLoading: saosLoading } = useEcoSaosNet();
@@ -69,8 +69,7 @@ export function PairsMatrix({ onJump }: { onJump: (target: "dex" | "saosnet") =>
         volume: Number.isFinite(volSat) ? volSat / 1000 : null,
         volumeUnit: "STEEM",
         spread,
-        jump: "dex",
-        note: "THE real market — full order book & tape in the DEX tab",
+        note: "THE real market — full order book & tape right below (this tab)",
       });
     }
 
@@ -241,7 +240,7 @@ export function PairsMatrix({ onJump }: { onJump: (target: "dex" | "saosnet") =>
                     }
                   }}
                   tabIndex={row.jump ? 0 : undefined}
-                  aria-label={row.jump ? `${row.pair} — open ${row.jump === "dex" ? "DEX" : "SAOS-NET"} view` : row.pair}
+                  aria-label={row.jump ? `${row.pair} — open SAOS-NET view` : row.pair}
                   className={cn(
                     "border-b border-[var(--border-subtle)] transition-colors last:border-0",
                     row.jump && "cursor-pointer hover:bg-white/[0.03]",
