@@ -1,48 +1,124 @@
-# Security — Sovereign Key Vault Threat Model (M2)
+# SAOS Security — Threat Model, Policies & Mechanical Gate
 
-## Assets under protection
+> Status: SEC-HARD round (owner directive: "connected to the network → strengthen
+> security, make sure we never read or use malicious code").
+> Every claim in this document is mechanically checked by
+> **`bun tools/security-audit.ts`** — re-run it after every dependency change,
+> every new API route, and before every push. Exit 1 = do not push.
 
-1. **Private key material** (Steem owner/active/posting/memo WIFs) — sealed as
-   `EncryptedKey` envelopes inside the vault state document.
-2. **The master password** — exists only in flight (request body) and in the
-   KDF; what persists is an Argon2id verifier, never the secret.
-3. **The vault state document** — hierarchy, policies, sealed envelopes,
-   backup metadata. Secret-free by construction; the danger is tampering, not
-   disclosure.
-4. **The audit chain** — its value is integrity; a forged history must be
-   detectable.
+---
 
-## Adversaries and controls
+## 1. What we are protecting
 
-| Threat | Vector | Control | Where |
-|--------|--------|---------|-------|
-| DB theft / state exfiltration | direct SQLite access | keys sealed AES-256-GCM / ChaCha20-Poly1305 under an Argon2id-derived key (64 MiB, t=3 — ~1s per guess); no plaintext secrets in the doc | crypto/cipher.ts, crypto/kdf.ts |
-| Brute-force the password | offline guessing of the verifier | Argon2id memory-hard KDF; ~1s/attempt at pinned params | crypto/kdf.ts |
-| Memory scraping while unlocked | process dump | derived key held in a single volatile field, zero-filled on `lock()` and on auto-lock (default 300s idle); wiped before any error path touches it | vault/vault.ts |
-| Signing with the wrong authority | posting key on a transfer | compiled-in static rules (`no-transfer-with-posting-key`, `memo-key-cannot-sign`) + the adapter's own funds-op role check — two independent gates | policy/defaults.ts, chains/steem/adapter.ts |
-| Runaway / malicious spend | anomalous operations | daily ceilings per symbol, approval requirements, rate limits, new-counterparty cooldown, anomaly scoring (frequency/amount/counterparty/hour/rapid-fire/failed-history) | policy/engine.ts |
-| Unauthorized broadcast | direct adapter misuse | the broadcast-capable `SteemAdapter` exists ONLY inside the vault runtime; broadcast fires exclusively after the policy gate + explicit user intent (`broadcast: true` + step-up password) | lib/vault-runtime.ts, signing/orchestrator.ts |
-| History forgery | tampered audit rows | hash chain: `eventHash = SHA-256(prevHash ‖ canonicalEvent)`; `verifyIntegrity()` reports the first corrupted seq; mismatches are never repaired | audit/audit.ts |
-| Forged backup package | malicious .vault file | HMAC-SHA256 over the canonical package + inner checksum, timing-safe compares; restore refuses non-fresh targets | backup/backup.ts |
-| Password loss | forgotten master password | Shamir-sharded backup (shards alone restore the state — no password) and social recovery (recovery key split among contacts) | backup/backup.ts |
-| Owner incapacitation | dead-man scenario | dead-man switch: heartbeat on unlock/sign; beneficiaries + inactivity window persisted and surfaced overdue in the UI | backup/backup.ts |
-| Proof phishing | "prove you know the password" replay | ZK Schnorr proofs anchored to the enrollment commitment; transcripts are context-bound; wrong password/context/tampered z all fail | crypto/zk.ts |
+| Asset | Where | Protection |
+|---|---|---|
+| Vault master password | in-memory only, never persisted | Argon2id verifier + ZK (Fiat–Shamir Schnorr) commitment; unlock/step-ups fail closed; 10/min unlock rate limit |
+| Vault private keys | encrypted at rest (SQLite) | vault LOCKED by default → no signing without password; policy engine allowlist; `sign`/`sign-cancel` re-deterministically rebuild the tx before signing |
+| Admin credential | SHA-256-only storage | bootstrap-once, timing-safe compare, `SAOS_ADMIN_TOKEN` override; key create/revoke gated |
+| API consumer keys | `saos_live_…` plaintext shown once | SHA-256-only at rest; 1,000/day UTC quota via **atomic** conditional upsert (race-proven: 1,050 concurrent → exactly 1,000 admitted, overshoot 0) |
+| Owner keys | NEVER in this repo | scan enforced (§4); keys live only in the owner's wallet / env |
+| Chain integrity claims | PROOFS tab | every number from a live API or the real engine — the Zero-Mock rule itself is a security control |
 
-## Residual risks (honest)
+## 2. Supply-chain policy (the "no malicious code" rule)
 
-- **Hot-server key custody.** While unlocked, key material lives in server
-  memory of the sandbox. Hardware-backed or air-gapped signing is the next
-  hardening step (tracked in the REGISTRY gaps).
-- **Local gateway trust.** Passwords travel in request bodies over the local
-  gateway; transport hardening beyond the sandbox boundary is out of scope
-  here.
-- **No 2FA/biometrics yet.** The step-up is a password re-entry (Argon2id
-  verified) — the policy engine's `step_up_auth` requirement is wired but the
-  biometric factor is a future layer.
+Because we operate in a connected environment and ship an SDK, every byte of
+third-party code is treated as hostile until proven otherwise:
 
-## Incident playbook
+1. **Lockfile is the contract** — `bun.lock` is git-tracked; dependency
+   resolution is pinned and reviewable. Never commit a dependency change
+   without the lockfile.
+2. **No install-time code execution** — zero `preinstall`/`postinstall`/
+   `prepare` scripts across all tracked `package.json` files (checked
+   mechanically, §gate 2). If a dependency demands one, it needs an explicit
+   owner review and an allowlist entry in the gate.
+3. **Registry audit** — `npm audit` against the live advisory DB is part of
+   the gate (best-effort when offline; honest SKIP, never a silent pass).
+   Last live run: **0 vulnerabilities across the whole tree**.
+4. **Dangerous-pattern allowlist** — `eval`, `new Function`,
+   `child_process`, `dangerouslySetInnerHTML` are scanned in all
+   `src/ packages/ tools/` TypeScript. The ONLY allowances, each with a
+   fixed, reviewable reason:
+   - `src/lib/grid98-bench.ts` — spawns the **frozen local** Grid98 engine at
+     a fixed `.grid98-lab/` path with clamped numeric args (benchMs ≤ 60s).
+     No remote or interpolated command targets. (Gate asserts this path
+     assertion still holds.)
+   - `src/components/ui/chart.tsx` — shadcn's CSS-variable injector; injects
+     colors from our own code constants, never user input.
+5. **Adding a dependency (checklist)**: justify in the PR → `npm audit` clean
+   → no lifecycle scripts → no transitive `eval`-based loaders → lockfile
+   updated → `bun tools/security-audit.ts` passes.
+6. **The official SDK (`saos-id-verify`) must stay zero-dependency** — pure
+   `fetch`, no transitive supply chain for consumers (gate §5 enforces).
+7. **External network calls from the client are zero** — all browser data
+   flows are same-origin `/api/*` (scan-verified); the server proxies chain
+   RPCs. CSP enforces `connect-src 'self'` (plus ws: for dev HMR).
 
-1. `GET /api/vault/audit?verify=1` — is the chain intact? `firstBadSeq` localizes tampering.
-2. `POST /api/vault/lock` — kill the session immediately.
-3. If key compromise is suspected: revoke (`DELETE /api/vault/keys`) the affected keys, rotate authorities on-chain, restore from a clean sharded backup into fresh storage.
-4. Generate a compliance report (`?report=json|csv|pdf`) for forensics — it binds the chain head hash at generation time.
+## 3. HTTP security posture
+
+Set globally in `next.config.ts` (`headers()`), verified live by the gate:
+
+- `Content-Security-Policy`: `default-src 'self'` baseline;
+  `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+  - `script-src 'unsafe-inline' 'unsafe-eval'`: required by Next.js hydration
+    bootstrap and dev HMR. Impact is bounded because the app holds **no
+    ambient credentials** (no cookie sessions; auth is explicit
+    `Authorization`/`X-Admin-Token` headers). Upgrading to nonce-based CSP
+    via middleware is a documented next step, not a regression.
+  - `connect-src ws: wss:`: dev HMR websocket through the gateway; the app
+    opens no outbound WebSockets of its own.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+  strict-origin-when-cross-origin`, `Permissions-Policy` (camera/mic/geo/
+  payment/usb/floc all denied), `X-DNS-Prefetch-Control: off`.
+- `Strict-Transport-Security`: inert over plain HTTP, future-proofs HTTPS.
+- `poweredByHeader: false` — framework version not advertised.
+- **Framing decision**: `frame-ancestors`/`X-Frame-Options` deliberately
+  omitted — the sandbox preview panel may embed the app cross-origin, and
+  with no cookie/ambient authority, clickjacking has nothing to steal. If a
+  public cookie session is ever added, revisit with `frame-ancestors 'self'`.
+
+### Rate-limit map (per-IP, in-process; metered API has DB-backed quotas)
+
+| Route | Limit | Why |
+|---|---|---|
+| `POST /api/v1/identity/verify` | 1,000/key/day (atomic, DB) | the product's metered quota |
+| `POST /api/developer/admin/bootstrap` | 5/min | credential oracle |
+| `POST/DELETE /api/developer/keys` | admin-gated | requireAdmin |
+| `POST /api/vault/init` | 5/min | Argon2id KDF cost |
+| `POST /api/vault/unlock` | 10/min | Argon2id + password oracle |
+| `POST /api/steem/trade/build` | 30/min | upstream RPC ref-block stamping |
+| `POST /api/steem/trade/cancel` | 30/min | upstream RPC ref-block stamping |
+| `GET/POST /api/saos/grid98-bench` | **3/min** | spawns a CPU-heavy engine run (≤60s) — compute-exhaustion vector |
+| `GET/POST /api/saos/anchor-verify` | **10/min** | proxies live external-RPC work — amplifier guard |
+| everything else | read-only or fail-closed | vault reads are LOCKED-state honest responses |
+
+## 4. Secrets policy
+
+- No `.env`, key, certificate, or credential files are git-tracked (gate §3).
+- No WIF / PEM / high-entropy-assignment patterns in tracked text files
+  (gate §3; known-noise allowlist: `bun.lock`, `skills/`, `examples/`).
+- Probe keys from dogfood runs are **revoked** after each live experiment;
+  the admin credential is reset so the owner bootstraps first.
+- Owner-only secrets (vault password, registry tokens for `npm publish`,
+  SMTP for outreach) never enter this repo — they live with the owner.
+
+## 5. Incident & drift response
+
+1. Gate fails → do not push. Fix the root cause, re-run until ALL PASS.
+2. A leaked secret (ever) → revoke at the source first, then purge history
+   (filter-repo) and rotate — in that order.
+3. A vulnerable dependency lands → pin the patched version in `bun.lock`,
+   re-run gate, commit both together.
+4. Chain-authority drift (as caught live on blk 109,410,651) → the verifier
+   reports FAILED with an explicit AUTHORITY DRIFT summary; re-burn stays
+   fail-closed until a fresh anchor is signed by the new key (owner action).
+
+## 6. Honest gaps (declared, not hidden)
+
+- CSP still allows inline scripts (Next.js constraint) — nonce-based CSP via
+  middleware is the follow-up once a public HTTPS deployment exists.
+- Rate limits are per-process in-memory (single-server scope); the metered
+  identity API is the only quota that must survive distribution, and it is
+  DB-backed and atomic.
+- `npm publish`, outreach sending, public `BASE_URL`, and vault
+  initialization with the owner's key remain owner actions by design — no
+  credentials exist in this sandbox.
