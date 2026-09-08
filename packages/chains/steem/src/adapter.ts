@@ -27,7 +27,7 @@ import {
 } from "../../chain-adapter";
 import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
-import type { LimitOrderCreateOperation, SteemOperationName } from "./operations";
+import type { LimitOrderCancelOperation, LimitOrderCreateOperation, SteemOperationName } from "./operations";
 import {
   STEEM_CHAIN_ID,
   SIGNATURE_SIZE,
@@ -210,8 +210,8 @@ export class SteemAdapter implements ChainAdapter {
 
   // -- ChainAdapter: write paths --------------------------------------------
 
-  /** Ops that move/commit funds — always require an ACTIVE (or owner) signature. */
-  private static readonly FUNDS_OPS: ReadonlySet<string> = new Set(["transfer", "limit_order_create"]);
+  /** Ops that move/commit funds or mutate open orders — always require an ACTIVE (or owner) signature. A cancel refunds the caller, but it still mutates order state, so the chain demands active/owner authority and we mirror that. */
+  private static readonly FUNDS_OPS: ReadonlySet<string> = new Set(["transfer", "limit_order_create", "limit_order_cancel"]);
 
   /**
    * Validates and stamps a limit_order_create payload (M1 DEX). Asset strings
@@ -253,9 +253,21 @@ export class SteemAdapter implements ChainAdapter {
   }
 
   /**
+   * Validates a limit_order_cancel payload (M3 DEX lifecycle). Owner must be a
+   * syntactically-valid account; orderid the uint32 from the original create.
+   */
+  private validateLimitOrderCancelPayload(p: Record<string, unknown>): void {
+    if (typeof p.owner !== "string") throw new SerializationError("limit_order_cancel requires string owner");
+    validateAccountName(p.owner);
+    if (!Number.isInteger(p.orderid) || (p.orderid as number) < 0 || (p.orderid as number) > 0xffffffff) {
+      throw new SerializationError("limit_order_cancel orderid must be an integer in [0, 4294967295]");
+    }
+  }
+
+  /**
    * Builds an unsigned transaction with fresh ref-block fields and expiration.
-   * M0: transfer. M1: + limit_order_create (the DEX op). Anything else fails
-   * closed.
+   * M0: transfer. M1: + limit_order_create (the DEX op). M3+: limit_order_cancel
+   * (DEX lifecycle closure). Anything else fails closed.
    */
   async buildOperations(ops: Array<{ type: string; payload: Record<string, unknown> }>): Promise<UnsignedTx> {
     for (const op of ops) {
@@ -273,9 +285,11 @@ export class SteemAdapter implements ChainAdapter {
         }
       } else if (op.type === "limit_order_create") {
         this.validateLimitOrderPayload(op.payload);
+      } else if (op.type === "limit_order_cancel") {
+        this.validateLimitOrderCancelPayload(op.payload);
       } else {
         throw new SerializationError(
-          `operation "${op.type}" is not supported (transfer, limit_order_create)`,
+          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel)`,
         );
       }
     }
@@ -336,6 +350,12 @@ export class SteemAdapter implements ChainAdapter {
         expiration: p.expiration,
       };
       return { name: "limit_order_create", body };
+    }
+    if (op.type === "limit_order_cancel") {
+      this.validateLimitOrderCancelPayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as { owner: string; orderid: number };
+      const body: LimitOrderCancelOperation = { owner: p.owner, orderid: p.orderid };
+      return { name: "limit_order_cancel", body };
     }
     throw new SerializationError(`operation "${op.type}" cannot be signed (unsupported)`);
   }

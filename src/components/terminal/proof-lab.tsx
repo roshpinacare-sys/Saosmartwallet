@@ -31,17 +31,21 @@ import {
   Gauge,
   KeyRound,
   Loader2,
+  RefreshCw,
   ShieldCheck,
   Users,
   XCircle,
 } from "lucide-react";
 
 import { PanelHeader, StatCell } from "@/components/terminal/primitives";
+import { useEcoSaosNet } from "@/hooks/use-eco";
 import {
   useSaosAnchorVerify,
   useSaosFleetStatus,
   useSaosGrid98Bench,
+  useSaosGrid98BenchRerun,
   type FleetSoldier,
+  type Grid98BenchResponse,
 } from "@/hooks/use-proofs";
 import { cn } from "@/lib/utils";
 
@@ -193,9 +197,51 @@ function IdentityAnchorPanel() {
 
 function Grid98BenchPanel() {
   const bench = useSaosGrid98Bench();
+  const rerun = useSaosGrid98BenchRerun();
+  // The daemon-pushed engine ledger (already loaded by the page's eco feed)
+  // provides the recorded bench — the honest baseline for the FIRST re-run,
+  // before any in-session result exists. Clearly labeled "recorded ledger".
+  const saosnet = useEcoSaosNet();
+  const recordedBench = saosnet.data?.engine.bench ?? null;
   const [duration, setDuration] = useState(15_000);
-  const r = bench.data;
+  // Re-run history: the pre-run result is kept so the NEW measurement renders
+  // NEXT TO the PREVIOUS one (delta visible). First render falls back to the
+  // engine's recorded ledger bench; the first re-run then compares against it.
+  const [previous, setPrevious] = useState<Grid98BenchResponse | null>(null);
+
+  // Current display prefers the latest SUCCESSFUL re-run, then the last RUN.
+  // An ok:false re-run never replaces the displayed numbers — it renders as
+  // the honest error it is (zero-mock: no fake zeros clobbering real data).
+  const rerunResult = rerun.data ?? null;
+  const rerunOk = rerunResult?.ok === true && rerunResult.run !== null;
+  const r = rerunOk ? rerunResult : bench.data;
   const tps = r?.run?.txsPerSec ?? null;
+  const engineBusy = bench.isPending || rerun.isPending;
+
+  const reRunBench = () => {
+    const snapshot = (rerunOk ? rerunResult : bench.data) ?? null; // pre-run result
+    rerun.mutate(10_000, {
+      onSuccess: (data) => {
+        // Only promote the old result to "previous" when the re-run actually
+        // produced a fresh measurement — a failed run keeps the display intact.
+        if (data.ok && data.run) setPrevious(snapshot);
+      },
+    });
+  };
+
+  const prevTps = previous?.run?.txsPerSec ?? recordedBench?.txsPerSec ?? null;
+  const curTps = r?.run?.txsPerSec ?? null;
+  const tpsDeltaPct =
+    curTps !== null && prevTps !== null && prevTps !== 0 ? ((curTps - prevTps) / prevTps) * 100 : null;
+  const prevTxs = previous?.run?.txs ?? null;
+  const curTxs = r?.run?.txs ?? null;
+  const txsDeltaPct =
+    curTxs !== null && prevTxs !== null && prevTxs !== 0 ? ((curTxs - prevTxs) / prevTxs) * 100 : null;
+  // A delta against the ledger baseline is honest ONLY when the ledger number
+  // is a real measured bench (txsPerSec + timestamp present).
+  const prevIsLedger = previous?.run?.txsPerSec == null && recordedBench?.txsPerSec != null && recordedBench?.at != null;
+  const prevAt = previous?.run?.at ?? recordedBench?.at ?? null;
+
   const bars = [
     { name: "Ethereum L1", tps: 15, src: "public reference" },
     { name: "Solana", tps: 2000, src: "public reference" },
@@ -234,8 +280,14 @@ function Grid98BenchPanel() {
           </div>
           <button
             type="button"
-            disabled={bench.isPending}
-            onClick={() => bench.mutate(duration)}
+            disabled={engineBusy}
+            onClick={() =>
+              bench.mutate(duration, {
+                // A fresh full RUN supersedes the re-run comparison — clear the
+                // re-run payload so the display reflects the newest measurement.
+                onSuccess: () => rerun.reset(),
+              })
+            }
             className="num inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-[var(--saos)]/50 bg-[var(--saos)]/15 px-4 py-2 text-[11px] font-bold tracking-[0.14em] text-[var(--saos)] transition hover:bg-[var(--saos)]/25 disabled:opacity-50"
           >
             {bench.isPending ? (
@@ -252,6 +304,37 @@ function Grid98BenchPanel() {
           </button>
         </div>
 
+        {/* Re-run control (network-audit hardening): fixed 10s bench through the
+            documented GET surface, previous result kept for a visible delta. */}
+        <div className="flex flex-col gap-2 rounded-md border border-[var(--border-subtle)] bg-black/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="num text-[10px] font-bold tracking-[0.18em] text-foreground/90">RE-RUN BENCH · 10s</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-[var(--text-tertiary)]">
+              Spawns the same real engine via GET /api/saos/grid98-bench?benchMs=10000 and keeps the previous
+              measurement so the delta is visible.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={engineBusy}
+            onClick={reRunBench}
+            aria-label="re-run the grid98 benchmark for 10 seconds against the previous result"
+            className="num inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md border border-[var(--saos)]/50 bg-[var(--saos)]/15 px-4 py-2 text-[11px] font-bold tracking-[0.14em] text-[var(--saos)] transition hover:bg-[var(--saos)]/25 disabled:opacity-50"
+          >
+            {rerun.isPending ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                RE-RUNNING…
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden />
+                RE-RUN BENCH (10s)
+              </>
+            )}
+          </button>
+        </div>
+
         {bench.isPending && (
           <p className="text-xs text-[var(--text-tertiary)]">
             Booting the real kernel from the 39.7MB archive, then replaying real transactions through
@@ -259,9 +342,32 @@ function Grid98BenchPanel() {
           </p>
         )}
 
+        {rerun.isPending && (
+          <p className="flex items-center gap-2 text-xs text-[var(--saos)]" role="status" aria-live="polite">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Replaying real archive txs — this takes ~10s. The kernel boot replays the full archive first, so the
+            wall clock is longer — real work, no fake numbers.
+          </p>
+        )}
+
         {bench.isError && (
           <p className="rounded-md border border-[var(--down)]/40 bg-[var(--down)]/10 px-3 py-2 text-xs text-[var(--down)]">
             {bench.error.message}
+          </p>
+        )}
+
+        {rerun.isError && (
+          <p className="rounded-md border border-[var(--down)]/40 bg-[var(--down)]/10 px-3 py-2 text-xs text-[var(--down)]">
+            re-run failed: {rerun.error.message}
+          </p>
+        )}
+
+        {/* ok:false re-run — the honest failure path. The previously measured
+            numbers stay on screen untouched; only the error is added. */}
+        {rerunResult && !rerunOk && (
+          <p className="rounded-md border border-[var(--down)]/40 bg-[var(--down)]/10 px-3 py-2 text-xs text-[var(--down)]">
+            re-run reported ok:false — {rerunResult.error ?? "no fresh bench in the engine ledger"}. The result
+            below is the last successful measurement, untouched.
           </p>
         )}
 
@@ -306,6 +412,58 @@ function Grid98BenchPanel() {
                     </div>
                   ))}
                 </div>
+
+                {/* NEW vs PREVIOUS — rendered once a re-run produced a fresh
+                    measurement and a real baseline exists (in-session previous
+                    run, or the engine's recorded ledger bench, labeled as
+                    such). Honest measured ÷ measured arithmetic only. */}
+                {rerunOk && (previous?.run || prevIsLedger) && (
+                  <div className="flex flex-col gap-2 rounded-md border border-[var(--border-subtle)] bg-black/25 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="num text-[9px] font-bold tracking-[0.2em] text-[var(--text-tertiary)]">
+                        RE-RUN vs PREVIOUS
+                      </span>
+                      <span className="num text-[9px] text-[var(--text-tertiary)]">both numbers are real engine measurements</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <StatCell
+                        label="NEW (this re-run)"
+                        value={<span className="num text-[var(--saos)]">{(curTps ?? 0).toLocaleString()} tx/s</span>}
+                        sub={`at ${rerunResult?.run?.at?.slice(11, 19) ?? "—"} UTC${curTxs !== null ? ` · ${curTxs.toLocaleString()} txs` : ""}`}
+                      />
+                      <StatCell
+                        label={prevIsLedger ? "PREVIOUS (engine ledger)" : "PREVIOUS (kept)"}
+                        value={<span className="num">{(prevTps ?? 0).toLocaleString()} tx/s</span>}
+                        sub={
+                          prevIsLedger
+                            ? `daemon-recorded bench @ ${prevAt?.slice(11, 19) ?? "—"} UTC — not this session`
+                            : `at ${prevAt?.slice(11, 19) ?? "—"} UTC${prevTxs !== null ? ` · ${prevTxs.toLocaleString()} txs` : ""}`
+                        }
+                      />
+                    </div>
+                    <p className="num text-[10px] text-[var(--text-tertiary)]">
+                      Δ throughput{" "}
+                      {tpsDeltaPct !== null ? (
+                        <span style={{ color: tpsDeltaPct >= 0 ? "var(--up)" : "var(--down)" }}>
+                          {tpsDeltaPct >= 0 ? "+" : ""}
+                          {tpsDeltaPct.toFixed(2)}%
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                      {prevTxs !== null && curTxs !== null && (
+                        <>
+                          {" "}· Δ txs replayed{" "}
+                          <span style={{ color: (txsDeltaPct ?? 0) >= 0 ? "var(--up)" : "var(--down)" }}>
+                            {(txsDeltaPct ?? 0) >= 0 ? "+" : ""}
+                            {(txsDeltaPct ?? 0).toFixed(2)}%
+                          </span>
+                        </>
+                      )}
+                      {" "}(measured ÷ measured — no reference numbers involved)
+                    </p>
+                  </div>
+                )}
               </>
             )}
 

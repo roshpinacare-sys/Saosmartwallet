@@ -13,6 +13,9 @@
  *                + live router fee quotes for the two direct rails
  *  · vault     → the M2 engine's secret-free status surface
  *  · dex       → the M1 market client (ticker + order book + chain status)
+ *  · wrappedInvariant → the wrapped economy's 1:1 backing rule checked on
+ *                the real daemon-pushed wrappedSummary (supply == locked
+ *                per asset, nano-exact); a mismatch counts as critical.
  *
  * Self-healing posture is reported alongside the numbers (what fails over
  * automatically, what stays fail-closed) so the report never overstates.
@@ -38,6 +41,78 @@ interface HealthIssue {
 }
 
 const ALL_NETWORKS = ["steem", "hive", "blurt", "tron", "saos-net", "ethereum", "solana"] as const;
+
+interface WrappedAssetCheck {
+  asset: string;
+  supply: number;
+  locked: number;
+  delta: number;
+  ok: boolean;
+}
+
+interface WrappedInvariant {
+  latencyMs: number;
+  measured: boolean;
+  source: string;
+  assetsChecked: number | null;
+  mismatches: number | null;
+  ok: boolean | null;
+  assets: WrappedAssetCheck[] | null;
+  error: string | null;
+}
+
+/**
+ * Wrapped-economy invariant: every wrapped asset's supply must equal its
+ * locked collateral 1:1 (e.g. WSTEEM 632=632, WBLURT 64.227=64.227).
+ *
+ * Source of truth: the daemon-pushed SAOS-NET state (`wrappedSummary` in the
+ * steem repo's sovereign/node/state.json) via saosNetSnapshot() — the SAME
+ * feed that powers SAOS HUB's wrapped table; no second source of truth.
+ *
+ * Comparison is decimal-exact at NANO resolution: both sides are scaled by
+ * 1e9 and rounded to integers before comparing. 1e-9 matches the engine's
+ * own nano bookScale (grid98/deposits book-keep at 1e9 nano), so any real
+ * mint/lock discrepancy survives the scaling, while float dust below 1e-9
+ * (e.g. 64.227 stored as 64.22700000000000386) can never fabricate a
+ * mismatch. An unmeasurable source is reported as ok:null + reason — never
+ * as a pass.
+ */
+const NANO_SCALE = 1e9;
+function nanoExact(a: number, b: number): boolean {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return Math.round(a * NANO_SCALE) === Math.round(b * NANO_SCALE);
+}
+
+async function wrappedInvariantCheck(): Promise<WrappedInvariant> {
+  const t = Date.now();
+  const source = "saosNetSnapshot().wrapped — daemon-pushed wrappedSummary (steem repo sovereign/node/state.json)";
+  try {
+    const snap = await saosNetSnapshot();
+    if (!snap.ok) {
+      return { latencyMs: Date.now() - t, measured: false, source, assetsChecked: null, mismatches: null, ok: null, assets: null, error: snap.error };
+    }
+    const assets: WrappedAssetCheck[] = snap.wrapped.map((w) => ({
+      asset: w.asset,
+      supply: w.supply,
+      locked: w.locked,
+      delta: w.supply - w.locked,
+      ok: nanoExact(w.supply, w.locked),
+    }));
+    const mismatches = assets.filter((a) => !a.ok).length;
+    return {
+      latencyMs: Date.now() - t,
+      measured: true,
+      source,
+      assetsChecked: assets.length,
+      mismatches,
+      ok: mismatches === 0,
+      assets,
+      error: null,
+    };
+  } catch (e) {
+    return { latencyMs: Date.now() - t, measured: false, source, assetsChecked: null, mismatches: null, ok: null, assets: null, error: e instanceof Error ? e.message : "wrapped snapshot failed" };
+  }
+}
 
 export async function GET() {
   const generatedAt = new Date().toISOString();
@@ -136,6 +211,9 @@ export async function GET() {
   }
   const dexLatencyMs = Date.now() - t4;
 
+  // ---- 4b. wrapped-economy invariant (supply == locked, 1:1 per asset) -----
+  const wrappedInvariant = await wrappedInvariantCheck();
+
   // ---- 5. issues — computed from the measurements above (honest) -----------
   const issues: HealthIssue[] = [];
   if (networks.ok) {
@@ -232,6 +310,25 @@ export async function GET() {
       action: "failover to the next Steem endpoint book entry",
     });
   }
+  if (wrappedInvariant.measured && wrappedInvariant.assets) {
+    for (const a of wrappedInvariant.assets) {
+      if (!a.ok) {
+        issues.push({
+          component: `wrapped:${a.asset}`,
+          severity: "critical",
+          detail: `wrapped supply ${a.supply} != locked ${a.locked} (delta ${a.delta}) — the 1:1 backing rule is violated on the daemon ledger`,
+          action: "reconcile the mint/burn ledger against the lock ledger; halt minting for the asset until supply == locked holds again",
+        });
+      }
+    }
+  } else if (!wrappedInvariant.measured) {
+    issues.push({
+      component: "wrapped",
+      severity: "warning",
+      detail: `wrapped invariant unmeasurable — ${String(wrappedInvariant.error)}`,
+      action: "restore the SAOS-NET state feed (github raw) so the 1:1 backing can be re-verified",
+    });
+  }
 
   const upChains = networks.ok ? networks.chains.filter((c) => c.status === "online").length : 0;
   const liveRails = rails.filter((r) => r.status === "live").length;
@@ -245,6 +342,7 @@ export async function GET() {
       liveRails,
       gatedRails,
       criticalIssues: issues.filter((i) => i.severity === "critical").length,
+      wrappedMismatches: wrappedInvariant.mismatches,
     },
     checks: {
       networks: {
@@ -262,6 +360,7 @@ export async function GET() {
       },
       vault: { latencyMs: vaultLatencyMs, ...vault },
       dex: { latencyMs: dexLatencyMs, ...dex },
+      wrappedInvariant,
     },
     issues,
     selfHealing: {

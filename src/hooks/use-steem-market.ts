@@ -124,6 +124,29 @@ export interface BuildOrderResponse {
   byteLength: number;
 }
 
+/** Unsigned limit_order_cancel preview from POST /api/steem/trade/cancel. */
+export interface BuildCancelResponse {
+  ok: true;
+  signingStatus: string;
+  operation: {
+    type: "limit_order_cancel";
+    payload: {
+      owner: string;
+      orderid: number;
+    };
+  };
+  unsignedTx: {
+    chainId: string;
+    refBlockNum: number;
+    refBlockPrefix: number;
+    txExpiration: string;
+  };
+  serializedHex: string;
+  digestHex: string;
+  txId: string;
+  byteLength: number;
+}
+
 // ---------------------------------------------------------------------------
 // Fetch helpers
 // ---------------------------------------------------------------------------
@@ -216,6 +239,23 @@ export async function buildOrder(body: {
   const parsed = (await res.json()) as BuildOrderResponse | { ok: false; error: string };
   if (!res.ok || !("ok" in parsed) || parsed.ok !== true) {
     throw new Error(("error" in parsed && parsed.error) || "order build failed");
+  }
+  return parsed;
+}
+
+export async function buildCancelOrder(body: {
+  account: string;
+  orderid: number;
+}): Promise<BuildCancelResponse> {
+  const res = await fetch("/api/steem/trade/cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const parsed = (await res.json()) as BuildCancelResponse | { ok: false; error: string };
+  if (!res.ok || !("ok" in parsed) || parsed.ok !== true) {
+    throw new Error(("error" in parsed && parsed.error) || "cancel build failed");
   }
   return parsed;
 }

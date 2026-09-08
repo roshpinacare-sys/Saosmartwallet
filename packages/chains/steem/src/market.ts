@@ -117,22 +117,63 @@ export function satoshisToAmountString(sat: number, precision: 3 | 6): string {
 }
 
 export class SteemMarketClient {
-  constructor(
-    private readonly rpcUrl: string,
-    private readonly timeoutMs = 12_000,
-  ) {}
+  private readonly rpcUrls: string[];
+  private readonly timeoutMs: number;
+  private readonly cacheTtlMs: number;
+  /** Index of the last-known-good endpoint — sticky until it fails. */
+  private sticky = 0;
+  /** Short-TTL read cache keyed by method|params — collapses duplicate
+   * concurrent polls (the UI polls book/tape/status on 4–15s intervals) so
+   * N client pollers share ONE upstream request per TTL window. Read-only
+   * client ⇒ every method here is cacheable; cached snapshots keep their
+   * original fetchedAt (staleness UX stays honest). */
+  private cache = new Map<string, { at: number; value: unknown }>();
+
+  /**
+   * @param rpcUrl primary RPC URL (or an ordered failover list — primary first).
+   * @param timeoutMs per-attempt fetch timeout.
+   * @param cacheTtlMs read-cache TTL (0 disables); default 2.5s — one market
+   *        heartbeat, never serves data older than one poll interval.
+   */
+  constructor(rpcUrl: string | string[], timeoutMs = 12_000, cacheTtlMs = 2_500) {
+    const urls = (Array.isArray(rpcUrl) ? rpcUrl : [rpcUrl])
+      .map((u) => u.trim())
+      .filter((u) => u.length > 0);
+    if (urls.length === 0) throw new Error("SteemMarketClient requires at least one RPC URL");
+    this.rpcUrls = urls;
+    this.timeoutMs = timeoutMs;
+    this.cacheTtlMs = Math.max(0, cacheTtlMs);
+  }
 
   private async rpc<T>(method: string, params: unknown): Promise<T> {
-    const res = await fetch(this.rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText}`);
-    const body = (await res.json()) as { result?: T; error?: { message?: string } };
-    if (body.error) throw new Error(`RPC error: ${body.error.message ?? "unknown"}`);
-    return body.result as T;
+    const key = `${method}|${JSON.stringify(params)}`;
+    const now = Date.now();
+    const hit = this.cache.get(key);
+    if (hit && now - hit.at < this.cacheTtlMs) return hit.value as T;
+
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt < this.rpcUrls.length; attempt++) {
+      // Start from the sticky (last-known-good) endpoint, then walk the list.
+      const idx = (this.sticky + attempt) % this.rpcUrls.length;
+      try {
+        const res = await fetch(this.rpcUrls[idx], {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+        if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText}`);
+        const body = (await res.json()) as { result?: T; error?: { message?: string } };
+        if (body.error) throw new Error(`RPC error: ${body.error.message ?? "unknown"}`);
+        this.sticky = idx;
+        const value = body.result as T;
+        if (this.cacheTtlMs > 0) this.cache.set(key, { at: Date.now(), value });
+        return value;
+      } catch (err) {
+        lastErr = err; // fail over to the next endpoint
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error("all Steem RPC endpoints failed");
   }
 
   private static mapLevel(e: RawBookEntry): MarketLevel | null {

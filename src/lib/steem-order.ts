@@ -28,6 +28,7 @@ import {
   serializeTransaction,
   transactionDigest,
   transactionId,
+  type LimitOrderCancelOperation,
   type LimitOrderCreateOperation,
   type SteemTransaction,
 } from "@/lib/steem-engine";
@@ -197,6 +198,78 @@ export async function buildSteemOrderTx(spec: SteemOrderSpec): Promise<SteemOrde
     sellAsset,
     receiveAsset,
     effectivePriceSat,
+    unsigned,
+    serializedHex,
+    digestHex,
+    txId,
+    byteLength: serializedHex.length / 2,
+    steemTx,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// limit_order_cancel — DEX lifecycle closure (M3+)
+// ---------------------------------------------------------------------------
+
+export interface SteemCancelSpec {
+  account: string;
+  /** The uint32 orderid from the original limit_order_create. */
+  orderid: number;
+}
+
+export interface SteemCancelBuild {
+  payload: { owner: string; orderid: number };
+  unsigned: UnsignedTx;
+  serializedHex: string;
+  /** sha256(chainId ‖ serialized tx) hex — the digest the key signs. */
+  digestHex: string;
+  txId: string;
+  byteLength: number;
+  /** Wire-exact transaction (asset-free cancel body) behind serializedHex/digestHex. */
+  steemTx: SteemTransaction;
+}
+
+/**
+ * Builds one limit_order_cancel end-to-end: payload → adapter-stamped
+ * unsigned tx → serialized hex → digest → txId. The orderid is used EXACTLY
+ * as provided (the signing rebuild must cancel the very order the user saw);
+ * ref-block fields + the 60s tx expiration are stamped FRESH by
+ * adapter.buildOperations on every call.
+ *
+ * Cancel wire format is oracle-verified live against the node's own
+ * serializer (see LimitOrderCancelOperation in packages/chains/steem).
+ */
+export async function buildSteemCancelTx(spec: SteemCancelSpec): Promise<SteemCancelBuild> {
+  const account = spec.account.trim().toLowerCase();
+  if (!account) throw new SerializationError("account is required");
+  if (!Number.isInteger(spec.orderid) || spec.orderid < 0 || spec.orderid > 0xffffffff) {
+    throw new SerializationError("orderid must be an integer in [0, 4294967295]");
+  }
+  const payload = { owner: account, orderid: spec.orderid };
+
+  const adapter = steemAdapter();
+  const unsigned = await adapter.buildOperations([
+    { type: "limit_order_cancel", payload: payload as unknown as Record<string, unknown> },
+  ]);
+
+  const meta = unsigned.metadata as { refBlockNum: number; refBlockPrefix: number; expiration: number };
+  const steemTx: SteemTransaction = {
+    refBlockNum: meta.refBlockNum,
+    refBlockPrefix: meta.refBlockPrefix,
+    expiration: meta.expiration,
+    operations: [
+      {
+        name: "limit_order_cancel",
+        body: { ...payload } as LimitOrderCancelOperation,
+      },
+    ],
+  };
+  const serializedHex = Buffer.from(serializeTransaction(steemTx)).toString("hex");
+  const digestHex = Buffer.from(transactionDigest(steemTx, STEEM_CHAIN_ID)).toString("hex");
+  const txId = transactionId(steemTx);
+
+  return {
+    payload,
     unsigned,
     serializedHex,
     digestHex,

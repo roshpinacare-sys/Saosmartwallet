@@ -58,3 +58,6 @@ server.log
 
 # grid98 live-bench lab (sparse clone of sovereign engine)
 /.grid98-lab/
+
+# agent tool output dumps (never commit)
+tool-results/

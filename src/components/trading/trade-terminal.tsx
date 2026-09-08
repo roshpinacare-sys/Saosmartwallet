@@ -31,6 +31,7 @@ import { toast } from "sonner";
 
 import { SigningDialog } from "@/components/vault/signing-dialog";
 import { LiveBadge, PanelHeader } from "@/components/terminal/primitives";
+import { OpenOrdersPanel } from "@/components/trading/open-orders-panel";
 import { useVaultStatus } from "@/hooks/use-vault";
 import {
   buildOrder,
@@ -180,7 +181,14 @@ export function TradeTerminal() {
         title="Trading Terminal"
         subtitle="limit_order_create · M0 engine"
         icon={<TerminalSquare className="h-4 w-4" />}
-        right={wallet ? <LiveBadge active label="SYNCED" /> : null}
+        right={
+          feed ? (
+            <LiveBadge
+              active
+              label={`SYNCED · lag ${feed.chainStatus.lagSeconds}s`}
+            />
+          ) : null
+        }
       />
 
       <div className="flex flex-col gap-4 p-5">
@@ -381,6 +389,11 @@ export function TradeTerminal() {
                   ? "amount exceeds tracked STEEM balance"
                   : "enter a valid price and amount"}
           </p>
+        ) : null}
+
+        {/* open orders + cancel (data rides the existing useWallet poller) */}
+        {account && walletOk && wallet ? (
+          <OpenOrdersPanel account={account} orders={wallet.openOrders} />
         ) : null}
       </div>
 

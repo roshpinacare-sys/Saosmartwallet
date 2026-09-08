@@ -182,6 +182,136 @@ const RAILS: RailDef[] = [
 // Router
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Rail catalog read-view — for tools/monitors that must PROVE registry facts
+// (what exists, in which direction, at which readiness) without reaching
+// into internals. Additive, read-only.
+// ---------------------------------------------------------------------------
+
+export interface RailCatalogEntry {
+  id: string;
+  source: BridgeNetworkId;
+  target: BridgeNetworkId;
+  label: string;
+  readiness: BridgePath["readiness"];
+  gateReason: string | null;
+}
+
+export function railCatalog(): RailCatalogEntry[] {
+  return RAILS.map((r) => ({ id: r.id, source: r.source, target: r.target, label: r.label, readiness: r.readiness, gateReason: r.gateReason }));
+}
+
+// ---------------------------------------------------------------------------
+// Multi-hop hub routing — composed ONLY from real registry rails (1-d fix)
+// ---------------------------------------------------------------------------
+// BUG FIXED HERE: the previous implementation composed multi-hop routes only
+// from rails with `target === "saos-net"` — no such rail exists in the
+// registry (every hub rail is authored source:"saos-net"), so that block was
+// DEAD CODE: e.g. hive→ethereum returned [] despite real hive + ethereum
+// rails existing. Composition now walks the actual rail graph, allowing each
+// REAL rail to be traversed forward (as defined) or in reverse (target→source
+// — the hub receipt direction; the same reverse-leg concept the mirror
+// fallback at the bottom of findPaths has always used, now applied per-leg).
+// Nothing is invented: a leg exists only if its rail exists in RAILS, and it
+// carries that rail's real readiness, real gateReason and real fee quote.
+
+/** Composition bounds — stated, not guessed. The registry's hub topology
+ *  (spoke → SAOS-NET → spoke → leaf) needs at most 3 legs; 1-leg "paths" are
+ *  direct rails and are owned by the direct block in findPaths. */
+const MIN_MULTIHOP_LEGS = 2;
+const MAX_MULTIHOP_LEGS = 3;
+
+interface RailLeg {
+  rail: RailDef;
+  /** "forward" = rail as defined; "reverse" = rail traversed target→source. */
+  direction: "forward" | "reverse";
+  from: BridgeNetworkId;
+  to: BridgeNetworkId;
+}
+
+function railLegsFrom(node: BridgeNetworkId, usedRailIds: ReadonlySet<string>): RailLeg[] {
+  const legs: RailLeg[] = [];
+  for (const rail of RAILS) {
+    if (usedRailIds.has(rail.id)) continue;
+    if (rail.source === node) legs.push({ rail, direction: "forward", from: node, to: rail.target });
+    else if (rail.target === node) legs.push({ rail, direction: "reverse", from: node, to: rail.source });
+  }
+  return legs;
+}
+
+function legRouteHops(leg: RailLeg): BridgeHop[] {
+  return leg.direction === "forward" ? leg.rail.hops() : leg.rail.hops().slice().reverse();
+}
+
+function legLabel(leg: RailLeg): string {
+  return leg.direction === "forward" ? leg.rail.label : `${leg.rail.label} — reverse direction`;
+}
+
+/** Depth-limited simple-path search over the REAL rail graph — no repeated
+ *  nodes, no repeated rails. Deterministic: registry order, fewer legs first. */
+function composeHubLegs(source: BridgeNetworkId, target: BridgeNetworkId): RailLeg[][] {
+  const found: RailLeg[][] = [];
+  const walk = (node: BridgeNetworkId, visited: Set<BridgeNetworkId>, path: RailLeg[]): void => {
+    if (node === target) {
+      if (path.length >= MIN_MULTIHOP_LEGS) found.push(path);
+      return; // target is terminal — never route "through" the destination
+    }
+    if (path.length >= MAX_MULTIHOP_LEGS) return;
+    const used = new Set(path.map((l) => l.rail.id));
+    for (const leg of railLegsFrom(node, used)) {
+      if (visited.has(leg.to)) continue;
+      walk(leg.to, new Set([...visited, leg.to]), [...path, leg]);
+    }
+  };
+  walk(source, new Set([source]), []);
+  return found.sort((a, b) => a.length - b.length); // Array#sort is stable → registry order on ties
+}
+
+/** Assemble one multi-hop BridgePath from composed REAL legs:
+ *  fee stacking = every leg's real fee legs concatenated (allMeasured = AND),
+ *  availability = the WORST leg's state (one gated leg → gated route with the
+ *  honest per-leg reason attached), time = sum of leg estimates. */
+async function buildMultiHopPath(source: BridgeNetworkId, target: BridgeNetworkId, legs: RailLeg[]): Promise<BridgePath> {
+  const quoted = await Promise.all(legs.map(async (leg) => ({ leg, fee: await leg.rail.quote() })));
+  const nodeChain: BridgeNetworkId[] = [source, ...legs.map((l) => l.to)];
+  const hasReverse = legs.some((l) => l.direction === "reverse");
+  const gatedLegs = legs.filter((l) => l.rail.readiness !== "live");
+  const readiness: BridgePath["readiness"] = gatedLegs.length === 0 ? "live" : "gated";
+  return {
+    id: legs.map((l) => (l.direction === "forward" ? l.rail.id : `${l.rail.id}:reverse`)).join("+"),
+    source,
+    target,
+    label: `${nodeChain.map((n) => BRIDGE_NETWORKS[n].name).join(" → ")} (Multi-hop${hasReverse ? " · reverse leg" : ""})`,
+    route: legs.flatMap(legRouteHops),
+    estimatedTime: legs.reduce((sum, l) => sum + l.rail.estimateTime(), 0),
+    fee: {
+      legs: quoted.flatMap(({ fee }) => fee.legs),
+      allMeasured: quoted.every(({ fee }) => fee.allMeasured),
+    },
+    readiness,
+    gateReason:
+      readiness === "live"
+        ? null
+        : gatedLegs.map((l) => `${l.rail.id} (${l.direction}): ${l.rail.gateReason ?? "constituent rail gated"}`).join(" · ") ||
+          "constituent rail gated",
+    trustLevel: legs.some((l) => l.rail.trustLevel === "federated") ? "federated" : "trustless",
+    trustDetail: legs.map((l) => l.rail.trustDetail).join(" — then — "),
+    hops: quoted.map(({ leg, fee }) => ({
+      railId: leg.rail.id,
+      direction: leg.direction,
+      from: leg.from,
+      to: leg.to,
+      label: legLabel(leg),
+      route: legRouteHops(leg),
+      estimatedTime: leg.rail.estimateTime(),
+      fee,
+      readiness: leg.rail.readiness,
+      gateReason: leg.rail.gateReason,
+    })),
+    via: nodeChain.slice(1, -1),
+  };
+}
+
 export interface FindPathParams {
   source: BridgeNetworkId;
   target: BridgeNetworkId;
@@ -217,30 +347,13 @@ export async function findPaths(params: FindPathParams): Promise<BridgePath[]> {
     });
   }
 
-  // Multi-hop: source →(rail A) saos-net →(rail B) target — the sovereign hub.
-  if (out.length === 0) {
-    for (const a of RAILS) {
-      if (a.target !== "saos-net" || a.source !== source) continue;
-      for (const b of RAILS) {
-        if (b.source !== "saos-net" || b.target !== target) continue;
-        const [feeA, feeB] = await Promise.all([a.quote(), b.quote()]);
-        out.push({
-          id: `${a.id}+${b.id}`,
-          source,
-          target,
-          label: `${BRIDGE_NETWORKS[source].name} → SAOS-NET → ${BRIDGE_NETWORKS[target].name} (Multi-hop)`,
-          route: [...a.hops(), ...b.hops()],
-          estimatedTime: a.estimateTime() + b.estimateTime(),
-          fee: { legs: [...feeA.legs, ...feeB.legs], allMeasured: feeA.allMeasured && feeB.allMeasured },
-          readiness: a.readiness === "live" && b.readiness === "live" ? "live" : "gated",
-          gateReason:
-            a.readiness === "live" && b.readiness === "live"
-              ? null
-              : [a.gateReason, b.gateReason].filter(Boolean).join(" · ") || "constituent rail gated",
-          trustLevel: a.trustLevel === "federated" || b.trustLevel === "federated" ? "federated" : "trustless",
-          trustDetail: `${a.trustDetail} — then — ${b.trustDetail}`,
-        });
-      }
+  // Multi-hop: composed from REAL registry rails (forward or reverse legs)
+  // through the sovereign hub — additive to the candidate set, ranked after
+  // direct rails, and suppressed entirely when a direct LIVE rail exists
+  // (a direct live rail always beats composing the same move through the hub).
+  if (!out.some((p) => p.readiness === "live")) {
+    for (const legs of composeHubLegs(source, target)) {
+      out.push(await buildMultiHopPath(source, target, legs));
     }
   }
 

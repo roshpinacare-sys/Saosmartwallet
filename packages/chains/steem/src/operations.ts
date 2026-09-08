@@ -108,8 +108,29 @@ export interface LimitOrderCreateOperation {
   expiration: number;
 }
 
-export type SteemOperationBody = TransferOperation | LimitOrderCreateOperation;
-export type SteemOperationName = "transfer" | "limit_order_create";
+export type SteemOperationBody = TransferOperation | LimitOrderCreateOperation | LimitOrderCancelOperation;
+export type SteemOperationName = "transfer" | "limit_order_create" | "limit_order_cancel";
+
+/**
+ * Internal-market order cancel (M3+ DEX lifecycle closure). Cancels the
+ * open order `orderid` of `owner`; the unfilled remainder returns to the
+ * owner's balances. Wire format oracle-verified LIVE against the node's own
+ * serializer (condenser_api.get_transaction_hex accepts an unsigned-shaped
+ * tx with empty signatures, 2026-09-08):
+ *
+ *   tx {ref 1/2, exp 2026-09-08T20:00:00, ops:[["limit_order_cancel",
+ *      {owner:"headcorner", orderid:77}]], sigs:[]}
+ *   → 0100020000004069a06a 01 06 0a 68656164636f726e6572 4d000000 00 00
+ *     (envelope + op-count 1 + op-id 6 + varint-string owner + u32 LE orderid
+ *      + empty signatures + empty extensions)
+ *
+ * Field order: owner(varint-string), orderid(u32 LE). Nothing else.
+ */
+export interface LimitOrderCancelOperation {
+  owner: string;
+  /** The caller-chosen order id from the original limit_order_create. */
+  orderid: number;
+}
 
 export function packOperation(w: ByteWriter, name: SteemOperationName, body: SteemOperationBody): void {
   switch (name) {
@@ -131,6 +152,13 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
       packAsset(w, o.min_to_receive);
       w.u8(o.fill_or_kill ? 1 : 0); // fc::raw bool — 0x00/0x01 only
       w.u32(o.expiration); // time_point_sec, u32 LE unix
+      return;
+    }
+    case "limit_order_cancel": {
+      const c = body as LimitOrderCancelOperation;
+      w.varint(OP_IDS.limit_order_cancel);
+      w.string(c.owner);
+      w.u32(c.orderid); // uint32 LE — oracle-verified 2026-09-08 (see type doc)
       return;
     }
     default: {
@@ -170,8 +198,13 @@ export function unpackOperation(r: ByteReader): UnpackedOperation {
     const expiration = r.u32();
     return { id, name: "limit_order_create", body: { owner, orderid, amount_to_sell, min_to_receive, fill_or_kill, expiration } };
   }
+  if (id === OP_IDS.limit_order_cancel) {
+    const owner = r.string();
+    const orderid = r.u32();
+    return { id, name: "limit_order_cancel", body: { owner, orderid } };
+  }
   throw new Error(
-    `unsupported operation id ${id} — deserializer implements "transfer" (2) and "limit_order_create" (5); ` +
+    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5) and "limit_order_cancel" (6); ` +
       `extend packOperation/unpackOperation before parsing other op types`,
   );
 }

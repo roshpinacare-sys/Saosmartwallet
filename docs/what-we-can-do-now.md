@@ -200,8 +200,9 @@ Ethereum L1 ~15 tx/s · Solana (real-world) ~2,000–4,000 tx/s · Grid98 — ה
   (desktop 1440 + mobile 390, אפס שגיאות קונסולה).
 - מדידה חיה של יום-ההשקה: קריאה ממוסחרת עם מפתח אמיתי → `PROVEN`,
   latency 3,445ms, quota 1/1000; קריאה על חשבון לא-מעוגן → `FAILED` נמדד
-  ונספר; מפתח שנשלל → 401. (הערת-כנות: הענף של 429 quota-exhausted לא
-  נוסה חי — דורש 1,000 קריאות בפועל; ההיגיון נבדק בקוד.)
+  ונספר; מפתח שנשלל → 401. **(R2 עדכון: הענף 429 נשרף חי — `tools/m1-429-burn.ts`,
+  1,031 קריאות SDK אמיתיות, 30×429, `SaosQuotaError.retryAt == X-RateLimit-Reset ==
+  חצות UTC הבא`, fail-closed; `docs/m1-429-liveburn.md`.)**
 
 > פער-כנות שנשאר משבוע 1: ה-console היא owner-side (בלי auth לניהול-מפתחות)
 > כי ה-sandbox הוא מכונת-הבעלים; multi-tenant auth זה פריט שבוע 2+.
@@ -223,8 +224,8 @@ Ethereum L1 ~15 tx/s · Solana (real-world) ~2,000–4,000 tx/s · Grid98 — ה
 - אינטגרציה ב-console: טאב DEVELOPER → בלוק "OFFICIAL SDK" עם דוגמת
   3-השורות (מייצרת את ה-snippet עם ה-origin וה-username החיים).
 - פער-כנות: `npm publish` בפועל היא פעולת-בעלים (דורשת credentials ל-registry);
-  החבילה publish-ready (build+files+README). הענף 429 נשאר לא-נשרף-חי, כמו
-  בשבוע 1.
+  החבילה publish-ready (build+files+README). ~~הענף 429 לא-נשרף-חי~~ —
+  **נשרף חי ב-R2 (ראו שבוע 1 למעלה).**
 
 **שבוע 3 — Outreach ממוקד: 🟡 הוכן מלא באותו יום (2026-09-08); השליחה פעולת-בעלים.**
 `docs/model1-week3-outreach.md` — עשרת היעדים נאספו מחיפוש-רשת אמיתי (11 שאילתות)

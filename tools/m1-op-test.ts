@@ -118,7 +118,8 @@ async function oracleVector(label: string, tx: OracleTx): Promise<void> {
   check("round-trip serialize(deserialize(oracle))", reserialized === mine, `got=${reserialized}`);
 
   const op = reparsed.operations[0];
-  if (op?.name === "limit_order_create" && "owner" in op.body) {
+  if (op?.name === "limit_order_create" && "amount_to_sell" in op.body) {
+    // "amount_to_sell" discriminates create from the now-sibling cancel op.
     const b = op.body;
     const p = tx.operations[0][1] as {
       owner: string;
