@@ -289,3 +289,27 @@ Stage Summary:
 - org资产全景首次成图：11 repos、12-agent舰队、8合约mesh、5时钟notary、营销kit——全部接入连接图
 - 三处跨repo流血已堵(platform token/PID/本地remotes)；待操作员：token轮换+历史重写、新密钥.env、流浪资金处置、Adsmarket未背书主张、audit-package重打包、HIVE RC stale-read修复
 - saos-dex final: 00a8052..2697b97+evidence commit；platform fee52c5..5bb5ef1；steem 9fb2030..7bfd9fb
+
+---
+Task ID: SETTLE-7
+Agent: saos-dex agent (Z.ai Code)
+Task: "ודא שאתה על הקומיט האחרון מגיטהאב, בחן את שאר התיקיות של הסוכנים, תסיק מסקנות, אסוף מה שלא ידענו שיש לנו, חבר הכל, תקן דברים לא תקינים ומדממים, דחוף לריפו" + הסיכום-המקיף (מרוויח/מוגן/חכם/פורץ-דרך, הדקס, מיקרו-גריד)
+
+Work Log:
+- 7.1 סנכרון: git fetch עם טוקן-inline → HEAD a9f13ea == origin/main (שני קומיטי SETTLE-6 כבר נדחפו בסשן הקודם). אפס-פער.
+- 7.2 שני סוכני-ביקורת מקבילים (Explore): (A) claims-vs-reality — חבילת-הביקורת 7/12-קבצים-מיושנים כולל bug-ה-HALT, README/STATUS/LIQUIDITY/CHAOS טענות-שקריות, נכסים-לא-מחוברים; (B) fresh-eyes קוד — 20-ממצאים, 4-HIGH (חסם-ערבות-כפול, fill-limit-phantom-HALT, DoS-ארנה-לא-מאומת, סתירת-אימות-TRON-עצמית) עם 4-probes-דינמיים.
+- 7.3 תיקוני-כסף (kernel/book/relay/relay-sol): preLocked לנתיב-order (ביטול-החסם-הכפול — מוכח-probe), דחיית limit-fill, נרמול-issuer/to בכניסה (סגירת-עקיפת-"TREASURY"), TRON-משדר-stateRoot (מה-שהמאמת קורא), SOL getTransaction-fallback (ריפוי "19/0-verified"), ברירת-מחדל-mainnet-beta (יישור-פס).
+- 7.4 תיקוני-אנטי-דימום (chain/mm/routes): תקרות-ארנה (levels≤12...), journal-cap 600/500, resetChain מנקה-fuelSamples+מעיר-halted, reset-דורש {"confirm":"WIPE"}, תקרות-זריעה-לבוטים (2.4M/1.2M), רצפת-הון-60%-לחיילים (starving→cancel בלבד), bench-התקררות-60ש׳, עירוי-ארנה (ממנה-אוצר/מפעיל בלבד).
+- 7.5 אמת: sysNonce-דטרמיניסטי (ביטול-Math.random → stateRoot-שחזורי), prevDigest-נלכד (לא-null-תמיד), showcase-meta נגזר-GAS_TABLE (60/100-לא-200/220), chaos-test מזייף-5-פסים+chaosView-חושף-הכל.
+- 7.6 מימוש-חדש: GET /api/dex/metrics — Prometheus-text (saos_* שרשרת/דלק/ריצה/אינוואריאנטות/breakers) + ?format=json. M1-מה-ROADMAP מומש. חי-ונבדק.
+- 7.7 אריזת-ביקורת-מחדש: 15-קבצים מ-HEAD (settle.ts+showcase.ts נכללו), chain.ts-עיבוד-יחיד (evidence-port), tsc-עומד-לבד-נקי, MANIFEST-מחודש (17-שורות), FIDELITY-כנה-נעוץ-SHA-a9f13ea+פקודות-אימות, README/AUDIT_SCOPE מתוקנים (23-ops, 5-פסים).
+- 7.8 תיקוני-טענות: README (23-ops, 5-פסים, רשימת-נתיבים-אמת), STATUS (טביעת-קוד-חיה 1.6.0+settle7-audit), LIQUIDITY (Hive-Engine=צעד-דרך-לא-קיים — כנות), .env.example (UA-מעודכן), CHAOS_TEST_RESULTS (כיסוי-3/5-היסטורי — כנות).
+- 7.9 CODE_VERSION→saos-dex/1.6.0+settle7-audit. PROOF §12 (20-ממצאים-מתועדים-file:line).
+- 7.10 NETWORK-SUMMARY.md — הסיכום-המקיף: מפת-11-ריפואים, ציר-הישגים, בחינת-הדקס (חוזק/חולשה/ציון), מיקרו-גריד ×3-קריאות (תא-אנרגיה על ENERGY-הקיים / רשת-מיקרו-שווקים / גריד-חוצה-ריפואים), צעדים-קריטיים-מדורגים P0/P1/P2.
+- 7.11 אימות-חי: 6/6-probes-PASS, tsc/eslint-נקי ×2 (ראשי+חבילה), דמון h2080 halted=0, invariants TRUE×3, negatives=0, /metrics-חי.
+
+Stage Summary:
+- saos-dex נכון-על-הקומיט-האחרון-של-GitHub (a9f13ea) והסבב-החדש SETTLE-7 יידחף על-גביו.
+- 20-ממצאי-ביקורת → כולם-טופלו: 14-תיקוני-קוד, חבילת-הביקורת-נארזה-מחדש-מ-HEAD-עם-SHA-pin (היא-הכילה-את-קוד-הכסף-שקרס-בייצור!), /metrics-מומש, מסמכים-הוכנו-לאמת.
+- התוצר-למפעיל: NETWORK-SUMMARY.md (הכל-שיש-ברשת + מיקרו-גריד + צעדים-קריטיים: P0-מפתחות-חדשים = השער-היחיד).
+- נותר-פתוח (מתועד): ריצת-כאוס-5-פסים-מאמתת+intents-persist (ממתינים-מפתחות), חלון-נונסים-6000 (replay-אחרי-גלגול — מתועד-בכנות), WS/OHLC/HSM (P2).
