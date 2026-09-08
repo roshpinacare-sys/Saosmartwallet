@@ -333,3 +333,24 @@ Stage Summary:
 - סבב-SETTLE-8-סגור: הרשת-נבלעה-כולה-וממצאי-האחים-מומשו-בקוד-החי (6-תיקונים, כולם-אפס-עלות).
 - הריפו-נשאר-מקור-האמת; הדמון-חי-מריץ-את-הקוד-החדש-בלי-הפרה-של-אינווריאנטות.
 - פתוח-למפעיל: מפתחות-פרסום (STEEM/HIVE_POSTING_WIF), U-01 (27-עוגני-SOL-ישנים), ריצת-כאוס-חמישה-פסים-אחרי-מפתחות.
+
+---
+Task ID: SETTLE-9
+Agent: saos-dex agent (Z.ai Code)
+Task: "תמשיך עמוק יותר נרחב יותר, בחן עוד את השותפים, ייעל את מה שעשית ואמת, סבב מקיף משמעותי ודחוף לריפו" + סיכום-עברית-בצ'אט (המפעיל לא-קורא-סינית)
+
+Work Log:
+- 9.1 סנכרון: HEAD=4c40b33==origin/main (0-מאחורי); קלוני-ביקורת-עודכנו (7) + 3-חדשים נשלפו (Sdk=ריק, anchor-baseline=placeholder, Project-files=ZIP-ים); מלאי-מלא: 11-ריפואות.
+- 9.2 שלושה-סוכני-ביקורת-מקבילים: (A) חומר-טרי-של-4-שותפים (wallet-R2/jummper-live/foundry-sweep/platform-storm); (B) 6-ריפואות-הנותרות (roshpina-פורנזי גילה: סיסמת-כספת-בגלוי ×4 — ה-4 ב-Project-files/steem-main.zip); (C) ביקורת-אופטימיזציה-מדודה (bun micro-bench) — TOP-10.
+- 9.3 אימות-טענות-מול-הקוד: F-01/F-02/F-03/F-05/consoleGuard — כבר-בקוד (SETTLE-8); נמצאו-פתוחים: nextNonce-Math.random (בסתירה-להערה-שלו-עצמו!), minOut-NaN-fail-open, F-04, bind.
+- 9.4 תיקוני-ביצועים (chain/kernel/mm/settle-route/metrics): stateRoot-פעם-אחת-פר-בלוק+אימות-הקפאה-אמיתי-בחותם; cache-שורש-פר-גובה; dedupe-Set-WeakMap; metrics-ממוסגר-5ש׳+genesisTotals-ממוזכר; getBurnWindow-עותק+trim-מדויק; קוד-מת-נמחק (placeOrder/void-evs/void-nowMs); buildMs 3–12ms→1–2ms מדוד.
+- 9.5 תיקוני-כסף-ואמת: minOut-fail-closed-דו-שכבתי (route+kernel) — נבדק-חי bad-request; ASSETS-אימות-מפורש-בגרעין+route (EVILCOIN/SAOS-SAOS-נדחים-חי); funderFor-מאוחד (settle-היה-קשיח-8k/100k); nextNonce-מונה-מונוטוני (אפס-Math.random-בליבה).
+- 9.6 חוצה-סוכנים: F-04-endpointHost (נקבע-בשידור+fallback-configuredHost, חי-ב-API-ובפנקס); restoreRecords-סימטרי (שורש-באג-roshpina verified>anchored — בלתי-אפשרי-מבנית-עתה); bind `-H 127.0.0.1` (dev+start, הדמון-הופעל-מחדש-עליו).
+- 9.7 **U-01-נפתר**: getSignatureStatuses+searchTransactionHistory מול-mainnet+devnet לכל-6-עוגני-ה-SOL-בחלון → **6/6-mainnet-finalized-Ok; devnet-null** (הפס-הסולארי-מעוגן-mainnet-אמת).
+- 9.8 אימות-חי: CODE_VERSION=1.8.0+settle9-optimize; tsc/eslint-נקיים; דמון-h4423→4474-רציף-על-snapshot; invariants ×3=1; exam-ok; אפס-ALERT; gates-403/bad-request/queued; browser: RUN-PROOF→PASS-אפס-שגיאות; צילום settle9-proof-pass.png.
+- 9.9 מסמכים: STATUS-1.8.0 · PROOF-§14 · NETWORK-SUMMARY-עדכון-SETTLE-9 (מפת-ריפואות-טרייה+צעדים-מדורגים); CODE_VERSION→saos-dex/1.8.0+settle9-optimize.
+
+Stage Summary:
+- SETTLE-9 סגור: הסבב-היה "עומק+רוחב+מהירות" — 10-ריפואות-נבלעו-טריות, 8-אופטימיזציות-מדודות-מומשו, 4-תיקוני-כסף/אמת, F-04, bind, ו-U-01-נסגר-בראיה-RPC-חיה.
+- הבורסה-מהירה-פי-2-בבלוקים, חף-מקריות-בליבה, ממנה-דלק-מקור-אחד, מעידה-על-איזו-רשת-היא-עוגנת.
+- פתוח-למפעיל (לא-שלנו): כיבוי-delta-ה-convert-השורף-RC, מפתחות-חדשים, טוקן-rotation. פתוח-חוצה-סוכנים: F-06/F-07-דחיסת-עיגון-דורשת-תיאום-עם-המאמת-של-jummper-לפני-מימוש.
