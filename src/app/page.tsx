@@ -17,14 +17,14 @@
  *   WALLET    — balances, Steem Power, RC manabar, open orders + M3 ETH/SOL lookups, vault status
  *   VAULT     — Sovereign Key Vault: wizard, policy engine, backup, audit
  *
- * Every market number is chain-sourced — zero mock data. Keyboard: 1–8
+ * Every market number is chain-sourced — zero mock data. Keyboard: 1–9
  * switch sections. Signing flows through the M2 keystore + policy engine.
  */
 
 import { useEffect, useState } from "react";
 
 import { motion } from "framer-motion";
-import { Boxes, GitBranch, Grid3x3, Landmark, Server, ShieldCheck, Table2, Wallet2 } from "lucide-react";
+import { Boxes, FlaskConical, GitBranch, Grid3x3, Landmark, Server, ShieldCheck, Table2, Wallet2 } from "lucide-react";
 
 import { BridgeExplorer } from "@/components/terminal/bridge-explorer";
 import { BridgeMonitor } from "@/components/terminal/bridge-monitor";
@@ -32,6 +32,7 @@ import { TerminalHeader } from "@/components/terminal/eco-header";
 import { KpiStrip } from "@/components/terminal/kpi-strip";
 import { NetworkGrid } from "@/components/terminal/network-grid";
 import { PairsMatrix } from "@/components/terminal/pairs-matrix";
+import { ProofLab } from "@/components/terminal/proof-lab";
 import { RegistryPanel } from "@/components/terminal/registry-panel";
 import { SaosHub } from "@/components/terminal/saos-hub";
 import { SaosNetPanel } from "@/components/terminal/saosnet-panel";
@@ -44,11 +45,12 @@ import { DexView } from "@/components/trading/dex-view";
 import { Providers } from "@/components/providers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type SectionId = "grid" | "saoshub" | "dex" | "saosnet" | "bridges" | "registry" | "wallet" | "vault";
+type SectionId = "grid" | "saoshub" | "proofs" | "dex" | "saosnet" | "bridges" | "registry" | "wallet" | "vault";
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: React.ReactNode }> = [
   { id: "grid", label: "GRID", icon: <Grid3x3 className="h-3.5 w-3.5" aria-hidden /> },
   { id: "saoshub", label: "SAOS HUB", icon: <Boxes className="h-3.5 w-3.5" aria-hidden /> },
+  { id: "proofs", label: "PROOFS", icon: <FlaskConical className="h-3.5 w-3.5" aria-hidden /> },
   { id: "dex", label: "DEX", icon: <Table2 className="h-3.5 w-3.5" aria-hidden /> },
   { id: "saosnet", label: "SAOS-NET", icon: <Server className="h-3.5 w-3.5" aria-hidden /> },
   { id: "bridges", label: "BRIDGES", icon: <GitBranch className="h-3.5 w-3.5" aria-hidden /> },
@@ -121,6 +123,16 @@ export default function Home() {
                 transition={{ duration: 0.25 }}
               >
                 <SaosHub />
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="proofs" className="mt-0 outline-none">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <ProofLab />
               </motion.div>
             </TabsContent>
 
