@@ -1,10 +1,10 @@
 "use client";
 
 /**
- * StatusFooter — sticky terminal footer: build tag, data provenance, the
- * zero-mock pledge, and keyboard hints. Sticks to the viewport bottom on
- * short pages, pushes down naturally on long ones (mt-auto), and respects
- * the iOS safe-area inset.
+ * StatusFooter — sticky terminal footer: build tag, data provenance
+ * (SAOS-NET state first — it is OUR chain), the zero-mock pledge, and
+ * keyboard hints. Sticks to the viewport bottom on short pages, pushes
+ * down naturally on long ones (mt-auto), and respects the iOS safe-area inset.
  */
 
 import { Keyboard, ShieldCheck, Waypoints } from "lucide-react";
@@ -29,17 +29,17 @@ export function StatusFooter() {
 
         <p className="num hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] md:flex">
           <Waypoints className="h-3.5 w-3.5" aria-hidden />
-          sources: api.steemit.com · api.hive.blog · rpc.blurt.world · api.trongrid.io · saos-net state
+          sources: saos-net state (daemon) · api.steemit.com · api.hive.blog · rpc.blurt.world · api.trongrid.io
         </p>
 
         <p className="num hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] lg:flex">
           <Keyboard className="h-3.5 w-3.5" aria-hidden />
-          keys 1–8 switch sections
+          keys 1–9 switch sections
         </p>
 
         <p className="num ml-auto text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
-          chains <span className="text-[var(--up)]">{online}</span>/{total} · build{" "}
-          <span className="text-foreground/70">GRID·ENTERPRISE·M3</span>
+          rails <span className="text-[var(--up)]">{online}</span>/{total} · build{" "}
+          <span className="text-foreground/70">SAOS·SOVEREIGN·M3</span>
         </p>
       </div>
     </footer>

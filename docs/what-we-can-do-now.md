@@ -226,6 +226,19 @@ BASE_URL ציבורי נדרש לפני פיילוטים.
 integrations חיות ששולחות ≥100 אימותים/יום. אם אין — מדווחים בכנות ולומדים
 מה התנגדות השוק; התשתית לא נפגעת.
 
+**UI overhaul — SAOS-first (2026-09-08, מיידי אחרי Week 3):** חשיפת-בעלים:
+ה-UI עדיין נפתח כטרמינל STEEM/SBD (המחיר ב-header, STEEM כרטיס #1, SAOS-NET
+כרטיס #5) — הופך: **SAOS היא הרשת, STEEM/SBD רק רכבת-עוגן.** שונה:
+header חדש (wordmark SAOS + SOVEREIGN IDENTITY NETWORK, בלי טיקר STEEM/SBD)
+· מסך-פתיחה `SAOS` עם hero: משפט-זהות + CTAs + ויטלים ריבוניים חיים
+(height/checkpoints/bench/treasury/wrapped/pools) + **strip של checkpoint
+anchors אמיתיים עם txids קליקים ל-explorer** (הראיה הכי חזקה שהייתה מוסתרת)
+· Network Grid: SAOS-NET תמיד ראשון עם ״OUR CHAIN״ · 10→9 טאבים (REGISTRY
+מוזגה ל-DEVELOPER; DEX→MARKETS עם pairs matrix) · כל 9 הטאבים במקלדת ·
+footer/build: SAOS·SOVEREIGN·M3. אומת בדפדפן: golden path PROVEN
+@block 109,406,462 דרך ה-CTA החדש, 9/9 טאבים נטענים, אפס שגיאות קונסולה,
+מובייל 390px בלי גלילה-אופקית. אפס mock — הכל מה-apis הקיימים.
+
 **קריטריון יציאה ל-Model 2:** אחרי 3 לקוחות חיים, הכסף מממן את multi-tenant
 של Grid98 — באותה משמעת anti-mock.
 

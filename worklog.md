@@ -516,3 +516,28 @@ Work Log:
 
 Stage Summary:
 - Week 3 is prepared to the maximum extent possible from inside the sandbox: 10 real, live-checked targets with evidence-backed angles and ready-to-send emails, plus a public-evidence appendix that turns "trust us" into "check it yourself". The remaining steps are inherently owner actions (SMTP sending, precise contact addresses, public BASE_URL/domain, pilot keys issuance). Metric and follow-up cadence documented. Pushed to main.
+
+---
+Task ID: SAOS-UI-1
+Agent: Z.ai Code (main)
+Task: הפיכת המערכת ל-SAOS חד-משמעית ב-UI — roast מלא של כל השכבות, ארגון-מחדש לוגי של מה מוצג, השוואה לפלטפורמות מובילות, שיפור חריף, ביצוע + דחיפה.
+
+Work Log:
+- סקר מלא: git ב-sync (697edd0), קריאת page.tsx + כל רכיבי ה-terminal + ה-header/footer + hooks + shapes של /api/eco/saosnet, /api/eco/saos-hub, /api/eco/anchors (anchors חיים עם txids ציבוריים!).
+- ROAST (מתועד ב-README): המסך הראשון היה טרמינל-שוק STEEM/SBD — מחיר STEEM/SBD המספר הגדול ב-header, כרטיס STEEM #1 עם שורת-שוק מיוחדת, SAOS-NET כרטיס #5 שווה-ערך ל-Blurt, אין שום משפט שמסביר מה SAOS, 10 טאבים ללא היררכיה (REGISTRY כטאב בכיר; DEX לפני SAOS-NET), מקלדת 1–9 על 10 טאבים, הראיה הכי חזקה (checkpoint anchors עם txids ציבוריים) מוסתרת לגמרי.
+- EXECUTE:
+  - חדש `src/components/terminal/saos-hero.tsx`: hero ריבוני — משפט-זהות ("SAOS is our sovereign network — every claim anchored in public"), 3 CTAs (PROOFS/DEVELOPER/SAOS-NET), SAOS-NET height hero עם sparkline, רצועת ויטלים (bench/treasury/wrapped/pools/rails), strip של checkpoint anchors חיים מ-/api/eco/anchors עם קישורי explorer.
+  - `eco-header.tsx` שכתוב: wordmark SAOS + "SOVEREIGN IDENTITY NETWORK" + subline "our chain · public anchors · metered identity api"; רצועת LED מסומנת ANCHORED RAILS; הטיקר STEEM/SBD הוסר לגמרי — במקומו SAOS-NET height + 1,831 anchor txs verified + checkpoints; LiveBadge מחובר ל-freshness של state ה-daemon (≤20 דק') במקום פיד השוק.
+  - `kpi-strip.tsx` → `market-strip.tsx` (MarketStrip): STEEM/SBD + volume + spread + ספר-ריבוני SAOS/STEEM bid/ask + floor — הורד לטאב MARKETS בכוונה.
+  - `network-grid.tsx`: מיון קבוע SAOS-NET ראשון (CHAIN_ORDER) + מסגרת/זוהר סוברני + subline "OUR CHAIN" (תיקון truncation אחרי איטרציה ראשונה); הוסרה שורת-השוק המיוחדת של כרטיס STEEM.
+  - `page.tsx` שכתוב: 10→9 טאבים SAOS-ordered — SAOS · SAOS HUB · PROOFS · SAOS-NET · MARKETS · BRIDGES · WALLET · VAULT · DEVELOPER; REGISTRY מוזגה ל-DEVELOPER (developer-console.tsx), DEX→MARKETS (MarketStrip+PairsMatrix+DexView), כל 9 במקלדת, data-state=active בצבע --saos.
+  - `pairs-matrix.tsx`: jump type הוצר ל-"saosnet" (שורת STEEM/SBD נשארת בטאב שלה).
+  - `status-footer.tsx`: sources פותחים ב-saos-net state, build SAOS·SOVEREIGN·M3, keys 1–9.
+  - layout.tsx: title "SAOS — Sovereign Identity Network" + description/keywords SAOS-first.
+- אימות דפדפן (agent-browser): נחיתה חדשה מאושרת ויזואלית (1440+390), אפס גלילה-אופקית ב-390px; CTA "RUN A LIVE IDENTITY PROOF" → PROOFS → VERIFY → PROVEN @block 109,406,462 (EIP-191 sig==claim, KEY==EVM, SAME_KEY steem+hive, blurt N/A כן); CTA "GET A METERED API KEY" → DEVELOPER עם keys+SDK+registry; טאבים 2/4/6/7/8 נטענים ללא alerts (VAULT = not-initialized by-design fail-closed); footer נדחף טבעי; lint נקי; dev.log ללא שגיאות (bigint bindings benign).
+- Docs: README (סעיף UI חדש + טבלת 9 טאבים + תיקון שורת-מקלדת), what-we-can-do-now.md (בלוק UI overhaul), worklog זה.
+
+Stage Summary:
+- המערכת חד-משמעית SAOS: המסך הראשון עונה "מה זה SAOS והאם הוא חי" תוך שניות — משפט-זהות, ויטלים ריבוניים, ו-anchors ציבוריים לחיצים. STEEM/SBD מדורג ל-MARKETS בלי איבוד-נתונים (הכל נגיש), SAOS-NET מקבל את מקום הכבוד בכל השכבות.
+- אפס mock: כל הנתונים החדשים ב-hero (anchors strip) מה-api הקיים /api/eco/anchors; שום מספר לא הומצא.
+- קבצים: חדש saos-hero.tsx; שוכתבו eco-header/market-strip(מ-kpi-strip)/page/footer/layout; עודכנו network-grid/pairs-matrix/developer-console/README/what-we-can-do-now.

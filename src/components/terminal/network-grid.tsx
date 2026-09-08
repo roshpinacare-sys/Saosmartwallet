@@ -1,21 +1,24 @@
 "use client";
 
 /**
- * NetworkGrid — every chain in the ecosystem as a live card.
+ * NetworkGrid — the rails, as live cards. SAOS-NET (our sovereign chain)
+ * is always sorted FIRST with a distinct sovereign accent; the anchored
+ * public chains follow in identity-rail order (steem → hive → blurt →
+ * tron → ethereum → solana).
  * Card anatomy: identity row (glyph · name · family · status) → hero head
  * height (animated) with a real session sparkline → 2×2 metric grid (lag,
- * version, head id, probe age) → optional market row for STEEM.
+ * version, head id, probe age).
  * Click opens a drill-down Sheet with role, adapter status and notes.
  * Responsive: auto-fit grid ≥320px per card. Zero mock: offline chains show
  * their failure honestly.
  */
 
 import { motion } from "framer-motion";
-import { Boxes, Clock3, Layers, Network, ShieldHalf, Zap } from "lucide-react";
+import { Clock3, Layers, Network, ShieldHalf, Zap } from "lucide-react";
 import { useState } from "react";
 
 import { Sparkline } from "@/components/terminal/charts";
-import { AnimatedNumber, Delta, FlashValue, useRollingHistory } from "@/components/terminal/motion-bits";
+import { AnimatedNumber, useRollingHistory } from "@/components/terminal/motion-bits";
 import {
   ChainGlyph,
   PanelSkeleton,
@@ -29,7 +32,6 @@ import {
   useEcoNetworks,
   type EcoChain,
 } from "@/hooks/use-eco";
-import { fmtPrice, useMarketFeed } from "@/hooks/use-steem-market";
 import { ECO_NETWORKS } from "@/lib/eco-registry";
 import { cn } from "@/lib/utils";
 import {
@@ -39,6 +41,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+
+const CHAIN_ORDER = ["saos-net", "steem", "hive", "blurt", "tron", "ethereum", "solana"];
+function chainRank(id: string): number {
+  const i = CHAIN_ORDER.indexOf(id);
+  return i === -1 ? 99 : i;
+}
 
 export function NetworkGrid() {
   const { data, isLoading, isError, error } = useEcoNetworks();
@@ -62,10 +70,12 @@ export function NetworkGrid() {
     );
   }
 
+  const ordered = [...data.chains].sort((a, b) => chainRank(a.id) - chainRank(b.id));
+
   return (
     <>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4 md:gap-6">
-        {data.chains.map((chain, i) => (
+        {ordered.map((chain, i) => (
           <NetworkCard key={chain.id} chain={chain} index={i} onOpen={() => setSelected(chain)} />
         ))}
       </div>
@@ -87,9 +97,7 @@ export function NetworkGrid() {
 function NetworkCard({ chain, index, onOpen }: { chain: EcoChain; index: number; onOpen: () => void }) {
   const tone = chainTone(chain.id);
   const hist = useRollingHistory(`chain:${chain.id}`, chain.headHeight, 48);
-  const { data: market } = useMarketFeed();
-  const registry = ECO_NETWORKS.find((n) => n.id === chain.id);
-  const isSteem = chain.id === "steem";
+  const isSovereign = chain.id === "saos-net";
 
   return (
     <motion.button
@@ -103,6 +111,7 @@ function NetworkCard({ chain, index, onOpen }: { chain: EcoChain; index: number;
       className={cn(
         "glass glow-card cursor-pointer p-5 text-left outline-none",
         chain.status === "offline" && "border-[var(--down)]/30",
+        isSovereign && "border-[var(--saos)]/40 shadow-[0_0_28px_-10px_var(--saos)]",
       )}
     >
       {/* identity row */}
@@ -110,9 +119,16 @@ function NetworkCard({ chain, index, onOpen }: { chain: EcoChain; index: number;
         <ChainGlyph id={chain.id} name={chain.name} />
         <div className="min-w-0 flex-1">
           <span className="block truncate text-base font-semibold tracking-wide text-foreground">{chain.name}</span>
-          <p className="truncate text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-            {chain.family} · {chain.kind}
-          </p>
+          {isSovereign ? (
+            <p className="truncate text-[10px] uppercase tracking-[0.18em]">
+              <span className="font-bold text-[var(--saos)]">our chain</span>
+              <span className="text-[var(--text-tertiary)]"> · {chain.kind}</span>
+            </p>
+          ) : (
+            <p className="truncate text-[10px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
+              {chain.family} · {chain.kind}
+            </p>
+          )}
         </div>
         <StatusBadge status={chain.status} />
       </div>
@@ -142,19 +158,6 @@ function NetworkCard({ chain, index, onOpen }: { chain: EcoChain; index: number;
         <StatCell label="state age" value={fmtAge(chain.stateAgeSeconds)} />
         <StatCell label="probed" value={fmtAge(secondsSince(chain.probedAt))} />
       </div>
-
-      {/* market row for the host chain */}
-      {isSteem && market ? (
-        <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-white/[0.02] px-3 py-2">
-          <span className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] text-[var(--text-tertiary)]">
-            <Boxes className="h-3 w-3" aria-hidden /> internal market
-          </span>
-          <span className="flex items-baseline gap-2">
-            <FlashValue value={Number(market.ticker.latest)} format={fmtPrice} className="text-[13px] font-bold" />
-            <Delta value={market.ticker.percentChange} />
-          </span>
-        </div>
-      ) : null}
 
       {/* note (honest) */}
       <p className="mt-4 line-clamp-2 text-[11px] leading-relaxed text-[var(--text-tertiary)]">{chain.note}</p>
