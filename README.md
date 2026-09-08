@@ -1,6 +1,6 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-> **סטטוס: M0+M1+M2+M3 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · Sovereign Key Vault חי · שכבת גשרים עם router+quotes חיים**
+> **סטטוס: M0+M1+M2+M3+M4 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · Sovereign Key Vault חי · שכבת גשרים עם router+quotes חיים · M4 System Owner: בדיקות-חיים מאוחדות (/api/system/health) + דו"ח סטטוס חי (docs/system-status) + failover הוכח חי**
 > עדכון אחרון: 2026-09-08 (Asia/Jerusalem)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
@@ -113,6 +113,20 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 **אימות חי (23/23, `bun tools/m3-adapter-check.ts`):** health+height מול mainnet · יתרות מדויקות-BigInt (BigInt-lamports לעולם לא float) · ERC-20 (USDT) · SPL (4,287 חשבונות) · build+sign EIP-1559/legacy עם אימות-ed25519 מהצומת · גזירת-כתובות EIP-55/Base58 · broadcast fail-closed · מדיניות-תפקידים fail-closed.
 
 **כנות (ראו REGISTRY):** אין חוזה-גשר פרוס ב-Ethereum ואין תוכנית ב-Solana — מסילות ה-mint מדווחות `gated` עם הסיבה; ה-lock-op מוגדר ומוכן. שידור ב-ETH/SOL נשאר נעול (M0 gate) עד להחלטה מפורשת.
+
+## 🛡️ M4 — System Owner Mode (2026-09-08)
+
+אחריות מלאה על האקוסיסטם: אימות-חיים של כל רכיב, ריפוי-עצמי מוכח, סריקת-פערים מחודשת, ודיווח מקיף.
+
+**בדיקות-החיים המאוחדות — `GET /api/system/health`:** מדד-אחד שחוקר בכל קריאה את 7 הרשתות (גבהים חיים), 6 מסילות-הגשר (עדות חיה), 2 quotes-ראוטר ישירים (STEEM→ETH/SOL עם עמלות חיות ו-gateReason), את הכספת (ללא-סודות) ואת ה-DEX (ticker+orderbook+spread). כל רכיב-מת מדווח כ-DATA (issue עם סיבה+פעולה), לעולם לא V ירוק מאויר ולא 500.
+
+**ריפוי-עצמי — הוכח חי:** אדפטר Ethereum שנבנה עם RPC מת בראש ספר-נקודות-הקצה התאושש מיד לצומת החיה (lag 4s). ירידה רגעית של STEEM ב-strip (6/7) חזרה ל-7/7 תוך שניות — דיווח-כנה של תקלה חולפת, לא תקלה.
+
+**תיקון-באג אמיתי (M4):** ולידטור שמות-החשבונות ב-Steem אכף `segment > 13` — כלל שאינו קיים ב-steemd. אומת מול mainnet (`steem-venezuela`, סגמנט 15 תווים, חי מ-2020-08-08) ותוקן לכלל האמיתי: סה"כ 3..16 · סגמנט ≥3 · אות בהתחלה · [a-z0-9-] באמצע · [a-z0-9] בסוף. לפני התיקון, משתמשי-DEX עם שמות ארוכים היו נחסמים מהחתימה.
+
+**סריקת-פערים מחודשת (`tools/repo-scan.ts` → `docs/repo-scan.json`):** 8 ריפו נסרקו חי (עצים+READMEs+manifests). המסקנה עדכנית: אין קוד ETH/SOL בשום ריפו **מלבד שלנו** (M3). `saos-sovereign-foundry` משלים אותנו בפילוסופיה keyless (dry-run probe + external-signer + אימות-txid ציבורי) — נקודת-אינטגרציה עתידית, לא קוד-להעתקה. מפת-פערים כנה: חוזה-גשר פרוס ✗ · תוכנית Solana פרוסה ✗ · MEV ✗ · gas-oracle ✓ (EIP-1559 חי) · failover ✓ (הוכח) · multi-sig אפליקטיבי ✓ (3-of-5 + social recovery).
+
+**דוח-סטטוס חי:** `docs/system-status.json` + `docs/system-status.md` — נוצר ע"י `bun tools/system-status.ts` מול `/api/system/health` החי; כל מספר נמדד בזמן-יצירה, מה שלא נמדח = null עם הסיבה.
 
 ### 🎨 Enterprise redesign (2026-09-07) — design system מקצועי מלא
 
