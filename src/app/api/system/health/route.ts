@@ -42,9 +42,15 @@ const ALL_NETWORKS = ["steem", "hive", "blurt", "tron", "saos-net", "ethereum", 
 export async function GET() {
   const generatedAt = new Date().toISOString();
 
-  // ---- 1. networks (eco probes, TTL-cached upstream) -----------------------
+  // ---- 1. networks (eco probes, TTL-cached upstream) — health must survive
+  // a probe blowup, not 500 with it ------------------------------------------
   const t0 = Date.now();
-  const networks = await withCache("health:networks", 15_000, () => ecoNetworks());
+  let networks: Awaited<ReturnType<typeof ecoNetworks>> | { ok: false; error: string };
+  try {
+    networks = await withCache("health:networks", 15_000, () => ecoNetworks());
+  } catch (e) {
+    networks = { ok: false, error: e instanceof Error ? e.message : "eco networks probe failed" };
+  }
   const networksLatencyMs = Date.now() - t0;
 
   // ---- 2. bridges (rail statuses + analytics over live state) --------------
@@ -66,7 +72,7 @@ export async function GET() {
   const t2 = Date.now();
   const quote = async (from: string, to: string) => {
     try {
-      const paths = await findPaths({ source: from, target: to, asset: "STEEM", amount: "1" });
+      const paths = await findPaths({ source: from as Parameters<typeof findPaths>[0]["source"], target: to as Parameters<typeof findPaths>[0]["target"], asset: "STEEM", amount: "1" });
       const direct = paths[0];
       if (!direct) return { from, to, readiness: "unavailable", gateReason: "router returned no path", fee: null as Array<{ network: string; amount: string; currency: string }> | null, estimatedTime: null as number | null };
       return {

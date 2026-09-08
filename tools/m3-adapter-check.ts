@@ -140,7 +140,7 @@ async function main() {
   ok(
     "buildOperations legacy msg",
     typeof unsignedSol.metadata?.messageHex === "string" && unsignedSol.metadata.messageHex.length > 0,
-    `feePayer=${unsignedSol.metadata?.feePayer?.slice(0, 8)}… blockhash=${String(unsignedSol.metadata?.recentBlockhash).slice(0, 8)}…`,
+    `feePayer=${String(unsignedSol.metadata?.feePayer ?? "").slice(0, 8)}… blockhash=${String(unsignedSol.metadata?.recentBlockhash).slice(0, 8)}…`,
   );
 
   const signedSol = await sol.sign(
@@ -148,7 +148,7 @@ async function main() {
     { byRole: { active: seed } },
     ["active"],
   );
-  const sig58 = signedSol.signatures[0] ?? "";
+  const sig58 = String(signedSol.signatures[0] ?? "");
   ok(
     "sign legacy tx",
     /^[1-9A-HJ-NP-Za-km-z]{80,100}$/.test(sig58),
@@ -157,10 +157,11 @@ async function main() {
 
   // Wire integrity: signature must verify against the message via the pubkey.
   const { ed25519 } = await import("@noble/curves/ed25519.js");
-  const msgBytes = Buffer.from(unsignedSol.metadata.messageHex, "hex");
+  const msgHex = String(unsignedSol.metadata?.messageHex ?? "");
+  const msgBytes = Buffer.from(msgHex, "hex");
   const sigBytes = base58Decode(sig58);
   const pubBytes = KeypairPub(seed);
-  ok("ed25519 verify", ed25519.verify(sigBytes, msgBytes, pubBytes));
+  ok("ed25519 verify", ed25519.verify(new Uint8Array(sigBytes), new Uint8Array(msgBytes), new Uint8Array(pubBytes)));
 
   let solBroadcastBlocked = false;
   try {

@@ -60,6 +60,7 @@ export function SaosHub() {
     () => Math.max(1, ...(data?.floorSteps.map((s) => s.backedByMicro) ?? [1])),
     [data],
   );
+  const lastStep = data?.floorSteps.at(-1) ?? null;
   const maxPnl = useMemo(
     () => Math.max(1, ...(data?.soldiers.map((s) => Math.abs(s.pnlMicro ?? 0)) ?? [1])),
     [data],
@@ -151,7 +152,7 @@ export function SaosHub() {
             title="Honesty Gates"
             subtitle="edge-gated spending · backed floor ladder"
             icon={<Radar className="h-4 w-4" />}
-            accent="success"
+            accent="up"
           />
           <div className="grid grid-cols-3 gap-4 p-5">
             <StatCell label="skipped < edge" value={data.gates.skippedForEdge?.toLocaleString("en-US") ?? "—"} sub="would-be trades refused" />
@@ -171,7 +172,7 @@ export function SaosHub() {
           </div>
           <div className="border-t border-[var(--border-subtle)] px-5 py-2.5">
             <p className="num text-[10px] text-[var(--text-tertiary)]">
-              floor {engine?.floor != null ? fmtUsd(engine.floor) : "—"} · latest step backed {data.floorSteps.at(-1) ? fmtMicroSaos(data.floorSteps.at(-1).backedByMicro) : "—"}
+              floor {engine?.floor != null ? fmtUsd(engine.floor) : "—"} · latest step backed {lastStep ? fmtMicroSaos(lastStep.backedByMicro) : "—"}
             </p>
           </div>
         </section>
@@ -355,7 +356,7 @@ export function SaosHub() {
                       </p>
                       <p className="num truncate text-[9px] text-[var(--text-tertiary)]">{a.detail}</p>
                     </div>
-                    {a.explorer && (
+                    {a.explorer && a.txid && (
                       <a
                         href={a.explorer}
                         target="_blank"
@@ -386,7 +387,7 @@ export function SaosHub() {
               title="Honest Events"
               subtitle="dex-facts — every claim carries a public ref"
               icon={<Coins className="h-4 w-4" />}
-              accent="success"
+              accent="up"
             />
             <ul className="max-h-[240px] flex flex-col gap-2 overflow-y-auto px-5 py-3 thin-scrollbar">
               {data.facts.map((f) => (

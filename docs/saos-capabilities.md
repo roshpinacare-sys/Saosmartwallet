@@ -12,7 +12,7 @@ Legend: proof = how it was verified · value = the real problem it solves · eff
 - **Efficiency:** anchoring costs one custom_json per beat (~zero fees); no validator set to pay.
 
 ## 2. grid98 throughput — measured, not marketed
-- **Proof:** grid98-state bench: 65,238 **real archive txs** replayed in 2,001 ms → **32,603 tx/s**, 2,816,899,200/day mechanism ceiling (measured 2026-09-07, still the state's live bench record).
+- **Proof:** grid98 bench (real engine, real archive replay): latest live run 2026-09-08 → **232,283 tx/s** (2,322,825 archive txs / 10,000 ms, ≈20.07B/day mechanism ceiling); the daemon ledger recorded 183,998 tx/s at 17:43 the same day. The number MOVES with every run — always re-measure, never quote from memory.
 - **Value:** the chain mechanism is provably not the bottleneck — the economy is.
 - **Efficiency:** resident-state design (full replay once, then incremental sync) removed the per-tick O(blocks) replay.
 
@@ -84,7 +84,7 @@ Legend: proof = how it was verified · value = the real problem it solves · eff
 ## 16. The wallet layer that fronts it all (this repo)
 - **Proof:** 7 live networks probed (7/7 ONLINE), 23/23 adapter checks on mainnet, Vault lifecycle init→unlock→sign→lock proven, live DEX on STEEM/SBD, bridge explorer with live-quoted fees, and the new **SAOS HUB** tab (chain core · grid98 · soldiers interactive · loop census · pools · wrapped · oracle · anchors · dex-facts — all from `/api/eco/saos-hub`).
 - **Value:** one professional surface where the whole sovereign stack is visible and verifiable.
-- **Efficiency:** zero-mock data policy end-to-end; keyboard 1–8; 390px-clean.
+- **Efficiency:** zero-mock data policy end-to-end; keyboard 1–9; 390px-clean.
 
 ---
 

@@ -14,9 +14,13 @@ import { fmtClock, fmtPrice, useTradeHistory } from "@/hooks/use-steem-market";
 import { cn } from "@/lib/utils";
 
 export function TradeHistory() {
-  const { data, isFetching, isError, error } = useTradeHistory(40);
+  const { data, isFetching, isError, error, dataUpdatedAt } = useTradeHistory(40);
 
   const fills = data?.fills ?? [];
+  // honesty: the tape must reflect data AGE, not just fetch success
+  const POLL_MS = 12_000;
+  const tapeAge = dataUpdatedAt > 0 ? Math.max(0, Date.now() - dataUpdatedAt) : Infinity;
+  const stale = tapeAge > POLL_MS * 2;
 
   return (
     <section className="glass flex flex-col overflow-hidden" aria-label="Trade history">
@@ -30,7 +34,10 @@ export function TradeHistory() {
             {isFetching ? (
               <span className="num text-[9px] uppercase tracking-[0.16em] text-[var(--text-tertiary)]">syncing</span>
             ) : null}
-            <LiveBadge active={!isError} />
+            <span className="num text-[9px] uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
+              tape {tapeAge === Infinity ? "—" : `${Math.round(tapeAge / 1000)}s`} old
+            </span>
+            <LiveBadge active={!isError && !stale} />
           </div>
         }
       />

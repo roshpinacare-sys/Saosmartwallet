@@ -3,7 +3,7 @@
  * ====================================
  * GET    — metadata-only list (payloads stay sealed; works while locked)
  * POST   — import/derive keys behind a step-up password re-entry
- * DELETE — revoke a key (?id=&password=), step-up protected
+ * DELETE — revoke a key (?id= + password in the JSON body), step-up protected
  *
  * SECURITY: WIFs/master passwords travel in the request body only, are
  * sealed by the engine, and are NEVER logged, stored or echoed.
@@ -83,8 +83,11 @@ export async function POST(req: Request) {
     if (typeof body.network !== "string" || !NETWORK_IDS.has(body.network)) {
       throw new VaultError("VALIDATION", "network must be one of: steem, hive, tron, blurt, saos-net, ethereum, solana");
     }
-    if (SINGLE_KEY_NETWORKS.has(body.network) && (body.roles?.length !== 1 || body.roles[0] !== "active")) {
-      throw new VaultError("VALIDATION", "ethereum/solana keys accept exactly role: active");
+    if (SINGLE_KEY_NETWORKS.has(body.network)) {
+      const roles = body.roles as unknown[] | undefined;
+      if (!Array.isArray(roles) || roles.length !== 1 || roles[0] !== "active") {
+        throw new VaultError("VALIDATION", "ethereum/solana keys accept exactly role: active");
+      }
     }
     if (!Array.isArray(body.roles) || body.roles.length === 0 || !body.roles.every((r) => typeof r === "string" && STEEM_ROLES.has(r))) {
       throw new VaultError("VALIDATION", "roles must be a non-empty array of: owner, active, posting, memo");
@@ -146,11 +149,19 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    // keyId rides in the query string; the step-up password travels in the
+    // request BODY only — never in a URL (URLs land in proxy/access logs).
     const url = new URL(req.url);
     const keyId = url.searchParams.get("id");
-    const password = url.searchParams.get("password");
+    let password: string | null = null;
+    try {
+      const body = (await req.json()) as { password?: unknown };
+      if (typeof body.password === "string" && body.password.length > 0) password = body.password;
+    } catch {
+      // empty/invalid body → password stays null, fail-closed below
+    }
     if (keyId === null || keyId.length === 0) throw new VaultError("VALIDATION", "id query parameter is required");
-    if (password === null || password.length === 0) throw new VaultError("VALIDATION", "password query parameter is required");
+    if (password === null) throw new VaultError("VALIDATION", "password is required in the request body");
 
     const rt = getVaultRuntime();
     await rt.ready;

@@ -1,6 +1,6 @@
 # Saosmartwallet — System Status Report
 
-Generated: `2026-09-08T00:45:43.252Z` · git `fcb931f` · source: live `/api/system/health`
+Generated: `2026-09-08T18:53:28.364Z` · git `ddacb0c` · source: live `/api/system/health`
 
 **Summary:** networks `7/7` · rails live `2` · rails gated `4` · critical issues `0`
 
@@ -8,19 +8,19 @@ Generated: `2026-09-08T00:45:43.252Z` · git `fcb931f` · source: live `/api/sys
 
 | Network | Status | Head | Lag/State | Version/Evidence |
 |---------|--------|------|-----------|------------------|
-| STEEM | UP | 109,386,112 | 1s lag | live probe via M0/M1 SteemMarketClient |
-| HIVE | UP | 109,720,587 | 2s lag | live probe api.hive.blog |
-| BLURT | UP | 63,449,845 | 2s lag | live probe blurt-rpc.saboin.com |
-| TRON | UP | 86,052,183 | 5s lag | live probe api.trongrid.io |
-| SAOS-NET | UP | 54,664 | state 22m old | saos-net/0 |
-| ETHEREUM | UP | 25,929,146 | 8s lag | 0.053958887 gwei baseFee |
-| SOLANA | UP | 445,205,020 | — | epoch 1030 · slot 245020/432000 |
+| STEEM | UP | 109,407,784 | 2s lag | live probe via M0/M1 SteemMarketClient |
+| HIVE | UP | 109,742,290 | 2s lag | live probe api.hive.blog |
+| BLURT | UP | 63,471,273 | 2s lag | live probe blurt-rpc.saboin.com |
+| TRON | UP | 86,073,890 | 5s lag | live probe api.trongrid.io |
+| SAOS-NET | UP | 61,623 | state 37m old | saos-net/0 |
+| ETHEREUM | UP | 25,934,559 | 18s lag | 0.134395772 gwei baseFee |
+| SOLANA | UP | 445,411,215 | — | epoch 1031 · slot 19215/432000 |
 
 ## Bridge rails
 
 | Rail | Status | Evidence |
 |------|--------|----------|
-| SAOS-NET → STEEM | LIVE | latest: da6318197cfeaac6dbf10be7e6b30a8a5f583f07 (cp#54660) · 15 anchors in feed |
+| SAOS-NET → STEEM | LIVE | latest: 0210f1453dbd35964ea9defd8ee7af9aca299d25 (cp#61608) · 15 anchors in feed |
 | SAOS-NET ⇄ TRON | LIVE | cp#33612 → 1db5006b8dbb305e… @ TRON blk 86019974 · anchors measured: 4 |
 | SAOS-NET → HIVE | GATED | verified historically (d4cf936b… @ blk 10,970,856) — currently RC-regen wait |
 | SAOS-NET → BLURT | GATED | anchored on-chain before (e3201815…, bfce11c8…) · RPC live now (blurt-rpc.saboin.com) — anchors resume when the fleet gate reopens |
@@ -29,14 +29,14 @@ Generated: `2026-09-08T00:45:43.252Z` · git `fcb931f` · source: live `/api/sys
 
 ## Direct bridge routes (live router quotes)
 
-- **steemEthereum** — `gated` — No bridge contract deployed on Ethereum mainnet — lock op defined, mint leg awaits verified contract (BRIDGE_ABI ready) · fee: 0 STEEM + 0.00000864142192 ETH · ETA 783s
+- **steemEthereum** — `gated` — No bridge contract deployed on Ethereum mainnet — lock op defined, mint leg awaits verified contract (BRIDGE_ABI ready) · fee: 0 STEEM + 0.00002151532352 ETH · ETA 783s
 - **steemSolana** — `gated` — No bridge program deployed on Solana mainnet — lock op defined, mint leg awaits deployed program (program IDs staged) · fee: 0 STEEM + 0.000005 SOL + 0.00203928 SOL · ETA 16s
 
 ## Vault
 
 ```json
 {
-  "latencyMs": 2,
+  "latencyMs": 3,
   "reachable": true,
   "initialized": false,
   "locked": true,
@@ -54,14 +54,14 @@ Generated: `2026-09-08T00:45:43.252Z` · git `fcb931f` · source: live `/api/sys
 
 ```json
 {
-  "latencyMs": 874,
+  "latencyMs": 884,
   "reachable": true,
-  "bids": 19,
+  "bids": 20,
   "asks": 50,
-  "latest": "0.09692558184081984",
-  "spreadPercent": 0.15397703105060973,
-  "headBlock": 109386112,
-  "lagSeconds": 3
+  "latest": "0.09713049029224470",
+  "spreadPercent": 0.4171498400023408,
+  "headBlock": 109407785,
+  "lagSeconds": 1
 }
 ```
 

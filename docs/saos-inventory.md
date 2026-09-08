@@ -25,7 +25,7 @@ Generated: 2026-09-08 · evidence gathered live (GitHub API over the org's repos
 |---|---|---|---|
 | Engine | `sovereign/node/grid98.cjs` (63 KB, Task 98) | **live** | ticks 8,324 · rounds 48,850 · txs total 132,940 · trades 5,606 |
 | Engine state | `sovereign/node/grid98-state.json` (7.5 KB) | **live** | pools, anchors, seeds, mints, steps, journal reference |
-| Throughput bench | `grid98.cjs --bench` | **live-measured** | **32,603 tx/s** (65,238 archive txs / 2,001 ms) = 2.82B/day mechanism ceiling — measured on real archive replay, not a claim. (Any other number circulating, e.g. "130K", is NOT what the live state measures today.) |
+| Throughput bench | `grid98.cjs --bench` | **live-measured** | Latest live run (2026-09-08): **232,283 tx/s** (2,322,825 archive txs / 10,000 ms ≈ 20.07B/day mechanism ceiling); daemon ledger same day: 183,998 tx/s. The bench is re-runnable anytime via `curl /api/saos/grid98-bench` (lab hydrated by `tools/grid98-hydrate.ts`) — every run produces its own number; older folklore numbers (32.6K / "130K") are historical, not current. |
 | Profitability gate | per-op edge ≥ fee + min-profit | **live and enforced** | `skippedForEdge: 383,836` · `rejected: 130,499` · `edgeLeak: 109,919 µ` — counters grow in production |
 | Floor ladder | 9 steps, each backed by measured PnL | **live** | 0.01688 → 0.017567 USD; steps list with `backedByµ` |
 | Soldier arena | maker + rotating-taker PnL per soldier | **live** | `soldierPnlµ` (leader: wog +163,295 µSAOS) |
@@ -119,6 +119,6 @@ There is no naked "SAOS token" — **the sovereign asset design is wrapped 1:1 a
 
 1. **No SAOS mainnet token schedule** — no supply/inflation/reward economics document exists anywhere in the org; the only real supply is the wrapped 1:1 table.
 2. **ETH/SOL bridge rails gated** — adapters + ABI + program IDs ready; deployment pending (owner decision with real funds).
-3. **"130K tx/s" not reproducible today** — the live measured bench is 32,603 tx/s on the current kernel (2.82B/day ceiling). Report the measured number; the claim needs a re-measure or retraction.
+3. **"32.6K tx/s" / "130K tx/s" are historical** — the live bench is re-runnable on demand (`tools/grid98-hydrate.ts` → `curl /api/saos/grid98-bench`); 2026-09-08 runs measured 183,998 (daemon) and 232,283 tx/s (10s run). Report the freshly measured number, never a remembered one.
 4. **MEV protection absent org-wide** (as before).
 5. **Soldier balances are dust-scale** (SP ≤ 8.64 total) — the army is functionally real but economically tiny today.

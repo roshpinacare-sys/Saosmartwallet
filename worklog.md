@@ -541,3 +541,21 @@ Stage Summary:
 - המערכת חד-משמעית SAOS: המסך הראשון עונה "מה זה SAOS והאם הוא חי" תוך שניות — משפט-זהות, ויטלים ריבוניים, ו-anchors ציבוריים לחיצים. STEEM/SBD מדורג ל-MARKETS בלי איבוד-נתונים (הכל נגיש), SAOS-NET מקבל את מקום הכבוד בכל השכבות.
 - אפס mock: כל הנתונים החדשים ב-hero (anchors strip) מה-api הקיים /api/eco/anchors; שום מספר לא הומצא.
 - קבצים: חדש saos-hero.tsx; שוכתבו eco-header/market-strip(מ-kpi-strip)/page/footer/layout; עודכנו network-grid/pairs-matrix/developer-console/README/what-we-can-do-now.
+
+---
+Task ID: NET-AUDIT
+Agent: Z.ai Code (main) — System Owner Mode
+Task: בקשת הבעלים — ביקורת מלאה של התיקייה (באגים, דברים-שקיימים-ולא-מומשו, מימושים-גרועים, דימומים, ממצאים-שמתארים-ולא-עושים) + סיכום-רשת מקיף (מה הושג, צעדים קריטיים) + בחינת DEX ומיקרו-גריד; לשיתוף בין כל הסוכנים.
+
+Work Log:
+- 3 מעבדות-ביקורת מקבילות (Explore): DEX-layer / packages+bridges / docs-vs-code — עם curl חי לכל claim מרכזי.
+- תיקוני קוד (14 באגים): market-strip `}, arket]);` (שבירת-טאב אמיתית מוסתרת-ב-cache) + חיסור-spread מספרי; order-book mid מה-ask הגרוע→הטוב + depth /1e6→/1e3; trade-terminal מעבר מחיר-המשתמש verbatim ל-sign rebuild (ביטול סטיית-סאטושי במכירות) + wallet isSuccess fail-closed + דוקסטרינג; get_trade_history הוכח-חי-עולה-בלבד (יורד→0) → הרואט מביא 1,000 וחותך חדש בעצמו; vault keys DELETE סיסמה query→body (wire-mismatch שהיה שובר revoke מה-UI) + roles narrowing; orchestrator tautology הוסר; amountToSats regex; recoverPublicKey 1-arg ×4 אתרים; getJson non-JSON guard; health route networks try/catch + findPaths cast; bridge-monitor מסטטי→חי (/api/bridge/status) עם fallback מוצהר; staleness UX ("book Xs old" + STALE badge 2×poll) ב-order-book+trade-history.
+- tsc: 26 שגיאות-מוסתרות (ignoreBuildErrors) → 0 מחוץ ל-examples/skills; lint נקי.
+- grid98: המעבדה הייתה חסרה (ok:false) → tools/grid98-hydrate.ts (idempotent): sovereign/node+core+genesis מה-org + steem@0.7.10 ל-agent/node_modules (ה-fallback המתועד ב-saosnet.cjs עצמו) → הבנץ' חי שוב: ok:true, **232,283 tx/s** (2,322,825 txs/10s), BOOT height=61,628, gates 654,969/136,982/109,938µ, 9 מדרגות.
+- דוקס: packages/README (core ⬜SCAFFOLD→✅ + ethereum/solana/bridges/saos-id-verify + gaps כנים); saos-capabilities §2/§16; saos-inventory §2/§9.3 (תיקון-התיקון: המספר זז בכל ריצה); README שורת-כנות + שורת network-summary; what-we-can-do-now הוכחה-2 מחדש (232,283 + gates חיים + hydrate) + בלוק NET-AUDIT; docs/system-status.{md,json} regen חי (7/7, 0 critical).
+- חדש: docs/network-summary.md — סיכום-רשת לכל הסוכנים (תרומת-התיקייה, הישגים נמדדים, ביקורת, DEX+מיקרו-גריד, צעדים מדורגים, טבלת נכסים לשימוש-חוזר, פקודות בדיקה).
+
+Stage Summary:
+- התיקייה עברה מ"הרבה שכבות עם דימומים נסתרים" למבוקרת-מלא: 14 באגים תוקנים (כולל 2 חמורים: שבירת-MARKETS בפועל + wire-mismatch ב-vault revoke), 26 טייפ-שגיאות→0, Proof 2 חזר להיות self-verifiable עם מדידה חיה חדשה (232,283 tx/s — גבוהה מכל קודמת), והדוקס עכשיו נכונים line-for-line עם "המספר זז בכל ריצה" במקום מספרי-רגע.
+- פתוחים-מתועדים (לא בוצע בכוונה): 429 live-burn (1,000 קריאות — ריצה מבוקרת לפי בעלים), חיבור-ZK, multi-hop router, limit_order_cancel, auth ל-console, כיבוי ignoreBuildErrors. הכול מדורג ב-network-summary.md §6.
+- לא נגענו: chain-adapter.ts (קפוא), מנוע המעבדה (read-only hydration בלבד).

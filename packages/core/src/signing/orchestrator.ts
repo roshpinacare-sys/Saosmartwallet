@@ -886,17 +886,16 @@ export class SigningOrchestrator {
     if (!adapter.capabilities.has("broadcast")) {
       throw new VaultError("ADAPTER_INCAPABLE", "broadcast not enabled for this adapter — construct with allowBroadcast");
     }
-    // Timed lock: refuse to broadcast before the deadline. A positive lock
-    // cannot elapse inside one synchronous call — callers split sign and
-    // broadcast (or pass 0) deliberately.
+    // Timed lock: refuse to broadcast while a lock is demanded. The deadline is
+    // NOT persisted here (stateless call) — a positive lock therefore always
+    // throws: callers split sign and broadcast (or pass 0) deliberately, and
+    // re-issue the broadcast once the lock has expired on their clock.
     const lockSeconds = Math.max(options.timeLockSeconds ?? 0, decision.requirements?.timeLock ?? 0);
     if (lockSeconds > 0) {
       const lockUntil = Date.now() + lockSeconds * 1000;
-      if (Date.now() < lockUntil) {
-        throw new VaultError("TIMED_LOCK", `broadcast is time-locked for another ${lockSeconds}s — re-issue with broadcast once the lock expires`, {
-          lockUntil,
-        });
-      }
+      throw new VaultError("TIMED_LOCK", `broadcast is time-locked for another ${lockSeconds}s — re-issue with broadcast once the lock expires`, {
+        lockUntil,
+      });
     }
     if (options.confirmRequired !== undefined) {
       const approved = await options.confirmRequired({

@@ -19,13 +19,32 @@ Next.js at `src/app/page.tsx` + `/api/steem/*` routes).
 packages/
   crypto/          ✅ IMPLEMENTED — PrivateKey/PublicKey/signatures, WIF + "STM" encodings,
                    password & brain-key derivations (verified vs chain authorities)
-  core/            ⬜ SCAFFOLD — keystore (AES-256-GCM) + Policy Engine (next milestone)
+  core/            ✅ SHIPPED (M2) — Sovereign Key Vault: Argon2id KDF, AES-256-GCM
+                   envelope cipher (+ ChaCha20-Poly1305 fallback), Shamir sharded
+                   backups + social recovery + dead-man switch, Policy Engine
+                   (static/dynamic/contextual/composite), SigningOrchestrator,
+                   hash-chained AuditSystem (+ PDF/CSV reports), Fiat–Shamir ZK
+                   module (implemented; wiring pending — see below)
   chains/
     chain-adapter.ts  ✅ frozen seam (unchanged)
     steem/            ✅ IMPLEMENTED — binary serializer (varint/asset/ops/tx incl.
                       limit_order_create), SteemAdapter (broadcast hard-gated),
                       SteemMarketClient (read-only market data), evidence-annotated
+    ethereum/         ✅ IMPLEMENTED (M3) — reads live (gas/balances/nonce via RPC),
+                      sign-capable, broadcast fail-closed; bridge ABI is an
+                      interface spec — no contract deployed (rails gated honestly)
+    solana/           ✅ IMPLEMENTED (M3) — reads live, sign-capable (ed25519 verified
+                      in tools/m3-adapter-check.ts), broadcast fail-closed
+  bridges/         ✅ IMPLEMENTED — path router (live ETH fee legs, gated legs with
+                   explicit reasons) + rail monitor over daemon-pushed state;
+                   serving /api/bridge/routes + /api/bridge/status
+  saos-id-verify/  ✅ SHIPPED — official zero-dependency TypeScript SDK for
+                   POST /api/v1/identity/verify (live-dogfooded incl. dist)
 ```
+
+Known honest gaps inside packages: the ZK module (core/src/crypto/zk.ts) is
+real math but wired to nothing yet; `multiSign/batchSign/crossChainSign`
+orchestrator paths are implemented but unwired.
 
 Dependency rule (from `wallet-design/wallet-architecture.md`):
 `apps → core → crypto` and `apps → chains`. **`core` never imports `chains`** —

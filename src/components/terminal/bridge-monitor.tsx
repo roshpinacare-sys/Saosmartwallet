@@ -2,10 +2,12 @@
 
 /**
  * BridgeMonitor — cross-chain rails + live anchor evidence.
- * Top: rail cards (SAOS-NET → Steem/Hive/Blurt ⇄ TRON) with mechanism,
- * honest status and on-chain evidence. Bottom: live anchor feed with REAL
- * txids (explorer links when available) + the TRON bridge pulse read from
- * the daemon-pushed SAOS-NET state. Zero mock — missing data renders "—".
+ * Rail cards merge TWO layers honestly: the live /api/bridge/status feed
+ * (status + evidence + last activity, 45s poll) overlays the static registry
+ * metadata (mechanism copy); when the live feed is unavailable the card says
+ * so instead of silently posing as fresh. Bottom: live anchor feed with REAL
+ * txids + the TRON bridge pulse from the daemon-pushed SAOS-NET state.
+ * Zero mock — missing data renders "—".
  */
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -14,13 +16,24 @@ import { useMemo } from "react";
 
 import { AnimatedNumber } from "@/components/terminal/motion-bits";
 import { EcoChip, ErrorNote, PanelHeader, PanelSkeleton, StatCell } from "@/components/terminal/primitives";
-import { fmtAge, fmtCompact, fmtUsd, useEcoAnchors, useEcoSaosNet } from "@/hooks/use-eco";
+import { fmtAge, fmtCompact, fmtUsd, useBridgeStatus, useEcoAnchors, useEcoSaosNet } from "@/hooks/use-eco";
 import { ECO_BRIDGES } from "@/lib/eco-registry";
 import { cn } from "@/lib/utils";
 
 export function BridgeMonitor() {
   const { data, isLoading, isError, error } = useEcoAnchors();
   const { data: saos } = useEcoSaosNet();
+  const { data: bridgeStatus, isError: statusError } = useBridgeStatus();
+
+  // live status overlays the static registry by rail id; the registry copy
+  // (mechanism) remains the fallback when the feed is down
+  const liveById = useMemo(() => {
+    const m = new Map<string, { status: "live" | "gated" | "offline"; evidence: string; lastActivityAt: string | null }>();
+    for (const s of bridgeStatus?.statuses ?? []) {
+      m.set(s.id, { status: s.status, evidence: s.evidence, lastActivityAt: s.lastActivityAt });
+    }
+    return m;
+  }, [bridgeStatus]);
 
   const feed = useMemo(() => {
     if (!data) return [];
@@ -37,7 +50,10 @@ export function BridgeMonitor() {
     <div className="flex flex-col gap-4 md:gap-6">
       {/* rails */}
       <section aria-label="Bridge rails" className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4 md:gap-6">
-        {ECO_BRIDGES.map((b, i) => (
+        {ECO_BRIDGES.map((b, i) => {
+          const live = liveById.get(b.id);
+          const status = live?.status ?? b.status;
+          return (
           <motion.article
             key={b.id}
             initial={{ opacity: 0, y: 10 }}
@@ -50,7 +66,7 @@ export function BridgeMonitor() {
                 <Waypoints className="h-4 w-4 text-[var(--info)]" aria-hidden />
                 <h3 className="num text-[13px] font-bold tracking-wide text-foreground">{b.rail}</h3>
               </div>
-              <EcoChip status={b.status} />
+              <EcoChip status={status} />
             </div>
 
             {/* animated rail */}
@@ -60,12 +76,12 @@ export function BridgeMonitor() {
                 y1="6"
                 x2="196"
                 y2="6"
-                stroke={b.status === "live" ? "var(--up)" : "var(--warning)"}
+                stroke={status === "live" ? "var(--up)" : "var(--warning)"}
                 strokeOpacity="0.5"
                 strokeWidth="1.5"
-                className={b.status === "live" ? "flow-line" : undefined}
+                className={status === "live" ? "flow-line" : undefined}
               />
-              <circle cx="4" cy="6" r="3" fill={b.status === "live" ? "var(--up)" : "var(--warning)"} />
+              <circle cx="4" cy="6" r="3" fill={status === "live" ? "var(--up)" : "var(--warning)"} />
               <circle cx="196" cy="6" r="3" fill="var(--text-tertiary)" />
             </svg>
 
@@ -74,11 +90,17 @@ export function BridgeMonitor() {
               <p className="mt-1 text-[11.5px] leading-relaxed text-foreground/85">{b.mechanism}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">evidence</p>
-              <p className="num mt-1 text-[11px] leading-relaxed text-foreground/70">{b.evidence}</p>
+              <p className="text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">
+                evidence · live feed {live?.lastActivityAt ? `· ${fmtAge(secondsSince(live.lastActivityAt))} ago` : ""}
+              </p>
+              <p className="num mt-1 text-[11px] leading-relaxed text-foreground/70">{live?.evidence ?? b.evidence}</p>
             </div>
           </motion.article>
-        ))}
+          );
+        })}
+        {statusError ? (
+          <p className="text-[10px] text-[var(--warning)]">live rail-status feed unavailable — cards fall back to registry copy</p>
+        ) : null}
       </section>
 
       {/* last checkpoint + tron pulse */}

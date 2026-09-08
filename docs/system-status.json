@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-09-08T00:45:43.252Z",
+  "generatedAt": "2026-09-08T18:53:28.364Z",
   "summary": {
     "networksUp": "7/7",
     "liveRails": 2,
@@ -9,7 +9,7 @@
   },
   "checks": {
     "networks": {
-      "latencyMs": 674,
+      "latencyMs": 1028,
       "chains": [
         {
           "id": "steem",
@@ -17,11 +17,11 @@
           "family": "Graphene",
           "kind": "L1 public — internal market (our DEX)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T00:45:43.252Z",
+          "probedAt": "2026-09-08T18:53:28.364Z",
           "status": "online",
-          "headHeight": 109386112,
-          "lagSeconds": 1,
-          "headId": "06851980f00eb184",
+          "headHeight": 109407784,
+          "lagSeconds": 2,
+          "headId": "06856e28d2307aa0",
           "version": null,
           "note": "live probe via M0/M1 SteemMarketClient"
         },
@@ -31,11 +31,11 @@
           "family": "Graphene",
           "kind": "L1 public — anchor rail (RC-gated)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T00:45:43.253Z",
+          "probedAt": "2026-09-08T18:53:28.365Z",
           "status": "online",
-          "headHeight": 109720587,
+          "headHeight": 109742290,
           "lagSeconds": 2,
-          "headId": "068a340b37f3973b82106ffcce20bc49b040eee3",
+          "headId": "068a88d29b8c30d531744297fe0979a2a95d2e92",
           "version": null,
           "note": "live probe api.hive.blog"
         },
@@ -45,11 +45,11 @@
           "family": "Graphene",
           "kind": "L1 public — anchor rail (canonical sig)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T00:45:43.255Z",
+          "probedAt": "2026-09-08T18:53:28.366Z",
           "status": "online",
-          "headHeight": 63449845,
+          "headHeight": 63471273,
           "lagSeconds": 2,
-          "headId": "03c82af56a0f0a076b0f77505d1d9f3cd51860c0",
+          "headId": "03c87ea901a7b40bf91841d6898ae470e30b6d71",
           "version": null,
           "note": "live probe blurt-rpc.saboin.com"
         },
@@ -59,11 +59,11 @@
           "family": "TVM (DPoS)",
           "kind": "L1 public — zero-fee anchor rail",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T00:45:43.255Z",
+          "probedAt": "2026-09-08T18:53:28.367Z",
           "status": "online",
-          "headHeight": 86052183,
+          "headHeight": 86073890,
           "lagSeconds": 5,
-          "headId": "0000000005210d57…",
+          "headId": "0000000005216222…",
           "version": null,
           "note": "live probe api.trongrid.io"
         },
@@ -72,14 +72,14 @@
           "name": "SAOS-NET",
           "family": "Sovereign (deterministic kernel)",
           "kind": "L1 shadow chain — anchored to Steem/Hive/TRON",
-          "probedAt": "2026-09-08T00:45:43.555Z",
+          "probedAt": "2026-09-08T18:53:28.756Z",
           "status": "online",
-          "headHeight": 54664,
+          "headHeight": 61623,
           "lagSeconds": null,
-          "stateAgeSeconds": 1343,
-          "headId": "b6e39110428ecffd…",
+          "stateAgeSeconds": 2220,
+          "headId": "45ec880dc0a62037…",
           "version": "saos-net/0",
-          "note": "daemon-pushed state, 22m old (github: steem repo)"
+          "note": "daemon-pushed state, 37m old (github: steem repo)"
         },
         {
           "id": "ethereum",
@@ -87,12 +87,12 @@
           "family": "EVM",
           "kind": "L1 public — settlement + ERC-20 wrapped economy (M3)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T00:45:43.257Z",
+          "probedAt": "2026-09-08T18:53:28.368Z",
           "status": "online",
-          "headHeight": 25929146,
-          "lagSeconds": 8,
+          "headHeight": 25934559,
+          "lagSeconds": 18,
           "headId": null,
-          "version": "0.053958887 gwei baseFee",
+          "version": "0.134395772 gwei baseFee",
           "note": "live probe ethereum-rpc.publicnode.com"
         },
         {
@@ -101,27 +101,27 @@
           "family": "PoH + PoS",
           "kind": "L1 public — SPL wrapped economy (M3)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T00:45:43.258Z",
+          "probedAt": "2026-09-08T18:53:28.369Z",
           "status": "online",
-          "headHeight": 445205020,
+          "headHeight": 445411215,
           "lagSeconds": null,
           "headId": null,
-          "version": "epoch 1030 · slot 245020/432000",
+          "version": "epoch 1031 · slot 19215/432000",
           "note": "live probe api.mainnet-beta.solana.com"
         }
       ],
       "error": null
     },
     "bridges": {
-      "latencyMs": 0,
+      "latencyMs": 87,
       "rails": [
         {
           "id": "relay-steem",
           "rail": "SAOS-NET → STEEM",
           "mechanism": "custom_json saos-dex.anchor.v1 (active authority), every checkpoint seal",
           "status": "live",
-          "evidence": "latest: da6318197cfeaac6dbf10be7e6b30a8a5f583f07 (cp#54660) · 15 anchors in feed",
-          "explorer": "https://steemworld.org/tx/da6318197cfeaac6dbf10be7e6b30a8a5f583f07",
+          "evidence": "latest: 0210f1453dbd35964ea9defd8ee7af9aca299d25 (cp#61608) · 15 anchors in feed",
+          "explorer": "https://steemworld.org/tx/0210f1453dbd35964ea9defd8ee7af9aca299d25",
           "lastActivityAt": null
         },
         {
@@ -172,7 +172,7 @@
       ],
       "analytics": {
         "anchoredTotal": 4,
-        "checkpointsVerified": 1479,
+        "checkpointsVerified": 1868,
         "checkpointsTotal": 64,
         "lastAnchor": {
           "at": null,
@@ -219,9 +219,9 @@
           },
           {
             "asset": "WETH",
-            "supply": 0.004009819,
-            "locked": 0.004009819,
-            "holders": 2
+            "supply": 0.006209819,
+            "locked": 0.006209819,
+            "holders": 12
           },
           {
             "asset": "WDOGE",
@@ -302,7 +302,7 @@
             "holders": 0
           }
         ],
-        "sourcedAt": "2026-09-08T00:45:43.926Z"
+        "sourcedAt": "2026-09-08T18:53:29.479Z"
       },
       "routes": {
         "steemEthereum": {
@@ -319,7 +319,7 @@
             },
             {
               "network": "ethereum",
-              "amount": "0.00000864142192",
+              "amount": "0.00002151532352",
               "currency": "ETH"
             }
           ]
@@ -349,11 +349,11 @@
           ]
         }
       },
-      "routesLatencyMs": 286,
+      "routesLatencyMs": 306,
       "error": null
     },
     "vault": {
-      "latencyMs": 2,
+      "latencyMs": 3,
       "reachable": true,
       "initialized": false,
       "locked": true,
@@ -366,14 +366,14 @@
       ]
     },
     "dex": {
-      "latencyMs": 874,
+      "latencyMs": 884,
       "reachable": true,
-      "bids": 19,
+      "bids": 20,
       "asks": 50,
-      "latest": "0.09692558184081984",
-      "spreadPercent": 0.15397703105060973,
-      "headBlock": 109386112,
-      "lagSeconds": 3
+      "latest": "0.09713049029224470",
+      "spreadPercent": 0.4171498400023408,
+      "headBlock": 109407785,
+      "lagSeconds": 1
     }
   },
   "issues": [
@@ -429,6 +429,6 @@
   "meta": {
     "generator": "tools/system-status.ts (M4 System Owner)",
     "server": "http://localhost:3000",
-    "gitSha": "fcb931f"
+    "gitSha": "ddacb0c"
   }
 }
