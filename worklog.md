@@ -367,3 +367,19 @@ Work Log:
 Stage Summary:
 - **M4 הושלם**: כל 7 הרשתות חיות ומאומתות (23/23 + 7/7 probe) · גשרים מדווחים כנים (2 live + 4 gated עם סיבה) · כספת init/unlock/sign/lock מקצה-לקצה (ואז reset למסירה-נקייה) · DEX חי · UI מושלם ב-1440+390 עם אפס שגיאות · failover הוכח חי · /api/system/health + tools/system-status.ts + docs/system-status.{json,md} + docs/repo-scan.json חדשים · תיקון-באג אמיתי (steem account validator — steemd-accurate).
 - כנות: מסילות ETH/SOL נשארות gated עד פריסת חוזה/תוכנית (החלטת-בעלים עם כסף אמיתי); MEV חסר בכל ה-org; אין-המצאה בשום דוח.
+
+---
+Task ID: M4-S
+Agent: Z.ai Code (main) — System Owner Mode
+Task: Strategic grounding — the owner received a 7-business-model strategic analysis; re-verify every technical claim live and produce a grounded strategy document (docs/strategy-roadmap.md) mapping each model to verified capabilities vs. honest gates.
+
+Work Log:
+- Re-verification first (no trust in claims, only in measurements): dev server 200 · git clean at 1ef5477 (M4 committed) · /api/system/health → 7/7 networks ONLINE with rolling heads (STEEM 109,386,361 · HIVE 109,720,835 · BLURT 63,450,093 · TRON 86,052,433 · SAOS-NET 54,825 · ETH 25,929,208 @ 0.047 gwei baseFee · SOL 445,207,383 epoch 1030) · 2 live rails (relay-steem cp#54804 with txid evidence, bridge-tron) + 4 gated with reasons · 0 critical issues.
+- Adapter suite re-run: bun tools/m3-adapter-check.ts → 23/23 PASS against live mainnet (ETH head 25,929,209, vitalk 6.71215 ETH, USDT 290.368219, EIP-1559 build+sign, ed25519 verify, broadcast fail-closed ×2, formatLamports vectors).
+- DEX live: /api/steem/orderbook returns real asks (head 109,386,112). Vault: clean delivery state (initialized:false, by design after M4 reset) with full lifecycle already proven in M4.
+- Created docs/strategy-roadmap.md — strategy with zero-mock discipline: (1) verified asset base table with live evidence per layer; (2) 7-model readiness matrix (Wallet-as-a-Service / Bridge Aggregator / DEX Aggregator / Validator / White-Label / Security Audits / Institutional Custody) each mapped to verified foundation → blocking gates → first-revenue path → honest readiness; (3) reality corrections: the "$10-30M current value" and revenue tables are labeled speculative market context (pre-revenue, pre-audit, pre-users), technical claims confirmed true; (4) recommendation: bootstrap + open-core hybrid; (5) tiered build order — M5 Wallet MVP proceeds autonomously ($0, no keys at risk), bridge contract deployment / external audit / pilot = owner decisions (real money, real keys — the system's own fail-closed philosophy applied to business); (6) explicit owner decision points.
+- README.md: strategy-roadmap section added before the Enterprise redesign section (Hebrew RTL anchor issues worked around by anchoring on the ASCII heading).
+- This worklog entry; commit + push to main.
+
+Stage Summary:
+- The strategic analysis is now grounded: every technical claim it made re-verified true the same day (7/7 · 23/23 · 2 live rails · DEX live · 0 critical), every financial claim labeled speculative with honest framing. docs/strategy-roadmap.md is the single source of truth for what is monetizable now (White-Label + audits credibility path), what is one deployment away (Bridge rails), and what is certification-gated (Institutional Custody). The autonomous next step is defined: M5 Wallet MVP (onboarding/history/notifications) — no funds, no keys, pure code. Bridge deployment explicitly deferred to owner decision.
