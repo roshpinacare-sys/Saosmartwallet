@@ -1,0 +1,348 @@
+     1→# Worklog
+     2→
+     3→---
+     4→Task ID: 1
+     5→Agent: Z.ai Code (main)
+     6→Task: יצירת סביבת עבודה הנדסית engineering/zip-analysis-20260907-1520 — סריקת סביבה לקובצי ZIP ולרכיב "steem main", כתיבת דוחות, המלצה מותנית, תוכנית פריסה, ו-commit.
+     7→
+     8→Work Log:
+     9→- נבדק קובץ ה-upload היחיד (Roshcaregt.txt, 40 בייטים) — מכיל placeholder של טוקן GitHub מחוסם; תוכנו לא צוטט בשום מסמך תוצר.
+    10→- נוצר מבנה תיקיות מלא: 00_input, 01_extracted, 02_reports, 03_code_analysis, 04_architecture, 05_recommendation, 06_deployment_plan, 07_scripts.
+    11→- נכתב סקריפט סריקה 07_scripts/environment-scan.sh בארבע גרסאות (לקחים מתועדים):
+    12→  - v1: החרגת '!node_modules/**' גרמה לירידה לתוך node_modules (1.2GB) → timeout.
+    13→  - v2: 'rg --files-from' אינו נתמך בסביבה → תוצאות "no matches" כוזבות; תוקן.
+    14→  - v3: כפילויות עקב סריקת my-project דרך שני שורשים + self-match של הסורק; תוקן.
+    15→  - v4 (סופית): רשימת קבצים deduped + מסוננת-עצמית, חיפושי תוכן דרך xargs -d '\n', סיווג toolchain, בדיקות סודות בוליאניות בלבד. ריצה מאומתת: ~12 שניות, 111,262 קבצים במפלג המלא, 2,108 ברשימה האפקטיבית.
+    16→- כל התאמה לא-אפסית למילות מפתח אומתה בהקשר: 'steem' ב-HTML = substring ב-base64 ('...M0sTEeM...'); 'dpos' = substring ב-data-URI; התאמות 'node'/'api'/'token' = Next.js scaffold / node-compile-cache / tokens.css. אפס התאמות אמיתיות.
+    17→- נכתבו תוצרים: 02_reports/environment-scan.md (דוח סריקה מסונן), 02_reports/missing-inputs.md (דוח חסרים), 03_code_analysis/README.md + analysis-template.md (תבנית 23 שדות), 04_architecture/README.md, 05_recommendation/final-recommendation.md (13 סעיפים, מסומנת כמותנית), 06_deployment_plan/deployment-roadmap.md (מסומן כמותנה), README.md ראשי.
+    18→- נשמרו כללי בטיחות: קריאה בלבד, אין חילוץ ארכיונים, אין הרצת קוד, אין חשיפת סודות, לא נמחק/שונה תוכן קיים.
+    19→
+    20→Stage Summary:
+    21→- ממצא מרכזי מבוסס ממצאים: אין ZIP ואין שום עקבות של steem/steemd/בלוקצ'יין בסביבה — המשימה חסומה עד קבלת קלט.
+    22→- כל תוצרי ההמלצה/פריסה מסומנים במפורש כמותנים (הנחה: Steem ציבורי) ולא כמבוססי קוד.
+    23→- Git: branch main, לא מוגדר remote — commit מקומי בלבד; push דורש הגדרת remote (תועד כנה בדוחות).
+    24→- ארטיפקטים: engineering/zip-analysis-20260907-1520/ (README ראשי + 8 תיקיות + 11 קבצים).
+    25→
+    26→---
+    27→Task ID: 3-prep
+    28→Agent: Z.ai Code (main)
+    29→Task: לפני ביצוע שלב 3 המלא — בדיקה מעמיקה של כל התיקיות והארכיונים (בקשת משתמש: "תכין את עצמך", בלי ביצוע).
+    30→
+    31→Work Log:
+    32→- סריקת סיומות ארכיונים (zip/tar/gz/7z/rar/tgz/xz/bz2) על כל הפרויקט: 0 תוצאות — מאשר את שתי הסריקות הקודמות (v4, 111K קבצים).
+    33→- נבדקו: worklog.md, download/README.md (סטטי), tool-results/, /home/z/TODO (רשימת משימות פלטפורמה שלי — לא חומר משתמש), mini-services/ (ריקה), examples/ (websocket בלבד), skills/ (~40+ תיקיות כלים של הפלטפורמה).
+    34→- אומת git: branch main; wallet-design/ נכלל ב-commit מערכתי 737027c; אין remote מוגדר; עץ עבודה נקי מלבד tool artifact אחד לא-עקוב.
+    35→- נבדקו מסמכי שלב 2: README ראשי (BLOCKED — MISSING INPUTS), missing-inputs.md, וכן wallet-design/network-analysis.md (הושלם) + network-scan-raw-output.md (הושלם).
+    36→- לא בוצע ביצוע של המסמכים הנותרים לפי בקשת המשתמש ("רק תכין את עצמך").
+    37→
+    38→Stage Summary:
+    39→- המלאי בידיים: (א) חומרי משתמש אמיתיים = קובץ upload/Roshcaregt.txt (40 בייטים, טוקן מחוסם) בלבד + הקשר שיחה; (ב) סקפולד פלטפורמה Next.js — לא המוצר של המשתמש; (ג) תוצרי עבודה שלי: engineering/ שלם (13 קבצים, 167a010) + wallet-design/ חלקי (2 מתוך 5 קבצים).
+    40→- החשש של המשתמש "אתה מתכוון למוצר שלך" — מוצדק: כל מה שקיים בפועל הוא סקפולד פלטפורמה; ה"רשת" היא הנחה מסומנת מהשיחה (network-analysis.md סעיף 1 מציין זאת במפורש).
+    41→- מוכן לביצוע ברגע אישור: breakthrough-ideas.md, wallet-architecture.md, final-proposal.md, עדכון README, commit, remote+push (דיווח כן/לא בכנות).
+    42→
+    43→---
+    44→Task ID: 3-prep-2
+    45→Agent: Z.ai Code (main)
+    46→Task: בדיקה מחודשת עם הקובץ שהועלה שוב (Roshcaregt.txt) — אימות מלא של הטוקן, ה-repo והסביבה לפני ביצוע, בלי לבצע.
+    47→
+    48→Work Log:
+    49→- הקובץ upload/Roshcaregt.txt (40 בייטים) נבדק שוב: הפעם טוקן GitHub classic PAT תקין (ghp_); תוכנו לא צוטט, לא הוצג ולא נשמר בשום מסמך תוצר.
+    50→- אימות GitHub API (/user): HTTP 200, חשבון roshpinacare-sys (User, נוצר 2026-09-07); היקף הרשאות רחב מאוד (repo, workflow, delete_repo, admin:org ועוד).
+    51→- אימות ה-repo המטרה roshpinacare-sys/Saosmartwallet: קיים, פרטי, ריק לחלוטין (0 KB, אין branches, "This repository is empty"), default branch main; הרשאות הטוקן עליו: admin/maintain/push/triage/pull.
+    52→- אימות ערוץ git-over-HTTPS: ls-remote עם הטוקן (קריאה בלבד, ללא push) — exit 0, אין refs; ה-push אפשרי מבחינת אימות.
+    53→- סריקת ארכיונים מחודשת (zip/tar/gz/7z/rar/tgz/xz/bz2, ללא node_modules/.next/.git): 0 תוצאות — מאשר את שלוש הסריקות העצמאיות.
+    54→- מצב git מקומי: branch main, אין remote מוגדר, עץ עבודה נקי; היסטוריה: 167a010 (engineering), 737027c (wallet-design חלקי), e6997eb (אחרון).
+    55→- נקראו wallet-design/network-analysis.md + network-scan-raw-output.md (שלמים) ו-engineering/README.md (BLOCKED — MISSING INPUTS — נכון לתקופה שלפני הטוקן התקין).
+    56→- זוהה תיקון-לביצוע: שורת "placeholder טוקן מחוסם" ב-network-analysis.md וב-README של engineering אינה נכונה עוד — יעודכנו בשלב הביצוע עם ה-commit.
+    57→
+    58→Stage Summary:
+    59→- שינוי מהותי מההכנה הקודמת: הטוקן אמיתי, תקין ובעל הרשאת push על ה-repo המטרה — החסם המרכזי מהדוחות הקודמים (remote/אימות) נפתר.
+    60→- המלאי המלא: (א) טוקן תקין + repo ריק מאומת מקצה לקצה; (ב) אפס ZIP ואפס קוד בלוקצ'יין בסביבה (3 סריקות); (ג) תוצרים קיימים: engineering/ שלם + wallet-design/ חלקי (2/5 קבצים); (ד) חסרים לביצוע: breakthrough-ideas.md, wallet-architecture.md, final-proposal.md, עדכון README ראשי, remote+push.
+    61→- הכנה הושלמה; ביצוע רק באישור המשתמש. המלצת אבטחה שהועברה: הטוקן בהיקף רחב מאוד — מומלץ לצמצם היקף או לשלול אותו לאחר השימוש.
+    62→
+    63→---
+    64→Task ID: 3-execute
+    65→Agent: Z.ai Code (main)
+    66→Task: ביצוע מלא באישור המשתמש — כתיבת 3 המסמכים החסרים ב-wallet-design/, תיקון התייחסויות "placeholder מחוסם", README ראשי, commit, ניקוי סודות מהיסטוריה, remote+push ל-Saosmartwallet.
+    67→
+    68→Work Log:
+    69→- שלב 1א: נכתב wallet-design/breakthrough-ideas.md — 15 רעיונות מדורגים (Impact×Feasibility, Score מקס' 25), עם מיפוי נכס-רשת-מנוצל לכל רעיון; המלצה על 5 Core (Aurora Modes 25, Zero-Gate Onboarding 20, Tri-Token Treasury 16, Memo Vault 15, Governance Cockpit 15) + 3 Rails (Password-First Keys, Policy Engine, In-app Signals); רשימת אי-הכללות מפורשת.
+    70→- שלב 1ב: נכתב wallet-design/wallet-architecture.md — עקרונות (network-agnostic core + adapter, מפתחות בלקוח בלבד, least-privilege, fail closed), דיאגרמות ASCII (רכיבים + זרימת חתימה), מבנה מונורפו מלא (apps/packages/services/tools + חוקי תלות), סקיצת ChainAdapter, אבטחה (מחזור חיי מפתחות, Policy Engine, CSP/quorum, threat model 7 איומים, הצהרת אי-תחום), indexer קריאה-בלבד, תוכנית Phase 0–3 עם שער M0, בדיקות/CI, Open Questions.
+    71→- שלב 1ג: נכתב wallet-design/final-proposal.md — חזון, MVP 5 Core+3 Rails עם ערך מדיד, סטאק, מבנה משלוח, מילסטונים M0–M4 (~12 שבועות צוות / 4–5 חודשים סולו), סיכונים 8 עם מיגון, מדדי הצלחה, נקודות החלטה D1–D5 לבעל הפרויקט, checklist.
+    72→- שלב 2: תוקנו כל ההתייחסויות המיושנות ל"placeholder מחוסם" עם סימון ✏️ עודכן 2026-09-07 ב-6 מסמכים: network-analysis.md, engineering/README.md, environment-scan.md, missing-inputs.md, deployment-roadmap.md, final-recommendation.md; ב-2 קובצי raw scan (network-scan-raw-output.md, scan-raw-output.md) נוספה הערת תיקון מתוארכת בראש המסמך — גוף הראיות נשמר לא-משוכתב.
+    73→- שלב 3: נוצר README.md ראשי בשורש — סטטוס, מפת מסמכים (5 לינקים), החלטות מרכזיות, דרישות D1–D5, הערות אבטחה למאגר. נוסף /upload/ ל-.gitignore.
+    74→- שלב 4 (הכנות): זוהתה חשיפה — `.env` ו-`upload/Roshcaregt.txt` (הטוקן!) עוקבים ב-git מאז commit a1c0dd1; לפני push ינוקו מההיסטוריה כולה (git filter-branch, בטוח — ה-repo המרוחק ריק), reflog יפוג ו-gc ירוץ; hashes ישתנו וזה מתועד כאן.
+    75→
+    76→Stage Summary:
+    77→- wallet-design/ הושלמה: 5/5 מסמכים (network-analysis, network-scan-raw-output, breakthrough-ideas, wallet-architecture, final-proposal).
+    78→- שרשרת המסמכים עקבית: הנחה מסומנת בכולם; ליבה network-agnostic; שער M0 חוסם קוד חתימה עד אישור רשת/RPC.
+    79→- אבטחה: .env + upload/ ינוקו מהיסטוריית git לפני push; הטוקן לא צוטט בשום מסמך; המלצה לצמצם/לשלול את הטוקן לאחר השימוש.
+    80→- Push מתוכנן ל-origin = github.com/roshpinacare-sys/Saosmartwallet עם ההודעה: feat: add breakthrough wallet design based on network analysis; תוצאת ה-push תדווח כן/לא בכנות בסיום.
+    81→
+    82→---
+    83→Task ID: 3-execute-result
+    84→Agent: Z.ai Code (main)
+    85→Task: תיעוד תוצאות סופיות — ניקוי היסטוריה, push ואימות מקצה לקצה.
+    86→
+    87→Work Log:
+    88→- git filter-branch הסיר `.env` + `upload/Roshcaregt.txt` מכל 6 ה-commits; refs/original נמחקו, reflog פג, gc --prune=now רץ.
+    89→- תופעה מתועדת: filter-branch סינכרן את עץ העבודה ל-HEAD המשוכתב ומחק את שני הקבצים מהדיסק; שוחזרו: הטוקן מ-`/tmp/my-project/upload/Roshcaregt.txt` (40 בייטים, snapshot מתועד בסריקה), ו-.env נוצר מחדש (`DATABASE_URL="file:../db/custom.db"` — תואם למקור 50 בייטים/שורה אחת; תוכן המקור מעולם לא נקרא).
+    90→- אימות היסטוריה מול הטוקן האמיתי: git grep על כל revs — הטוקן לא נמצא בשום blob ✓; commits עם .env/upload: 0 ✓.
+    91→- git remote add origin https://github.com/roshpinacare-sys/Saosmartwallet.git; push -u origin main עם http.extraheader (Basic, טוקן מהקובץ, לא נשמר ב-config) — exit 0, "new branch main -> main".
+    92→- אימות מרוחק: ls-remote = refs/heads/main d0e150ff4af792e0ba848e38b25668eab8918fba = SHA מקומי ✓; API contents: 24 פריטים בשורש כולל README.md, wallet-design/, engineering/, worklog.md; wallet-design/ = 5 קבצים (breakthrough-ideas 15972B, final-proposal 10536B, network-analysis 7149B, network-scan-raw-output 17813B, wallet-architecture 16717B); upload/ במרוחק = "Not Found" ✓; .env במרוחק = לא קיים ✓.
+    93→- הערה: hashes השתנו עקב השכתוב — 167a010/737027c/e6997eb/104124e היסטוריים; HEAD הסופי במקום ובמרוחק: d0e150f.
+    94→
+    95→Stage Summary:
+    96→- ✅ Push הושלם בהצלחה ל-Saosmartwallet (private), branch main, HEAD d0e150f, מאומת ב-API וב-ls-remote.
+    97→- ✅ אפס סודות בהיסטוריה ובמרוחק: .env ו-upload/ חסרים מה-histogram ומה-commit הראשון ועד הראש.
+    98→- ✅ wallet-design/ 5/5 מסמכים במאגר; README ראשי עם לינקים; commit message: "feat: add breakthrough wallet design based on network analysis".
+    99→- מומלץ לבעל החשבון: לצמצם היקף הטוקן ל-repo או לשלול אותו לאחר האימות.
+   100→
+   101→---
+   102→Task ID: M0-prep
+   103→Agent: Z.ai Code (main)
+   104→Task: אימות עצמאי של מצב הריפו לאחר הניקוי+push (על בסיס הודעת תיאום חיצונית — "לא סומך על טענות"), והכנת groundwork לשלב M0 שאינו תלוי בהחלטות D1/D2.
+   105→
+   106→Work Log:
+   107→- אימות עצמאי מלא של טענות ההודעה: (א) אפס הופעות של ערך הטוקן האמיתי ושל צורת ghp_ מלאה בכל blob בהיסטוריה כולה (git grep על כל revs) ✓; (ב) אפס עצים היסטוריים המכילים .env או upload/ ✓; (ג) .gitignore מכסה .env* ו-/upload/ ✓; (ד) הריפו המרוחק עומד על d0e150f עם 5/5 מסמכי wallet-design בגדלים המדויקים ✓; (ה) עץ מקומי נקי, main מקומי מקדים את origin ב-commit אחד (f45dfdc — auto-commit של הפלטפורמה: tool-results + 19 שורות worklog, תוכן תמים, נסרק לסודות לפני push) ✓.
+   108→- נמצא ודווח: הטוקן עדיין חי (HTTP 200 ל-repos + rate_limit) — פעולת ההיגיינה #1 (שלילת טוקן) טרם בוצעה על-ידי הבעלים.
+   109→- נכתב tools/chain-health-check.ts — פרוב קריאה-בלבד (אין מפתחות/סודות/כתיבה): version, chain id (2 namespaces), dgp+lag, account, RC manabar; יציאות 0/1/2/3; פלט human + --json; אפס תלות חיצוניות.
+   110→- ריצה אמיתית ראשונה מול https://api.steemit.com חשפה שני לקחים אמפיריים ותוקנו בקוד: (1) condenser_api דורש פרמטרים מערכיים — {} מחזיר "Bad Cast: Invalid cast from object_type to Array"; (2) שדה זמן הראש בצומת זה הוא time ולא head_block_time; בנוסף "method not found" ב-chain id מסווג warn (מגבלת צומת) ולא fail.
+   111→- ריצה סופית מאומתת: HEALTHY (exit 0) — blockchain_version 0.23.0, head block ~109.4M, lag 2–3s, namespaces חיים condenser_api+rc_api, חשבון steem נמצא, RC manabar נשלף; chain id אינו נחשף בשני ה-namespaces — פער ראיות מסומן המשפיע על D2.
+   112→- נכתב packages/chains/chain-adapter.ts — ממשק ChainAdapter קפוא (interface בלבד, ללא מימוש, מוגן שער M0); נכתבו packages/README.md, packages/crypto/README.md, packages/core/README.md (היקף, כללי איכות: test vectors חובה/אין קריפטו ביתי/איסור יבוא chains ב-core, תנאי כניסה ל-M0).
+   113→- README ראשי עודכן: סעיף Groundwork ל-M0 עם טבלת נכסים, ראיות אמפיריות מתוארכות, פקודת הרצה, והלקח ההנדסי המאומת.
+   114→
+   115→Stage Summary:
+   116→- כל טענות הודעת התיאום אומתו באופן עצמאי ומדויקות; הריפו נקי מסודות מקצה לקצה (ביקורת חוזרת שלי, לא רק התיעוד הקודם).
+   117→- Groundwork ל-M0 חי במאגר: כלי health-check רץ ומאומת מול צומת אמיתי + ממשק ChainAdapter קפוא + סקפולד packages מתועד; כל הרכיבים מסומנים ASSUMPTION ומוגני שער M0 — אפס קוד חתימה לפני D1/D2.
+   118→- ראיות רשת ראשונות בפועל (לא הנחה): צומת Steem ציבורי חי, ver 0.23.0, rc_api זמין — ו-chain id חסר בצומת הציבורי, רלוונטי להחלטת D2.
+   119→- נותר פתוח אצל בעל הפרויקט: D1/D2 (רשת+RPC) לשחרור ה-M0 gate; שלילת/צמצום הטוקן הרחב (עדיין חי).
+   120→
+   121→---
+   122→Task ID: M0-impl
+   123→Agent: Z.ai Code (main)
+   124→Task: מימוש M0 Core באישור הבעלים (טוקן נשאר פעיל; רשת = Steem Protocol): חבילת crypto, מנוע serialization ל-Steem, SteemAdapter, סוויטת אימות מול chain חי, תיעוד, commit ו-push.
+   125→
+   126→Work Log:
+   127→- deps קריפטוגרפיות אומתו: @noble/curves@2.4.0 + @noble/hashes@2.4.0 + @scure/base@2.4.0; נבנה על APIs בלבד (noble v2: sign מחזיר Uint8Array(64); 65B 'recovered' פורמט = [recid, r, s]).
+   128→- לכידת ראיות מה-chain לפני כתיבת serializer (עקרון "אין ניחושים"): מיני-serializer זמני שיחזר עסקאות אמיתיות — 4/4 עסקאות vote עם עסקה-מעטפת מתאימות tx-id; שתי השערות Asset (15B/14B) נכשלו מול 20 עסקאות transfer; condenser_api.get_transaction_hex נמצא כ-oracle קנוני; ניתוח hex חשף: **Asset = 16 בייטים** (int64 + precision byte + 7-char ריפוד-אפס) — הראיה: `01…00 | 03 "STEEM" 00 00` + memo varint; get_transaction_hex = tx bytes + וקטור חתימות (varint 0 כשאין חתימות); checksum של מפתח ציבורי "STM" חולץ ממחרוזת on-chain אמיתית = **ripemd160(pub33)[0:4]** ישירות (לא ripemd160(sha256()) — זיכרון תוקן מול ראיות); header של חתימות אמיתיות = 0x1f/0x20 → recid = header−31; שמות חשבונות מכילים נקודות (wakeupkittty.pal נצפה).
+   129→- נכתב packages/chains/steem/src/serializer.ts — ByteWriter/ByteReader (u8/u16/u32/i64/varint/string) + Asset pack/unpack (16B) + parseAsset/formatAsset ללא floats (BigInt בלבד), fail-closed על סימולים לא-ידועים.
+   130→- נכתב packages/chains/steem/src/operations.ts — ריסטר op-ids סטנדרטי; transfer (id 2) ממומש pack/unpack; ops לא-נתמכים נזרקים בבירור.
+   131→- נכתב packages/chains/steem/src/transaction.ts — מעטפת serialize/deserialize, transactionDigest = sha256(chain_id‖tx) (chain id Steem = 32 אפסים), transactionId (sha256[0:40]), appendSignatures (wire: tx + varint(count) + 65B sigs).
+   132→- נכתב packages/crypto/src/{encoding,keys,index}.ts — WIF (0x80 + double-sha256 checksum), STM encode/decode (ripemd160(pub) checksum), PrivateKey/PublicKey, signRecoverable → [31+recid, r, s], verify = recovery-and-compare (כמו ה-chain), derivePrivateKey = sha256(account+role+password), generateMasterPassword = "P"+WIF, normalizeBrainKey + deriveFromBrainKey (cli_wallet סמנטיקה, flag ל-lowercase).
+   133→- נכתב packages/chains/steem/src/adapter.ts — SteemAdapter implements ChainAdapter: health/getAccount/getBalances/getRcManabar (JSON-RPC), buildOperations (ref_block_num=head&0xFFFF, prefix=LE u32 של head_block_id[4:8], expiration=+60s), sign עם policy (אסור לחתום transfer עם posting key), broadcast **נעול** כברירת מחדל (allowBroadcast:true בלבד) — capability "broadcast" מפורסם רק אז.
+   134→- נכתב tools/serialize-test.ts — קריטריוני קבלה מול chain חי: (1) זהות ביט-אחר-ביט מול get_transaction_hex (עם וקטור חתימות ריק), (2) sha256(bytes)=transaction_id, (3) round-trip deserialize→serialize, (4) recovery של חתימות אמיתיות מול authority on-chain, (5) self-tests: WIF/STM round-trip+tamper, חתימה/אימות, גזירות, assets.
+   135→- איתור באגים תוך כדי: recid-first פורמט noble v2 (מכאן "invalid recovery id"), באג .result כפול ב-probe שגרם ל-false-fails, אורך STM משתנה (test תוקן לבדיקת payload 37B).
+   136→- תוצאה סופית: **30/30 PASS, exit 0** — כולל 10/10 עסקאות BIT-IDENTICAL מול serializer הצומת, 10/10 tx-id anchors, ו-2/2 חתימות אמיתיות ששוחזרו ל-authority ה-on-chain; בדיקת adapter מקומית: sign→recover PASS, policy gate PASS, broadcast FAILS CLOSED.
+   137→- READMEs עודכנו (packages/README.md, packages/crypto/README.md, packages/chains/steem/README.md חדש) + README ראשי (הצהרת תקפות מעודכנת — ההנחה הפכה למאומתת; סעיף M0).
+   138→
+   139→Stage Summary:
+   140→- M0 Core שלם ומאומת: crypto + serialization + adapter, עם שרשרת ראיות מלאה מול chain חי; ההצהרה "אין ניחושים" הוכחה בפועל — 3 הנחות זיכרון שלי נפלו מול bytes אמיתיים ותוקנו מהראיות (Asset 16B, STM checksum, oracle-הכולל-חתימות-ריקות).
+   141→- אבטחה: אפס סודות בקוד; broadcast נעול כברירת מחדל; policy מונע transfer עם posting key; כלי האימות קריאה-בלבד ולא שולח שום חתימה.
+   142→- פתוח ל-M1: packages/core (keystore AES-256-GCM + Policy Engine/Aurora Modes), ולאחר מכן indexer + apps/web-wallet.
+   143→- פעולה שעדיין תלויה בבעלים: הטוקן הרחב נשאר חי לפי החלטתו — הסיכון מתועד, מומלץ לצמצם היקף ל-repo בלבד.
+   144→
+   145→---
+   146→Task ID: M1-impl
+   147→Agent: Z.ai Code (main)
+   148→Task: Phase M1 — DEX UI & Wallet Dashboard: live STEEM/SBD trading terminal on the M0 engine (limit_order_create serialization, market client, API routes, terminal UI), verification with live chain data, docs, commit & push.
+   149→
+   150→Work Log:
+   151→- החלטת ארכיטקטורה מסומנת: הבקשה המקורית דיברה על apps/web (Vite), אבל הסנדבוקס חושף רק את אפליקציית Next.js בפורט 3000 דרך Preview Panel — ה-DEX נבנה בתוך ה-Next.js הקיים עם בדיוק הסטאק המבוקש (React+TS+Tailwind+shadcn/ui+Framer Motion+TanStack Query, כבר ב-deps).
+   152→- ראיות לפני קוד (עיקרון "אין ניחושים", אותה מתודולוגיית M0): עשרות probes חיים מול api.steemit.com — get_order_book (asks/bids עם order_price/real_price/steem/sbd ב-satoshis, ממוינים best-first) · get_ticker · get_trade_history דורש 2-3 ארגומנטים בלבד (לא 5 כמו ב-API ישן) וחלון [start=ישן, stop=חדש] · get_account_history = 3 ארגומנטים · get_open_orders.
+   153→- ראית serialization ל-limit_order_create: שני וקטורים סינתטיים דרך condenser_api.get_transaction_hex (ה-serializer הקנוני של הצומת) פוענחו ביט-אחר-ביט: varint(5) ‖ owner ‖ u32 orderid ‖ Asset×2 (16B) ‖ u8 fill_or_kill ‖ u32 expiration — כולל boundary (orderid=0xffffffff, fok=true, אמאונט-אפס).
+   154→- הורחב מנוע M0: operations.ts (LimitOrderCreateOperation + pack/unpack עם fail-closed על fok byte>1) · adapter.ts (buildOperations מקבל limit_order_create עם ולידציה מלאה: שמות, orderid uint32, STEEM/SBD בלבד, צדדים מנוגדים, חיי פקודה 1min..7d; sign() ממפה by-type דרך toWireOperation; policy: פקודות כספים דורשות ACTIVE — posting נדחה; broadcast מוכלל לשני סוגי ops ונשאר fail-closed).
+   155→- tools/m1-op-test.ts — סוויטת קבלה: 3 וקטורי oracle (כולל וקטור sell גדול עם סכומים אי-זוגיים) — bit-exact vs צומת + round-trip מה-hex של ה-oracle + tx-id anchors + self-tests של assets. תוצאה: **27/27 PASS** (אחרי תיקון: oracle hex כולל וקטור חתימות ריק בסוף — מוסר לפני round-trip).
+   156→- packages/chains/steem/src/market.ts (חדש, קריאה-בלבד): SteemMarketClient — orderbook/ticker/history/chainStatus/openOrders, מנורמל מהראיות; אמאונטים בשלמים (satoshis) עם פורמט עשרוני ללא floats; ה-seam הקפוא chain-adapter.ts לא שונה.
+   157→- API routes (Next.js App Router): /api/steem/market (ticker+dgp) · /api/steem/orderbook · /api/steem/history · /api/steem/wallet (יתרות+RC+SP בהמרת שלמים+פקודות פתוחות) · POST /api/steem/trade/build (BigInt math: BUY=ceil/SELL=floor על 1e6 price scale, orderid מ-timestamp, ref-block fields מה-adapter, serializedHex+digestHex+txId; אין מפתחות, אין שידור).
+   158→- באגי סביבה שתוקנו: Turbopack לא פותר relative imports עמוקים ל-packages — נוצר src/lib/steem-engine.ts (re-export barrel) ו-steem-server.ts (adapter fail-closed singleton); סיומות .js הוסרו מ-imports יחסיים (ושוחזרו על bare imports של @noble v2 שמחייבים אותן ב-exports map); dev server הופעל מחדש עם ניקוי .next.
+   159→- UI (דארק-אונלי, Bloomberg×Cyberpunk): globals.css (פלטת oklch ירוקה-כהה, .glass glassmorphism, .num mono tabular, flash-up/down keyframes, led-pulse, גריד blueprint, scanlines, scrollbars) · DexHeader (quote strip עם FlashNumber+chain vitals) · OrderBook (סולם asks/bids עם depth bars, לחיצה מזריקה מחיר לטרמינל, AnimatePresence) · TradeHistory (tape חי ממוין newest-first) · TradeTerminal (BUY/SELL tabs, BID/MID/ASK presets, % יתרה, lifetime select, fill-or-kill, Dialog preview: op payload+envelope+hex+digest+txId+שער "SIGNING LOCKED — M2") · WalletPanel (4 כרטיסים כולל RC gauge מונפש + טבלת פקודות פתוחות) · StatusFooter דביק (mt-auto, min-h-screen flex-col).
+   160→- באגים שאימות הדפדפן תפס ותוקנו: (1) מפתחות React כפולים בספר (שתי פקודות באותו מחיר+שעה) — אינדקס נוסף ל-key; (2) ReferenceError ב-BookRow (onClick קרא ל-onPickPrice במקום onPick) — ה-prefill לא עבד; (3) **באג M0 אמיתי**: getRcManabar קרא max_rc מתוך rc_manabar אבל ב-wire הוא ברמת החשבון — percent היה תמיד 0; תוקן ואומת (@steem: 24.8%); (4) sync של zustand persist אחרי rehydration (adjust-during-render, בלי effects — עומד בכלל react-hooks/set-state-in-effect); (5) אי-עקביות עיגול Cost/Receive — floor לגריד satoshi כמו השרת.
+   161→- אימות מקצה לקצה ב-agent-browser: page render תקין, אפס שגיאות קונסולה, נתונים חיים זורמים (ticker/orderbook/history/wallet/RC), golden path מלא: track @steem → לחיצה על שורה בספר → הזרקת מחיר+היפוך צד → SELL 500 STEEM @0.096555 → preview dialog עם payload/hex/digest → ראיית השער; מובייל 390px ודסקטופ 1440px נבדקו ויזואלית; footer דביק נבדק.
+   162→- ראיית קצה: פקודה שנבנתה דרך ה-API (BUY 100 STEEM @ 0.098 → 9.800 SBD → 100.000 STEEM, 60 בייטים) נשלחה ל-oracle וחזרה **BIT-EXACT** מול ה-serializer של הצומת.
+   163→- lint נקי · serialize-test 30/30 · m1-op-test 27/27 · READMEs עודכנו (ראשי + packages + steem) עם סעיף M1 וראיות.
+   164→
+   165→Stage Summary:
+   166→- M1 מושלם: ה-DEX חי בדפדפן עם נתוני chain אמיתיים בלבד — אפס mock data; כל מספר במסך מגיע מ-api.steemit.com דרך ה-packages שלנו.
+   167→- שרשרת הראיות הוארכה: limit_order_create מאומת bit-exact (3 וקטורי oracle + בדיקת קצה של פקודה שנבנתה ב-API) — מנוע הסריאליזציה מוכן לחתימה בפועל ברגע שה-keystore (M2) יסופק.
+   168→- באג M0 נתגלה ותוקן בזכות ה-UI חושף-הנתונים (RC manabar) — העיקרון "ה-UI מאמת את ה-backend" שוב שילם.
+   169→- אבטחה נשמרת: אפס מפתחות בכל שרשרת ה-M1; ה-adapter ב-API נבנה fail-closed; הטרמינל מציג את השער במפורש.
+   170→- פתוח ל-M2: packages/core (keystore AES-256-GCM + Policy Engine/Aurora Modes) — ברגע שיסופק, כפתור החתימה מתחבר ל-digestHex שכבר מוצג.
+   171→
+   172→---
+   173→Task ID: M1-grid
+   174→Agent: Z.ai Code (main)
+   175→Task: Grid Dashboard — סריקה מלאה של כל האקוסיסטם (8 ריפו של roshpinacare-sys) ובניית מרכז-שליטה מקצועי שמציג את כל הרשתות/טוקנים/צמדים/גשרים — הכל חי, אפס mock data.
+   176→
+   177→Work Log:
+   178→- סריקה חיה מול GitHub API (טוקן מ-upload, מעולם לא צוטט): 8 ריפו — steem (181MB, SAOS AI Agent OS: fleet 13/28, SAOS-NET, grid98), saos-dex (בורסה ריבונית SIM + relay), saos-sovereign-platform (Foundry v3), saos-sovereign-foundry (v2 מתועד), Saosmartwallet (M0/M1), roshpina (kernel 17 מודולים), anchor-baseline + Project-files (ארכיונים).
+   179→- ניתוח עומק: READMEs, עצים, package.json, STATUS.md, state files חיים — זוהו 5 רשתות (STEEM/HIVE/BLURT/TRON/SAOS-NET), ~25 טוקנים (כולל 9 עטיפות TRC20 + עטיפות חוץ), 3 גשרים עם txids אמיתיים, 10 שירותים.
+   180→- גילוי מפתח: SAOS-NET חיה דרך daemon-push — state.json + grid98-state.json נדחפים ל-repo steem ונקראים כאן חי (גובה 52,522, 64 cps בחלון, 1,112 verified, bench 130,541 tx/s, treasury 18,440.8 SAOS, oracle חתום-שעתי 15 נכסים, 11 בריכות, 20 עטיפות, 18 delegations, TRON pulse חי).
+   181→- שכבת שרת חדשה: src/lib/eco-server.ts (TTL cache, probes fail-soft עם fallbacks ל-Hive×3 ו-Blurt×2, קריאת GitHub raw עם טוקן בצד-שרת בלבד) + 3 routes: /api/eco/networks · /api/eco/saosnet · /api/eco/anchors.
+   182→- ראיות אמפיריות: verified הוא מערך (לא אובייקט) — תוקף לספירה נכונה (1112); Blurt חי דווקא דרך blurt-rpc.saboin.com (fallback הפריך את "nodes 0/6" מהסריקה — החי מנצח); px ב-oracle = nano-USD (1e9=$1).
+   183→- registry סטטי מהסריקה: src/lib/eco-registry.ts (8 ריפו, 5 רשתות, 8 צמדים, 4 גשרים, 10 שירותים, 5 פערים כנים) — עובדות-קוד בלבד, אפס נתוני-שוק.
+   184→- UI חדש: src/components/grid/ (eco-header עם LED-strip חי לכל שרשרת + שעון UTC, kpi-strip, network-grid עם Sheet drill-down, pairs-matrix sortable עם source-badges, bridge-monitor עם Live Anchor Feed של txids אמיתיים + TRON pulse, saosnet-panel (מנוע/ספר/oracle/pools/wrapped/delegations), registry-panel, eco-bits) — הכל על שפת העיצוב של M1 (glass, num, LEDs, Framer Motion).
+   185→- page.tsx מוקם מחדש כמרכז-טאבים: GRID / DEX (רכיבי M1 קיימים) / SAOS-NET / BRIDGES / REGISTRY / WALLET (WalletPanel קיים) + קיצורי מקלדת 1–6; layout metadata עודכן; footer BUILD GRID·M1.
+   186→- אימות דפדפן מקצה לקצה (agent-browser): 5/5 שרשראות ONLINE עם גבהים חיים מתגלגלים (STEEM #109,376,4xx · HIVE #109,710,8xx · BLURT #63,440,2xx · TRON #86,042,4xx · SAOS-NET #52,522); כל 6 הטאבים נבדקו ויזואלית; drill-down sheet נפתח; wallet golden path (@steem: 1740.618 STEEM / 5627.804 SBD / 14.19M SP / RC 24.7%); קיצורי מקלדת עובדים; מובייל 390px תקין; אפס שגיאות קונסולה.
+   187→- lint נקי · README עודכן (סעיף SAOS GRID) · dev.log בלי שגיאות.
+   188→
+   189→Stage Summary:
+   190→- המשתמש רואה את כל האקוסיסטם במסך אחד: 5 רשתות חיות, 8 שווקים במטריצה, עוגנים חיים עם txids, הרשת הריבונית שלנו עם מנוע/oracle/עטיפות — הכל מה-chain, אפס mock.
+   191→- החוק "רשת שנופלת = נתון" נשמר: offline מוצג באדום עם הסיבה, לעולם לא מוסתר או מומצא.
+   192→- ארכיטקטורה מוכנה ל-המשך: adapters ל-Hive/Blurt (Graphene תאומים) ו-TRON מסומנים כפערים ב-REGISTRY; keystore M2 עדיין השער לחתימה.
+   193→- מקורות חיים מנוטרים: 4 RPC ציבוריים + daemon-state (GitHub raw) — כולם עם cache/TTL ו-fallbacks.
+   194→
+   195→---
+   196→Task ID: M1-grid-redesign
+   197→Agent: Z.ai Code (main)
+   198→Task: Redesign מלא של ה-Grid Dashboard לרמת Enterprise/Professional (Bloomberg Terminal × TradingView × dYdX) — מחיקת כל ה-UI הקיים ובנייה מחדש עם design system, אנימציות, data visualization ו-micro-interactions; שכבת הנתונים נשארת נעולה; push לריפו.
+   199→
+   200→Work Log:
+   201→- ארכיטקטורה לפני קוד: נקראו כל hook-י הנתונים (use-eco, use-steem-market), ה-registry הסטטי, dex-store ו-API routes — החלטה: החוזים (types + polling intervals + zero-mock) קפואים; רק שכבת ה-presentation נבנית מחדש. נמחקו src/components/grid + src/components/dex (14 קבצים) ונכתבו מחדש 16 קבצי UI.
+   202→- Design system מהאפס (globals.css): כל הטוקנים מהמפרט — semantic colors (#10b981/#ef4444/#f59e0b/#3b82f6 + saos violet), bg layers ×4, text ×3, borders ×3, gradients ×4, elevation shadows ×4, spacing 8px, מודולר type scale; מיפוי shadcn bridge מלא על הפלטה החדשה (כל רכיבי shadcn ממשיכים לעבוד); glassmorphism אמיתי blur(12px)+saturate(180%)+inset-light; glow-card עם gradient-border (mask-composite xor) + translateY(-2px) ב-hover; skeleton shimmer; flow-line לגשרים; focus-visible + prefers-reduced-motion.
+   203→- טיפוגרפיה: הוחלף Geist ב-Inter (--font-inter) + JetBrains Mono (--font-jetbrains) דרך next/font; כל מספר במסך ב-.num עם tabular-nums.
+   204→- primitives.tsx: StatusDot/StatusBadge/EcoChip/LiveBadge/PanelHeader/StatCell/ChainGlyph (מונוגרם per-chain tone: steem=green, hive=amber, blurt=blue, tron=red, saos=violet)/Skeleton/PanelSkeleton/ErrorNote.
+   205→- motion-bits.tsx: AnimatedNumber (tween דרך useMotionValue+useTransform — עדכון DOM ישיר בלי re-render לפריים); FlashValue (adjust-during-render, הבזק ירוק/אדום מחזורי); Delta; useRollingHistory — ring buffer ב-module store חיצוני (useSyncExternalStore) שנדחף מ-effect — דוגם ערכי poll חיים (גבהים, מחירים) לספארק-ליין session אמיתי, עומד על כללי react-hooks (בלי setState-in-effect).
+   206→- charts.tsx (Recharts): Sparkline (Area+gradient, honest "sampling…" <2 נקודות) ו-DepthChart — עומק צבירה אמיתי: bids ירוק משמאל/asks אדום מימין, tooltip כהה, ציר מחיר mono; שימוש בספר STEEM/SBD ובספר הריבוני SAOS/STEEM.
+   207→- מסכים חדשים: TerminalHeader (brand + LED strip + quote flash + UTC + chains-up) · KpiStrip (6 כרטיסי KPI עם AnimatedNumber + ספארק מחיר חי + treasury P&L) · NetworkGrid (auto-fit 230px, hero height מונפש, ספארק גובה, מדדים 2×2, שורת שוק ל-STEEM, drill-down Sheet עם role/adapter/evidence) · PairsMatrix (15 שורות, sort לכל עמודה, חיפוש, null-as-"—", שורות קליקביליות שמקפיצות ל-DEX/SAOS-NET) · BridgeMonitor (4 רכבות עם קו זרימה מונפש, Last Checkpoint, TRON Pulse, Live Anchor Feed עם txids+explorer) · SaosNetPanel (core/engine/leaderboard-bars/ספר ריבוני depth/oracle/pools/wrapped/delegations) · RegistryPanel (scan-meta, 8 ריפו, שירותים, 5 פערים כנים) · WalletPanel (יתרות מונפשות, RC manabar gradient לפי סף, פקודות פתוחות) · DEX (OrderBook: depth chart + ladder + mid flash; TradeTerminal: כל הלוגיקה של M1 במוחה חדשה עם gradient buttons; TradeHistory: tape מונפש) · StatusFooter (sticky, safe-area, zero-mock pledge).
+   208→- באגים שהאימות בדפדפן תפס ותיקן: (1) 5× "two children with the same key ''" — TabsContent לא-keyed כילדי AnimatePresence(mode=wait); הוסר AnimatePresence, נשמרו entrance animations; (2) אזהרת multiple-children-in-wait — נעלמת עם אותו תיקון; (3) 24H VOLUME תקוע על skeleton — steemVolume הוא "44.259" בלי סיומת; עבר ל-steemVolumeSatoshis/1000 (מתמטיקה שלמה) גם ב-KPI וגם ב-PairsMatrix; (4) KPI grid נשבר ל-5+1 — price card span-2 ⇒ grid-cols-7; (5) שמות רשת נחתכו בכרטיסים צרים — הוסר family chip (מופיע ב-drill-down); (6) טאבים במובייל ללא accessible name — aria-label עם רמז מקלדת.
+   209→- אימות מלא ב-agent-browser: אפס errors/warnings בקונסולה; 6 טאבים נבדקו ויזואלית ב-1440px + 390px; drill-down sheet; golden path (לחיצת מחיר → prefill+היפוך צד → track @steem → build → דיאלוג: payload/envelope/hex/digest/tx_id 60B + toast); קיצורי 1–6 (כולל מובייל); footer דביק; BLURT offline מוצג בכנות "probe failed: HTTP 503".
+   210→- lint נקי · README עודכן (סעיף Enterprise redesign) · dev.log ללא שגיאות.
+   211→
+   212→Stage Summary:
+   213→- המשתמש מקבל מסך ברמת trading platform אמיתית: design system עקבי מטוקנים, כל מספר מתעדכן באנימציה, כל כרטיס עם hover glow, גרפי עומק וספארק-ליין על נתוני session אמיתיים, skeleton בכל טעינה, responsive מושלם 390→1440px.
+   214→- שכבת הנתונים לא נגעה: packages/hooks/API routes זהים — החוק "zero mock" נשמר; offline/offline-values מוצגים כ"—" או הודעת כישלון, לעולם לא מומצאים.
+   215→- תיקוני הקונסולה מתועדים כאן לדורות; אפס סודות בקוד; signing עדיין נעול (M2).
+   216→
+   217→---
+   218→Task ID: 2-a
+   219→Agent: general-purpose (crypto+vault) — finished by main agent after agent deadline
+   220→Task: packages/core layers 1–2 — CryptoEngine (Argon2id KDF, AES-256-GCM/ChaCha20-Poly1305 envelope, Shamir SSS, ZK Schnorr) + SovereignVault hierarchy
+   221→
+   222→Work Log:
+   223→- crypto/kdf.ts: Argon2id via hash-wasm (64 MiB / t=3 / p=1 / 32B — the M2 brute-force budget ~1s), PasswordVerifier build + timingSafeEqual verify (never throws).
+   224→- crypto/cipher.ts: envelope AEAD — AES-256-GCM + ChaCha20-Poly1305 (node:crypto, with pure-TS RFC 8439 fallback), content-CEK wrapped under master key (layers), SHA-256 checksum, AAD roundtrip, tamper → VaultError DECRYPTION_FAILED.
+   225→- crypto/shamir.ts: GF(256) Shamir SSS (AES field 0x11B, log/exp tables, Lagrange@0), 1≤t≤n≤254.
+   226→- crypto/zk.ts: Fiat–Shamir Schnorr identification over secp256k1 (@noble/curves v2) + deriveCommitment enrollment anchor.
+   227→- vault/defaults.ts: emptyState + default rule sets (deny-huge / approve-large / step-up dynamic; rate-limit + new-counterparty contextual; high-risk composite).
+   228→- vault/keys.ts: VaultKeys — seal/reveal WIF material under derived key, STM public keys persisted, revoke semantics.
+   229→- vault/vault.ts: SovereignVault — initialize (master 3-of-5 + 5 network + 13 soldier + 4 purpose vaults per M2 spec), unlock/lock (volatile key, zero-fill), auto-lock, addKey step-up, exportState, getStatus + computeSecurityScore heuristics.
+   230→- FIXED post-agent (main): shamir polyEval Horner missing final multiply (all shares identical → detection via 2-of-3 single-byte trace); initialize() requireState on first boot → fresh emptyState; ZK verify anchored to stored enrollment commitment (self-consistent foreign transcripts no longer pass); cipher union-type overloads removed.
+   231→
+   232→Stage Summary:
+   233→- packages/core typechecks clean (0 errors); 25/25 functional sanity checks pass (cipher roundtrips both algs, tamper detection, shamir subsets, verifier accept/reject, ZK accept + 3 reject paths, vault lifecycle 5N/13S/4P, security score, persistence, policy rules, audit chain, pdf/csv/json reports).
+   234→
+   235→---
+   236→Task ID: 2-b
+   237→Agent: general-purpose (policy+audit) — verified by main agent after agent deadline
+   238→Task: packages/core layers 3+6 — PolicyEngine (static/dynamic/contextual/composite + anomaly detection) + AuditSystem (hash-chain, query, json/csv/pdf reports)
+   239→
+   240→Work Log:
+   241→- policy/defaults.ts: 6 compiled-in static rules (no-transfer-with-posting-key, memo-key-cannot-sign, operation-allowlist, daily-limit, owner-key-step-up, soldier-permissions) with detail-injected config; default dynamic/contextual/composite rule data.
+   242→- policy/engine.ts: evaluate() pipeline — static → dynamic → contextual (time window/rate/new-counterparty) → composite (depth-1 refs) → anomalies (frequency_spike/unusual_amount/new_counterparty/odd_hour/rapid_fire/failed_history); PolicyDecision with full checks[] trace for the signing dialog; step-up satisfied-session suppression.
+   243→- audit/audit.ts: hash-chained events (eventHash = sha256(prev ‖ canonicalJson)), genesis from vaultInstanceId, query/count/head, verifyIntegrity walk (firstBadSeq), generateReport json/csv/pdf, buildOperationContext (history + behavior aggregates for the policy engine).
+   244→- audit/pdf.ts: minimal valid multi-page PDF writer (Helvetica, exact xref offsets, %%EOF).
+   245→- Verified: chain of 5 verifies OK, newest-first paging, PDF decodes to valid %PDF…%%EOF with xref+startxref, CSV rows, JSON counts.
+   246→
+   247→Stage Summary:
+   248→- Policy deny-paths proven: posting-key transfer, daily-limit exceed, soldier transfer block, 70-ops/hour rate limit; allow-path: active-key limit_order_create.
+   249→- pdf report body contract: base64 of PDF bytes (documented in types.ts + audit.ts).
+   250→
+   251→---
+   252→Task ID: 3
+   253→Agent: general-purpose (signing+backup) — verified+fixed by main agent
+   254→Task: packages/core layers 4+5 — SigningOrchestrator (sign/multiSign/batchSign/crossChainSign/simulate) + BackupManager (encrypted/sharded/social/dead-man/QR) + root barrel
+   255→
+   256→Work Log:
+   257→- signing/orchestrator.ts: SigningOrchestrator — buildContext (audit history + vault-derived policy config injection: allowedOperations/dailyLimit/spentToday/soldierPermissions), evaluateAndCheck (fail-closed gate, POLICY_DENIED/POLICY_STEP_UP_REQUIRED with decision in error.details), sign (unlock → gate → key reveal via SovereignVault.revealKeyFor → adapter.sign → optional broadcast via capabilities check + timeLock + confirm gate → audit signing_attempt/key_used/broadcast), simulate (honest: missing_adapter/offline/insufficient_balance/policy risks, RC percent, "0" fee for steem — no invented numbers), multiSign (pre-chain primitive, master threshold 3), batchSign (per-entry isolation), crossChainSign (no adapter → errors[] + null signature — never fabricated).
+   258→- backup/backup.ts: BackupManager — createBackup (password-sealed state + optional Shamir wrapping layer), restoreBackup (HMAC timing-safe + checksum + fresh-vault fail-closed), setupSocialRecovery (recovery key R seals state; R split to contacts; recoveryPackage returned to caller — shares/payload never persist server-side), recoverFromSocial (t shares + package + NEW password → fresh vault), setupDeadManSwitch + deadManOverdue + heartbeat, createAirGappedBackup (qrcode → data-URL frames "SAOSVAULT|1|i/n|chunk").
+   259→- Root barrel packages/core/src/index.ts + layer barrels.
+   260→- FIXED post-agent (main): sharded restore demanded the backup password on top of shards — wrapping key now seals the state document DIRECTLY (shards alone restore; password-only path kept for unsharded packages; legacy dual-layer packages still accepted). Verified: unsharded password-only ✓, sharded shards-only 2-of-3 subset ✓, too-few shards ✓, tampered signature ✓.
+   261→
+   262→Stage Summary:
+   263→- 14/14 end-to-end sanity checks pass: policy allow/deny gates, honest missing-adapter simulation, fail-closed sign without key, backup roundtrips (unsharded + sharded + social recovery full flow), dead-man math + heartbeat, ≥1 QR data-URL frames, audit chain integrity after the whole flow.
+   264→- packages/core typechecks clean (0 errors). The signing route (task 4-a) needs only: orchestrator + broadcast-enabled SteemAdapter + the vault runtime singleton.
+   265→
+   266→---
+   267→Task ID: 4-a
+   268→Agent: general-purpose (vault API routes) — verified by main agent
+   269→Task: /api/vault/* routes + Prisma stores + vault runtime singleton + broadcast-enabled SteemAdapter + steem-order extraction
+   270→
+   271→Work Log:
+   272→- src/lib/steem-order.ts: deterministic order-build extracted from the M1 build route (buildSteemOrderTx with exact orderid/orderExpiration passthrough for signing rebuilds); build route refactored onto it with byte-identical response shape.
+   273→- src/lib/vault-stores.ts: PrismaVaultStorage (VaultState singleton) + PrismaAuditStore (AuditEvent rows, seq-ordered, JS-side exact vaultId containment).
+   274→- src/lib/vault-runtime.ts: getVaultRuntime() — SovereignVault + AuditSystem + PolicyEngine + SigningOrchestrator wired to a broadcast-enabled SteemAdapter (only path to broadcast), 30s auto-lock/heartbeat sweep, VaultError→HTTP status mapping (423 locked / 403 policy / 401 wrong-password / …).
+   275→- 14 routes under /api/vault/: status, init, unlock, lock, keys (GET/POST/DELETE), networks, soldiers, policy (GET/PUT), simulate, sign, backup (POST/PUT), social-recovery (POST/PUT), deadman (PUT), audit (query/verify/report json+csv+raw pdf).
+   276→- FIXED post-agent (main): AuditEvent.timestamp Int→BigInt (epoch ms overflows Int32 — Prisma read failed with "Conversion failed"); schema pushed, store converts BigInt↔Number.
+   277→
+   278→Stage Summary:
+   279→- Live-verified through the browser + curl: status/init/unlock/keys/sign/audit all green; signature over the real tx digest recovers the vault public key (crypto-verified); audit chain integrity 8/8; ?report=pdf serves a valid %PDF.
+   280→
+   281→---
+   282→Task ID: 4-b
+   283→Agent: general-purpose (vault UI) — verified by main agent
+   284→Task: Vault UI layer — use-vault hooks + wizard/signing/policy/backup/audit components + DEX signing gate integration
+   285→
+   286→Work Log:
+   287→- src/hooks/use-vault.ts: TanStack Query hooks for every /api/vault/* surface (status 15s poll, keys 30s, audit 10s) + 14 typed mutations with status invalidation + ApiError-aware toast handling.
+   288→- components/vault/: vault-status-widget (score/session countdown/audit-integrity/findings/unlock-lock), vault-setup-wizard (6 steps: welcome → password+strength meter → recovery → networks → soldiers → complete+auto-backup), signing-dialog (policy-gated signing: summary grid → simulate panel with balance legs/risks/RC → progress checklist → signed/broadcast result → red policy-violation panel per Flow 3), policy-management-dialog, backup-recovery-dialog (backup/shards/QR/restore/social/dead-man tabs, client-side SAOSVAULT QR frames), audit-panel (live feed + VERIFY + report downloads), vault-console (VAULT tab assembly), index barrel.
+   289→- trade-terminal.tsx: "Signing locked (M2)" gate replaced by real SIGN WITH VAULT — builds SignOrderRequest from the preview payload (deterministic orderid/orderExpiration), SigningDialog wired in; unsigned hex/digest display preserved.
+   290→- FIXED post-agent (main): unused eslint-disable removed.
+   291→
+   292→Stage Summary:
+   293→- Browser-verified end-to-end: wizard full run → initialized (5N/13S/4P, score live); unlock → 300s countdown ticks; DEX build → SIGN WITH VAULT → policy PASS → progress checklist → SIGNED (signed-only) + copyable txid; fail-closed KEY_NOT_FOUND before key seal — honest error panel + toast; simulation panel shows -0.960 SBD / +10.000 STEEM legs with PASS badge; audit feed live (vault_created → … → signing_attempt), VERIFY = intact; 390px mobile layout clean.
+   294→
+   295→---
+   296→Task ID: 5
+   297→Agent: Z.ai Code (main)
+   298→Task: Integration, verification, hardening — page.tsx VAULT tab, wallet widget, audit BigInt fix, state reset, full E2E verification
+   299→
+   300→Work Log:
+   301→- page.tsx: VAULT section added (tab 7, ShieldCheck icon, keyboard 7) rendering VaultConsole; compact VaultStatusWidget mounted above WalletPanel in the WALLET tab; header comment + keyboard hint updated to 1–7.
+   302→- Fixed AuditEvent.timestamp Int32 overflow (schema BigInt + db push + store conversion).
+   303→- Reset vault state (dev DB) for a clean user handoff after agent-era test data (@qaaccount key) polluted it; restarted dev server to flush the stale runtime singleton.
+   304→- eco-registry.ts: "Keystore M2" moved from gated/planned to live with the real layer list; honest new gap "Signing keys held hot in sandbox" replaces the resolved "keystore missing" gap.
+   305→- Full E2E in agent-browser (1440px + 390px): 7 tabs, wizard golden path, unlock countdown, DEX sign flow, crypto verification (recoverFromCompact(sig, digest) == vault pubkey via bun probe), audit integrity, PDF report bytes (%PDF-1.4 … %%EOF), zero console/page errors, dev.log clean.
+   306→
+   307→Stage Summary:
+   308→- The M2 gate is OPEN: signing flows through packages/core with policy + audit on every attempt; broadcast stays user-explicit. Success criteria: hierarchy ✓, crypto engine ✓ (all roundtrips + tamper paths), policy engine ✓ (static/dynamic/contextual/composite + anomalies), orchestrator ✓ (sign proven live; multi/batch/crossChain fail-honest), backup ✓ (password + shards-only + social + dead-man + QR), audit ✓ (tamper-evident, reports), UX ✓ (wizard/signing/widget/policy/backup), integration ✓ (5 networks config, 13 soldiers, DEX signing, dashboard), zero-mock ✓ (simulate reports missing adapters honestly; no fabricated numbers).
+   309→
+   310→---
+   311→Task ID: 6
+   312→Agent: Z.ai Code (main)
+   313→Task: Documentation + push
+   314→
+   315→Work Log:
+   316→- packages/core/README.md rewritten from scaffold placeholder to the live 6-layer architecture doc with security invariants + verification record.
+   317→- docs/security.md: threat model (assets, 12-row adversary/control matrix, residual risks: hot-server custody / gateway trust / no biometrics yet, incident playbook).
+   318→- docs/vault.md: user guide (wizard, daily operation, policy, backup/recovery, audit, REST surface).
+   319→- README.md: status → M0+M1+M2, packages table, M2 gate section, VAULT tab row, keyboard 1–7.
+   320→- worklog.md: this + prior entries; no secrets anywhere (token file remains gitignored).
+   321→
+   322→Stage Summary:
+   323→- M2 SHIPPED: Sovereign Key Vault live end-to-end, browser-verified, docs complete → commit + push to origin main.
+   324→
+   325→---
+   326→Task ID: M3
+   327→Agent: Z.ai Code (main)
+   328→Task: Phase M3 — Multi-Chain Sovereign Ecosystem: סריקת כל ריפו של roshpinacare-sys, אדפטרים ל-Ethereum + Solana על ה-seam הקפוא, שכבת-גשרים (router/monitor), הרחבת ה-Vault ל-7 רשתות, UI (GRID 7 + Bridge Explorer + WALLET ETH/SOL), אימות דפדפן ו-push.
+   329→
+   330→Work Log:
+   331→- סריקה חיה (Step 6.1): GitHub API עם טוקן-side-server בלבד — 8 ריפו (user repos, לא org endpoints — ה-`/users/.../repos` מחזיר ריק לחשבון-משתמש פרטי; `/user/repos` פותר). עצים + READMEs + package.json לכולם. ממצא מרכזי: אפס קוד Ethereum/Solana בכל האקוסיסטם (אפס ethers/web3/solana-web3) — האדפטרים נבנו מאפס. יכולות-למיחזור שזוהו: THE-DOOR relay (saos-dex — queue+circuit-breakers), anchor-payload seam (roshpina `pending-anchors.jsonl`), external-signer keyless flow (foundry). bridge_state.json ב-repo steem: anchoredTotal=100.
+   332→- אדפטר Ethereum (packages/chains/ethereum): ChainAdapter מלא על ethers v6 — health/block/timestamp, getBalances (BigInt-exact "x ETH"), getAccountInfo (+codeKind: EOA | eip7702 (0xef01 designator — נתגלה חי על כתובת ויטליק!) | contract), ERC-20 read, EIP-1559 fees (eth_maxPriorityFeePerGas + baseFee×policy מנומק), buildOperations (transfer/erc20_transfer/erc20_approve, gas estimate +20% headroom), sign (roles=["active"] בדיוק; מקבל 0x-hex/Uint8Array/vault PrivateKey duck-typed), broadcast fail-closed, failover 4 RPC ציבוריים.
+   333→- אדפטר Solana (packages/chains/solana): ChainAdapter מלא על @solana/web3.js — health/getSlot, getChainInfo (epoch/version), getBalances (formatLamports BigInt-exact — לעולם לא float), SPL token accounts (Token + Token-2022, parsed), buildOperations (transfer/spl_transfer עם ATA idempotent + memo), sign דרך Message.from→Transaction.populate→sign→serialize (החתימה מכסה בדיוק את בייטי ה-message מ-buildOperations — חסר-מצב), keypair מ-32-seed/64-secret/base58, broadcast fail-closed.
+   334→- רישום (packages/chains/index.ts): endpoint books מתועדים + getSteem/getEthereum/getSolanaAdapter lazy singletons.
+   335→- שכבת-גשרים (packages/bridges): types (BridgePath/Fee legs עם שדה-source אנטי-mock), router (קטלוג 6 מסילות כן: 2 live + 4 gated עם gateReason; multi-hop דרך SAOS-NET hub; עמלות ETH חיות מ-getChainInfo, קבועות Solana 5000 lamports/sig + rent, "0 TRX נמדד"), monitor (pure functions עם data injection — packages לא מייבאים src/), barrel.
+   336→- Vault→7 רשתות: NetworkId+OperationType (+erc20_transfer/erc20_approve/spl_transfer/memo), DEFAULT_NETWORK_ROLES/OPS/LIMITS ל-ethereum (active; ETH wei 0.1) ו-solana (active; SOL 1 lamport-scale), initialize מקצה 7 network-vaults (ETH/SOL נולדים offline), keys.ts — סכימת-מפתח מאוחדת מתועדת: אותם 32 בייטים = secp256k1 (Steem/EVM) וגם Ed25519 seed (Solana); publicKey per-network: EIP-55 (keccak via @noble, checksum ידני) / base58-ed25519; validateRoleForNetwork: ethereum/solana מקבלים "active" בלבד; policy thresholds ETH/SOL.
+   337→- vault-runtime: Ethereum/Solana adapters מחוטרים ל-orchestrator (SIGN-capable בלבד — בלי allowBroadcast ⇒ capabilities בלי "broadcast" ⇒ broadcast gate נכשל-סגור). keys/networks routes: ולידציה ל-7 רשתות + single-key guard.
+   338→- probes (eco-server): probeEthereum (eth_getBlockByNumber raw — height+timestamp+baseFee gwei בקריאה-אחת, failover 3) + probeSolana (getEpochInfo, failover 2) → ecoNetworks מחזיר 7 שרשראות. eco-registry: 7 רשתות + 2 גשרים חדשים (gated) + פער-חדש "אין חוזה/תוכנית פרוסה" + scan-meta 2026-09-08.
+   339→- API חדשים: /api/bridge/routes (findPaths חי), /api/bridge/status (railStatuses+analytics מה-state החי — anchors/verified/wrapped collateral), /api/eco/account (ETH native+ERC-20 / SOL native+SPL).
+   340→- UI: טוקנים --eth/--sol ב-globals.css; CHAIN_TONE+7; header "8 repos · 7 chains" + 7/7; **bridge-explorer.tsx** (from/to/asset/amount → FIND ROUTES → כרטיסי-נתיב עם hop-chips, ETA, trust, עמלות-חיות + שדות-מקור, gateReason בכנות; Bridge Analytics עם anchors/verified/wrapped-collateral טבלה חיה); **multichain-wallet.tsx** (ETH/SOL address tracking persist-local, יתרה מונפשת, SPL accounts scroll-טבלה, account-type EOA/delegated(EIP-7702)/contract); VAULT console+wizard 7 רשתות עם role-lock ל-chains חד-מפתח; footer GRID·ENTERPRISE·M3; page.tsx BRIDGES=Explorer+Monitor, WALLET+=MultiChainWallet.
+   341→- באגים שנתפסו ותוקנו: BigInt×number ב-gas policy; decimals כ-bigint מ-ethers (uint8); import-שמות @noble/hashes v2 (keccak_256); never[] instructions; monitor inject-types בלי index-signature (interfaces לא מקבלות implicit index); getJson generic narrowing; תצוגת "yes (true)"→סיווג codeKind אמיתי (EIP-7702 התגלה חי).
+   342→- אימות: bun tools/m3-adapter-check.ts — **23/23 PASS** מול mainnet חי (health/heights, יתרות vitalk 6.71 ETH + Binance 1.73M SOL, USDT 290.37, SPL 4,287, EIP-1559+legacy build+sign, ed25519-verify מהחתימה, broadcast fail-closed ×2, role-policy fail-closed, formatLamports vectors). agent-browser: 7/7 כרטיסים חיים עם גבהים מתגלגלים (ETH 25,928,7xx + baseFee בשורת-version · SOL 445,189,xxx + epoch 1030), Bridge Explorer golden path (FIND ROUTES → כרטיס STEEM→ETHEREUM עם עמלה-חיה 0.0000067 ETH @ block מדוד + gateReason), WALLET ETH/SOL tracking חי, VAULT dropdown 7 אפשרויות + role-lock, REGISTRY 7-network scan meta; מובייל 390px נקי; 7 טאבים נסרקו; אפס שגיאות קונסולה/עמוד אחרי reload טרי. lint נקי · dev.log ללא שגיאות.
+   343→
+   344→Stage Summary:
+   345→- **7 רשתות חיות במסך אחד** — כל הקריטריונים: אדפטרים build/sign/broadcast(fail-closed)+ERC-20/SPL · Bridge Layer (router+monitor עם anti-mock source fields) · Bridge UI (explorer+analytics) · Vault 7 רשתות (סכימת-מפתח מאוחדת) · Grid 7 cards · Wallet 7 · אפס שגיאות קונסולה · mobile 390px · a11y נשמר (aria/sr-only/keyboard 1–7).
+   346→- כנות ללא-פשרות: מסילות ETH/SOL gated עם סיבה מפורשת (אין חוזה/תוכנית פרוסים) — ה-lock-op מוגדר, ה-mint ממתין; broadcast נשאר נעול ב-ETH/SOL; כל עמלה נושאת מקור.
+   347→- Scan report (Step 6.1) מוטמע ב-REGISTRY: אפס קוד ETH/SOL קיים ב-org; למיחזור: relay-pattern, anchor-seam, signer-flow; חסר: חוזה-גשר + תוכנית Solana + מימון TRON.
+   348→
