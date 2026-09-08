@@ -118,6 +118,40 @@ export interface AnchorRecord {
   explorer: string | null;
 }
 
+export interface SaosHubResponse {
+  ok: true;
+  fetchedAt: string;
+  core: SaosNetResponse["core"] | null;
+  engine: SaosNetResponse["engine"] | null;
+  gates: { skippedForEdge: number | null; rejected: number | null; edgeLeak: number | null };
+  floorSteps: Array<{ at: string; floor: number; backedByMicro: number }>;
+  seeds: Record<string, string>;
+  mints: Record<string, string>;
+  soldiers: Array<{
+    name: string;
+    role: "commander" | "trade" | "ring";
+    scopes: string[];
+    live: { sp: number; vpPct: number | null; rcPct: number | null; created: string } | null;
+    liveError?: string;
+    seq: number | null;
+    pnlMicro: number | null;
+  }>;
+  steemAccountsLive: number;
+  armyLiveError?: string;
+  loops: {
+    agent: Array<{ name: string; layer: string; bytes: number | null; cadence: string; purpose: string }>;
+    node: Array<{ name: string; layer: string; bytes: number | null; cadence: string; purpose: string }>;
+    censusNote: string;
+  };
+  pools: SaosNetResponse["pools"];
+  oracle: SaosNetResponse["oracle"];
+  wrapped: SaosNetResponse["wrapped"];
+  tronBridge: SaosNetResponse["tronBridge"];
+  anchors: Array<{ id: string; chain: string; cpHeight: number | null; txid: string; detail: string; explorer: string }>;
+  facts: Array<{ at: string; kind: string; text: string; ref: string | null; url: string | null }>;
+  delegations: Array<{ name: string; scopes: string[] }>;
+}
+
 export interface AnchorsResponse {
   ok: true;
   anchors: AnchorRecord[];
@@ -159,6 +193,16 @@ export function useEcoSaosNet() {
     queryKey: ["eco", "saosnet"],
     queryFn: () => getJson<SaosNetResponse>("/api/eco/saosnet"),
     refetchInterval: 12000,
+    retry: 1,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useEcoSaosHub() {
+  return useQuery({
+    queryKey: ["eco", "saoshub"],
+    queryFn: () => getJson<SaosHubResponse>("/api/eco/saos-hub"),
+    refetchInterval: 30000,
     retry: 1,
     placeholderData: keepPreviousData,
   });

@@ -34,7 +34,7 @@ export function StatusFooter() {
 
         <p className="num hidden items-center gap-2 text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)] lg:flex">
           <Keyboard className="h-3.5 w-3.5" aria-hidden />
-          keys 1–6 switch sections
+          keys 1–8 switch sections
         </p>
 
         <p className="num ml-auto text-[9px] uppercase tracking-[0.2em] text-[var(--text-tertiary)]">

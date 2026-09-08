@@ -83,8 +83,9 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 | טאב | תוכן | מקור נתונים (חי) |
 |---|---|---|
 | **GRID** | KPI strip · Network Grid (**7 כרטיסי רשת** + drill-down) · Pairs Matrix (sortable, כל ה-venues) | probes חיים לכל השרשראות |
+| **SAOS HUB** | **SAOS במרכז הבמה** (2026-09-08): Chain Core · grid98 (bench נמדד · סולם-רצפה גובה-צעד · שערי-כנות: skipped-for-edge/rejected/edge-leak) · **צי-החיילים אינטראקטיבי** (לחיצה על חייל = SP/VP/RC חי עכשיו + seq + PnL + scopes) · מפקד-לולאות (8 agent + 15 node daemons עם הוכחת-bytes) · 14 בריכות · 20 wrapped (supply==locked) · 15 ציטוטי-oracle חתומים · anchor rails עם txids ציבוריים · dex-facts כנים | `/api/eco/saos-hub` (state daemon-push + Steem RPC חי + GitHub contents API) |
 | **DEX** | Order Book + Trading Terminal + Tape — השוק האמיתי STEEM/SBD | api.steemit.com (M0/M1) |
-| **SAOS-NET** | מנוע הרשת הריבונית שלנו: bench 130K tx/s, treasury P&L, הספר-הריבוני, ציטוטי oracle חתומים, wrapped assets, delegations | `state.json` + `grid98-state.json` (daemon-push ל-repo `steem`) |
+| **SAOS-NET** | מנוע הרשת הריבונית שלנו: bench **32.6K tx/s נמדד** (65,238 txs אמיתיים מהארכיון ב-replay — תקרת-מנגנון 2.82B/יום; ״130K״ שהיה-כתוב-כאן קודם לא היה מדידה), treasury P&L, הספר-הריבוני, ציטוטי oracle חתומים, wrapped assets, delegations | `state.json` + `grid98-state.json` (daemon-push ל-repo `steem`) |
 | **BRIDGES** | **M3 Bridge Explorer** (מציאת-נתיב 7×7 · עמלות מנומקות-מקור · שערי-readiness כנים) + מטריצת עוגנים + Live Anchor Feed + TRON Pulse + Analytics מה-state החי | router + SAOS-NET checkpoints |
 | **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON · חוזה-גשר לא פרוס · חתימה cold/hardware) | סריקה 2026-09-08 |
 | **WALLET** | יתרות/SP/RC/פקודות פתוחות + **M3: חיפוש כתובות ETH (native+ERC-20) ו-SOL (native+SPL)** + סטטוס הכספת | api.steemit.com + adapters |
@@ -92,7 +93,7 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 
 **מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · `ethereum-rpc.publicnode.com` (+fallbacks) · `api.mainnet-beta.solana.com` (+fallbacks) · daemon-state של SAOS-NET. כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 
-**קיצורי מקלדת:** מקשים 1–7 מחליפים מסכים (7 = VAULT).
+**קיצורי מקלדת:** מקשים 1–8 מחליפים מסכים (8 = VAULT).
 
 ## 🌉 M3 — Multi-Chain Sovereign Ecosystem (2026-09-08)
 
@@ -129,6 +130,23 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 **דוח-סטטוס חי:** `docs/system-status.json` + `docs/system-status.md` — נוצר ע"י `bun tools/system-status.ts` מול `/api/system/health` החי; כל מספר נמדד בזמן-יצירה, מה שלא נמדח = null עם הסיבה.
 
 **מפת-דרכים אסטרטגית (`docs/strategy-roadmap.md`):** ניתוח-עסקי מעוגן-חיים — 7 מודלים עסקיים (Wallet-as-a-Service · Bridge Aggregator · DEX Aggregator · Validator · White-Label · Security Audits · Institutional Custody) ממופים ליכולות-מאומתות מול שערי-חוסמים כנים; המלצה: bootstrap + open-core, סדר-בנייה מדורג (M5 Wallet MVP אוטונומי → פריסת חוזה-גשר/audit/פיילוט = החלטות-בעלים). zero-mock גם באסטרטגיה: הטענות-טכניות בניתוח אומתו מחדש באותו-יום (7/7 · 23/23 · 2 גשרים חיים), הטענות-פיננסיות סומנו כספקולטיביות.
+
+## 🔱 SAOS Deep Dive — Breakthrough Proof (2026-09-08)
+
+**SAOS במרכז הבמה.** סריקת-עומק חיה של כל הרכיבים הריבוניים (GitHub API על 6 ריפו + probes על mainnet + ה-state החי) וארבעה מסמכי-אמת:
+
+| מסמך | תוכן |
+|---|---|
+| `docs/saos-inventory.md` | מיפוי מלא: chain kernel (`saosnet.cjs` 142KB) · grid98 · ה-13 חיילים (13/13 חיים על Steem mainnet, נמדדו SP/VP/RC) · מפקד-לולאות (8 agent + 15 node daemons) · 6 גשרים · 20 wrapped · 15 oracle · פערים כנים |
+| `docs/saos-capabilities.md` | **16 יכולות מוכחות** — כל אחת עם proof חי + value + efficiency |
+| `docs/saos-breakthroughs.md` | **5 פריצות-דרך**: עוגן-זהות חוצה-פרדיגמות (EIP-191 ⇄ Graphene, ecrecover-verifiable) · shadow-L1 עם אבטחה-שכורה (עוגנים ל-3 שרשראות ב~אפס-עלות) · grid98 honesty-engine (383,836 skipped-for-edge — הסירוב-הוא הפיצ'ר) · כלכלת-wrapped 1:1 עם הוכחות-מנט ציבוריות · המטא: מערכת שמתעדת את עצמה |
+| `docs/saos-strategy.md` | SAOS-first: הרשת הריבונית = המוצר, 7 הרשתות = ההיקף; סדר-בנייה S1–S4 עם שערי-בעלים |
+
+**תיקון-כנות:** "130K tx/s" שהיה-כתוב ב-README לא היה מדידה — ה-bench החי המדוד: **32,603 tx/s** (65,238 txs אמיתיים מ-`chain-archive.jsonl` 39.6MB ב-replay על state משוכפל), תקרת-מנגנון 2.82B/יום.
+
+**UI חדש — טאב SAOS HUB (מקש 2):** `/api/eco/saos-hub` מאגד בחיים: Chain Core · grid98 (שערי-כנות + סולם-רצפה) · **צי-החיילים האינטראקטיבי** (לחיצה = מה-הוא-עושה-עכשיו: SP/VP/RC חי, fleet-seq, arena-PnL, scopes) · Loop Census עם הוכחת-bytes מ-GitHub · 14 בריכות · 20 wrapped · 15 oracle חתומים · anchor rails (txids ציבוריים) · dex-facts כנים. אפס-mock: מה שלא נמדד = null עם הסיבה.
+
+**תשתית סריקה חדשה:** `tools/saos-deep-scan.ts` (→ `docs/saos-scan.json` · 6 ריפו, מיפוי-מילות-מפתח לכל-רכיב-ריבוני) + `tools/saos-fetch-core.ts`/`round2` (שליפת-קוד-מקור לתחקיר).
 
 ### 🎨 Enterprise redesign (2026-09-07) — design system מקצועי מלא
 
