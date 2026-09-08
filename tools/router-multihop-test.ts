@@ -112,14 +112,24 @@ async function main() {
   );
 
   // ---- 2. Materialize + import the PRE-FIX router from git (read-only) -----
+  // SEC/AUDIT fix (fix-round): this used to pin `HEAD` — a MOVING reference.
+  // Once later commits landed, "HEAD" became the POST-fix router, so the
+  // "before" runs silently executed today's code and the historical
+  // "0 candidates" assertions failed (27/3 drift caught live). The pre-fix
+  // bytes are now pinned to the parent of the commit that INTRODUCED the
+  // 1-d multi-hop fix (14956a5) — the snapshot carries its own frozen RAILS
+  // registry (rails live inside router.ts), and packages/bridges/types.ts has
+  // been additive-only since, so old bytes + current types reproduce the
+  // historical world honestly.
+  const PREFIX_REF = "14956a5~1"; // router BEFORE multi-hop composition existed
   let beforeFn: typeof findPaths | null = null;
-  console.log(`\n=== BEFORE MODULE (git show HEAD:${"packages/bridges/router.ts"} → ${SNAPSHOT}) ===`);
+  console.log(`\n=== BEFORE MODULE (git show ${PREFIX_REF}:packages/bridges/router.ts → ${SNAPSHOT}) ===`);
   try {
-    const headRouter = execSync(`git show HEAD:packages/bridges/router.ts`, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
+    const headRouter = execSync(`git show ${PREFIX_REF}:packages/bridges/router.ts`, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
     writeFileSync(SNAPSHOT, headRouter);
     const mod = (await import(pathToFileURL(SNAPSHOT).href)) as { findPaths: typeof findPaths };
     beforeFn = mod.findPaths;
-    ok("pre-fix router materialized + imported", typeof beforeFn === "function", "real HEAD code, real registry, no reimplementation");
+    ok("pre-fix router materialized + imported", typeof beforeFn === "function", `real pre-fix bytes pinned to ${PREFIX_REF}, frozen internal registry, no reimplementation`);
   } catch (e) {
     console.log(`  WARN  before-module unavailable (${e instanceof Error ? e.message : "unknown"}) — before/after runs will say null + reason`);
   }

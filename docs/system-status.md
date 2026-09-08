@@ -1,6 +1,6 @@
 # Saosmartwallet — System Status Report
 
-Generated: `2026-09-08T22:04:20.154Z` · git `14956a5` · source: live `/api/system/health`
+Generated: `2026-09-08T22:57:18.426Z` · git `9cd9881` · source: live `/api/system/health`
 
 **Summary:** networks `7/7` · rails live `2` · rails gated `4` · critical issues `0`
 
@@ -8,13 +8,13 @@ Generated: `2026-09-08T22:04:20.154Z` · git `14956a5` · source: live `/api/sys
 
 | Network | Status | Head | Lag/State | Version/Evidence |
 |---------|--------|------|-----------|------------------|
-| STEEM | UP | 109,411,581 | 3s lag | live probe via M0/M1 SteemMarketClient |
-| HIVE | UP | 109,746,096 | 3s lag | live probe api.hive.blog |
-| BLURT | UP | 63,475,031 | 3s lag | live probe blurt-rpc.saboin.com |
-| TRON | UP | 86,077,708 | 3s lag | live probe api.trongrid.io |
-| SAOS-NET | UP | 63,638 | state 7m old | saos-net/0 |
-| ETHEREUM | UP | 25,935,512 | 21s lag | 0.057420735 gwei baseFee |
-| SOLANA | UP | 445,447,241 | — | epoch 1031 · slot 55241/432000 |
+| STEEM | UP | 109,412,638 | 1s lag | live probe via M0/M1 SteemMarketClient |
+| HIVE | UP | 109,747,151 | 1s lag | live probe api.hive.blog |
+| BLURT | UP | 63,476,076 | 1s lag | live probe blurt-rpc.saboin.com |
+| TRON | UP | 86,078,767 | 4s lag | live probe api.trongrid.io |
+| SAOS-NET | UP | 63,638 | state 60m old | saos-net/0 |
+| ETHEREUM | UP | 25,935,776 | 8s lag | 0.044266198 gwei baseFee |
+| SOLANA | UP | 445,457,243 | — | epoch 1031 · slot 65243/432000 |
 
 ## Bridge rails
 
@@ -29,14 +29,14 @@ Generated: `2026-09-08T22:04:20.154Z` · git `14956a5` · source: live `/api/sys
 
 ## Direct bridge routes (live router quotes)
 
-- **steemEthereum** — `gated` — No bridge contract deployed on Ethereum mainnet — lock op defined, mint leg awaits verified contract (BRIDGE_ABI ready) · fee: 0 STEEM + 0.00000919347616 ETH · ETA 783s
+- **steemEthereum** — `gated` — No bridge contract deployed on Ethereum mainnet — lock op defined, mint leg awaits verified contract (BRIDGE_ABI ready) · fee: 0 STEEM + 0.0000070883396 ETH · ETA 783s
 - **steemSolana** — `gated` — No bridge program deployed on Solana mainnet — lock op defined, mint leg awaits deployed program (program IDs staged) · fee: 0 STEEM + 0.000005 SOL + 0.00203928 SOL · ETA 16s
 
 ## Vault
 
 ```json
 {
-  "latencyMs": 2,
+  "latencyMs": 12,
   "reachable": true,
   "initialized": false,
   "locked": true,
@@ -54,14 +54,14 @@ Generated: `2026-09-08T22:04:20.154Z` · git `14956a5` · source: live `/api/sys
 
 ```json
 {
-  "latencyMs": 648,
+  "latencyMs": 678,
   "reachable": true,
   "bids": 19,
   "asks": 50,
   "latest": "0.09713049029224470",
-  "spreadPercent": 0.5799331510656447,
-  "headBlock": 109411581,
-  "lagSeconds": 3
+  "spreadPercent": 0.28212667050987417,
+  "headBlock": 109412638,
+  "lagSeconds": 2
 }
 ```
 

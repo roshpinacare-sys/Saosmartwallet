@@ -58,6 +58,13 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async rewrites() {
+    return [
+      // RFC 9116 — security.txt at the standard well-known path (the
+      // dot-folder is not routable in App Router, so a rewrite serves it).
+      { source: "/.well-known/security.txt", destination: "/api/security-txt" },
+    ];
+  },
 };
 
 export default nextConfig;

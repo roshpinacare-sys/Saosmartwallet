@@ -122,3 +122,28 @@ Set globally in `next.config.ts` (`headers()`), verified live by the gate:
 - `npm publish`, outreach sending, public `BASE_URL`, and vault
   initialization with the owner's key remain owner actions by design — no
   credentials exist in this sandbox.
+
+## 7. Disclosure channel (RFC 9116)
+
+`/.well-known/security.txt` is served live (rewrite → `/api/security-txt`)
+pointing at this repo's GitHub **security advisory** flow (private by
+design), with `Policy` → this document and a 90-day `Expires` that must be
+rolled on security-affecting pushes. Mechanically enforced by the gate
+(section 6b).
+
+## 8. Fix-round evidence (live, this repo)
+
+- Full input-fuzz across all 20 POST-facing API endpoints (garbage JSON +
+  prototype-pollution shapes): **zero 500s** — every route answers an honest
+  4xx (400 validation / 401 auth / 405 method / 409 state) or runs its
+  documented default.
+- Proof-suite re-run in one round: ZK 9/9 · quota-race ATOMIC-PROVEN ·
+  m1-op-test 27/27 · cancel-oracle ALL PASS · serialize 30/30 ·
+  m3-adapter 23/23 · chain-health exit 0 (1s lag) · router-multihop
+  **30/30 after tool fix** (the tool's "before" snapshot was pinned to the
+  moving HEAD — a measurement bug, not a product bug; now pinned to the
+  true pre-fix bytes `14956a5~1`).
+- Admin credential: fuzz POST accidentally consumed the owner-first
+  bootstrap; state was reset to 0 rows (verified), bootstrap re-proven 201,
+  and the live GET surface stays 405 (POST-only). No plaintext token ever
+  left the process (201 copy-once by design).

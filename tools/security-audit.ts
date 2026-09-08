@@ -244,6 +244,22 @@ async function main() {
     }
   }
 
+  // ── 6b. Disclosure channel (RFC 9116 security.txt) ──────────────────────
+  head("6b. Disclosure channel — security.txt (RFC 9116)");
+  try {
+    const route = await readFile(path.join(ROOT, "src/app/api/security-txt/route.ts"), "utf8");
+    const cfg = await readFile(path.join(ROOT, "next.config.ts"), "utf8");
+    const routeOk = /security\/advisories\/new/.test(route) && /Expires: /.test(route);
+    const rewriteOk = /\.well-known\/security\.txt/.test(cfg);
+    if (routeOk && rewriteOk) {
+      pass("security.txt route (real advisory channel + Expires) + /.well-known rewrite present");
+    } else {
+      fail(`security.txt incomplete — route ok=${routeOk} rewrite ok=${rewriteOk}`);
+    }
+  } catch {
+    fail("src/app/api/security-txt/route.ts missing — disclosure channel regressed");
+  }
+
   // ── 7. Security headers (live) ───────────────────────────────────────────
   head("7. HTTP security headers (live server)");
   if (OFFLINE) {
