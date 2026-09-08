@@ -313,3 +313,23 @@ Stage Summary:
 - 20-ממצאי-ביקורת → כולם-טופלו: 14-תיקוני-קוד, חבילת-הביקורת-נארזה-מחדש-מ-HEAD-עם-SHA-pin (היא-הכילה-את-קוד-הכסף-שקרס-בייצור!), /metrics-מומש, מסמכים-הוכנו-לאמת.
 - התוצר-למפעיל: NETWORK-SUMMARY.md (הכל-שיש-ברשת + מיקרו-גריד + צעדים-קריטיים: P0-מפתחות-חדשים = השער-היחיד).
 - נותר-פתוח (מתועד): ריצת-כאוס-5-פסים-מאמתת+intents-persist (ממתינים-מפתחות), חלון-נונסים-6000 (replay-אחרי-גלגול — מתועד-בכנות), WS/OHLC/HSM (P2).
+
+---
+Task ID: SETTLE-8
+Agent: saos-dex agent (Z.ai Code)
+Task: המשך-פקודת-המפעיל (הודעות-21+22): וידוא-סנכרון-מול-GitHub, סריקה-מחודשת-של-תיקיות-הסוכנים-האחרים (רק-קריאה), איסוף-נכסים-לא-ידועים, תיקון-דיממים-ב-saos-dex, דחיפה, וסיכום-רשת.
+
+Work Log:
+- סנכרון: fetch מול-origin עם-טוקן-inline; HEAD=e402a9a=origin/main (SETTLE-7), עץ-נקי.
+- סריקה-מחודשת ×7-ריפואות (git ls-remote): 6/7-התקדמו-מאז-SETTLE-6; הושגו-הקלונים-ב-~/agents-audit (רק-קריאה) ונבלעו-העדכונים.
+- נבלעו-שני-מסמכי-עדות-חוצי-סוכנים: jummper CROSS-AGENT-FINDINGS (F-01..F-10) + foundry task-22 ("0-auth routes = top bug" על-הדקס).
+- אימות-מול-הקוד-שלנו: F-01/F-05/F-08-לא-תוקנים; F-02-חלקי; F-03-תוקן-ב-SETTLE-7.
+- תיקונים-בקוד-החי: (1) POSTING-authority-עדיף-על-ACTIVE ב-relay.ts (STEEM/HIVE_POSTING_WIF); (2) הקרנת-RC-קנונית (current+regen, מינוס-52.6x-חסר-מדוד); (3) searchTransactionHistory:true; (4) ערוץ-אימות-SOL-על-finalized+שער-confirmationStatus; (5) ethIntents→state/anchors.json (persist-מיידי+שחזור-בעלייה — סוגר-P0-5); (6) consoleGuard-על-9-נתיבי-POST (שער-CSRF בכותרת-מנהלת) + הקונסולה-מזדהה.
+- CODE_VERSION→saos-dex/1.7.0+settle8-crossaudit; STATUS/NETWORK-SUMMARY-עודכנו; §13-נוסף-ל-PROOF.
+- אימות-חי: tsc-נקי; שער-נבדק-חי (reset-בלי-כותרת=403, settle-עם-כותרת=200); דמון-חי h2900+ ledgerOk=true examOk=true; agent-browser: STABILIZE-מה-UI-עובר, exam-PASS, אפס-שגיאות-עמוד; צילומי-settle8-נשמרו.
+- pegkeeper-הודק-חי (settle-POST: pool-peg-111kµ; פער--55bps→--12bps).
+
+Stage Summary:
+- סבב-SETTLE-8-סגור: הרשת-נבלעה-כולה-וממצאי-האחים-מומשו-בקוד-החי (6-תיקונים, כולם-אפס-עלות).
+- הריפו-נשאר-מקור-האמת; הדמון-חי-מריץ-את-הקוד-החדש-בלי-הפרה-של-אינווריאנטות.
+- פתוח-למפעיל: מפתחות-פרסום (STEEM/HIVE_POSTING_WIF), U-01 (27-עוגני-SOL-ישנים), ריצת-כאוס-חמישה-פסים-אחרי-מפתחות.
