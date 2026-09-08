@@ -375,3 +375,23 @@ Stage Summary:
 - **P0-הוותיק-נסגר**: מפתחות-חדשים-הוקמו-בפועל (בלי-מפעיל), הדלופים-מבוטלים-על-השרשרת, הרליי-עוגן-חי-מאומת-בשתי-השרשראות-עם-הזהות-החדשה.
 - שער-המפעיל-הפך-מ"חומה-שוברת-נתיב-זהב" ל"שער-אמיתי-עם-מנגנון-חיול-נוח".
 - פתוח-למפעיל: מפתחות-חיים-של-9-חיילים (לא-אצלנו); מימון-ETH-gas/TRX לפסים-נוספים; רוטציית-PAT-GitHub (עדיין-קיים-בplatform-היסטוריה).
+
+---
+Task ID: SETTLE-11
+Agent: saos-dex agent (Z.ai Code)
+Task: הודעת-המפעיל: "יש לך כסף וגישה — תמיר מה שאתה צריך, עדיף פתרון ריבוני; נושא-ההמרה חשוב — שנוכל להמיר על הרשת שלנו את המטבעות שברשותנו; היזהר מפישינג וסוכנים זרים, לא נפעיל קוד זר; הכל חשוב, תעשה ודחוף לריפו"
+
+Work Log:
+- 11.1 סנכרון: HEAD=96db4e5 (SETTLE-10) · anchors.json-חי-בלבד-משופר.
+- 11.2 דימם-א' שנחשף — פצצת-זמן WIF: כל-ה-WIF-ים ב-.env מהרוטציה היו **דחוסים** (52 תווים K/L); ספריית-steem דוחה אותם ("Expecting 32 bytes, instead got 33" — 181 אירועים בלוג). הדמון-החי רץ על עותק-זיכרון ישן → כל-אתחול-מחדש היה הורג-עיגון. תוקן: normalizeWif() ב-loadKeys (base58check→השלכת-0x01→לא-דחוס; fail-closed). נבדק 5/5 (שקילות-מול-לא-דחוס-ישיר, אידמפוטנציה, זבל→null, checksum-שגוי→null).
+- 11.3 דימם-ב': eth/sol ללא-מפתח ננסו ככשל-קשה ×15 → breakers-שווא. תוקן: השבתה-שקטה (no record/breaker/retry) + סיווג config-permanent + fallback-endpointHost תוקן (blxrbdn→ברירת-המחדל-האמתית).
+- 11.4 גילוי-קריטי אחרי-התחייה: השרשרת דוחה "Missing Posting Authority" — המפתחות-ב-.env (STM8dccB…/STM6awWia…) **אינם** רשויות-headcorner-בשרשרת (posting: STM6UBp98q… · active: STM5beptA…). ההיסטוריה-מתיישבת: ה-WIF-ים-ב-.env נכתבו 21:20 כנראה-פגומים (בליעת-פלט-כלים — §15); העיגונים-החיים-נמשכים דרך keyrelay (txs מאומתים verified:True). **המפתחות-הנכונים לא-קיימים אצלנו** — זהו הפער-המדויק-למפעיל.
+- 11.5 התרופה-המוסדית: טיסה-מקדימה של רשויות (authorityOk) — גזירת-מפתח-ציבורי-מקומית + השוואה מול-רשות-החשבון ב-RPC; אי-התאמה → disabled fail-closed עם-הודעה-כנה (אפס-רכבת-דחיות). נמדד-חי: STEEM/HIVE=disabled(כנה) · TRON=unfunded-כנה · ETH/SOL=disabled-שקטה · breakers-סגורים · אפס-רעש.
+- 11.6 הגדר-הריבונית: fence.ts (assertAllowedHost לפני-כל-fetch יוצא: relay.rpc/relay-eth.rpc/relay-sol.rpc/relay.tron) + scripts/fence-check.ts (42 קבצים: אפס eval/new-Function/import-מרחוק; 10 pinned+6 display-only) + /api/dex/security + PHISHING_DEFENSE.md (מודל-איום+7 הגנות+כללי-מפעיל).
+- 11.7 SOVEREIGN-CONVERT: /api/dex/convert — המרת-המטבעות-שברשותנו על-הרשת שלנו (GET: מלאי+ציטוט-חי ישיר/דרך-SAOS; POST: ביצוע עם minOut-חובה fail-closed, שערי operator+console). נבדק-חי: quote WSTEEM→USDS עובד.
+- 11.8 אימות: tsc נקי · fence-check נקי · סריקת-סודות על-כל-ה-diff (7 פגיעות=שקריות-חיוביות-שמות-משתנים) · דמון-חי על 1.10.0+settle11-fence-convert · CODE_VERSION-מדווח-חי.
+
+Stage Summary:
+- הרשת-מגודרת: שער-יוצא-לא-מקובע=חסימה, קוד-זר=אסור-ונסרק, המרות-ריבוניות-על-הגרעין, פצצת-ה-WIF-נוטרלה, הריליי-כן.
+- הפער-המדויק (למפעיל): ייבוא/רוטציה של ה-posting/active-WIF-האמתיים של headcorner (Steem+Hive) — אצל-ה-keyrelay/הכספת של-ה-platform; או מימון TRX/ETH/SOL לפסים-נוספים.
+- פתוח-מתועד: anchors.json-מצומצם-אחרי-הפעלה-מחדש (היסטוריה-מלאה-ב-git).
