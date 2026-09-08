@@ -143,6 +143,7 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 | `docs/saos-capabilities.md` | **16 יכולות מוכחות** — כל אחת עם proof חי + value + efficiency |
 | `docs/saos-breakthroughs.md` | **5 פריצות-דרך**: עוגן-זהות חוצה-פרדיגמות (EIP-191 ⇄ Graphene, ecrecover-verifiable) · shadow-L1 עם אבטחה-שכורה (עוגנים ל-3 שרשראות ב~אפס-עלות) · grid98 honesty-engine (383,836 skipped-for-edge — הסירוב-הוא הפיצ'ר) · כלכלת-wrapped 1:1 עם הוכחות-מנט ציבוריות · המטא: מערכת שמתעדת את עצמה |
 | `docs/saos-strategy.md` | SAOS-first: הרשת הריבונית = המוצר, 7 הרשתות = ההיקף; סדר-בנייה S1–S4 עם שערי-בעלים |
+| `docs/agents-survey.md` | **סקר תיקיות-הסוכנים (2026-09-08):** מפת `engineering/`+`wallet-design/`+`tests/`+`tool-results/` · תיקון הדימום של 267 שינויי-mode (core.fileMode=false) · **החיבור הגדול**: ההצעה המייסדת F1–F5/R1–R3 מול מה שנבנה בפועל (R1/R2 ✅ · F4/F5/F1/F3 🟡 · F2 ❌ — עם ראיות-קוד) · 4 החלטות-בעלים שנאספו |
 
 **תיקון-כנות:** "130K tx/s" שהיה-כתוב ב-README לא היה מדידה — ה-bench החי המדוד: **32,603 tx/s** (65,238 txs אמיתיים מ-`chain-archive.jsonl` 39.6MB ב-replay על state משוכפל), תקרת-מנגנון 2.82B/יום.
 

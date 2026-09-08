@@ -461,3 +461,22 @@ Work Log:
 
 Stage Summary:
 - Model 1 Week 1 is DONE same-day as the plan was written: the identity verification is a real product — key-authenticated, metered, quota'd, ledgered, with an owner console and a live PROVEN path (curl + browser). Everything anti-mock: a FAILED verdict is a measured fact, zeros are real zeros, the only untested branch (429) is declared. Next step per plan: Week 2 — the thin `saos-id-verify` npm SDK wrapping this endpoint. Pushed to main.
+
+---
+Task ID: AGENT-SURVEY
+Agent: Z.ai Code (main) — System Owner Mode
+Task: הבעלים: "וודא שאתה על הקומיט האחרון מהגיטהאב, תבחן את שאר התיקיות של הסוכנים, תסיק מסקנות ותאסוף מה שלא ידעת שיש לנו, ותחבר הכל, תקן אם יש דברים לא תקינים ומדממים, ודחוף לריפו."
+
+Work Log:
+- Git first: fetch → remote 0 commits ahead (HEAD==origin/main==9dc6526, אחרי MODEL1-W1). אבל 267 קבצים דווחו modified — אבחון: 0 insertions/0 deletions, שינוי-mode בלבד 100644→100755 (הכול הפך executable; חשד: חילוץ-ZIP/sync של סשן-סוכן אחר).
+- התיקון המדמם: chmod 644 ל-267 הקבצים (שחזור מדויק ל-index) + `git config core.fileMode false` — חיזוק מבני נגד רעש-modes עתידי מה-sandbox; אומת 1,087 הקבצים ה-executable הלגיטימיים ב-index (עץ skills + .zscripts) לא נפגעו; working tree נקי 100%.
+- סקר פיזי של תיקיות-הסוכנים: engineering/zip-analysis-20260907-1520 (BLOCKED missing-inputs בכנות; המלצה מותנית: indexer+API 8.7 > wallet 8.3 > fork 3.5; תבנית-ניתוח + environment-scan.sh v4 לשימוש-חוזר) · wallet-design (מסמכי-היסוד של הריפו: F1–F5 + R1–R3, 2026-09-07) · tool-results (שרף M2 — כולל ראיית-ביקורת: "Ref main was rewritten", 0 commits עם .env/upload) · tests/ (רתמות python/db runtime — נכס-נסתר שלא הוזכר באף worklog) · download/ (ריק) · examples/websocket (רפרנס) · skills/ (מערכתי).
+- החיבור: הצלבת wallet-design/final-proposal.md מול הקוד החי ב-grep אמיתי — R1 Password-First Keys ✅ (Argon2id, עבר ביקורת-פורנזית) · R2 Policy Engine ✅ (מעבר ל-"lite" שהוצע) · F4 Memo Vault 🟡 (התפר מוצהר ב-operations.ts:90 — "M2 concern" שנדחה) · F5 Governance 🟡 (witness_vote חתים ב-types.ts:34, אין קוקפיט) · F1 Modes 🟡 (roles+policy מכסים את התת-תכונה, אין UX) · F3 Tri-Token 🟡 (תצוגה חיה, power ops חסרים — rg אפס תוצאות) · F2 Zero-Gate Onboarding ❌ (חי ב-agent החצוני בלבד — 13 החיילים הם ההוכחה) · R3 Signals 🟡 (audit+RC חי, אין feed התראות).
+- מסקנת-חיבור מסודרת ל-M5+: R3 → F4 → F5 → F1 → F3 → F2 (מהזול/מוכן ליקר/דורש-תיאום).
+- ההמלצה ההיסטורית (indexer 8.7) נבחנה מול ההווה: read-layer חי קיים (hub/fleet/orderbook/health + ה-API המסחרי), אבל אין אינדקסר היסטורי ו-API ציבורי יציב — פער-כנה שתועד.
+- docs/agents-survey.md נכתב: מפת-תיקיות עם ערך · טבלת הדלתא F/R עם ראיות-שורה · סטטוס ההמלצה ההיסטורית · 4 החלטות-בעלים שנאספו (tool-results: להשאיר כ-evidence · F2 אדריכלות · סדר indexer מול SDK · skills tree gitignore) · פקודות אימות-עצמי.
+- README: שורת מסמך לסקר נוספה לטבלת docs.
+- בריאות לאורך כל התהליך: health/hub/developer-usage 200 בכל נקודת-ביקורת; lint נקי; dev.log נקי.
+
+Stage Summary:
+- הריפו חזר למצב-מסירה מבחינת git (0 dirty), מחוזק מבנית נגד חזרת הדימום (core.fileMode=false), והידע הנסתר של הסוכנים נאסף ומחובר: מסמכי-היסוד של wallet-design הפכו רשמית לרשימת-עבודות מדורגת עם ראיות-קוד (F/R delta), ההמלצה ההיסטורית של האינדקסר תועדה כפער פתוח, tests/ זוהה כנכס, tool-results סווג כראיית-ביקורת לשימור. 4 החלטות-בעלים ממתינות. Pushed to main.
