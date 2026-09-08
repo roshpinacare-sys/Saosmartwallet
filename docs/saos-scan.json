@@ -1,0 +1,1701 @@
+{
+  "scannedAt": "2026-09-08T01:17:33.320Z",
+  "owner": "roshpinacare-sys",
+  "repos": {
+    "steem": {
+      "description": "SAOS — Steem AI Agent OS sovereign cycle (Task 114 snapshot restored) — PRIVATE",
+      "sizeKB": 188671,
+      "branch": "main",
+      "truncated": false,
+      "fileCount": 11353,
+      "topDirs": [
+        ".github",
+        ".gitignore",
+        ".zscripts",
+        "Caddyfile",
+        "DIV_NOISE.tmp",
+        "ENGINEER_BRIEF.md",
+        "README.md",
+        "THE_WEAVE.md",
+        "agent",
+        "bun.lock",
+        "components.json",
+        "docs",
+        "download",
+        "eslint.config.mjs",
+        "examples",
+        "mini-services",
+        "next.config.ts",
+        "package.json",
+        "postcss.config.mjs",
+        "prisma",
+        "public",
+        "scripts",
+        "sovereign",
+        "src",
+        "tailwind.config.ts",
+        "tests",
+        "tsconfig.json",
+        "worklog.md"
+      ],
+      "hits": {
+        "agent": [
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/reports/Titai-v12-phenomenal-engineering-report.pdf",
+            "size": 713267
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/PACKAGE_MANIFEST.signed.json",
+            "size": 480815
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/roast/RELEASE_MANIFEST.json",
+            "size": 454903
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/release/BUILD_PROVENANCE.json",
+            "size": 452848
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/reports/Titai-v11-adversarial-engineering-report.pdf",
+            "size": 372486
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/package-lock.json",
+            "size": 281006
+          },
+          {
+            "path": "agent/agent.cjs",
+            "size": 262950
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/agent.cjs",
+            "size": 262950
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v12/traceability-graph.json",
+            "size": 218303
+          },
+          {
+            "path": "agent/verify_system.cjs",
+            "size": 207985
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/verify_system.cjs",
+            "size": 207985
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v12/screenshots/design-board-print.png",
+            "size": 177683
+          },
+          {
+            "path": "agent/chaintalk_pending.json",
+            "size": 174837
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/tasks/TASKS.json",
+            "size": 137815
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/release/SBOM.cyclonedx.json",
+            "size": 137329
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v12/screenshots/design-board-desktop.png",
+            "size": 134084
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/chaintalk_pending.json",
+            "size": 128292
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/roast/ROAST_FINDINGS.json",
+            "size": 108959
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v15/report-assets/vertical-slices.png",
+            "size": 98571
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v15/report-assets/release-gates.png",
+            "size": 87622
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/roast/TITAI_V8_ROAST_AUDIT.pdf",
+            "size": 76441
+          },
+          {
+            "path": "download/research/extracted/qodo-v24.30.49-pass76-quota-gauge_2/Vercel-claude-hebrew-tech-ministry-improvement-7qpqs3/tasks/agent-task-queue.json",
+            "size": 75176
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/verify_last.json",
+            "size": 69316
+          },
+          {
+            "path": "agent/verify_last.json",
+            "size": 67581
+          },
+          {
+            "path": "agent/he_report.cjs",
+            "size": 66064
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/he_report.cjs",
+            "size": 66064
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v16-baseline/full-test.json",
+            "size": 63834
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/release/LICENSE_INVENTORY.json",
+            "size": 62419
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v12/screenshots/design-board-mobile.png",
+            "size": 62145
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/40_V12_PHENOMENAL_ENGINEERING_REPORT.md",
+            "size": 59918
+          },
+          {
+            "path": "agent/wrapped.cjs",
+            "size": 59257
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/wrapped.cjs",
+            "size": 59257
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/research/CLAIMS_LEDGER.jsonl",
+            "size": 58970
+          },
+          {
+            "path": "download/research/extracted/zip-to-pdf-polyglot-9.1.0_3/zip-to-pdf-polyglot-9.1.0/src/strategies/agent-readable.ts",
+            "size": 58675
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/src/lib/engine/runner.ts",
+            "size": 58095
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v12/screenshots/design-board-mobile.pdf",
+            "size": 56673
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v12/screenshots/design-board-desktop.pdf",
+            "size": 56504
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/roast/ROAST_REPORT.md",
+            "size": 53768
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/29_V11_ADVERSARIAL_ENGINEERING_REPORT.md",
+            "size": 51875
+          },
+          {
+            "path": "agent/package-lock.json",
+            "size": 47905
+          }
+        ],
+        "fleet/loop": [
+          {
+            "path": "agent/fleet_keys.enc",
+            "size": 170905
+          },
+          {
+            "path": "docs/screens/87-system-loops.png",
+            "size": 95050
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/87-system-loops.png",
+            "size": 95050
+          },
+          {
+            "path": "docs/screens/82-system-loops.png",
+            "size": 93972
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/82-system-loops.png",
+            "size": 93972
+          },
+          {
+            "path": "docs/screens/85-loops-list.png",
+            "size": 91745
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/85-loops-list.png",
+            "size": 91745
+          },
+          {
+            "path": "docs/screens/87-linkage-loop-live.png",
+            "size": 82461
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/87-linkage-loop-live.png",
+            "size": 82461
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/gumloop/assets/chart_code_health.png",
+            "size": 81167
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/lib/fleetTrendClusterEngine358.js",
+            "size": 35567
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/src_lib/fleetTrendClusterEngine358.js",
+            "size": 35567
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/fleet_keys.enc",
+            "size": 29089
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/lib/fleetHealthHeatmapEngine356.js",
+            "size": 27433
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/src_lib/fleetHealthHeatmapEngine356.js",
+            "size": 27433
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/lib/fleetHealthCompositeEngine349.js",
+            "size": 26007
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/src_lib/fleetHealthCompositeEngine349.js",
+            "size": 26007
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/lib/multiFleetAggregator355.js",
+            "size": 25344
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/src_lib/multiFleetAggregator355.js",
+            "size": 25344
+          },
+          {
+            "path": "agent/he_fleet_sell.cjs",
+            "size": 22620
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/he_fleet_sell.cjs",
+            "size": 22620
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/lib/fleetHealthHistoryEngine350.js",
+            "size": 21833
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/src_lib/fleetHealthHistoryEngine350.js",
+            "size": 21833
+          },
+          {
+            "path": "agent/fleet_voice.cjs",
+            "size": 15597
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/fleet_voice.cjs",
+            "size": 15597
+          },
+          {
+            "path": "download/research/extracted/tfa-evolution-studio-validated_2/tasks/.skills/skill-creator/scripts/run_loop.py",
+            "size": 14230
+          },
+          {
+            "path": "download/research/extracted/qodo-v24.30.49-pass76-quota-gauge_2/Vercel-claude-hebrew-tech-ministry-improvement-7qpqs3/packages/agent/tests/resume-loop.test.ts",
+            "size": 12276
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/lib/learningLoop417.js",
+            "size": 11054
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/_archive_orphans_v497/src_lib/learningLoop417.js",
+            "size": 11054
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentFleetSafetyArm447.js",
+            "size": 9974
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentFleetSafetyArm447.js",
+            "size": 9974
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/reflectionLoop268.js",
+            "size": 8645
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/reflectionLoop268.js",
+            "size": 8645
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentLoop231.js",
+            "size": 7682
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentLoop231.js",
+            "size": 7682
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentLoop230.js",
+            "size": 7593
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentLoop230.js",
+            "size": 7593
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentLoop227.js",
+            "size": 7068
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentLoop227.js",
+            "size": 7068
+          },
+          {
+            "path": "agent/fleet_vault.cjs",
+            "size": 6498
+          }
+        ],
+        "anchor": [
+          {
+            "path": "docs/screens/92-live-anchor-strip.png",
+            "size": 191569
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/92-live-anchor-strip.png",
+            "size": 191569
+          },
+          {
+            "path": "docs/screens/71-explorer-anchors.png",
+            "size": 150255
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/71-explorer-anchors.png",
+            "size": 150255
+          },
+          {
+            "path": "docs/screens/89-verified-hive-anchors.png",
+            "size": 111231
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/89-verified-hive-anchors.png",
+            "size": 111231
+          },
+          {
+            "path": "agent/anchor.cjs",
+            "size": 19670
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/anchor.cjs",
+            "size": 19670
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/tests/transparency-log/federation-anchor.test.ts",
+            "size": 10850
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/lib/transparency-log/receipt-anchor.ts",
+            "size": 10713
+          },
+          {
+            "path": "agent/reanchor103.cjs",
+            "size": 10057
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/reanchor103.cjs",
+            "size": 10057
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/lib/transparency-log/federation-anchor.ts",
+            "size": 9008
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/tests/transparency-log/receipt-anchor.test.ts",
+            "size": 4124
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/schemas/external-qualification-trust-anchor-v32_12.schema.json",
+            "size": 1795
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.32/V33_32_FEDERATED_ANCHOR.json",
+            "size": 1105
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.32/V33_32_GENESIS_ANCHOR.json",
+            "size": 825
+          },
+          {
+            "path": "agent/reanchor103_result.json",
+            "size": 661
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/reanchor103_result.json",
+            "size": 657
+          },
+          {
+            "path": "agent/reanchor103_state.json",
+            "size": 83
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/reanchor103_state.json",
+            "size": 83
+          }
+        ],
+        "bridge": [
+          {
+            "path": "docs/116-bridge-strip.png",
+            "size": 173045
+          },
+          {
+            "path": "docs/screens/90-tron-bridge-panel.png",
+            "size": 134728
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/90-tron-bridge-panel.png",
+            "size": 134728
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/tronbridge.cjs",
+            "size": 43425
+          },
+          {
+            "path": "sovereign/node/tronbridge.cjs",
+            "size": 43425
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/tron-bridge-state.json",
+            "size": 26202
+          },
+          {
+            "path": "sovereign/node/tron-bridge-state.json",
+            "size": 26202
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentDispatchBridge253.js",
+            "size": 21404
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentDispatchBridge253.js",
+            "size": 21404
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/app/api/ops/tronbridge/route.ts",
+            "size": 15782
+          },
+          {
+            "path": "src/app/api/ops/tronbridge/route.ts",
+            "size": 15782
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/languageBridge.js",
+            "size": 15315
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/languageBridge.js",
+            "size": 15315
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/eventFeedBridge274.js",
+            "size": 12276
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/eventFeedBridge274.js",
+            "size": 12276
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/lib/potential/collaboration-escrow-bridge.ts",
+            "size": 11690
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/globalBridgeNetwork.js",
+            "size": 10592
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/globalBridgeNetwork.js",
+            "size": 10592
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/swarmRagBridge244.js",
+            "size": 10241
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/swarmRagBridge244.js",
+            "size": 10241
+          },
+          {
+            "path": "download/research/extracted/qodo-v24.30.49-pass76-quota-gauge_2/Vercel-claude-hebrew-tech-ministry-improvement-7qpqs3/packages/agent/src/services/support-ticket-bridge.ts",
+            "size": 10222
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentControlAuditBridge446.js",
+            "size": 10139
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentControlAuditBridge446.js",
+            "size": 10139
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentResultHealthBridge445.js",
+            "size": 9866
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentResultHealthBridge445.js",
+            "size": 9866
+          },
+          {
+            "path": "sovereign/node/roshpina-bridge.cjs",
+            "size": 9188
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/agentErrorAlertBridge444.js",
+            "size": 7746
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/agentErrorAlertBridge444.js",
+            "size": 7746
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/diamondOrchestratorBridge466.js",
+            "size": 7168
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/diamondOrchestratorBridge466.js",
+            "size": 7168
+          },
+          {
+            "path": "agent/bridge_test.cjs",
+            "size": 7075
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/bridge_test.cjs",
+            "size": 7075
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/canonRegistryBridge516.js",
+            "size": 6642
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/canonRegistryBridge516.js",
+            "size": 6642
+          },
+          {
+            "path": "download/research/extracted/qodo-v24.30.49-pass76-quota-gauge_2/Vercel-claude-hebrew-tech-ministry-improvement-7qpqs3/packages/agent/src/services/integrations/blame-sentry-bridge.ts",
+            "size": 6406
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/canonBridgePatch508.js",
+            "size": 5941
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/canonBridgePatch508.js",
+            "size": 5941
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/dispatchBridge550.js",
+            "size": 5931
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/dispatchBridge550.js",
+            "size": 5931
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/registryConsolidationBridge496.js",
+            "size": 5879
+          }
+        ],
+        "vault/wallet": [
+          {
+            "path": "docs/114-vault-deposits-panel.png",
+            "size": 201045
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/114-vault-deposits-panel.png",
+            "size": 201045
+          },
+          {
+            "path": "docs/shot-43-vault-army.png",
+            "size": 191076
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/shot-43-vault-army.png",
+            "size": 191076
+          },
+          {
+            "path": "docs/114-vault-deposits-panel2.png",
+            "size": 178596
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/114-vault-deposits-panel2.png",
+            "size": 178596
+          },
+          {
+            "path": "docs/113-wallets-panel.png",
+            "size": 147429
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/113-wallets-panel.png",
+            "size": 147429
+          },
+          {
+            "path": "docs/shot-42-vault-mismatch.png",
+            "size": 133969
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/shot-42-vault-mismatch.png",
+            "size": 133969
+          },
+          {
+            "path": "docs/114-vault-deposits-mobile.png",
+            "size": 97695
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/114-vault-deposits-mobile.png",
+            "size": 97695
+          },
+          {
+            "path": "docs/screens/55-vaultv2-reflex-card.png",
+            "size": 93163
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/55-vaultv2-reflex-card.png",
+            "size": 93163
+          },
+          {
+            "path": "docs/screens/86-vault-ynet-final.png",
+            "size": 80081
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/86-vault-ynet-final.png",
+            "size": 80081
+          },
+          {
+            "path": "docs/113-wallets-mobile.png",
+            "size": 79017
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/113-wallets-mobile.png",
+            "size": 79017
+          },
+          {
+            "path": "docs/screens/87-vault-check.png",
+            "size": 71242
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/87-vault-check.png",
+            "size": 71242
+          },
+          {
+            "path": "docs/shot-42-vault-mobile.png",
+            "size": 68012
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/shot-42-vault-mobile.png",
+            "size": 68012
+          },
+          {
+            "path": "docs/shot-43-vault-mobile.png",
+            "size": 64822
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/shot-43-vault-mobile.png",
+            "size": 64822
+          },
+          {
+            "path": "docs/screens/55-vaultv2-mobile.png",
+            "size": 58611
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/55-vaultv2-mobile.png",
+            "size": 58611
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/components/console/vault-view.tsx",
+            "size": 47374
+          },
+          {
+            "path": "src/components/console/vault-view.tsx",
+            "size": 47374
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/apps/web/src/app/wallet/page.jsx",
+            "size": 45940
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/app/api/ops/vault/master/route.ts",
+            "size": 17694
+          },
+          {
+            "path": "src/app/api/ops/vault/master/route.ts",
+            "size": 17694
+          },
+          {
+            "path": "agent/xwallet.cjs",
+            "size": 13619
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/xwallet.cjs",
+            "size": 13619
+          },
+          {
+            "path": "src/app/api/ops/vault/route.ts",
+            "size": 12086
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/secretVault234.js",
+            "size": 10164
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/secretVault234.js",
+            "size": 10164
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/embeddedWallet268.js",
+            "size": 8282
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/embeddedWallet268.js",
+            "size": 8282
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/lib/army-vault.ts",
+            "size": 5113
+          },
+          {
+            "path": "src/lib/army-vault.ts",
+            "size": 5113
+          }
+        ],
+        "oracle": [
+          {
+            "path": "download/research/extracted/qodo-v24.30.49-pass76-quota-gauge_2/Vercel-claude-hebrew-tech-ministry-improvement-7qpqs3/packages/agent/src/agents/compliance-oracle.ts",
+            "size": 7402
+          },
+          {
+            "path": "download/research/extracted/qodo-v24.30.49-pass76-quota-gauge_2/Vercel-claude-hebrew-tech-ministry-improvement-7qpqs3/packages/agent/src/agents/infra-oracle.ts",
+            "size": 4992
+          },
+          {
+            "path": "agent/oracle106.cjs",
+            "size": 4789
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/oracle106.cjs",
+            "size": 4789
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/lib/steem-os/apps/solo-oracle.ts",
+            "size": 4681
+          },
+          {
+            "path": "src/lib/steem-os/apps/solo-oracle.ts",
+            "size": 4681
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/app/api/solo/oracle/route.ts",
+            "size": 3413
+          },
+          {
+            "path": "src/app/api/solo/oracle/route.ts",
+            "size": 3413
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/lib/steem-os/apps/oracle.ts",
+            "size": 3225
+          },
+          {
+            "path": "src/lib/steem-os/apps/oracle.ts",
+            "size": 3225
+          },
+          {
+            "path": "agent/oracle106_result.json",
+            "size": 364
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/agent/oracle106_result.json",
+            "size": 364
+          }
+        ],
+        "sovereign": [
+          {
+            "path": "sovereign/node/chain-archive.jsonl",
+            "size": 39599970
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/chain-archive.jsonl",
+            "size": 37714396
+          },
+          {
+            "path": "download/research/zips/srs_sovereign_runtime_substrate_v8.2.0_2.zip",
+            "size": 4578799
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/sovereignty/TITAI_V15_SOVEREIGN_INTELLIGENCE_REPORT.pdf",
+            "size": 640292
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v15/sovereignty-ledger.json",
+            "size": 476934
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/evidence/v15/sovereignty-dependency-ledger.json",
+            "size": 476016
+          },
+          {
+            "path": "docs/104-mobile-sovereign.png",
+            "size": 335663
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/104-mobile-sovereign.png",
+            "size": 335663
+          },
+          {
+            "path": "sovereign/node/chain.json",
+            "size": 284454
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/chain.json",
+            "size": 241243
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/docs/architecture.png",
+            "size": 228768
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/docs/STRATEGIC_AUDIT_v124.pdf",
+            "size": 204572
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/docs/coverage_partial.json",
+            "size": 204528
+          },
+          {
+            "path": "sovereign/node/state.json",
+            "size": 178826
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/coverage.json",
+            "size": 172833
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/lib/api-spec/openapi.yaml",
+            "size": 156787
+          },
+          {
+            "path": "src/components/weave/sovereign.tsx",
+            "size": 145082
+          },
+          {
+            "path": "sovereign/node/saosnet.cjs",
+            "size": 142645
+          },
+          {
+            "path": "docs/106-sovereign-desktop.png",
+            "size": 141224
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/106-sovereign-desktop.png",
+            "size": 141224
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/saosnet.cjs",
+            "size": 141069
+          },
+          {
+            "path": "docs/104-sovereign-integrity.png",
+            "size": 139756
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/104-sovereign-integrity.png",
+            "size": 139756
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/state.json",
+            "size": 129639
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/sovereignty/TITAI_V16_OPERATIONAL_SOVEREIGNTY_REPORT.pdf",
+            "size": 122526
+          },
+          {
+            "path": "docs/102-sovereign-top.png",
+            "size": 117603
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/102-sovereign-top.png",
+            "size": 117603
+          },
+          {
+            "path": "sovereign/node/state-snapshot.json",
+            "size": 117393
+          },
+          {
+            "path": "sovereign/node/state-snapshot.prev.json",
+            "size": 116908
+          },
+          {
+            "path": "sovereign/node/state-snapshot.prev.poisoned-1788801717.json",
+            "size": 113486
+          },
+          {
+            "path": "sovereign/node/state-snapshot.poisoned-1788801717.json",
+            "size": 113378
+          },
+          {
+            "path": "sovereign/node/state-snapshot.prev.quarantine-1788800493.json",
+            "size": 113042
+          },
+          {
+            "path": "sovereign/node/state-snapshot.quarantine-1788800493.json",
+            "size": 113042
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/v6.42_CLOSURE_THEOREM/v6.42_CLOSURE_THEOREM.pdf",
+            "size": 112256
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/v6.43_AUDIT/v6.42_CLOSURE_THEOREM.pdf",
+            "size": 112256
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/v6.44_BULLETPROOF/v6.42_CLOSURE_THEOREM.pdf",
+            "size": 112256
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/v6.45_PC_REVIEW/v6.42_CLOSURE_THEOREM.pdf",
+            "size": 112256
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/v6.46_PROGRAM_CONCLUSION/v6.42_CLOSURE_THEOREM.pdf",
+            "size": 112256
+          },
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/v6_theory/v6.42_CLOSURE_THEOREM.pdf",
+            "size": 112256
+          },
+          {
+            "path": "sovereign/node/state-root.json",
+            "size": 111799
+          }
+        ],
+        "soldier": [
+          {
+            "path": "docs/103-sovereign-soldiers.png",
+            "size": 174629
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/103-sovereign-soldiers.png",
+            "size": 174629
+          },
+          {
+            "path": "docs/screens/86-vault-ynet-soldier.png",
+            "size": 81669
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/86-vault-ynet-soldier.png",
+            "size": 81669
+          }
+        ],
+        "attestation": [
+          {
+            "path": "docs/screens/82-knowledge-living-attest.png",
+            "size": 110120
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/docs/screens/82-knowledge-living-attest.png",
+            "size": 110120
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/src/app/hsm-interoperability-remote-attestation-v33_40.ts",
+            "size": 39594
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/tests/hsm-interoperability-remote-attestation-v33_40.test.ts",
+            "size": 23896
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/scripts/hsm-interoperability-remote-attestation-proof-v33_40.mjs",
+            "size": 11239
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/scripts/verify-hsm-interoperability-remote-attestation-v33_40.mjs",
+            "size": 4975
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationAttestationBundleLedger411.js",
+            "size": 3798
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationAttestationBundle410.js",
+            "size": 3733
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/tests/attested-kms-branch-v28.test.ts",
+            "size": 3671
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/proofAttestation212.js",
+            "size": 3271
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/proofAttestation212.js",
+            "size": 3271
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyAttestationLog404.js",
+            "size": 3138
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/src/security/attested-kms-adapter.ts",
+            "size": 2528
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/docs/V33_40_HSM_INTEROPERABILITY_REMOTE_ATTESTATION.md",
+            "size": 1305
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/attestations/store-1.json",
+            "size": 1136
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/attestations/store-2.json",
+            "size": 1136
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/attestations/store-3.json",
+            "size": 1136
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/attestations/worker-1.json",
+            "size": 1076
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/attestations/worker-2.json",
+            "size": 1076
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.55/external-evidence-custody-transport/process-attestations/2.json",
+            "size": 1054
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.55/external-evidence-custody-transport/process-attestations/1.json",
+            "size": 1053
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.56/custody-authority/process-attestations/2.json",
+            "size": 923
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.56/custody-authority/process-attestations/1.json",
+            "size": 780
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/process-attestations/stores.json",
+            "size": 750
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.54/qualification-execution-bundle/process-attestations/roles.json",
+            "size": 713
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.53/persistence-infrastructure-qualification/process-attestations/workload-recovery.json",
+            "size": 695
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.56/custody-authority/process-attestations/3.json",
+            "size": 678
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.54/qualification-execution-bundle/process-attestations/drills.json",
+            "size": 620
+          }
+        ],
+        "grid98": [
+          {
+            "path": "sovereign/node/grid98.cjs",
+            "size": 63234
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/grid98.cjs",
+            "size": 61266
+          },
+          {
+            "path": "sovereign/node/grid98-state.json",
+            "size": 7541
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/grid98-state.json",
+            "size": 7187
+          }
+        ],
+        "delegation": [
+          {
+            "path": "download/recovery/extracted/steem-main/src/app/api/ops/vault/delegated/route.ts",
+            "size": 8933
+          },
+          {
+            "path": "src/app/api/ops/vault/delegated/route.ts",
+            "size": 8933
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/tests/orchestrator/orchestrator-delegation.test.ts",
+            "size": 8547
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/tests/agent-identity/delegation.test.ts",
+            "size": 7887
+          },
+          {
+            "path": "download/research/extracted/workspace-v0.0.1_2/artifacts/api-server/sovereign/lib/agent-identity/delegation.ts",
+            "size": 2764
+          },
+          {
+            "path": "download/research/extracted/TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE_3/Titai-canonical-agent-platform-v18-capability-foundry-english/docs/canonical/decisions/ADR-0006-identity-tenancy-and-delegation.md",
+            "size": 1403
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/sovereign/node/rc-delegation.json",
+            "size": 1054
+          },
+          {
+            "path": "sovereign/node/rc-delegation.json",
+            "size": 1054
+          }
+        ],
+        "checkpoint": [
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/src/app/federated-checkpoint-continuity-v33_33.ts",
+            "size": 65063
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/src/app/federated-human-pilot-checkpoint-v33_32.ts",
+            "size": 50505
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/tests/federated-checkpoint-continuity-v33_33.test.ts",
+            "size": 34820
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/tests/federated-human-pilot-checkpoint-v33_32.test.ts",
+            "size": 31503
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/scripts/federated-human-pilot-checkpoint-proof-v33_32.mjs",
+            "size": 11841
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/scripts/federated-checkpoint-continuity-proof-v33_33.mjs",
+            "size": 11527
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/tests/trust-checkpoint-branch-v28.test.ts",
+            "size": 6938
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/src/security/trust-checkpoint-store.ts",
+            "size": 6285
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/scripts/verify-federated-human-pilot-checkpoint-v33_32.mjs",
+            "size": 5362
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/scripts/verify-federated-checkpoint-continuity-v33_33.mjs",
+            "size": 4631
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/checkpointScheduler.js",
+            "size": 4327
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/checkpointScheduler.js",
+            "size": 4327
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationAttestationBundleLedgerCheckpointChain413.js",
+            "size": 3999
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/tests/mmrCheckpoint.test.js",
+            "size": 3987
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationCheckpointReplayTrendDigestChain413.js",
+            "size": 3952
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationCheckpointReplayTrendDigest412.js",
+            "size": 3828
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationAttestationBundleLedgerCheckpoint412.js",
+            "size": 3756
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationQuorumCheckpoint409.js",
+            "size": 3471
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/mmrCheckpoint.js",
+            "size": 3424
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/mmrCheckpoint.js",
+            "size": 3424
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationCheckpointReplay410.js",
+            "size": 2998
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.26/V33_26_TRANSPARENCY_CHECKPOINTS.json",
+            "size": 2847
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/docs/V33_33_FEDERATED_CHECKPOINT_CONTINUITY.md",
+            "size": 2791
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/solvencyFederationCheckpointReplayTrend411.js",
+            "size": 2784
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/tests/checkpointScheduler.test.js",
+            "size": 2298
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/docs/V33_32_FEDERATED_HUMAN_PILOT_CHECKPOINT.md",
+            "size": 2220
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.32/V33_32_CHECKPOINT_PROPOSAL.json",
+            "size": 1390
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.32/V33_32_FEDERATED_CHECKPOINT_PROOF.json",
+            "size": 1331
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/pilot-kits/v33.33/checkpoint-continuity/RUNBOOK.md",
+            "size": 1127
+          },
+          {
+            "path": "download/recovery/extracted/steem-main/src/app/api/weave/checkpoints/route.ts",
+            "size": 927
+          },
+          {
+            "path": "src/app/api/weave/checkpoints/route.ts",
+            "size": 927
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.31/V33_31_SYNTHETIC_IMPORT_CHECKPOINT.json",
+            "size": 832
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/release-evidence/v33.32/V33_32_CANDIDATE_CHECKPOINT.json",
+            "size": 809
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/pilot-kits/v33.33/checkpoint-continuity/WITNESS_ROTATION_TEMPLATE.json",
+            "size": 733
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/pilot-kits/v33.33/checkpoint-continuity/manifest.json",
+            "size": 702
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/src/cli/trust-checkpoint-worker.ts",
+            "size": 664
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/pilot-kits/v33.33/checkpoint-continuity/TRANSPARENCY_PINNING.md",
+            "size": 565
+          },
+          {
+            "path": "download/research/extracted/unified-platform-v33.56-custody-authority-persistence_2/external-qualification/v33.27/witness-gossip/scripts/verify-checkpoint-coordinates.sh",
+            "size": 182
+          }
+        ],
+        "pool/amm": [
+          {
+            "path": "download/research/extracted/srs_sovereign_runtime_substrate_v8.2.0_2/api/connection_pool.py",
+            "size": 9337
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/lib/validatorPoolStaking212.js",
+            "size": 5909
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/src/lib/validatorPoolStaking212.js",
+            "size": 5909
+          },
+          {
+            "path": "download/research/extracted/tfa-evolution-studio-validated_2/tasks/src/lib/execution/resource-pool.ts",
+            "size": 3819
+          },
+          {
+            "path": "download/research/extracted/ecos_v568_canonical/ecos_v568_canonical/db/pool.js",
+            "size": 3594
+          }
+        ]
+      }
+    },
+    "saos-dex": {
+      "description": "SAOS-DEX — הבורסה הריבונית: ספר-הזמנות דטרמיניסטי + AMM 30bps + ארנת-חיילים אוטונומית (מורשת saos-dex + grid98)",
+      "sizeKB": 295,
+      "branch": "main",
+      "truncated": false,
+      "fileCount": 72,
+      "topDirs": [
+        ".env.example",
+        ".gitignore",
+        "ARCHITECTURE_ROADMAP.md",
+        "CHAOS_TEST_RESULTS.md",
+        "DEPLOYMENT_CHECKLIST.md",
+        "LIQUIDITY_STRATEGY.md",
+        "README.md",
+        "STATUS.md",
+        "WORKLOG_PHASE5.md",
+        "WORKLOG_PHASE6.md",
+        "audit-package",
+        "bun.lock",
+        "next.config.ts",
+        "package.json",
+        "postcss.config.mjs",
+        "prisma",
+        "scripts",
+        "src",
+        "state",
+        "tsconfig.json"
+      ],
+      "hits": {
+        "pool/amm": [
+          {
+            "path": "audit-package/src/amm.ts",
+            "size": 5961
+          },
+          {
+            "path": "src/lib/dex/amm.ts",
+            "size": 5961
+          },
+          {
+            "path": "src/app/api/dex/pool/route.ts",
+            "size": 1381
+          }
+        ],
+        "vault/wallet": [
+          {
+            "path": "src/app/api/dex/wallets/route.ts",
+            "size": 229
+          }
+        ],
+        "anchor": [
+          {
+            "path": "state/anchors.json",
+            "size": 17407
+          }
+        ]
+      }
+    },
+    "saos-sovereign-platform": {
+      "description": "The chosen project - standalone canonical copy. Sovereign anchoring platform (folder B)",
+      "sizeKB": 698,
+      "branch": "main",
+      "truncated": false,
+      "fileCount": 143,
+      "topDirs": [
+        ".gitignore",
+        ".zscripts",
+        "Caddyfile",
+        "README.md",
+        "agent",
+        "bun.lock",
+        "components.json",
+        "download",
+        "eslint.config.mjs",
+        "examples",
+        "mini-services",
+        "next.config.ts",
+        "package.json",
+        "postcss.config.mjs",
+        "prisma",
+        "public",
+        "scripts",
+        "src",
+        "tailwind.config.ts",
+        "tests",
+        "tsconfig.json",
+        "worklog.md"
+      ],
+      "hits": {
+        "fleet/loop": [
+          {
+            "path": "agent/keys/fleet_keys.enc",
+            "size": 170905
+          },
+          {
+            "path": "agent/keys/fleet_keys.meta.json",
+            "size": 193
+          }
+        ],
+        "anchor": [
+          {
+            "path": "src/lib/saos/anchor-evm.ts",
+            "size": 14518
+          },
+          {
+            "path": "src/app/api/saos/anchor/svm/route.ts",
+            "size": 13830
+          },
+          {
+            "path": "src/app/api/saos/anchor/evm/route.ts",
+            "size": 13345
+          },
+          {
+            "path": "src/lib/saos/anchor-svm.ts",
+            "size": 13342
+          },
+          {
+            "path": "src/lib/saos/anchor-live.ts",
+            "size": 12947
+          },
+          {
+            "path": "src/lib/saos/auto-anchor.ts",
+            "size": 7618
+          },
+          {
+            "path": "src/app/api/saos/anchor-auto/route.ts",
+            "size": 6743
+          },
+          {
+            "path": "src/lib/saos/anchor-gates.ts",
+            "size": 4805
+          }
+        ],
+        "vault/wallet": [
+          {
+            "path": "src/lib/vault-seal.ts",
+            "size": 13638
+          },
+          {
+            "path": "src/app/api/saos/vault/seal/route.ts",
+            "size": 6352
+          },
+          {
+            "path": "src/app/api/saos/vault/route.ts",
+            "size": 4056
+          }
+        ]
+      }
+    },
+    "saos-sovereign-foundry": {
+      "description": "SAOS Sovereign Foundry v2 - cross-network anchoring, energy sovereignty, evidence economy. אנחנו מנצחים את הבלוקצ'יין",
+      "sizeKB": 756,
+      "branch": "main",
+      "truncated": false,
+      "fileCount": 96,
+      "topDirs": [
+        ".env.example",
+        ".github",
+        ".gitignore",
+        "bun.lock",
+        "docs",
+        "download",
+        "eslint.config.mjs",
+        "next.config.ts",
+        "package.json",
+        "postcss.config.mjs",
+        "prisma",
+        "scripts",
+        "src",
+        "tsconfig.json",
+        "worklog.md"
+      ],
+      "hits": {
+        "anchor": [
+          {
+            "path": "docs/first-anchor-runbook.md",
+            "size": 8822
+          },
+          {
+            "path": "src/lib/saos/anchor-gates.ts",
+            "size": 6518
+          },
+          {
+            "path": "docs/anchor-preflight.md",
+            "size": 6004
+          },
+          {
+            "path": "src/app/api/saos/anchor-preflight/route.ts",
+            "size": 3091
+          }
+        ],
+        "agent": [
+          {
+            "path": "docs/multi-agent-map.md",
+            "size": 7022
+          },
+          {
+            "path": "docs/cross-agent-findings.md",
+            "size": 4064
+          }
+        ]
+      }
+    },
+    "roshpina": {
+      "description": "Roshpina — Sovereign Trust & Value Platform: profit (fee engine + cost arbitrage) + protection (fail-closed guard, hash-linked audit, Ed25519 passports) + intelligence (potential engine) — PRIVATE",
+      "sizeKB": 481,
+      "branch": "main",
+      "truncated": false,
+      "fileCount": 208,
+      "topDirs": [
+        ".gitignore",
+        "bun.lock",
+        "components.json",
+        "eslint.config.mjs",
+        "kernel",
+        "kernel-smoke.ts",
+        "next.config.ts",
+        "package.json",
+        "postcss.config.mjs",
+        "src",
+        "tailwind.config.ts",
+        "tsconfig.json"
+      ],
+      "hits": {
+        "agent": [
+          {
+            "path": "kernel/adapter/agent-adapter.ts",
+            "size": 22419
+          },
+          {
+            "path": "kernel/adapter/agent-provenance.ts",
+            "size": 5721
+          },
+          {
+            "path": "kernel/agent-identity/identity.ts",
+            "size": 3175
+          },
+          {
+            "path": "kernel/agent-identity/types.ts",
+            "size": 2176
+          },
+          {
+            "path": "kernel/agent-identity/index.ts",
+            "size": 645
+          }
+        ],
+        "delegation": [
+          {
+            "path": "kernel/agent-identity/delegation.ts",
+            "size": 2764
+          }
+        ],
+        "attestation": [
+          {
+            "path": "kernel/passport/passport.ts",
+            "size": 11510
+          },
+          {
+            "path": "kernel/passport/passport-verifier.ts",
+            "size": 9690
+          },
+          {
+            "path": "kernel/passport/claim.ts",
+            "size": 8582
+          },
+          {
+            "path": "kernel/passport/key-ring.ts",
+            "size": 7670
+          },
+          {
+            "path": "kernel/passport/claim-verifier.ts",
+            "size": 6329
+          },
+          {
+            "path": "kernel/passport/types.ts",
+            "size": 5906
+          },
+          {
+            "path": "kernel/passport/passport-revocation-list.ts",
+            "size": 5658
+          },
+          {
+            "path": "src/components/roshpina/passports-panel.tsx",
+            "size": 5341
+          },
+          {
+            "path": "src/app/api/passports/verify/route.ts",
+            "size": 1743
+          },
+          {
+            "path": "kernel/passport/index.ts",
+            "size": 1439
+          },
+          {
+            "path": "src/app/api/passports/route.ts",
+            "size": 1392
+          }
+        ],
+        "bridge": [
+          {
+            "path": "kernel/potential/collaboration-escrow-bridge.ts",
+            "size": 11660
+          },
+          {
+            "path": "src/components/roshpina/bridge-panel.tsx",
+            "size": 5846
+          },
+          {
+            "path": "src/app/api/bridge/saos/route.ts",
+            "size": 3793
+          }
+        ],
+        "anchor": [
+          {
+            "path": "kernel/transparency-log/receipt-anchor.ts",
+            "size": 10695
+          },
+          {
+            "path": "kernel/transparency-log/federation-anchor.ts",
+            "size": 9002
+          }
+        ]
+      }
+    },
+    "Project-files": {
+      "description": null,
+      "sizeKB": 64902,
+      "branch": "main",
+      "truncated": false,
+      "fileCount": 10,
+      "topDirs": [
+        "TITAI_v18_VERIFIED_INSTALLER_WITH_ARCHITECTURE (3).zip",
+        "V33_30_controlled_human_ux_pilot_instrumentation_patch (2).zip",
+        "ecos_v568_canonical.zip",
+        "qodo-v24.30.49-pass76-quota-gauge (2).zip",
+        "srs_sovereign_runtime_substrate_v8.2.0 (2).zip",
+        "steem-main (1).zip",
+        "tfa-evolution-studio-validated (2).zip",
+        "unified-platform-v33.56-custody-authority-persistence (2).zip",
+        "workspace-v0.0.1 (2).zip",
+        "zip-to-pdf-polyglot-9.1.0 (3).zip"
+      ],
+      "hits": {
+        "sovereign": [
+          {
+            "path": "srs_sovereign_runtime_substrate_v8.2.0 (2).zip",
+            "size": 4578799
+          }
+        ]
+      }
+    }
+  }
+}

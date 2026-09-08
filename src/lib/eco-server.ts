@@ -84,7 +84,7 @@ async function githubToken(): Promise<string | null> {
   }
 }
 
-async function githubRaw(repo: string, filePath: string): Promise<string | null> {
+export async function githubRaw(repo: string, filePath: string): Promise<string | null> {
   const token = await githubToken();
   if (!token) return null;
   try {
