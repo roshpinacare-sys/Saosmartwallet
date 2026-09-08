@@ -154,3 +154,21 @@ export function useSaosGrid98Bench() {
     },
   });
 }
+
+/**
+ * Re-run control (network-audit hardening): GET /api/saos/grid98-bench?benchMs=N
+ * — the same REAL engine spawn, exercised through the documented query-param
+ * surface. ok:false still resolves (the payload IS the honest measurement
+ * result; the caller renders its error instead of inventing numbers).
+ */
+export function useSaosGrid98BenchRerun() {
+  return useMutation<Grid98BenchResponse, Error, number | undefined>({
+    mutationFn: async (benchMs) => {
+      const ms = typeof benchMs === "number" && benchMs > 0 ? benchMs : 10_000;
+      const res = await fetch(`/api/saos/grid98-bench?benchMs=${ms}`, { cache: "no-store" });
+      const j = (await res.json()) as Grid98BenchResponse;
+      if (!res.ok) throw new Error(j.error ?? `grid98-bench ${res.status}`);
+      return j;
+    },
+  });
+}

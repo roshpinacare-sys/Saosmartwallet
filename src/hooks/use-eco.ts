@@ -72,6 +72,10 @@ export interface SaosNetResponse {
     updatedAt: string | null;
     checkpointCount: number;
     verifiedCount: number;
+    /** Seal timestamp of the newest checkpoint (daemon state `checkpoints[-1].at`). */
+    lastCheckpointAt: string | null;
+    /** Median gap (s) of the last ≤12 checkpoint seal stamps — measured cadence. */
+    checkpointCadenceSeconds: number | null;
   };
   engine: {
     at: string | null;
@@ -236,6 +240,21 @@ export interface BridgePath {
   gateReason: string | null;
   trustLevel: string;
   trustDetail: string;
+  /** Multi-hop only — per-leg breakdown: each leg is a REAL registry rail. Absent on direct rails. */
+  hops?: Array<{
+    railId: string;
+    direction: "forward" | "reverse";
+    from: string;
+    to: string;
+    label: string;
+    route: Array<{ network: string; contract: string | null; action: string }>;
+    estimatedTime: number;
+    fee: { legs: Array<{ network: string; amount: string; currency: string; source: string }>; allMeasured: boolean };
+    readiness: "live" | "gated";
+    gateReason: string | null;
+  }>;
+  /** Multi-hop only — intermediate networks between source and target (e.g. ["saos-net"]). Absent on direct rails. */
+  via?: string[];
 }
 
 export interface BridgeRoutesResponse {

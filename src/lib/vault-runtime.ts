@@ -205,6 +205,30 @@ export function buildSteemLimitOrderOp(built: {
   };
 }
 
+/**
+ * Builds the policy-gated limit_order_cancel PolicyOperation from a
+ * deterministic cancel build. A cancel puts NOTHING at risk — it refunds the
+ * unfilled remainder to the owner — so amountSatoshis is "0" and the daily
+ * limit rule passes trivially; the operation is still policy-gated (steem
+ * network allowlist includes limit_order_cancel by default) and audited like
+ * every other signature.
+ */
+export function buildSteemCancelOp(payload: { owner: string; orderid: number }): PolicyOperation {
+  return {
+    vaultId: "network-steem",
+    network: "steem",
+    type: "limit_order_cancel",
+    amountSatoshis: "0",
+    symbol: "STEEM",
+    counterparty: null,
+    role: "active",
+    detail: {
+      account: payload.owner,
+      orderid: payload.orderid,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Error mapping — VaultError codes → HTTP status
 // ---------------------------------------------------------------------------

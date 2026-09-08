@@ -44,7 +44,10 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-useless-escape": "off",
   },
 }, {
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]
+  // .grid98-lab/** is the FROZEN external micro-grid engine (CommonJS) —
+  // resurrected by tools/grid98-hydrate.ts; it is never linted, never edited.
+  // tool-results/** is agent tool output (never committed).
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", ".grid98-lab/**", "tool-results/**", "db/**", "agent/**"]
 }];
 
 export default eslintConfig;

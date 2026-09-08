@@ -64,6 +64,25 @@ export interface BridgeFee {
   allMeasured: boolean;
 }
 
+/**
+ * One REAL registry rail used as a leg inside a multi-hop path. Multi-hop
+ * composition invents nothing: every leg is an existing rail with its own
+ * real readiness, real gate reason and real measured fee quote.
+ */
+export interface BridgePathLeg {
+  railId: string;
+  /** "forward" = rail as defined; "reverse" = rail traversed target→source (the hub receipt direction). */
+  direction: "forward" | "reverse";
+  from: BridgeNetworkId;
+  to: BridgeNetworkId;
+  label: string;
+  route: BridgeHop[];
+  estimatedTime: number;
+  fee: BridgeFee;
+  readiness: "live" | "gated";
+  gateReason: string | null;
+}
+
 export interface BridgePath {
   id: string;
   source: BridgeNetworkId;
@@ -79,6 +98,10 @@ export interface BridgePath {
   gateReason: string | null;
   trustLevel: BridgeTrustLevel;
   trustDetail: string;
+  /** Multi-hop only — per-leg breakdown: each leg is a REAL registry rail. Absent on direct rails. */
+  hops?: BridgePathLeg[];
+  /** Multi-hop only — intermediate networks between source and target (e.g. ["saos-net"]). Absent on direct rails. */
+  via?: BridgeNetworkId[];
 }
 
 // ---------------------------------------------------------------------------

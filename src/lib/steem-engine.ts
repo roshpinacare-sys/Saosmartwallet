@@ -15,4 +15,8 @@ export {
   transactionId,
   type SteemTransaction,
 } from "../../packages/chains/steem/src/transaction";
-export { OP_IDS, type LimitOrderCreateOperation } from "../../packages/chains/steem/src/operations";
+export {
+  OP_IDS,
+  type LimitOrderCreateOperation,
+  type LimitOrderCancelOperation,
+} from "../../packages/chains/steem/src/operations";

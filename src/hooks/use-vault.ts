@@ -36,6 +36,8 @@ import type {
   RestoreBackupResponse,
   SetupSocialRecoveryRequest,
   SetupSocialRecoveryResponse,
+  SignCancelRequest,
+  SignCancelResponse,
   SignOrderRequest,
   SignOrderResponse,
   SimulateOrderRequest,
@@ -255,6 +257,12 @@ export function useVaultSimulate() {
 
 export function useVaultSign() {
   return useVaultMutation<SignOrderResponse, SignOrderRequest>((vars) => postJson("/api/vault/sign", vars));
+}
+
+export function useVaultSignCancel() {
+  return useVaultMutation<SignCancelResponse, SignCancelRequest>((vars) =>
+    postJson("/api/vault/sign-cancel", vars),
+  );
 }
 
 export function useVaultBackup() {

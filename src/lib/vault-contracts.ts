@@ -206,6 +206,34 @@ export interface SignOrderResponse {
 }
 
 // ---------------------------------------------------------------------------
+// POST /api/vault/sign-cancel — DEX limit_order_cancel signing (M3+)
+// (additive contract — existing shapes untouched)
+// ---------------------------------------------------------------------------
+
+export interface SignCancelRequest {
+  network: NetworkId;
+  account: string;
+  /** The uint32 orderid from the open order being cancelled. */
+  orderid: number;
+  /** Step-up password — required when the vault is locked or rule demands it. */
+  password?: string;
+  /** false (default) → signed-only; true → broadcast via the gated adapter. */
+  broadcast?: boolean;
+}
+
+export interface SignCancelResponse {
+  ok: true;
+  decision: PolicyDecision;
+  digestHex: string;
+  serializedHex: string;
+  signatureHex: string;
+  publicKey: string;
+  txId: string;
+  byteLength: number;
+  broadcast: { txId: string; blockNum?: number } | null;
+}
+
+// ---------------------------------------------------------------------------
 // GET  /api/vault/backup — package preview metadata
 // POST /api/vault/backup — create backup package (password re-entry)
 // POST /api/vault/restore — restore from package JSON (fresh state only)

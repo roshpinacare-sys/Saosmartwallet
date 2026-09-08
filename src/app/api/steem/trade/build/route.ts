@@ -21,6 +21,7 @@ import { NextResponse } from "next/server";
 
 import { SerializationError } from "@/lib/steem-engine";
 import { buildSteemOrderTx } from "@/lib/steem-order";
+import { clientIpOf, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,17 @@ interface BuildRequest {
 }
 
 export async function POST(req: Request) {
+  // Per-IP budget — every build stamps fresh ref-block fields via a live RPC
+  // call; a bursty client must not be able to hammer the upstream node.
+  const ip = clientIpOf(req);
+  const rl = rateLimit(`trade-build:${ip}`, 30, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: `too many builds — retry in ${rl.retryAfterSeconds}s` },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
   let body: BuildRequest;
   try {
     body = (await req.json()) as BuildRequest;

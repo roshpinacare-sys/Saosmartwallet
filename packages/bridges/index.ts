@@ -3,5 +3,5 @@
  */
 
 export * from "./types";
-export { findPaths, describePath, assertExecutable, type FindPathParams } from "./router";
+export { findPaths, describePath, assertExecutable, railCatalog, type FindPathParams, type RailCatalogEntry } from "./router";
 export { railStatuses, bridgeAnalytics } from "./monitor";

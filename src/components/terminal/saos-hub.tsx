@@ -24,8 +24,10 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
+  AlertTriangle,
   Anchor,
   Boxes,
+  CheckCircle2,
   Coins,
   Cpu,
   Crown,
@@ -38,11 +40,89 @@ import {
 
 import { AnimatedNumber } from "@/components/terminal/motion-bits";
 import { EcoChip, LiveBadge, PanelHeader, PanelSkeleton, StatCell } from "@/components/terminal/primitives";
-import { fmtAge, fmtMicroSaos, fmtUsd, useEcoSaosHub } from "@/hooks/use-eco";
+import { fmtAge, fmtMicroSaos, fmtUsd, useEcoSaosHub, type SaosHubResponse } from "@/hooks/use-eco";
 import { cn } from "@/lib/utils";
 
 function secondsSince(iso: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+}
+
+/**
+ * ANCHOR-HEALTH ALERT RULE — threshold derived from the chain's OWN data:
+ *  · age       = now − last checkpoint seal stamp (real field
+ *    `core.lastCheckpointAt` = state.json `checkpoints[-1].at`, written by the
+ *    daemon when the checkpoint is sealed). Fallback when that stamp is
+ *    absent: `core.updatedAt` (the daemon state push) — every sealed
+ *    checkpoint ships inside the pushed state, so the push time can only
+ *    OVERestimate freshness (anchors sealed later look younger), never
+ *    invent it; the basis is reported so the display stays honest.
+ *  · threshold = max(3 × core.checkpointCadenceSeconds, 600s)
+ *    `checkpointCadenceSeconds` is the chain's own measured median gap
+ *    between its last ≤12 checkpoint seals. 3× absorbs one missed seal on
+ *    the observed cadence; the 10-minute floor stops the alert from
+ *    flapping on a single slow seal when the cadence is fast.
+ *    If the cadence is unmeasurable (<2 stamps), fall back to 3600s — the
+ *    same staleness bound the eco probes already apply to SAOS-NET state.
+ *  · lagging   = age > threshold (null = both real stamps missing — honest
+ *    "unmeasurable", never a fabricated OK).
+ */
+export function anchorHealth(core: SaosHubResponse["core"]): {
+  ageSeconds: number | null;
+  thresholdSeconds: number;
+  lagging: boolean | null;
+  basis: "checkpoint-seal" | "state-push" | "unavailable";
+} {
+  const cadence = core?.checkpointCadenceSeconds ?? null;
+  const thresholdSeconds = cadence !== null && Number.isFinite(cadence) ? Math.max(3 * cadence, 600) : 3_600;
+  const stamp = core?.lastCheckpointAt ?? core?.updatedAt ?? null;
+  if (!stamp) return { ageSeconds: null, thresholdSeconds, lagging: null, basis: "unavailable" };
+  const parsed = new Date(stamp).getTime();
+  if (!Number.isFinite(parsed)) return { ageSeconds: null, thresholdSeconds, lagging: null, basis: "unavailable" };
+  const ageSeconds = Math.max(0, Math.floor((Date.now() - parsed) / 1000));
+  return {
+    ageSeconds,
+    thresholdSeconds,
+    lagging: ageSeconds > thresholdSeconds,
+    basis: core?.lastCheckpointAt ? "checkpoint-seal" : "state-push",
+  };
+}
+
+function AnchorHealthChip({ health }: { health: ReturnType<typeof anchorHealth> }) {
+  if (health.lagging === null) {
+    return (
+      <span
+        className="num inline-flex items-center rounded-full border border-[var(--border-default)] bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold tracking-[0.14em] text-[var(--text-tertiary)]"
+        aria-label="anchor age unmeasurable — no timestamped checkpoint in state"
+      >
+        ANCHOR AGE N/A
+      </span>
+    );
+  }
+  const ageLabel = health.ageSeconds !== null ? fmtAge(health.ageSeconds) : "—";
+  const detail = `age ${ageLabel} · threshold ${fmtAge(health.thresholdSeconds)} · basis ${health.basis}`;
+  if (health.lagging) {
+    return (
+      <span
+        role="alert"
+        aria-label={`anchor lag — ${detail}`}
+        title={`checkpoint seal is older than the chain's own cadence allows (${detail})`}
+        className="num inline-flex items-center gap-1 rounded-full border border-[var(--warning)]/45 bg-[var(--warning)]/10 px-2 py-0.5 text-[9px] font-bold tracking-[0.14em] text-[var(--warning)]"
+      >
+        <AlertTriangle className="h-3 w-3" aria-hidden />
+        ANCHOR LAG — {ageLabel} old
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-label={`anchor healthy — ${detail}`}
+      title={`checkpoint seal within the chain's own cadence (${detail})`}
+      className="num inline-flex items-center gap-1 rounded-full border border-[var(--up)]/35 bg-[var(--up)]/10 px-2 py-0.5 text-[9px] font-bold tracking-[0.14em] text-[var(--up)]"
+    >
+      <CheckCircle2 className="h-3 w-3" aria-hidden />
+      ANCHOR OK — {ageLabel} ago
+    </span>
+  );
 }
 
 const ROLE_META: Record<string, { label: string; tone: string; icon: React.ReactNode }> = {
@@ -81,6 +161,7 @@ export function SaosHub() {
   const agentLoops = data.loops.agent.length;
   const nodeLoops = data.loops.node.length;
   const liveWrapped = data.wrapped.filter((w) => w.supply > 0).length;
+  const anchor = anchorHealth(core);
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
@@ -92,7 +173,12 @@ export function SaosHub() {
             subtitle="deterministic kernel · daemon-pushed state"
             icon={<Cpu className="h-4 w-4" />}
             accent="saos"
-            right={<EcoChip status={core ? "live" : "gated"} />}
+            right={
+              <div className="flex shrink-0 items-center gap-2">
+                <AnchorHealthChip health={anchor} />
+                <EcoChip status={core ? "live" : "gated"} />
+              </div>
+            }
           />
           <div className="grid grid-cols-2 gap-4 p-5">
             <StatCell

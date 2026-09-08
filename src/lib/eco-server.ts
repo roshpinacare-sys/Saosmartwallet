@@ -398,6 +398,10 @@ export interface SaosNetSnapshot {
     updatedAt: string | null;
     checkpointCount: number;
     verifiedCount: number;
+    /** Seal timestamp (`at`) of the newest checkpoint — real field from the daemon state. */
+    lastCheckpointAt: string | null;
+    /** Median gap (s) between the last ≤12 checkpoint seal timestamps — measured cadence, null if <2 stamps. */
+    checkpointCadenceSeconds: number | null;
   };
   engine: {
     at: string | null;
@@ -520,6 +524,18 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
   const derivativesRaw = (tronRaw.derivatives ?? {}) as Record<string, unknown>;
   const delegationsRaw = (raw.delegationsSummary ?? {}) as Record<string, Record<string, unknown>>;
 
+  // Checkpoint seal cadence, measured from the chain's own data: median gap
+  // between the `at` stamps of the last ≤12 checkpoints. This is the input for
+  // the SAOS HUB anchor-lag alert threshold (no invented cadence).
+  const cpStamps = checkpoints
+    .map((cp) => (typeof cp.at === "string" ? Date.parse(cp.at) : NaN))
+    .filter((t) => Number.isFinite(t))
+    .slice(-12);
+  const cpGaps = cpStamps.slice(1).map((t, i) => (t - cpStamps[i]) / 1000).filter((g) => g > 0);
+  const cpGapsSorted = [...cpGaps].sort((a, b) => a - b);
+  const checkpointCadenceSeconds =
+    cpGapsSorted.length > 0 ? cpGapsSorted[Math.floor(cpGapsSorted.length / 2)] : null;
+
   return {
     ok: true,
     fetchedAt: new Date().toISOString(),
@@ -533,6 +549,8 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
       updatedAt: str(raw.updatedAt),
       checkpointCount: checkpoints.length,
       verifiedCount,
+      lastCheckpointAt: lastCp && typeof lastCp.at === "string" ? lastCp.at : null,
+      checkpointCadenceSeconds,
     },
     engine: {
       at: str(g.at),
