@@ -63,3 +63,40 @@ model AuditEvent {
   previousEventHash String
   eventHash         String
 }
+
+// ---------------------------------------------------------------------------
+// Model 1 — Metered Identity Verification API (Week 1 of docs/what-we-can-do-now.md)
+// ---------------------------------------------------------------------------
+
+/// Developer API key for the metered product endpoint (POST /api/v1/identity/verify).
+/// The raw key (`saos_live_` + 32 random bytes, base64url) is shown EXACTLY ONCE
+/// at creation; only its SHA-256 hash is ever stored. `prefix` keeps the first 16
+/// characters so the console can display and the product endpoint can label the
+/// caller without revealing the secret.
+model ApiKey {
+  id         String        @id @default(cuid())
+  name       String
+  prefix     String        @unique
+  keyHash    String        @unique
+  active     Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  lastUsedAt DateTime?
+  records    UsageRecord[]
+}
+
+/// One row per executed product call — the usage ledger. outcome is
+/// PROVEN | FAILED | ERROR (the service did real chain work in every case,
+/// so every executed call consumes quota — stated honestly in the console).
+model UsageRecord {
+  id        String   @id @default(cuid())
+  keyId     String
+  key       ApiKey   @relation(fields: [keyId], references: [id], onDelete: Cascade)
+  endpoint  String
+  outcome   String
+  username  String?
+  latencyMs Int
+  createdAt DateTime @default(now())
+
+  @@index([keyId, createdAt])
+  @@index([createdAt])
+}

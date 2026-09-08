@@ -16,18 +16,21 @@
  *   REGISTRY  — the repo/scan catalog + honest gaps
  *   WALLET    — balances, Steem Power, RC manabar, open orders + M3 ETH/SOL lookups, vault status
  *   VAULT     — Sovereign Key Vault: wizard, policy engine, backup, audit
+ *   DEVELOPER — Model 1 metered Identity API: keys, try-it, usage ledger
  *
  * Every market number is chain-sourced — zero mock data. Keyboard: 1–9
- * switch sections. Signing flows through the M2 keystore + policy engine.
+ * switch sections (DEVELOPER is click-only). Signing flows through the M2
+ * keystore + policy engine.
  */
 
 import { useEffect, useState } from "react";
 
 import { motion } from "framer-motion";
-import { Boxes, FlaskConical, GitBranch, Grid3x3, Landmark, Server, ShieldCheck, Table2, Wallet2 } from "lucide-react";
+import { Boxes, FlaskConical, GitBranch, Grid3x3, Landmark, Server, ShieldCheck, Table2, Wallet2, Waypoints } from "lucide-react";
 
 import { BridgeExplorer } from "@/components/terminal/bridge-explorer";
 import { BridgeMonitor } from "@/components/terminal/bridge-monitor";
+import { DeveloperConsole } from "@/components/developer/developer-console";
 import { TerminalHeader } from "@/components/terminal/eco-header";
 import { KpiStrip } from "@/components/terminal/kpi-strip";
 import { NetworkGrid } from "@/components/terminal/network-grid";
@@ -45,7 +48,17 @@ import { DexView } from "@/components/trading/dex-view";
 import { Providers } from "@/components/providers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type SectionId = "grid" | "saoshub" | "proofs" | "dex" | "saosnet" | "bridges" | "registry" | "wallet" | "vault";
+type SectionId =
+  | "grid"
+  | "saoshub"
+  | "proofs"
+  | "dex"
+  | "saosnet"
+  | "bridges"
+  | "registry"
+  | "wallet"
+  | "vault"
+  | "developer";
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: React.ReactNode }> = [
   { id: "grid", label: "GRID", icon: <Grid3x3 className="h-3.5 w-3.5" aria-hidden /> },
@@ -57,6 +70,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: React.ReactNode }> =
   { id: "registry", label: "REGISTRY", icon: <Landmark className="h-3.5 w-3.5" aria-hidden /> },
   { id: "wallet", label: "WALLET", icon: <Wallet2 className="h-3.5 w-3.5" aria-hidden /> },
   { id: "vault", label: "VAULT", icon: <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> },
+  { id: "developer", label: "DEVELOPER", icon: <Waypoints className="h-3.5 w-3.5" aria-hidden /> },
 ];
 
 export default function Home() {
@@ -93,12 +107,12 @@ export default function Home() {
                 <TabsTrigger
                   key={s.id}
                   value={s.id}
-                  aria-label={`${s.label} section (keyboard ${i + 1})`}
+                  aria-label={`${s.label} section${i < 9 ? ` (keyboard ${i + 1})` : ""}`}
                   className="num gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold tracking-[0.18em] data-[state=active]:bg-[var(--up)]/15 data-[state=active]:text-[var(--up)]"
                 >
                   {s.icon}
                   <span className="hidden sm:inline">{s.label}</span>
-                  <span className="hidden text-[8px] text-[var(--text-tertiary)] lg:inline">{i + 1}</span>
+                  <span className="hidden text-[8px] text-[var(--text-tertiary)] lg:inline">{i < 9 ? i + 1 : ""}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -198,6 +212,16 @@ export default function Home() {
                 transition={{ duration: 0.25 }}
               >
                 <VaultConsole />
+              </motion.div>
+            </TabsContent>
+
+            <TabsContent value="developer" className="mt-0 outline-none">
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <DeveloperConsole />
               </motion.div>
             </TabsContent>
           </Tabs>

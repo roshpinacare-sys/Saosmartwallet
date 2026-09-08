@@ -170,9 +170,28 @@ Ethereum L1 ~15 tx/s · Solana (real-world) ~2,000–4,000 tx/s · Grid98 — ה
 
 ### תוכנית 4 שבועות (מ-היום)
 
-**שבוע 1 — API מסחרי:** API-key + rate-limit + metering פשוט על
-`/api/saos/anchor-verify`; endpoint ציבורי `verify` חינמי (quota קטן) ומסלול
-מדוד לאינטגרטורים; לנדינג-פייג' אחת עם ה-honesty summary מה-API.
+**שבוע 1 — API מסחרי: ✅ שולם (2026-09-08, אותו יום).** חי בפועל:
+
+- `POST /api/v1/identity/verify` — ה-product endpoint: `Authorization: Bearer
+  saos_live_…`, מריץ את אותה אימות-אמיתית ומודד כל קריאה שבוצעה.
+- מפתחות API: יצירה/שלילה דרך `/api/developer/keys` — ה-plaintext מוצג פעם
+  אחת בלבד, ב-DB נשמר רק SHA-256; fail-closed מוכח (401 בלי מפתח, 401 אחרי
+  שלילה — נמדד חי).
+- Quota: 1,000 אימותים/מפתח/יום UTC (free tier) עם headers
+  `X-RateLimit-Limit/Remaining/Reset`; כל קריאה שבוצעת נספרת כולל FAILED —
+  השירות עשה עבודת-שרשרת אמיתית בכל מקרה (רשום בכנות ב-console).
+- ספר-שימוש (usage ledger): כל קריאה = שורה (outcome PROVEN/FAILED/ERROR,
+  username, latencyMs) + אנליטיקה ב-`/api/developer/usage`.
+- Console למפתחים: טאב **DEVELOPER** בדשבורד — יצירת מפתח (copy-once),
+  try-it חי (verdict + latency מדודה + quota), וגרף 24h. נבדק בדפדפן
+  (desktop 1440 + mobile 390, אפס שגיאות קונסולה).
+- מדידה חיה של יום-ההשקה: קריאה ממוסחרת עם מפתח אמיתי → `PROVEN`,
+  latency 3,445ms, quota 1/1000; קריאה על חשבון לא-מעוגן → `FAILED` נמדד
+  ונספר; מפתח שנשלל → 401. (הערת-כנות: הענף של 429 quota-exhausted לא
+  נוסה חי — דורש 1,000 קריאות בפועל; ההיגיון נבדק בקוד.)
+
+> פער-כנות שנשאר משבוע 1: ה-console היא owner-side (בלי auth לניהול-מפתחות)
+> כי ה-sandbox הוא מכונת-הבעלים; multi-tenant auth זה פריט שבוע 2+.
 
 **שבוע 2 — SDK דק:** חבילת JS אחת (`saos-id-verify`) שעוטפת את ה-API + דוגמת
 3-שורות לאינטגרציה. פרסום npm ציבורי.
@@ -207,7 +226,19 @@ curl -s http://localhost:3000/api/saos/fleet-status | jq '.statusLine, .soldiers
 curl -s http://localhost:3000/api/saos/hub | jq '.ok, .fetchedAt'
 ```
 
-ובדפדפן: **טאב PROOFS** — שלושת ה-demos לחיצים ומריצים עכשיו.
+**וה-product (שבוע 1, חי):** צרו מפתח בטאב DEVELOPER (או:)
+
+```bash
+KEY=$(curl -s -X POST http://localhost:3000/api/developer/keys \
+  -H 'Content-Type: application/json' -d '{"name":"self-check"}' | jq -r .key)
+curl -s -X POST http://localhost:3000/api/v1/identity/verify \
+  -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
+  -d '{"username":"headcorner"}' | jq '.ok, .verify.sameScalarProof, .meta'
+curl -s http://localhost:3000/api/developer/usage | jq '.totals, .last24h'
+```
+
+ובדפדפן: **טאב PROOFS** — שלושת ה-demos לחיצים ומריצים עכשיו; **טאב
+DEVELOPER** — ה-API המסחרי המדוד (מפתחות + try-it + ledger).
 
 ---
 

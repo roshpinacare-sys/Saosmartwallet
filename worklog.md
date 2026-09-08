@@ -439,3 +439,25 @@ Work Log:
 
 Stage Summary:
 - Saosmartwallet עבר את הביקורת שדרשה אותה: הפגם של סיסמה-גלויה לא קיים כאן והוכח אמפירית (0 מופעים ב-DB אחרי lifecycle מלא). הכספת הוחזרה למצב מסירה נקי. הסיכון האמיתי — מפתחות fleet שרופים, PAT, daemons — מתועד כפעולות-בעלים בלבד. תשתית: מנגנון השרדות-השרת פוענח ומתועד (.zscripts/dev.sh + stdin detach). Pushed to main.
+
+---
+Task ID: MODEL1-W1
+Agent: Z.ai Code (main) — System Owner Mode
+Task: Model 1, Week 1 — the metered Identity Verification API goes commercial: API keys (SHA-256-only storage, plaintext shown once), daily quota with rate-limit headers, usage ledger, /api/v1/identity/verify product endpoint, DEVELOPER console tab, browser verification, docs, push.
+
+Work Log:
+- Health patrol first: hub 200, 7/7 networks — then executed the next step promised in docs/what-we-can-do-now.md (Model 1 Week 1: metered API), pure code, $0, no keys at risk.
+- Schema: ApiKey (name, prefix[16], keyHash unique, active, lastUsedAt) + UsageRecord (keyId FK cascade, endpoint, outcome, username, latencyMs, indexed createdAt) → db push ok.
+- src/lib/api-keys.ts: generateApiKey (saos_live_ + 32B base64url, only SHA-256 stored), fail-closed resolveApiKey (missing/invalid/revoked), UTC-day quota (free tier 1,000/key/day), meterCall (ledger row + lastUsedAt, called AFTER real work), X-RateLimit-* headers.
+- Product endpoint POST|GET /api/v1/identity/verify: Bearer auth → quota gate → runs the REAL verifyIdentityAnchor (same code path as PROOFS) → meters outcome PROVEN/FAILED/ERROR with measured latency → responds with meta{keyPrefix,outcome,latencyMs,quota,plan}. 401/429 fail-closed.
+- /api/developer/keys (list w/ honest per-key counters, create returns plaintext exactly once, soft-revoke keeps history) + /api/developer/usage (totals, last-24h outcomes, avg latency, hourly series).
+- UI: src/components/developer/developer-console.tsx (TRY IT / API KEYS / USAGE panels in the terminal aesthetic, hooks in use-developer.ts) + 10th tab DEVELOPER in page.tsx (click-only by design); fixed a11y honesty — tab label no longer claims "keyboard 10".
+- Caught a REAL bug en route: usage series bucket key was Date.UTC(y,m,hour) — dropped the day, so hour 14 collided into "Sep 14". Fixed to Date.UTC(y,m,d,h); verified first bucket 09-07T14:00, current hour carries the 2 real calls.
+- Infra: first restart attempt died in the harness cgroup cleanup (script killed mid prisma-generate, never reached bun run dev); fix = manual db:push first (instant no-op) then .zscripts/dev.sh with stdin detached → server up, fresh PrismaClient with new models. Documented behavior.
+- Live proof (curl): create key → POST verify with key → ok:true, sameScalarProof:true, anchor block 109,389,994, latency 4,078ms (first call), quota 1/1000, X-RateLimit headers present; unanchored account "satoshi" → outcome FAILED, quota 2/1000 (honest metering of real work); DELETE key → next call 401. Keys list shows per-key today/total counters.
+- Browser verification (agent-browser): DEVELOPER tab renders 3 panels; golden path: paste key → RUN VERIFY → PROVEN chip, latency 3,445ms measured, quota 1/1000 + resets 00:00 UTC, EVM address + active authority + anchor block link + full PROVEN summary; CREATE KEY via UI → plaintext-shown-once block with working COPY, new ACTIVE row appears; curl disclosure expands with the exact integrator command; USAGE panel live (3 keys, 3 calls today, avg 2,890ms, PROVEN 2/FAILED 1/ERROR 0, hourly bar green on current hour); desktop 1440 + mobile 390 (scrollW==390, no h-scroll, icon-only tab bar honest); zero console/page errors; footer sticks on both.
+- lint clean · dev.log clean 200s after restart. Honest note: the 429 quota-exhausted branch was NOT live-tested (would burn 1,000 real calls) — logic reviewed, quota arithmetic proven via 1/1000→2/1000 counters.
+- Docs: what-we-can-do-now.md Week 1 marked SHIPPED same-day with live numbers + self-check commands + honest gap (console is owner-side until Week 2+); README tab table gained the missing PROOFS row + new DEVELOPER row; keyboard hint corrected to 1–9 + click-only DEVELOPER.
+
+Stage Summary:
+- Model 1 Week 1 is DONE same-day as the plan was written: the identity verification is a real product — key-authenticated, metered, quota'd, ledgered, with an owner console and a live PROVEN path (curl + browser). Everything anti-mock: a FAILED verdict is a measured fact, zeros are real zeros, the only untested branch (429) is declared. Next step per plan: Week 2 — the thin `saos-id-verify` npm SDK wrapping this endpoint. Pushed to main.
