@@ -320,5 +320,33 @@ DEVELOPER** — ה-API המסחרי המדוד (מפתחות + try-it + ledger).
 
 ---
 
+## SEC-HARD — אבטחה בסביבה-מחוברת (2026-09-08, סבב רביעי)
+
+**ההנחיה:** "מחוברים לרשת → לחזק אבטחה, לוודא שלא נקרא/נעשה שימוש בקוד זדוני."
+**הכל נמדד חי, והשער מכני: `bun tools/security-audit.ts` → 23/23 PASS (exit 0).**
+
+- **שרשרת-אספקה נבדקה חי:** `npm audit` מול DB-הייעוץ החי → **0 פגיעויות** בכל
+  עץ-התלויות; `bun.lock` נעול ב-git; **0 lifecycle-scripts** ב-6 package.json
+  (אין ריצת-קוד בזמן-install); ה-SDK הרשמי `saos-id-verify` נשאר **אפס-תלות**
+  (נאכף מכנית).
+- **קוד זדוני — אין, וזה נאכף:** סריקת `eval`/`new Function`/`child_process`/
+  `dangerouslySetInnerHTML` על כל `src+packages+tools` → שתי ההיתרים היחידים
+  (runner-המנוע המקומי בנתיב-קבוע; מזריק-CSS של chart) מתועדים ונבדקים מכנית,
+  כולל assertion שנתיב-ה-spawn נשאר `.grid98-lab` מקומי.
+- **secrets — אין ב-git:** 0 קבצי .env/.pem/keystore; 0 דפוסי WIF/PEM/מפתחות
+  בקבצי-טקסט נעקבים; מפתחות-probe נשללו; אישור-מנהל reset ל-owner-first.
+- **HTTP חוזק:** CSP (`default-src 'self'` + דוקומנטציה-כנה של ההקלות), nosniff,
+  Referrer-Policy, Permissions-Policy, HSTS, `X-Powered-By` כבוי — חי בכל
+  תשובה; **0 הפרות-CSP בדפדפן** ו-HMR חי.
+- **rate-limits חדשים + הוכחות-429 חיות:** `grid98-bench` 3/min (spawn יקר —
+  חי: 3×200 ואז 429+Retry-After); `anchor-verify` 10/min (proxy חיצוני — חי:
+  10×200 ואז 429); ה-limit אף תפס זרימת-משתמש אמיתית מה-UI בזמן-הבדיקה.
+- **דפדפן אחרי-החיזוק:** golden path PROVEN חי, אפס שגיאות/הפרות, 390px
+  ו-1440px אפס-גלילה אופקית.
+- מסמך-האם: `docs/security.md` (מודל-איום · מדיניות-שרשרת-אספקה · מפת
+  rate-limits · מדיניות-secrets · תגובה לתקריות · פערים-כנים).
+
+---
+
 *המסמך נכתב אחרי הרצת כל שלושת ה-apis בסשן זה (2026-09-08). מספרים
 עתידיים/פיננסיים מסומנים speculative ולא מהווים נתון. כנות > שיווק.*
