@@ -90,10 +90,12 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 | **REGISTRY** | 8 ריפו · שירותים · פערים כנים (מה חסר: adapters ל-Hive/Blurt/TRON · חוזה-גשר לא פרוס · חתימה cold/hardware) | סריקה 2026-09-08 |
 | **WALLET** | יתרות/SP/RC/פקודות פתוחות + **M3: חיפוש כתובות ETH (native+ERC-20) ו-SOL (native+SPL)** + סטטוס הכספת | api.steemit.com + adapters |
 | **VAULT** | Sovereign Key Vault: wizard 6-שלבי (**7 רשתות**) · Policy Engine · Backup/Shamir/Social/Dead-man · Audit chain עם דוחות json/csv/pdf | packages/core (M2+M3) |
+| **PROOFS** | 3 demos חיים: Identity Anchor (EIP-191 + ecrecover — sameScalarProof חי) · Grid98 Live Benchmark (ה-engine האמיתי, TPS נמדד עכשיו) · Soldier Fleet 13/13 (SP/VP/RC + ops אחרונים, refresh 10s) | `/api/saos/anchor-verify` · `/api/saos/grid98-bench` · `/api/saos/fleet-status` |
+| **DEVELOPER** | **ה-API המסחרי המדוד (Model 1, שבוע 1 — חי):** API keys (plaintext פעם-אחת, רק SHA-256 ב-DB) · try-it על `POST /api/v1/identity/verify` (verdict + latency מדודה + quota) · usage ledger (PROVEN/FAILED/ERROR, גרף 24h) · free tier 1,000/יום UTC | `/api/developer/keys` · `/api/developer/usage` · SQLite (Prisma) |
 
 **מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · `ethereum-rpc.publicnode.com` (+fallbacks) · `api.mainnet-beta.solana.com` (+fallbacks) · daemon-state של SAOS-NET. כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 
-**קיצורי מקלדת:** מקשים 1–8 מחליפים מסכים (8 = VAULT).
+**קיצורי מקלדת:** מקשים 1–9 מחליפים מסכים (9 = VAULT); DEVELOPER בלחיצה בלבד (10 טאבים, בכנות — אין מקש 10).
 
 ## 🌉 M3 — Multi-Chain Sovereign Ecosystem (2026-09-08)
 
