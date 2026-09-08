@@ -1,0 +1,791 @@
+     1→/**
+     2→ * Saosmartwallet — Ecosystem server layer (Grid Dashboard)
+     3→ * =========================================================
+     4→ * Live probes for every network in the SAOS ecosystem + the SAOS-NET
+     5→ * sovereign chain state (daemon-pushed by their node into the `steem`
+     6→ * repo, read here through the GitHub API).
+     7→ *
+     8→ * Rules:
+     9→ *  · Every field is chain- or repo-sourced — ZERO mock market data.
+    10→ *  · Probes never throw: a dead chain is DATA (status: offline), not a 500.
+    11→ *  · Small in-process TTL cache — external RPCs and GitHub stay politely
+    12→ *    rate-limited even with several browser tabs polling.
+    13→ *  · The GitHub token never leaves the server process and is never logged.
+    14→ */
+    15→
+    16→import { readFile } from "node:fs/promises";
+    17→import path from "node:path";
+    18→
+    19→import { steemMarket } from "./steem-server";
+    20→
+    21→// ---------------------------------------------------------------------------
+    22→// Tiny TTL cache
+    23→// ---------------------------------------------------------------------------
+    24→
+    25→type CacheEntry = { at: number; value: unknown };
+    26→
+    27→const cache = new Map<string, CacheEntry>();
+    28→
+    29→export async function withCache<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+    30→  const hit = cache.get(key);
+    31→  const now = Date.now();
+    32→  if (hit && now - hit.at < ttlMs) return hit.value as T;
+    33→  const value = await fn();
+    34→  cache.set(key, { at: now, value });
+    35→  return value;
+    36→}
+    37→
+    38→// ---------------------------------------------------------------------------
+    39→// Fetch helpers (fail-soft, with timeout)
+    40→// ---------------------------------------------------------------------------
+    41→
+    42→async function fetchJson(
+    43→  url: string,
+    44→  init: RequestInit & { timeoutMs?: number },
+    45→): Promise<unknown> {
+    46→  const { timeoutMs = 5_000, ...rest } = init;
+    47→  const controller = new AbortController();
+    48→  const timer = setTimeout(() => controller.abort(), timeoutMs);
+    49→  try {
+    50→    const res = await fetch(url, {
+    51→      ...rest,
+    52→      signal: controller.signal,
+    53→      cache: "no-store",
+    54→    });
+    55→    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    56→    return (await res.json()) as unknown;
+    57→  } finally {
+    58→    clearTimeout(timer);
+    59→  }
+    60→}
+    61→
+    62→function rpcBody(method: string, params: unknown): string {
+    63→  return JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 });
+    64→}
+    65→
+    66→// ---------------------------------------------------------------------------
+    67→// GitHub (private repos → token required; read-only)
+    68→// ---------------------------------------------------------------------------
+    69→
+    70→const GH_OWNER = "roshpinacare-sys";
+    71→const STEEM_REPO = "steem";
+    72→const SAOSNET_STATE_PATH = "sovereign/node/state.json";
+    73→const GRID98_STATE_PATH = "sovereign/node/grid98-state.json";
+    74→
+    75→async function githubToken(): Promise<string | null> {
+    76→  const env = process.env.GITHUB_TOKEN;
+    77→  if (env && env.trim().length > 10) return env.trim();
+    78→  try {
+    79→    const raw = await readFile(path.join(process.cwd(), "upload", "Roshcaregt.txt"), "utf8");
+    80→    const token = raw.trim();
+    81→    return token.length > 10 ? token : null;
+    82→  } catch {
+    83→    return null;
+    84→  }
+    85→}
+    86→
+    87→async function githubRaw(repo: string, filePath: string): Promise<string | null> {
+    88→  const token = await githubToken();
+    89→  if (!token) return null;
+    90→  try {
+    91→    const controller = new AbortController();
+    92→    const timer = setTimeout(() => controller.abort(), 10_000);
+    93→    const res = await fetch(`https://raw.githubusercontent.com/${GH_OWNER}/${repo}/main/${filePath}`, {
+    94→      headers: { Authorization: `token ${token}` },
+    95→      signal: controller.signal,
+    96→      cache: "no-store",
+    97→    });
+    98→    clearTimeout(timer);
+    99→    if (!res.ok) return null;
+   100→    return await res.text();
+   101→  } catch {
+   102→    return null;
+   103→  }
+   104→}
+   105→
+   106→// ---------------------------------------------------------------------------
+   107→// Chain probes — each returns a normalized, honest status
+   108→// ---------------------------------------------------------------------------
+   109→
+   110→export type ChainStatusKind = "online" | "stale" | "offline";
+   111→
+   112→export interface EcoChain {
+   113→  id: string;
+   114→  name: string;
+   115→  family: string;
+   116→  kind: string;
+   117→  status: ChainStatusKind;
+   118→  /** Head height (number) when the chain exposes one. */
+   119→  headHeight: number | null;
+   120→  /** Seconds between the chain's head time and our clock (probed chains only). */
+   121→  lagSeconds: number | null;
+   122→  /** For push-based chains (SAOS-NET): age of the last daemon-pushed state. */
+   123→  stateAgeSeconds: number | null;
+   124→  headId: string | null;
+   125→  version: string | null;
+   126→  /** One-line, human-readable evidence (what was actually measured). */
+   127→  note: string;
+   128→  probedAt: string;
+   129→}
+   130→
+   131→async function probeGraphene(
+   132→  id: string,
+   133→  name: string,
+   134→  kind: string,
+   135→  urls: string[],
+   136→  timeoutMs: number,
+   137→): Promise<EcoChain> {
+   138→  const base: Omit<EcoChain, "status" | "headHeight" | "lagSeconds" | "headId" | "version" | "note"> & {
+   139→    status?: ChainStatusKind;
+   140→    note?: string;
+   141→  } = {
+   142→    id,
+   143→    name,
+   144→    family: "Graphene",
+   145→    kind,
+   146→    stateAgeSeconds: null,
+   147→    probedAt: new Date().toISOString(),
+   148→  };
+   149→  let lastErr = "unknown";
+   150→  for (const url of urls) {
+   151→    try {
+   152→      const res = (await fetchJson(url, {
+   153→        method: "POST",
+   154→        headers: { "Content-Type": "application/json" },
+   155→        body: rpcBody("condenser_api.get_dynamic_global_properties", []),
+   156→        timeoutMs,
+   157→      })) as { result?: Record<string, unknown> } | Record<string, unknown>;
+   158→      const r = ("result" in res && res.result ? res.result : res) as Record<string, unknown>;
+   159→      const head = typeof r.head_block_number === "number" ? r.head_block_number : null;
+   160→      if (head === null) throw new Error("no head_block_number");
+   161→      const timeStr = typeof r.time === "string" ? r.time : null;
+   162→      const lag = timeStr ? Math.max(0, Math.round((Date.now() - Date.parse(`${timeStr}Z`)) / 1000)) : null;
+   163→      return {
+   164→        ...base,
+   165→        status: "online",
+   166→        headHeight: head,
+   167→        lagSeconds: lag,
+   168→        headId: typeof r.head_block_id === "string" ? r.head_block_id : null,
+   169→        version: typeof r.hf_version === "string" ? r.hf_version : null,
+   170→        note: `live probe ${url.replace("https://", "")}`,
+   171→      };
+   172→    } catch (err) {
+   173→      lastErr = err instanceof Error ? err.message : "unknown";
+   174→    }
+   175→  }
+   176→  return {
+   177→    ...base,
+   178→    status: "offline",
+   179→    headHeight: null,
+   180→    lagSeconds: null,
+   181→    headId: null,
+   182→    version: null,
+   183→    note: `probe failed: ${lastErr}`,
+   184→  };
+   185→}
+   186→
+   187→async function probeTron(): Promise<EcoChain> {
+   188→  const base = {
+   189→    id: "tron",
+   190→    name: "TRON",
+   191→    family: "TVM (DPoS)",
+   192→    kind: "L1 public — zero-fee anchor rail",
+   193→    stateAgeSeconds: null,
+   194→    probedAt: new Date().toISOString(),
+   195→  };
+   196→  try {
+   197→    const r = (await fetchJson("https://api.trongrid.io/wallet/getnowblock", {
+   198→      method: "POST",
+   199→      headers: { "Content-Type": "application/json" },
+   200→      body: "{}",
+   201→      timeoutMs: 5_000,
+   202→    })) as {
+   203→      blockID?: string;
+   204→      block_header?: { raw_data?: { number?: number; timestamp?: number } };
+   205→    };
+   206→    const head = r.block_header?.raw_data?.number;
+   207→    if (typeof head !== "number") throw new Error("no block number");
+   208→    const ts = r.block_header?.raw_data?.timestamp ?? Date.now();
+   209→    const lag = Math.max(0, Math.round((Date.now() - ts) / 1000));
+   210→    return {
+   211→      ...base,
+   212→      status: "online",
+   213→      headHeight: head,
+   214→      lagSeconds: lag,
+   215→      headId: r.blockID ? `${r.blockID.slice(0, 16)}…` : null,
+   216→      version: null,
+   217→      note: "live probe api.trongrid.io",
+   218→    };
+   219→  } catch (err) {
+   220→    return {
+   221→      ...base,
+   222→      status: "offline",
+   223→      headHeight: null,
+   224→      lagSeconds: null,
+   225→      headId: null,
+   226→      version: null,
+   227→      note: `probe failed: ${err instanceof Error ? err.message : "unknown"}`,
+   228→    };
+   229→  }
+   230→}
+   231→
+   232→async function probeSteem(): Promise<EcoChain> {
+   233→  const base = {
+   234→    id: "steem",
+   235→    name: "STEEM",
+   236→    family: "Graphene",
+   237→    kind: "L1 public — internal market (our DEX)",
+   238→    stateAgeSeconds: null,
+   239→    probedAt: new Date().toISOString(),
+   240→  };
+   241→  try {
+   242→    const cs = await steemMarket().chainStatus();
+   243→    return {
+   244→      ...base,
+   245→      status: cs.lagSeconds > 0 && cs.lagSeconds < 60 ? "online" : "stale",
+   246→      headHeight: cs.headBlock,
+   247→      lagSeconds: cs.lagSeconds,
+   248→      headId: cs.headBlockId.slice(0, 16) || null,
+   249→      version: null,
+   250→      note: "live probe via M0/M1 SteemMarketClient",
+   251→    };
+   252→  } catch (err) {
+   253→    return {
+   254→      ...base,
+   255→      status: "offline",
+   256→      headHeight: null,
+   257→      lagSeconds: null,
+   258→      headId: null,
+   259→      version: null,
+   260→      note: `probe failed: ${err instanceof Error ? err.message : "unknown"}`,
+   261→    };
+   262→  }
+   263→}
+   264→
+   265→async function probeEthereum(): Promise<EcoChain> {
+   266→  const base = {
+   267→    id: "ethereum",
+   268→    name: "ETHEREUM",
+   269→    family: "EVM",
+   270→    kind: "L1 public — settlement + ERC-20 wrapped economy (M3)",
+   271→    stateAgeSeconds: null,
+   272→    probedAt: new Date().toISOString(),
+   273→  };
+   274→  const urls = ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org", "https://eth-mainnet.public.blastapi.io"];
+   275→  let lastErr = "unknown";
+   276→  for (const url of urls) {
+   277→    try {
+   278→      // Raw JSON-RPC — no SDK in the probe path; eth_getBlockByNumber(false)
+   279→      // gives head height + timestamp + baseFee in ONE call.
+   280→      const r = (await fetchJson(url, {
+   281→        method: "POST",
+   282→        headers: { "Content-Type": "application/json" },
+   283→        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false] }),
+   284→        timeoutMs: 6_000,
+   285→      })) as { result?: { number?: string; timestamp?: string; baseFeePerGas?: string } };
+   286→      const block = r.result;
+   287→      if (!block?.number) throw new Error("no block");
+   288→      const head = Number.parseInt(block.number, 16);
+   289→      const ts = block.timestamp ? Number.parseInt(block.timestamp, 16) * 1000 : Date.now();
+   290→      const baseFeeWei = block.baseFeePerGas ? BigInt(block.baseFeePerGas) : null;
+   291→      return {
+   292→        ...base,
+   293→        status: "online",
+   294→        headHeight: head,
+   295→        lagSeconds: Math.max(0, Math.round((Date.now() - ts) / 1000)),
+   296→        headId: null,
+   297→        version: baseFeeWei ? `${Number(baseFeeWei) / 1e9} gwei baseFee` : null,
+   298→        note: `live probe ${url.replace("https://", "")}`,
+   299→      };
+   300→    } catch (err) {
+   301→      lastErr = err instanceof Error ? err.message : "unknown";
+   302→    }
+   303→  }
+   304→  return {
+   305→    ...base,
+   306→    status: "offline",
+   307→    headHeight: null,
+   308→    lagSeconds: null,
+   309→    headId: null,
+   310→    version: null,
+   311→    note: `probe failed: ${lastErr}`,
+   312→  };
+   313→}
+   314→
+   315→async function probeSolana(): Promise<EcoChain> {
+   316→  const base = {
+   317→    id: "solana",
+   318→    name: "SOLANA",
+   319→    family: "PoH + PoS",
+   320→    kind: "L1 public — SPL wrapped economy (M3)",
+   321→    stateAgeSeconds: null,
+   322→    probedAt: new Date().toISOString(),
+   323→  };
+   324→  const urls = ["https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com"];
+   325→  let lastErr = "unknown";
+   326→  for (const url of urls) {
+   327→    try {
+   328→      const r = (await fetchJson(url, {
+   329→        method: "POST",
+   330→        headers: { "Content-Type": "application/json" },
+   331→        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getEpochInfo" }),
+   332→        timeoutMs: 6_000,
+   333→      })) as { result?: { absoluteSlot?: number; epoch?: number; slotIndex?: number; slotsInEpoch?: number } };
+   334→      const ep = r.result;
+   335→      if (!ep?.absoluteSlot) throw new Error("no epoch info");
+   336→      return {
+   337→        ...base,
+   338→        status: "online",
+   339→        headHeight: ep.absoluteSlot,
+   340→        lagSeconds: null, // slots carry no wall-clock timestamp in this response — honest null
+   341→        headId: null,
+   342→        version: `epoch ${ep.epoch} · slot ${ep.slotIndex ?? "—"}/${ep.slotsInEpoch ?? "—"}`,
+   343→        note: `live probe ${url.replace("https://", "")}`,
+   344→      };
+   345→    } catch (err) {
+   346→      lastErr = err instanceof Error ? err.message : "unknown";
+   347→    }
+   348→  }
+   349→  return {
+   350→    ...base,
+   351→    status: "offline",
+   352→    headHeight: null,
+   353→    lagSeconds: null,
+   354→    headId: null,
+   355→    version: null,
+   356→    note: `probe failed: ${lastErr}`,
+   357→  };
+   358→}
+   359→
+   360→// ---------------------------------------------------------------------------
+   361→// SAOS-NET sovereign state (daemon-pushed into the `steem` repo)
+   362→// ---------------------------------------------------------------------------
+   363→
+   364→export interface SaosNetPool {
+   365→  pair: string;
+   366→  baseReserve: number;
+   367→  quoteReserve: number;
+   368→  px: number;
+   369→  lp: number;
+   370→}
+   371→
+   372→export interface SaosNetOracleQuote {
+   373→  asset: string;
+   374→  /** Quoted price in USD (nano-dollar scale converted). */
+   375→  pxUsd: number;
+   376→  src: string;
+   377→  ref: string;
+   378→  at: string;
+   379→}
+   380→
+   381→export interface SaosNetWrapped {
+   382→  asset: string;
+   383→  supply: number;
+   384→  locked: number;
+   385→  holders: number;
+   386→}
+   387→
+   388→export interface SaosNetSnapshot {
+   389→  ok: true;
+   390→  fetchedAt: string;
+   391→  stateAvailable: boolean;
+   392→  core: {
+   393→    netVersion: string | null;
+   394→    genesisHash: string | null;
+   395→    height: number | null;
+   396→    stateRoot: string | null;
+   397→    lastBlockHash: string | null;
+   398→    updatedAt: string | null;
+   399→    checkpointCount: number;
+   400→    verifiedCount: number;
+   401→  };
+   402→  engine: {
+   403→    at: string | null;
+   404→    ticks: number | null;
+   405→    rounds: number | null;
+   406→    tradesToday: number | null;
+   407→    txsToday: number | null;
+   408→    tradesTotal: number | null;
+   409→    txsTotal: number | null;
+   410→    treasuryPnlSAOS: number | null;
+   411→    treasuryPnlTodaySAOS: number | null;
+   412→    floor: number | null;
+   413→    bench: { txsPerSec: number | null; capabilityPerDay: number | null; at: string | null; note: string | null };
+   414→    leaderboard: Array<{ name: string; pnlMicro: number }>;
+   415→  };
+   416→  book: {
+   417→    asks: Array<{ id: number; owner: string; amount: number; price: number }>;
+   418→    bids: Array<{ id: number; owner: string; amount: number; price: number }>;
+   419→  };
+   420→  sov: { floats: number | null; orders: number | null; fills: number | null; matches: number | null };
+   421→  oracle: SaosNetOracleQuote[];
+   422→  wrapped: SaosNetWrapped[];
+   423→  assetMeta: Record<string, { chain: string; contract: string; decimals: number; note: string }>;
+   424→  pools: SaosNetPool[];
+   425→  tronBridge: {
+   426→    address: string | null;
+   427→    relay: string | null;
+   428→    anchors: number | null;
+   429→    lastAnchor: { cpHeight: number | null; txid: string | null; tronBlock: number | null; at: string | null } | null;
+   430→    pulse: { tronHeight: number | null; at: string | null } | null;
+   431→    usdtTotal: number | null;
+   432→    measuredAddresses: string | null;
+   433→  };
+   434→  delegations: Array<{ name: string; scopes: string[] }>;
+   435→}
+   436→
+   437→function num(v: unknown): number | null {
+   438→  return typeof v === "number" && Number.isFinite(v) ? v : null;
+   439→}
+   440→
+   441→function str(v: unknown): string | null {
+   442→  return typeof v === "string" && v.length > 0 ? v : null;
+   443→}
+   444→
+   445→function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string, unknown> | null): SaosNetSnapshot {
+   446→  const checkpoints = Array.isArray(raw.checkpoints) ? (raw.checkpoints as Record<string, unknown>[]) : [];
+   447→  const lastCp = checkpoints.length > 0 ? checkpoints[checkpoints.length - 1] : null;
+   448→  const verified = raw.verified;
+   449→  // `verified` has been observed as an array of verified checkpoint hashes
+   450→  // (len 1112 at scan time) — accept both array and object shapes.
+   451→  const verifiedCount = Array.isArray(verified)
+   452→    ? verified.length
+   453→    : verified && typeof verified === "object"
+   454→      ? Object.keys(verified).length
+   455→      : 0;
+   456→
+   457→  const g = grid98Raw ?? {};
+   458→  const bench = (g.bench ?? {}) as Record<string, unknown>;
+   459→  const leaderboard = Array.isArray(g.leaderboard) ? (g.leaderboard as Record<string, unknown>[]) : [];
+   460→
+   461→  const oracleRaw = (raw.assetPricesSummary ?? {}) as Record<string, Record<string, unknown>>;
+   462→  const oracle: SaosNetOracleQuote[] = Object.entries(oracleRaw)
+   463→    .map(([asset, q]) => ({
+   464→      asset,
+   465→      // their oracle quotes are integer nano-dollars (1e9 = $1.00)
+   466→      pxUsd: typeof q.px === "number" ? q.px / 1e9 : NaN,
+   467→      src: typeof q.src === "string" ? q.src : "—",
+   468→      ref: typeof q.ref === "string" ? q.ref : "—",
+   469→      at: typeof q.at === "string" ? q.at : "—",
+   470→    }))
+   471→    .sort((a, b) => a.asset.localeCompare(b.asset));
+   472→
+   473→  const wrappedRaw = (raw.wrappedSummary ?? {}) as Record<string, Record<string, unknown>>;
+   474→  const wrapped: SaosNetWrapped[] = Object.entries(wrappedRaw)
+   475→    .map(([asset, w]) => ({
+   476→      asset,
+   477→      supply: typeof w.supply === "number" ? w.supply : 0,
+   478→      locked: typeof w.locked === "number" ? w.locked : 0,
+   479→      holders: typeof w.holders === "number" ? w.holders : 0,
+   480→    }))
+   481→    .sort((a, b) => b.locked - a.locked || a.asset.localeCompare(b.asset));
+   482→
+   483→  const metaRaw = (raw.assetMetaSummary ?? {}) as Record<string, Record<string, unknown>>;
+   484→  const assetMeta: SaosNetSnapshot["assetMeta"] = {};
+   485→  for (const [asset, m] of Object.entries(metaRaw)) {
+   486→    assetMeta[asset] = {
+   487→      chain: typeof m.chain === "string" ? m.chain : "—",
+   488→      contract: typeof m.contract === "string" ? m.contract : "",
+   489→      decimals: typeof m.decimals === "number" ? m.decimals : 0,
+   490→      note: typeof m.note === "string" ? m.note : "",
+   491→    };
+   492→  }
+   493→
+   494→  const poolsRaw = (g.pools ?? {}) as Record<string, Record<string, unknown>>;
+   495→  const pools: SaosNetPool[] = Object.entries(poolsRaw)
+   496→    .map(([pair, p]) => ({
+   497→      pair,
+   498→      baseReserve: typeof p.a === "number" ? p.a : 0,
+   499→      quoteReserve: typeof p.b === "number" ? p.b : 0,
+   500→      px: typeof p.px === "number" ? p.px : 0,
+   501→      lp: typeof p.lp === "number" ? p.lp : 0,
+   502→    }))
+   503→    .sort((a, b) => b.lp - a.lp || a.pair.localeCompare(b.pair));
+   504→
+   505→  const bookRaw = (raw.book ?? {}) as Record<string, unknown>;
+   506→  const sideOf = (v: unknown) =>
+   507→    Array.isArray(v)
+   508→      ? (v as Record<string, unknown>[]).map((o) => ({
+   509→          id: typeof o.id === "number" ? o.id : 0,
+   510→          owner: typeof o.owner === "string" ? o.owner : "—",
+   511→          amount: typeof o.amount === "number" ? o.amount : 0,
+   512→          price: typeof o.price === "number" ? o.price : 0,
+   513→        }))
+   514→      : [];
+   515→
+   516→  const sovRaw = (raw.sov ?? {}) as Record<string, unknown>;
+   517→  const tronRaw = (raw.tron ?? {}) as Record<string, unknown>;
+   518→  const lastAnchorRaw = (tronRaw.lastAnchor ?? {}) as Record<string, unknown>;
+   519→  const pulseRaw = (tronRaw.pulse ?? {}) as Record<string, unknown>;
+   520→  const derivativesRaw = (tronRaw.derivatives ?? {}) as Record<string, unknown>;
+   521→  const delegationsRaw = (raw.delegationsSummary ?? {}) as Record<string, Record<string, unknown>>;
+   522→
+   523→  return {
+   524→    ok: true,
+   525→    fetchedAt: new Date().toISOString(),
+   526→    stateAvailable: true,
+   527→    core: {
+   528→      netVersion: str(raw.netVersion),
+   529→      genesisHash: str(raw.genesisHash),
+   530→      height: num(raw.height),
+   531→      stateRoot: str(raw.stateRoot),
+   532→      lastBlockHash: str(raw.lastBlockHash),
+   533→      updatedAt: str(raw.updatedAt),
+   534→      checkpointCount: checkpoints.length,
+   535→      verifiedCount,
+   536→    },
+   537→    engine: {
+   538→      at: str(g.at),
+   539→      ticks: num(g.ticks),
+   540→      rounds: num(g.rounds),
+   541→      tradesToday: num(g.tradesToday),
+   542→      txsToday: num(g.txsToday),
+   543→      tradesTotal: num(g.tradesTotal),
+   544→      txsTotal: num(g.txsTotal),
+   545→      treasuryPnlSAOS: num(g.treasuryPnlSAOS),
+   546→      treasuryPnlTodaySAOS: num(g.treasuryPnlTodaySAOS),
+   547→      floor: num(g.floor),
+   548→      bench: {
+   549→        txsPerSec: num(bench.txsPerSec),
+   550→        capabilityPerDay: num(bench.capabilityPerDay),
+   551→        at: str(bench.at),
+   552→        note: str(bench.note),
+   553→      },
+   554→      leaderboard: leaderboard.map((l) => ({
+   555→        name: typeof l.name === "string" ? l.name : "—",
+   556→        pnlMicro: typeof l.pnlµ === "number" ? l.pnlµ : 0,
+   557→      })),
+   558→    },
+   559→    book: { asks: sideOf(bookRaw.asks), bids: sideOf(bookRaw.bids) },
+   560→    sov: {
+   561→      floats: num(sovRaw.floats),
+   562→      orders: num(sovRaw.orders),
+   563→      fills: num(sovRaw.fills),
+   564→      matches: num(sovRaw.matches),
+   565→    },
+   566→    oracle,
+   567→    wrapped,
+   568→    assetMeta,
+   569→    pools,
+   570→    tronBridge: {
+   571→      address: str(tronRaw.address),
+   572→      relay: str(tronRaw.relay),
+   573→      anchors: num(tronRaw.anchors),
+   574→      lastAnchor: lastAnchorRaw
+   575→        ? {
+   576→            cpHeight: num(lastAnchorRaw.cpHeight),
+   577→            txid: str(lastAnchorRaw.txid),
+   578→            tronBlock: num(lastAnchorRaw.tronBlock),
+   579→            at: str(lastAnchorRaw.at),
+   580→          }
+   581→        : null,
+   582→      pulse: { tronHeight: num(pulseRaw.tronHeight), at: str(pulseRaw.at) },
+   583→      usdtTotal: num(derivativesRaw.usdtTotal),
+   584→      measuredAddresses: str(derivativesRaw.measured),
+   585→    },
+   586→    delegations: Object.entries(delegationsRaw).map(([name, d]) => ({
+   587→      name,
+   588→      scopes: Array.isArray(d.scopes) ? (d.scopes as string[]) : [],
+   589→    })),
+   590→  };
+   591→}
+   592→
+   593→export async function saosNetSnapshot(): Promise<SaosNetSnapshot | { ok: false; error: string }> {
+   594→  return withCache("saosnet", 15_000, async () => {
+   595→    const [stateText, gridText] = await Promise.all([
+   596→      githubRaw(STEEM_REPO, SAOSNET_STATE_PATH),
+   597→      githubRaw(STEEM_REPO, GRID98_STATE_PATH),
+   598→    ]);
+   599→    if (!stateText) {
+   600→      return { ok: false, error: "SAOS-NET state unavailable (github raw fetch failed)" };
+   601→    }
+   602→    try {
+   603→      const state = JSON.parse(stateText) as Record<string, unknown>;
+   604→      const grid = gridText ? (JSON.parse(gridText) as Record<string, unknown>) : null;
+   605→      return normalizeSaosNet(state, grid);
+   606→    } catch (err) {
+   607→      return { ok: false, error: `state parse failed: ${err instanceof Error ? err.message : "unknown"}` };
+   608→    }
+   609→  });
+   610→}
+   611→
+   612→async function probeSaosNet(): Promise<EcoChain> {
+   613→  const snap = await saosNetSnapshot();
+   614→  const base = {
+   615→    id: "saos-net",
+   616→    name: "SAOS-NET",
+   617→    family: "Sovereign (deterministic kernel)",
+   618→    kind: "L1 shadow chain — anchored to Steem/Hive/TRON",
+   619→    probedAt: new Date().toISOString(),
+   620→  };
+   621→  if (!("ok" in snap) || snap.ok !== true) {
+   622→    return {
+   623→      ...base,
+   624→      status: "offline",
+   625→      headHeight: null,
+   626→      lagSeconds: null,
+   627→      stateAgeSeconds: null,
+   628→      headId: null,
+   629→      version: null,
+   630→      note: "daemon state not reachable",
+   631→    };
+   632→  }
+   633→  const updatedAt = snap.core.updatedAt ? Date.parse(snap.core.updatedAt) : NaN;
+   634→  const age = Number.isFinite(updatedAt) ? Math.max(0, Math.round((Date.now() - updatedAt) / 1000)) : null;
+   635→  return {
+   636→    ...base,
+   637→    status: age !== null && age < 3_600 ? "online" : "stale",
+   638→    headHeight: snap.core.height,
+   639→    lagSeconds: null,
+   640→    stateAgeSeconds: age,
+   641→    headId: snap.core.lastBlockHash ? `${snap.core.lastBlockHash.slice(0, 16)}…` : null,
+   642→    version: snap.core.netVersion,
+   643→    note:
+   644→      age !== null
+   645→        ? `daemon-pushed state, ${age < 90 ? `${age}s` : `${Math.round(age / 60)}m`} old (github: steem repo)`
+   646→        : "daemon-pushed state (github: steem repo)",
+   647→  };
+   648→}
+   649→
+   650→// ---------------------------------------------------------------------------
+   651→// Public server API
+   652→// ---------------------------------------------------------------------------
+   653→
+   654→export async function ecoNetworks(): Promise<{ ok: true; chains: EcoChain[]; fetchedAt: string }> {
+   655→  return withCache("eco-networks", 6_000, async () => {
+   656→    const [steem, hive, blurt, tron, saosnet, ethereum, solana] = await Promise.all([
+   657→      probeSteem(),
+   658→      probeGraphene(
+   659→        "hive",
+   660→        "HIVE",
+   661→        "L1 public — anchor rail (RC-gated)",
+   662→        ["https://api.hive.blog", "https://api.openhive.network", "https://anyx.tv"],
+   663→        5_000,
+   664→      ),
+   665→      probeGraphene(
+   666→        "blurt",
+   667→        "BLURT",
+   668→        "L1 public — anchor rail (canonical sig)",
+   669→        ["https://rpc.blurt.world", "https://blurt-rpc.saboin.com"],
+   670→        4_500,
+   671→      ),
+   672→      probeTron(),
+   673→      probeSaosNet(),
+   674→      probeEthereum(),
+   675→      probeSolana(),
+   676→    ]);
+   677→    return { ok: true, chains: [steem, hive, blurt, tron, saosnet, ethereum, solana], fetchedAt: new Date().toISOString() };
+   678→  });
+   679→}
+   680→
+   681→export interface AnchorRecord {
+   682→  id: string;
+   683→  kind: "checkpoint-anchor" | "tron-anchor" | "soldier-attest";
+   684→  chain: "steem" | "hive" | "tron" | "internal";
+   685→  cpHeight: number;
+   686→  txid: string | null;
+   687→  detail: string;
+   688→  explorer: string | null;
+   689→}
+   690→
+   691→export interface EcoAnchors {
+   692→  ok: true;
+   693→  anchors: AnchorRecord[];
+   694→  attests: AnchorRecord[];
+   695→  lastCheckpoint: {
+   696→    height: number | null;
+   697→    checkpointHash: string | null;
+   698→    stateRoot: string | null;
+   699→  } | null;
+   700→  fetchedAt: string;
+   701→}
+   702→
+   703→function steemExplorer(txid: string): string {
+   704→  return `https://steemworld.org/tx/${txid}`;
+   705→}
+   706→
+   707→function hiveExplorer(txid: string): string {
+   708→  return `https://hiveblocks.com/tx/${txid}`;
+   709→}
+   710→
+   711→export async function ecoAnchors(): Promise<EcoAnchors> {
+   712→  return withCache("eco-anchors", 45_000, async () => {
+   713→    const snap = await saosNetSnapshot();
+   714→    const anchors: AnchorRecord[] = [];
+   715→    const attests: AnchorRecord[] = [];
+   716→    let lastCheckpoint: EcoAnchors["lastCheckpoint"] = null;
+   717→
+   718→    if ("ok" in snap && snap.ok === true) {
+   719→      // fresh checkpoints from the live state — pull anchors + attests out of them
+   720→      const stateText = await githubRaw(STEEM_REPO, SAOSNET_STATE_PATH);
+   721→      if (stateText) {
+   722→        try {
+   723→          const state = JSON.parse(stateText) as Record<string, unknown>;
+   724→          const cps = Array.isArray(state.checkpoints) ? (state.checkpoints as Record<string, unknown>[]) : [];
+   725→          const lastCp = cps.length > 0 ? cps[cps.length - 1] : null;
+   726→          if (lastCp) {
+   727→            lastCheckpoint = {
+   728→              height: typeof lastCp.height === "number" ? lastCp.height : null,
+   729→              checkpointHash: typeof lastCp.checkpointHash === "string" ? lastCp.checkpointHash : null,
+   730→              stateRoot: typeof lastCp.stateRoot === "string" ? lastCp.stateRoot : null,
+   731→            };
+   732→          }
+   733→          for (const cp of cps.slice(-14).reverse()) {
+   734→            const cpHeight = typeof cp.height === "number" ? cp.height : 0;
+   735→            const cpHash = typeof cp.checkpointHash === "string" ? cp.checkpointHash : null;
+   736→            const cpAnchors = (cp.anchors ?? {}) as Record<string, unknown>;
+   737→            for (const [chain, txid] of Object.entries(cpAnchors)) {
+   738→              if (typeof txid !== "string" || txid.length < 10) continue;
+   739→              anchors.push({
+   740→                id: `cp-${cpHeight}-${chain}`,
+   741→                kind: "checkpoint-anchor",
+   742→                chain: chain === "hive" ? "hive" : chain === "tron" ? "tron" : "steem",
+   743→                cpHeight,
+   744→                txid,
+   745→                detail: `SAOS-NET cp#${cpHeight} → ${chain.toUpperCase()} (stateRoot ${(typeof cp.stateRoot === "string" ? cp.stateRoot : "").slice(0, 14)}…)`,
+   746→                explorer: chain === "hive" ? hiveExplorer(txid) : chain === "tron" ? `https://tronscan.org/#/transaction/${txid}` : steemExplorer(txid),
+   747→              });
+   748→            }
+   749→            const cpAttests = Array.isArray(cp.attests) ? (cp.attests as Record<string, unknown>[]) : [];
+   750→            for (const a of cpAttests) {
+   751→              if (typeof a.txid !== "string" || a.txid.length < 10) continue;
+   752→              attests.push({
+   753→                id: `att-${cpHeight}-${String(a.by)}`,
+   754→                kind: "soldier-attest",
+   755→                chain: "internal",
+   756→                cpHeight,
+   757→                txid: a.txid,
+   758→                detail: `${String(a.by ?? "soldier")} attested cp#${cpHeight}`,
+   759→                explorer: steemExplorer(a.txid),
+   760→              });
+   761→            }
+   762→          }
+   763→        } catch {
+   764→          // fall through — anchors list stays empty (honest)
+   765→        }
+   766→      }
+   767→
+   768→      const tb = snap.tronBridge.lastAnchor;
+   769→      if (tb?.txid && tb.cpHeight) {
+   770→        anchors.push({
+   771→          id: `tron-${tb.cpHeight}`,
+   772→          kind: "tron-anchor",
+   773→          chain: "tron",
+   774→          cpHeight: tb.cpHeight,
+   775→          txid: tb.txid,
+   776→          detail: `SAOS⇄TRON bridge anchor cp#${tb.cpHeight} @ TRON blk ${tb.tronBlock ?? "—"} (amount encodes hash)`,
+   777→          explorer: `https://tronscan.org/#/transaction/${tb.txid}`,
+   778→        });
+   779→      }
+   780→    }
+   781→
+   782→    return {
+   783→      ok: true,
+   784→      anchors: anchors.slice(0, 16),
+   785→      attests: attests.slice(0, 12),
+   786→      lastCheckpoint,
+   787→      fetchedAt: new Date().toISOString(),
+   788→    };
+   789→  });
+   790→}
+   791→
