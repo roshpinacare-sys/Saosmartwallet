@@ -53,13 +53,40 @@ function pct(sorted: number[], p: number): number {
   return sorted[Math.max(0, idx)];
 }
 
-/* ── 1. create the dedicated key ─────────────────────────────────────── */
+/* ── 1. create the dedicated key (admin-gated since the W1-gap closure) ─ */
+// Admin resolution: env SAOS_ADMIN_TOKEN first; otherwise bootstrap-once
+// (first caller wins and receives the plaintext — printed ONCE here so the
+// owner can save it). If a credential already exists and no env token is
+// set, we fail with instructions instead of guessing.
+console.log(`[admin] resolving admin credential …`);
+let adminToken: string | null = process.env.SAOS_ADMIN_TOKEN?.trim() ?? null;
+if (!adminToken) {
+  const boot = await fetch(`${BASE}/api/developer/admin/bootstrap`, { method: "POST" });
+  const bootBody = (await boot.json()) as { created?: boolean; token?: string; exists?: boolean; note?: string };
+  if (boot.status === 201 && bootBody.created && typeof bootBody.token === "string") {
+    adminToken = bootBody.token;
+    console.log(`[admin] BOOTSTRAPPED a new admin credential — save this token NOW (shown once):`);
+    console.log(`[admin]   ${adminToken}`);
+  } else {
+    console.error(
+      "FATAL: no admin credential available — key creation is admin-gated. " +
+        "Set SAOS_ADMIN_TOKEN or authenticate the console once (POST /api/developer/admin/bootstrap).",
+    );
+    process.exit(1);
+  }
+} else {
+  console.log("[admin] using SAOS_ADMIN_TOKEN from env");
+}
 console.log(`[key] creating dedicated key "${KEY_NAME}" …`);
 const keyRes = await fetch(`${BASE}/api/developer/keys`, {
   method: "POST",
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
   body: JSON.stringify({ name: KEY_NAME }),
 });
+if (keyRes.status === 401) {
+  console.error("FATAL: admin token rejected (401) — the configured token does not match the credential");
+  process.exit(1);
+}
 if (keyRes.status !== 201) {
   console.error(`FATAL: key creation returned HTTP ${keyRes.status} (expected 201)`);
   process.exit(1);

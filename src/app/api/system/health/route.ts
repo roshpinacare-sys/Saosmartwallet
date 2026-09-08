@@ -47,6 +47,10 @@ interface WrappedAssetCheck {
   supply: number;
   locked: number;
   delta: number;
+  /** locked/supply — >1 means over-collateralized (the engine's ≥101% cover posture). */
+  coverRatio: number | null;
+  /** true ONLY when supply > locked (the real danger: an unbacked mint). */
+  overIssued: boolean;
   ok: boolean;
 }
 
@@ -62,8 +66,13 @@ interface WrappedInvariant {
 }
 
 /**
- * Wrapped-economy invariant: every wrapped asset's supply must equal its
- * locked collateral 1:1 (e.g. WSTEEM 632=632, WBLURT 64.227=64.227).
+ * Wrapped-economy invariant: NO wrapped asset may be OVER-ISSUED — supply
+ * must never exceed its locked reserve (nano-exact). Equality is NOT required
+ * by the engine's own design: grid98.cjs bridgeMintTxs (read live) mints
+ * excess cover only up to supply=0.99*locked for the MINTABLE_1TO1 set,
+ * deliberately holding cover ≥101% (the measured lesson of the ×843,000 WBTC
+ * mis-unit inflation). So ENERGY 49.5 supply vs 50 locked is the DESIGNED
+ * over-collateralized state — reported with its coverRatio, not critical.
  *
  * Source of truth: the daemon-pushed SAOS-NET state (`wrappedSummary` in the
  * steem repo's sovereign/node/state.json) via saosNetSnapshot() — the SAME
@@ -91,13 +100,25 @@ async function wrappedInvariantCheck(): Promise<WrappedInvariant> {
     if (!snap.ok) {
       return { latencyMs: Date.now() - t, measured: false, source, assetsChecked: null, mismatches: null, ok: null, assets: null, error: snap.error };
     }
-    const assets: WrappedAssetCheck[] = snap.wrapped.map((w) => ({
-      asset: w.asset,
-      supply: w.supply,
-      locked: w.locked,
-      delta: w.supply - w.locked,
-      ok: nanoExact(w.supply, w.locked),
-    }));
+    const assets: WrappedAssetCheck[] = snap.wrapped.map((w) => {
+      const supplyMicro = Math.round(w.supply * 1e9);
+      const lockedMicro = Math.round(w.locked * 1e9);
+      const overIssued = supplyMicro > lockedMicro;
+      return {
+        asset: w.asset,
+        supply: w.supply,
+        locked: w.locked,
+        delta: w.supply - w.locked,
+        coverRatio: w.supply > 0 ? Math.round((w.locked / w.supply) * 1e6) / 1e6 : null,
+        overIssued,
+        // The invariant is the SAFETY property: supply must never exceed the
+        // locked reserve. supply < locked is the daemon's documented ≥101%
+        // cover posture (grid98.cjs bridgeMintTxs targets supply=0.99*locked
+        // for 1:1-mintable coins — ENERGY 49.5/50 is that designed state,
+        // measured live 2026-09-08), NOT a violation.
+        ok: !overIssued,
+      };
+    });
     const mismatches = assets.filter((a) => !a.ok).length;
     return {
       latencyMs: Date.now() - t,
@@ -312,12 +333,12 @@ export async function GET() {
   }
   if (wrappedInvariant.measured && wrappedInvariant.assets) {
     for (const a of wrappedInvariant.assets) {
-      if (!a.ok) {
+      if (a.overIssued) {
         issues.push({
           component: `wrapped:${a.asset}`,
           severity: "critical",
-          detail: `wrapped supply ${a.supply} != locked ${a.locked} (delta ${a.delta}) — the 1:1 backing rule is violated on the daemon ledger`,
-          action: "reconcile the mint/burn ledger against the lock ledger; halt minting for the asset until supply == locked holds again",
+          detail: `wrapped supply ${a.supply} > locked ${a.locked} (delta ${a.delta}) — over-issue: unbacked supply exists on the daemon ledger`,
+          action: "reconcile the mint ledger against the lock ledger; halt minting for the asset until supply <= locked holds again",
         });
       }
     }

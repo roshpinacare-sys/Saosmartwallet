@@ -24,7 +24,17 @@
 import { createHash } from "node:crypto";
 
 import { STEEM_ROLES, PrivateKey } from "../../../crypto/src/index";
-import { DEFAULT_KDF_PARAMS, deriveMasterKey, deriveVerifier, randomBytes, seal, verifyPassword } from "../crypto";
+import {
+  DEFAULT_KDF_PARAMS,
+  deriveCommitment,
+  deriveMasterKey,
+  deriveVerifier,
+  generateZKProof,
+  randomBytes,
+  seal,
+  verifyPassword,
+  verifyZKProof,
+} from "../crypto";
 import { b64ToBytes, parseSats, utf8 } from "../encoding";
 import type { AuditStore, VaultStateRecord, VaultStorage } from "../storage/types";
 import {
@@ -48,6 +58,15 @@ import {
 } from "../types";
 import { DEFAULT_AUTO_LOCK_SECONDS, emptyState } from "./defaults";
 import { VaultKeys, type AddKeyInput } from "./keys";
+
+/**
+ * ZK purpose-context for the master-password knowledge proof. Binding the
+ * proof to (vaultInstanceId, purpose) makes transcripts non-replayable across
+ * vaults or purposes — the same discipline zk.ts prescribes for contexts.
+ */
+function zkUnlockContext(vaultInstanceId: string): string {
+  return `saos-vault:zk:unlock:${vaultInstanceId}`;
+}
 
 // ---------------------------------------------------------------------------
 // Options & inputs
@@ -383,6 +402,9 @@ export class SovereignVault {
     state.soldiers = soldiers;
     state.purposes = purposes;
     state.verifier = await deriveVerifier(password);
+    // Layer-2 enrollment: the curve commitment binds the SAME password into an
+    // independent verifier, anchored to this vault instance's ZK context.
+    state.zkCommitment = deriveCommitment(password, state.verifier.salt, zkUnlockContext(state.vaultInstanceId));
     state.initialized = true;
 
     await this.persist();
@@ -403,6 +425,8 @@ export class SovereignVault {
     if (!state.initialized || state.verifier === null) {
       throw new VaultError("VAULT_NOT_INITIALIZED", "vault has no password verifier — initialize() first");
     }
+    // Layer 2 first — cheap curve math fails fast and detects commitment tamper.
+    await this.assertZKPasswordKnowledge(password, state);
     const ok = await verifyPassword(password, state.verifier);
     if (!ok) {
       throw new VaultError("WRONG_PASSWORD", "password verification failed");
@@ -644,6 +668,7 @@ export class SovereignVault {
       if (state.verifier === null) {
         throw new VaultError("VAULT_NOT_INITIALIZED", "vault has no password verifier");
       }
+      await this.assertZKPasswordKnowledge(input.password, state);
       const ok = await verifyPassword(input.password, state.verifier);
       if (!ok) {
         throw new VaultError("WRONG_PASSWORD", "step-up password verification failed");
@@ -723,9 +748,38 @@ export class SovereignVault {
     if (!state.initialized || state.verifier === null) {
       throw new VaultError("VAULT_NOT_INITIALIZED", "vault has no password verifier — initialize() first");
     }
+    await this.assertZKPasswordKnowledge(password, state);
     const ok = await verifyPassword(password, state.verifier);
     if (!ok) {
       throw new VaultError("WRONG_PASSWORD", "step-up password verification failed");
+    }
+  }
+
+  /**
+   * Zero-knowledge password-knowledge check (M2 layer 2 — defense in depth).
+   * Generates a Fiat–Shamir Schnorr transcript for `password` and verifies it
+   * against the curve commitment installed at initialize(). This is an
+   * INDEPENDENT second verifier: unlock/step-up now require BOTH the ZK
+   * commitment check AND the Argon2id verifier to agree on the same password,
+   * so corruption or mutation of either stored verifier alone fails closed
+   * with WRONG_PASSWORD (no oracle about which check rejected).
+   *
+   * @throws VaultError("VAULT_NOT_INITIALIZED") when no verifier exists,
+   *   VaultError("CORRUPT_STATE") when an initialized vault lost its
+   *   commitment (restore from backup or re-initialize),
+   *   VaultError("WRONG_PASSWORD") when the transcript does not verify.
+   */
+  private async assertZKPasswordKnowledge(password: string, state: VaultStateDoc): Promise<void> {
+    if (!state.initialized || state.verifier === null) {
+      throw new VaultError("VAULT_NOT_INITIALIZED", "vault has no password verifier — initialize() first");
+    }
+    if (state.zkCommitment === null) {
+      throw new VaultError("CORRUPT_STATE", "vault state is missing its ZK commitment — restore from backup or re-initialize");
+    }
+    const proof = await generateZKProof(password, state.verifier.salt, zkUnlockContext(state.vaultInstanceId));
+    const ok = await verifyZKProof(proof, state.zkCommitment);
+    if (!ok) {
+      throw new VaultError("WRONG_PASSWORD", "password knowledge check failed");
     }
   }
 

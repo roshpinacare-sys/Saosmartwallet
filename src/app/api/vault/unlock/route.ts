@@ -9,11 +9,23 @@
 import { NextResponse } from "next/server";
 
 import { BackupManager, VaultError, getVaultRuntime, getInstanceId, mapVaultError } from "@/lib/vault-runtime";
+import { clientIpOf, rateLimit } from "@/lib/rate-limit";
 import type { UnlockRequest, UnlockResponse } from "@/lib/vault-contracts";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Per-IP throttle — the unlock endpoint is the password-oracle surface
+  // (Argon2id CPU + guessing). 10/min blunts brute force without hurting the
+  // single owner; the vault itself remains the authority (ZK + Argon2id).
+  const rl = rateLimit(`vault-unlock:${clientIpOf(req)}`, 10, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "too many unlock attempts — retry later" },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
   let body: UnlockRequest;
   try {
     body = (await req.json()) as UnlockRequest;

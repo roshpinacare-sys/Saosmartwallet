@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { generateApiKey } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Developer key console — owner-side (this sandbox is the owner's machine;
- * multi-tenant auth is a later-week item, stated honestly in the UI).
+ * Developer key console — MUTATING routes are admin-gated (Model 1 W1 gap
+ * closed): POST/DELETE require `Authorization: Bearer <admin token>` (the
+ * bootstrap-once credential or env SAOS_ADMIN_TOKEN). GET stays open —
+ * prefixes and usage counters only, no secrets.
  *
  * GET    → list keys with honest usage counters (calls today / total)
  * POST   { name }  → create; the plaintext key is returned EXACTLY ONCE
@@ -50,6 +53,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const adminGate = await requireAdmin(req);
+  if (adminGate) return adminGate;
   let name = "unnamed key";
   try {
     const body = (await req.json()) as { name?: string };
@@ -73,6 +78,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const adminGate = await requireAdmin(req);
+  if (adminGate) return adminGate;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) {
     return NextResponse.json({ ok: false, error: "missing ?id=" }, { status: 400, headers: { "Cache-Control": "no-store" } });

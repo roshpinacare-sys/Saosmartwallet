@@ -100,3 +100,34 @@ model UsageRecord {
   @@index([keyId, createdAt])
   @@index([createdAt])
 }
+
+/// Atomic per-key daily quota reservation counter (one row per key per UTC
+/// day). The gate is a single conditional INSERT..ON CONFLICT..DO UPDATE
+/// (used < limit) — check-then-act on the ledger admitted exactly one
+/// in-flight call over the limit under concurrency (measured live in
+/// docs/m1-429-liveburn.md); the reservation closes that off-by-one. The
+/// ledger stays the truth of EXECUTED calls; at completion of all reserved
+/// calls the two converge (a crash between reserve and meter errs
+/// conservative: quota consumed without a ledger row).
+model QuotaCounter {
+  id        String   @id @default(cuid())
+  keyId     String
+  dayUtc    String
+  used      Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([keyId, dayUtc])
+  @@index([dayUtc])
+}
+
+/// Owner gate for key-management routes (create/revoke keys) — closes the
+/// auth gap declared at Model 1 Week 1. The admin token is shown ONCE at
+/// bootstrap (same copy-once discipline as API keys); only its SHA-256 is
+/// stored. When env SAOS_ADMIN_TOKEN is set it takes precedence (ops
+/// override); the DB credential is the sandbox default path.
+model AdminCredential {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  label     String
+  createdAt DateTime @default(now())
+}

@@ -97,12 +97,12 @@
 8. ~~Rate-limit per-IP על trade/build~~ — **בוצע** (build + cancel, 30/min, הוכח חי).
 9. ~~TTL-cache + failover~~ — **בוצע** (סעיף 4); ~~lagSeconds~~ — **בוצע**.
 
-**אפשרי-עכשיו בתוך הסנדבוקס (קוד בלבד):**
-1. **חיבור ה-ZK** — commitment ב-init + וריפיקציה ב-unlock (או הסרה מה-barrel) — הפריט הפתוח היחיד ששרד מהסבבים הקודמים.
-2. **Auth ל-developer console** (הפער המוצהר של W1) + rate-limit ל-unlock.
-3. **Reservation טרנזקציוני למכסה** — סוגר את ה-off-by-one שנמדד ב-burn (החלטת-בעלים: האם קריאה-אחת מעל 1,000 במקביליות גבוהה מקובלת).
-4. **הכרעת ENERGY** — פטור מפורש באינווריאנט או תיקון ב-daemon (חוצה-תיקיות).
-5. ולידציית account מאוחדת ב-UI (regex ה-UI מקבל שמות שהרשת דוחה — השרת כבר fail-closed).
+**אפשרי-עכשיו בתוך הסנדבוקס — הושלם כולם בסבב השלישי (SOVEREIGN MODE, 2026-09-08):**
+1. ~~חיבור ה-ZK~~ — **בוצע + מוכח**: `zkCommitment` ב-init, נבדק ב-unlock ובשתי ה-step-ups; `tools/vault-zk-check.ts` 9/9 `ZK-WIRED-PROVEN` (זיהוי-שחיתות דו-כיווני, קשירת-context, fail-closed על חסר).
+2. ~~Auth ל-developer console~~ — **בוצע + חי**: `POST /api/developer/admin/bootstrap` copy-once + `requireAdmin` על create/revoke; `SAOS_ADMIN_TOKEN` מנגלה; unlock/init מדורגים (10/min, 5/min — הוכח חי 10×409→429).
+3. ~~Reservation טרנזקציוני למכסה~~ — **בוצע + מוכח**: `QuotaCounter` upsert מותנה אחד עם RETURNING; `tools/quota-race-test.ts` 1,050 מקביליות → בדיוק 1,000/50, overshoot 0, `ATOMIC-PROVEN`.
+4. ~~הכרעת ENERGY~~ — **הוכרע מבוסס-ראיות**: ה-daemon עצמו (`bridgeMintTxs`) מטריח supply=0.99·locked (cover ≥101%) — האינווריאנט תוקן ל-supply≤locked (over-issue=קריטי, חוסר-חיבור=כנה עם coverRatio); 20 נכסים, criticalIssues 0.
+5. ~~ולידציית account מאוחדת~~ — **בוצע**: `src/lib/account-name.ts` (חוקי steemd המלאים) מיובא ב-trade-terminal וב-wallet-panel במקום ה-regex הרופף; השרת נשאר הסמכות.
 
 **פעולות-בעלים (לא ניתן מבפנים):** npm publish (credentials) · שליחת outreach (SMTP) · דומיין/BASE_URL ציבורי · דיפלוי חוזה/פרוגרם גשר (כסף אמיתי) · אתחול-כספת + סיסמה (שוער אחרון של cancel-broadcast חי) · החלטות daemon/פליט-מפתחות ב-repos האחרים.
 

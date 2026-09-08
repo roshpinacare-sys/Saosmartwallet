@@ -117,3 +117,25 @@ PROVEN · FAILED (metered) · 401 · **429 + X-RateLimit-Reset + SDK `SaosQuotaE
 ```
 bun tools/m1-429-burn.ts            # creates its own dedicated key; ~50 s; prints honest JSON
 ```
+
+## Post-fix note (2026-09-08, third round)
+
+The off-by-one measured above (used=1001) is now CLOSED: the gate is a single
+atomic conditional upsert on `QuotaCounter`
+(`INSERT .. ON CONFLICT .. DO UPDATE .. WHERE used < limit RETURNING used`).
+A dedicated race tool re-proved the exact arithmetic live:
+`bun tools/quota-race-test.ts` → 1,050 concurrent reservations against a
+synthetic key: exactly 1,000 granted, 50 denied, final counter used=1000,
+**overshootAboveLimit=0**, granted `used` values complete 2..1000 with zero
+double-spend — verdict `ATOMIC-PROVEN`.
+
+A full 1,031-call burn re-run was attempted and fail-closed at preflight: at
+21:17:33 UTC (block 109,410,651) a live `account_update_operation` rotated the
+account's active authority, so the newest identity anchor no longer proves the
+CURRENT key — the API now (correctly) returns FAILED with an explicit
+`AUTHORITY DRIFT` summary instead of PROVEN. The burn tool aborts unless the
+preflight is PROVEN — exactly as designed. The atomicity claim rests on the
+race tool (the same `reserveQuota` the HTTP route calls) plus live per-call
+arithmetic through the API (`used:1 remaining:999` on a fresh probe key).
+Re-run the burn after the fleet publishes a fresh anchor signed by the new
+active key (owner/fleet action, outside this repo).

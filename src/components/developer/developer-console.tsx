@@ -14,7 +14,7 @@
  * verdict for an unanchored account is an honest measurement, not an error.
  */
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { motion } from "framer-motion";
 import {
@@ -24,6 +24,7 @@ import {
   ExternalLink,
   KeyRound,
   Loader2,
+  ShieldCheck,
   TerminalSquare,
   Trash2,
   TrendingUp,
@@ -32,6 +33,10 @@ import {
 import { PanelHeader, StatCell } from "@/components/terminal/primitives";
 import { RegistryPanel } from "@/components/terminal/registry-panel";
 import {
+  clearAdminToken,
+  getAdminToken,
+  setAdminToken,
+  useAdminBootstrap,
   useApiKeys,
   useCreateKey,
   useMeteredVerify,
@@ -44,6 +49,9 @@ import { cn } from "@/lib/utils";
 function Mono({ children, className }: { children: React.ReactNode; className?: string }) {
   return <span className={cn("num font-mono text-[11px] break-all", className)}>{children}</span>;
 }
+
+/** No-op external-store subscription — see AdminGateBar's sessionStorage read. */
+const subscribeNoop = () => () => {};
 
 function OutcomeChip({ outcome }: { outcome: "PROVEN" | "FAILED" | "ERROR" }) {
   const cls =
@@ -61,6 +69,154 @@ function OutcomeChip({ outcome }: { outcome: "PROVEN" | "FAILED" | "ERROR" }) {
 }
 
 /* ─────────────────────────── API KEYS ─────────────────────────── */
+
+/**
+ * AdminGateBar — console mutations (mint/revoke keys) are admin-gated
+ * server-side. The credential is bootstrap-once (copy-once like the keys
+ * themselves), lives in sessionStorage for the tab session, and can be
+ * forgotten with one click. Stale tokens are cleared automatically by the
+ * hooks on 401.
+ */
+function AdminGateBar() {
+  const bootstrap = useAdminBootstrap();
+  const [tokenInput, setTokenInput] = useState("");
+  const [freshToken, setFreshToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  // sessionStorage is browser-only: read it through an external store so the
+  // server snapshot renders LOCKED and every re-render re-reads the token
+  // (bootstrap/forget both setState → re-render → fresh snapshot).
+  const hasToken = useSyncExternalStore(
+    subscribeNoop,
+    () => getAdminToken() !== null,
+    () => false,
+  );
+
+  const onBootstrap = () => {
+    setAuthError(null);
+    bootstrap.mutate(undefined, {
+      onSuccess: (r) => {
+        if (r.created && r.token) {
+          setAdminToken(r.token);
+          setFreshToken(r.token);
+          setCopied(false);
+        } else if (r.exists) {
+          setAuthError(r.note ?? "credential already exists — paste its token below");
+        }
+      },
+      onError: (e) => setAuthError(e.message),
+    });
+  };
+
+  const onPasteToken = (e: React.FormEvent) => {
+    e.preventDefault();
+    const t = tokenInput.trim();
+    if (!t) return;
+    setAdminToken(t);
+    setTokenInput("");
+    setAuthError(null);
+  };
+
+  const copyToken = async () => {
+    if (!freshToken) return;
+    try {
+      await navigator.clipboard.writeText(freshToken);
+      setCopied(true);
+    } catch {
+      // clipboard blocked — the token remains visible for manual copy
+    }
+  };
+
+  return (
+    <div
+      className="flex flex-col gap-2 rounded border border-[var(--border-default)] bg-[var(--bg-elevated)] p-3"
+      role="group"
+      aria-label="console admin access"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <ShieldCheck className="h-3.5 w-3.5 text-[var(--saos)]" aria-hidden />
+        <span className="text-[10px] font-bold tracking-[0.14em]">ADMIN ACCESS</span>
+        <span
+          className={cn(
+            "num rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-[0.14em]",
+            hasToken
+              ? "border-[var(--saos)] text-[var(--saos)]"
+              : "border-[var(--border-default)] text-[var(--fg-muted)]",
+          )}
+        >
+          {hasToken ? "UNLOCKED (session)" : "LOCKED"}
+        </span>
+        {hasToken && (
+          <button
+            type="button"
+            className="ml-auto rounded border border-[var(--border-default)] px-2 py-1 text-[10px] font-bold tracking-wider hover:bg-[var(--bg-elevated)]"
+            onClick={() => {
+              clearAdminToken();
+              setFreshToken(null);
+            }}
+          >
+            FORGET TOKEN
+          </button>
+        )}
+      </div>
+      {!hasToken && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            className="rounded border border-[var(--saos)] px-2 py-1 text-[10px] font-bold tracking-wider text-[var(--saos)] hover:bg-[var(--bg-elevated)] disabled:opacity-50"
+            onClick={onBootstrap}
+            disabled={bootstrap.isPending}
+          >
+            {bootstrap.isPending ? (
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            ) : (
+              "BOOTSTRAP ADMIN TOKEN"
+            )}
+          </button>
+          <form className="flex flex-1 gap-2" onSubmit={onPasteToken}>
+            <input
+              className="num min-w-0 flex-1 rounded border border-[var(--border-default)] bg-transparent px-2 py-1 font-mono text-[11px] outline-none focus:border-[var(--saos)]"
+              placeholder="…or paste an existing admin token"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              aria-label="existing admin token"
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] font-bold tracking-wider hover:bg-[var(--bg-elevated)]"
+            >
+              USE
+            </button>
+          </form>
+        </div>
+      )}
+      {freshToken && (
+        <div className="flex flex-col gap-1 rounded border border-[var(--saos)] p-2">
+          <Mono className="text-[var(--saos)]">{freshToken}</Mono>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded border border-[var(--border-default)] px-2 py-0.5 text-[10px] font-bold hover:bg-[var(--bg-elevated)]"
+              onClick={copyToken}
+            >
+              {copied ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
+              {copied ? "COPIED" : "COPY"}
+            </button>
+            <span className="text-[9px] text-[var(--fg-muted)]">
+              shown once — only its SHA-256 is stored server-side
+            </span>
+          </div>
+        </div>
+      )}
+      {authError && (
+        <p className="text-[10px] text-[var(--danger,--fg)]" role="alert">
+          {authError}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function KeysPanel() {
   const keys = useApiKeys();
@@ -105,6 +261,7 @@ function KeysPanel() {
         accent="saos"
       />
       <div className="flex flex-col gap-4 p-4">
+        <AdminGateBar />
         <form className="flex flex-col gap-2 sm:flex-row" onSubmit={onCreate}>
           <label className="sr-only" htmlFor="dev-key-name">
             Key name

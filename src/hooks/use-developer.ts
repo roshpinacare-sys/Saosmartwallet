@@ -77,16 +77,71 @@ export function useApiKeys() {
   });
 }
 
+/* ── Admin gate (console MUTATIONS are admin-gated server-side) ─────────── */
+
+const ADMIN_TOKEN_STORAGE_KEY = "saos_admin_token";
+
+export function getAdminToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY);
+}
+
+export function setAdminToken(token: string): void {
+  window.sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAdminToken(): void {
+  window.sessionStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+}
+
+export interface AdminBootstrapResponse {
+  ok: boolean;
+  created: boolean;
+  token?: string;
+  exists?: boolean;
+  source?: "env" | "db";
+  note?: string;
+  warning?: string;
+  error?: string;
+}
+
+export function useAdminBootstrap() {
+  return useMutation<AdminBootstrapResponse, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch("/api/developer/admin/bootstrap", { method: "POST" });
+      const j = (await res.json()) as AdminBootstrapResponse;
+      if (!res.ok && !j.error) throw new Error(`bootstrap ${res.status}`);
+      return j;
+    },
+  });
+}
+
+/** Auth header for admin-gated console mutations (omitted when unauthenticated). */
+function adminAuthHeaders(): Record<string, string> {
+  const token = getAdminToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** True when the server rejected console credentials — clears the stale token. */
+function isAdminRejection(status: number, body: unknown): boolean {
+  const err = (body as { error?: string } | null)?.error;
+  return status === 401 && (err ?? "").startsWith("admin authorization failed");
+}
+
 export function useCreateKey() {
   const qc = useQueryClient();
   return useMutation<CreateKeyResponse, Error, string>({
     mutationFn: async (name) => {
       const res = await fetch("/api/developer/keys", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
         body: JSON.stringify({ name }),
       });
       const j = (await res.json()) as CreateKeyResponse;
+      if (isAdminRejection(res.status, j)) {
+        clearAdminToken();
+        throw new Error("admin token required — authenticate the console to mint keys");
+      }
       if (!res.ok) throw new Error("key creation failed");
       return j;
     },
@@ -98,8 +153,15 @@ export function useRevokeKey() {
   const qc = useQueryClient();
   return useMutation<{ ok: boolean; revoked: string }, Error, string>({
     mutationFn: async (id) => {
-      const res = await fetch(`/api/developer/keys?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      const j = (await res.json()) as { ok: boolean; revoked: string };
+      const res = await fetch(`/api/developer/keys?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: adminAuthHeaders(),
+      });
+      const j = (await res.json()) as { ok: boolean; revoked: string; error?: string };
+      if (isAdminRejection(res.status, j)) {
+        clearAdminToken();
+        throw new Error("admin token required — authenticate the console to revoke keys");
+      }
       if (!res.ok) throw new Error("revoke failed");
       return j;
     },
