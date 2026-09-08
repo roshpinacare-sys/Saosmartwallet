@@ -278,8 +278,11 @@ curl -s http://localhost:3000/api/saos/hub | jq '.ok, .fetchedAt'
 **וה-product (שבוע 1, חי):** צרו מפתח בטאב DEVELOPER (או:)
 
 ```bash
+ADMIN=$(curl -s -X POST http://localhost:3000/api/developer/admin/bootstrap | jq -r '.token // empty')
+# (bootstrap מחזיר פלטנקט פעם-אחת בלבד; אחר-כך: Authorization: Bearer <admin token>)
 KEY=$(curl -s -X POST http://localhost:3000/api/developer/keys \
-  -H 'Content-Type: application/json' -d '{"name":"self-check"}' | jq -r .key)
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $ADMIN" \
+  -d '{"name":"self-check"}' | jq -r .key)
 curl -s -X POST http://localhost:3000/api/v1/identity/verify \
   -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
   -d '{"username":"headcorner"}' | jq '.ok, .verify.sameScalarProof, .meta'
@@ -288,6 +291,32 @@ curl -s http://localhost:3000/api/developer/usage | jq '.totals, .last24h'
 
 ובדפדפן: **טאב PROOFS** — שלושת ה-demos לחיצים ומריצים עכשיו; **טאב
 DEVELOPER** — ה-API המסחרי המדוד (מפתחות + try-it + ledger).
+
+---
+
+## SOVEREIGN MODE — חמשת הפריטים הפתוחים נסגרו חי (2026-09-08, סבב שלישי)
+
+כל הפריטים ה"אפשריים-עכשיו בסנדבוקס" מ-`network-summary.md §6` בוצעו, עם
+הוכחה חיה לכל אחד (Zero-Mock — כל מספר מהריצה בפועל):
+
+| # | פריט | מה נעשה | הוכחה חיה |
+|---|------|---------|-----------|
+| 1 | **מכסה אטומית** | `QuotaCounter` — upsert מותנה אחד (`INSERT..ON CONFLICT..DO UPDATE..WHERE used<limit` + `RETURNING`) סוגר את ה-off-by-one שנמדד ב-burn | `tools/quota-race-test.ts` — 1,050 הזמנות מקבילות: בדיוק 1,000 אישורים, 50 דחיות, overshoot **0**, אפס double-spend (`ATOMIC-PROVEN` 7/7) |
+| 2 | **ZK מחובר** | `zkCommitment` (Schnorr Fiat–Shamir) נקבע ב-init ונבדק ב-unlock + שתי נקודות ה-step-up — מאמת עצמאי שני ל-Argon2id | `tools/vault-zk-check.ts` 9/9 `ZK-WIRED-PROVEN`: זיהוי-שחיתות דו-כיווני, קשירת-context נגד replay, fail-closed על commitment חסר |
+| 3 | **Auth ל-console** | `POST /api/developer/admin/bootstrap` (copy-once) + `requireAdmin` על create/revoke מפתחות; `SAOS_ADMIN_TOKEN` מנגלה | חי: 401 ללא-token, 201 מאומת, bootstrap שני לא מחזיר פלטנקט, revoke מאומת עובד |
+| 4 | **ENERGY — הכרעה** | האינווריאנט תוקן להיגיון הבטיחות האמיתי: supply>locked = קריטי (over-issue); supply<locked = ה-posture המתוכנן של ה-daemon (cover ≥101%, `bridgeMintTxs` מטריח 0.99·locked) | `/api/system/health`: 20 נכסים, ENERGY cover 1.010101 ok:true, criticalIssues 0; מעודכן ב-system-status |
+| 5 | **ולידציית account מאוחדת** | `src/lib/account-name.ts` — חוקי steemd המלאים (סגמנטים ≥3, התחלה a-z, סיום a-z0-9) בשני הפאנלים במקום ה-regex הרופף | tsc/lint נקי; שם-שגוי מקבל סיבה מדויקת ב-UI במקום דחיית-שרת |
+
+**אירוע חי — AUTHORITY DRIFT (21:17 UTC):** בזמן הסבב חל `account_update_operation`
+על headcorner (blk 109,410,651) — ה-active authority הוחלף. ה-anchor החדש-ביותר
+(18:28) חתום ע"י ה-scalar הקודם, ולכן ה-API מחזיר FAILED **נכון וכנה** — זו בדיוק
+ההבטחה של המוצר: סטיית-סמכות נתפסת. ה-verifier שודרג לדווח `AUTHORITY DRIFT`
+במפורש עם שני הכתובות + הבלוק של ה-anchor. עד שה-fleet תפרסם anchor חתום
+מהמפתח החדש (פעולת-בעלים/חוצה-תיקיות), ה-golden path מציג את ה-FAILED הכנה.
+
+**re-burn של ה-429 חסום זמנית** ע"י אירוע ה-drift (ה-tool fail-closed לפי
+עיצוב) — הוכחת האטומיות עומדת על `quota-race-test` (אותו `reserveQuota` שמופעל
+ב-HTTP) + חשבון-מכסה מדויק חי (`used:1 remaining:999` ב-probes).
 
 ---
 

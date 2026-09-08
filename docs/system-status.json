@@ -1,15 +1,16 @@
 {
   "ok": true,
-  "generatedAt": "2026-09-08T18:53:28.364Z",
+  "generatedAt": "2026-09-08T22:04:20.154Z",
   "summary": {
     "networksUp": "7/7",
     "liveRails": 2,
     "gatedRails": 4,
-    "criticalIssues": 0
+    "criticalIssues": 0,
+    "wrappedMismatches": 0
   },
   "checks": {
     "networks": {
-      "latencyMs": 1028,
+      "latencyMs": 869,
       "chains": [
         {
           "id": "steem",
@@ -17,11 +18,11 @@
           "family": "Graphene",
           "kind": "L1 public — internal market (our DEX)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T18:53:28.364Z",
+          "probedAt": "2026-09-08T22:04:20.154Z",
           "status": "online",
-          "headHeight": 109407784,
-          "lagSeconds": 2,
-          "headId": "06856e28d2307aa0",
+          "headHeight": 109411581,
+          "lagSeconds": 3,
+          "headId": "06857cfdbcc5ccf9",
           "version": null,
           "note": "live probe via M0/M1 SteemMarketClient"
         },
@@ -31,11 +32,11 @@
           "family": "Graphene",
           "kind": "L1 public — anchor rail (RC-gated)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T18:53:28.365Z",
+          "probedAt": "2026-09-08T22:04:20.156Z",
           "status": "online",
-          "headHeight": 109742290,
-          "lagSeconds": 2,
-          "headId": "068a88d29b8c30d531744297fe0979a2a95d2e92",
+          "headHeight": 109746096,
+          "lagSeconds": 3,
+          "headId": "068a97b0da643dda95ed85ce396bc9045363f468",
           "version": null,
           "note": "live probe api.hive.blog"
         },
@@ -45,11 +46,11 @@
           "family": "Graphene",
           "kind": "L1 public — anchor rail (canonical sig)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T18:53:28.366Z",
+          "probedAt": "2026-09-08T22:04:20.157Z",
           "status": "online",
-          "headHeight": 63471273,
-          "lagSeconds": 2,
-          "headId": "03c87ea901a7b40bf91841d6898ae470e30b6d71",
+          "headHeight": 63475031,
+          "lagSeconds": 3,
+          "headId": "03c88d57fff2a4555a95e657632acd5cae4631f6",
           "version": null,
           "note": "live probe blurt-rpc.saboin.com"
         },
@@ -59,11 +60,11 @@
           "family": "TVM (DPoS)",
           "kind": "L1 public — zero-fee anchor rail",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T18:53:28.367Z",
+          "probedAt": "2026-09-08T22:04:20.157Z",
           "status": "online",
-          "headHeight": 86073890,
-          "lagSeconds": 5,
-          "headId": "0000000005216222…",
+          "headHeight": 86077708,
+          "lagSeconds": 3,
+          "headId": "000000000521710c…",
           "version": null,
           "note": "live probe api.trongrid.io"
         },
@@ -72,14 +73,14 @@
           "name": "SAOS-NET",
           "family": "Sovereign (deterministic kernel)",
           "kind": "L1 shadow chain — anchored to Steem/Hive/TRON",
-          "probedAt": "2026-09-08T18:53:28.756Z",
+          "probedAt": "2026-09-08T22:04:20.430Z",
           "status": "online",
-          "headHeight": 61623,
+          "headHeight": 63638,
           "lagSeconds": null,
-          "stateAgeSeconds": 2220,
-          "headId": "45ec880dc0a62037…",
+          "stateAgeSeconds": 392,
+          "headId": "d5b2162c380f0c47…",
           "version": "saos-net/0",
-          "note": "daemon-pushed state, 37m old (github: steem repo)"
+          "note": "daemon-pushed state, 7m old (github: steem repo)"
         },
         {
           "id": "ethereum",
@@ -87,12 +88,12 @@
           "family": "EVM",
           "kind": "L1 public — settlement + ERC-20 wrapped economy (M3)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T18:53:28.368Z",
+          "probedAt": "2026-09-08T22:04:20.159Z",
           "status": "online",
-          "headHeight": 25934559,
-          "lagSeconds": 18,
+          "headHeight": 25935512,
+          "lagSeconds": 21,
           "headId": null,
-          "version": "0.134395772 gwei baseFee",
+          "version": "0.057420735 gwei baseFee",
           "note": "live probe ethereum-rpc.publicnode.com"
         },
         {
@@ -101,27 +102,27 @@
           "family": "PoH + PoS",
           "kind": "L1 public — SPL wrapped economy (M3)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T18:53:28.369Z",
+          "probedAt": "2026-09-08T22:04:20.160Z",
           "status": "online",
-          "headHeight": 445411215,
+          "headHeight": 445447241,
           "lagSeconds": null,
           "headId": null,
-          "version": "epoch 1031 · slot 19215/432000",
+          "version": "epoch 1031 · slot 55241/432000",
           "note": "live probe api.mainnet-beta.solana.com"
         }
       ],
       "error": null
     },
     "bridges": {
-      "latencyMs": 87,
+      "latencyMs": 1,
       "rails": [
         {
           "id": "relay-steem",
           "rail": "SAOS-NET → STEEM",
           "mechanism": "custom_json saos-dex.anchor.v1 (active authority), every checkpoint seal",
           "status": "live",
-          "evidence": "latest: 0210f1453dbd35964ea9defd8ee7af9aca299d25 (cp#61608) · 15 anchors in feed",
-          "explorer": "https://steemworld.org/tx/0210f1453dbd35964ea9defd8ee7af9aca299d25",
+          "evidence": "latest: 867fe4dd6ca8f6f223576e3caf40fc2eb2350408 (cp#63348) · 6 anchors in feed",
+          "explorer": "https://steemworld.org/tx/867fe4dd6ca8f6f223576e3caf40fc2eb2350408",
           "lastActivityAt": null
         },
         {
@@ -172,7 +173,7 @@
       ],
       "analytics": {
         "anchoredTotal": 4,
-        "checkpointsVerified": 1868,
+        "checkpointsVerified": 2073,
         "checkpointsTotal": 64,
         "lastAnchor": {
           "at": null,
@@ -201,8 +202,8 @@
           },
           {
             "asset": "WTRX",
-            "supply": 22.924,
-            "locked": 22.924,
+            "supply": 40.523,
+            "locked": 40.523,
             "holders": 11
           },
           {
@@ -302,7 +303,7 @@
             "holders": 0
           }
         ],
-        "sourcedAt": "2026-09-08T18:53:29.479Z"
+        "sourcedAt": "2026-09-08T22:04:21.024Z"
       },
       "routes": {
         "steemEthereum": {
@@ -319,7 +320,7 @@
             },
             {
               "network": "ethereum",
-              "amount": "0.00002151532352",
+              "amount": "0.00000919347616",
               "currency": "ETH"
             }
           ]
@@ -349,11 +350,11 @@
           ]
         }
       },
-      "routesLatencyMs": 306,
+      "routesLatencyMs": 444,
       "error": null
     },
     "vault": {
-      "latencyMs": 3,
+      "latencyMs": 2,
       "reachable": true,
       "initialized": false,
       "locked": true,
@@ -366,14 +367,205 @@
       ]
     },
     "dex": {
-      "latencyMs": 884,
+      "latencyMs": 648,
       "reachable": true,
-      "bids": 20,
+      "bids": 19,
       "asks": 50,
       "latest": "0.09713049029224470",
-      "spreadPercent": 0.4171498400023408,
-      "headBlock": 109407785,
-      "lagSeconds": 1
+      "spreadPercent": 0.5799331510656447,
+      "headBlock": 109411581,
+      "lagSeconds": 3
+    },
+    "wrappedInvariant": {
+      "latencyMs": 0,
+      "measured": true,
+      "source": "saosNetSnapshot().wrapped — daemon-pushed wrappedSummary (steem repo sovereign/node/state.json)",
+      "assetsChecked": 20,
+      "mismatches": 0,
+      "ok": true,
+      "assets": [
+        {
+          "asset": "WSTEEM",
+          "supply": 632,
+          "locked": 632,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WBLURT",
+          "supply": 64.227,
+          "locked": 64.227,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "ENERGY",
+          "supply": 49.5,
+          "locked": 50,
+          "delta": -0.5,
+          "coverRatio": 1.010101,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WTRX",
+          "supply": 40.523,
+          "locked": 40.523,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WSBD",
+          "supply": 0.26,
+          "locked": 0.26,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WSOL",
+          "supply": 0.096126117,
+          "locked": 0.096126117,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WETH",
+          "supply": 0.006209819,
+          "locked": 0.006209819,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WDOGE",
+          "supply": 0.004,
+          "locked": 0.004,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "PHIVE",
+          "supply": 0.002,
+          "locked": 0.002,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WXRP",
+          "supply": 0.001,
+          "locked": 0.001,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WBTC",
+          "supply": 3e-9,
+          "locked": 3e-9,
+          "delta": 0,
+          "coverRatio": 1,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WBTT",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WHTX",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WJST",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WNFT",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WSUN",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WTUSD",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WUSD1",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WUSDD",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        },
+        {
+          "asset": "WUSDT",
+          "supply": 0,
+          "locked": 0,
+          "delta": 0,
+          "coverRatio": null,
+          "overIssued": false,
+          "ok": true
+        }
+      ],
+      "error": null
     }
   },
   "issues": [
@@ -429,6 +621,6 @@
   "meta": {
     "generator": "tools/system-status.ts (M4 System Owner)",
     "server": "http://localhost:3000",
-    "gitSha": "ddacb0c"
+    "gitSha": "14956a5"
   }
 }

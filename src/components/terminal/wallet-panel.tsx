@@ -16,11 +16,11 @@ import { AnimatedNumber } from "@/components/terminal/motion-bits";
 import { PanelHeader, PanelSkeleton, StatCell } from "@/components/terminal/primitives";
 import { fmtInt, fmtSat, timeAgo, useWallet } from "@/hooks/use-steem-market";
 import { useDexStore } from "@/lib/dex-store";
+import { accountNameError } from "@/lib/account-name";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const ACCOUNT_RE = /^[a-z0-9.\-]{3,16}$/;
 
 export function WalletPanel() {
   const { account, setAccount } = useDexStore();
@@ -41,8 +41,9 @@ export function WalletPanel() {
 
   const track = () => {
     const name = draft.trim().toLowerCase();
-    if (!ACCOUNT_RE.test(name)) {
-      toast.error("invalid account name", { description: "3–16 chars: a-z 0-9 . -" });
+    const nameErr = accountNameError(name);
+    if (nameErr) {
+      toast.error("invalid account name", { description: nameErr });
       return;
     }
     setAccount(name);

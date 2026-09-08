@@ -134,6 +134,18 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 
 **מפת-דרכים אסטרטגית (`docs/strategy-roadmap.md`):** ניתוח-עסקי מעוגן-חיים — 7 מודלים עסקיים (Wallet-as-a-Service · Bridge Aggregator · DEX Aggregator · Validator · White-Label · Security Audits · Institutional Custody) ממופים ליכולות-מאומתות מול שערי-חוסמים כנים; המלצה: bootstrap + open-core, סדר-בנייה מדורג (M5 Wallet MVP אוטונומי → פריסת חוזה-גשר/audit/פיילוט = החלטות-בעלים). zero-mock גם באסטרטגיה: הטענות-טכניות בניתוח אומתו מחדש באותו-יום (7/7 · 23/23 · 2 גשרים חיים), הטענות-פיננסיות סומנו כספקולטיביות.
 
+## 🔒 SOVEREIGN MODE — הסבב השלישי: כל הפריטים הפתוחים נסגרו חי (2026-09-08)
+
+חמשת ה"אפשרי-עכשיו" מ-network-summary §6 בוצעו, כל אחד עם הוכחה חיה:
+
+1. **מכסה אטומית** — `QuotaCounter`: upsert מותנה אחד (`WHERE used<limit` + `RETURNING`) — סוגר את ה-off-by-one שנמדד ב-burn. `tools/quota-race-test.ts`: 1,050 מקביליות → בדיוק 1,000/50, overshoot **0**, `ATOMIC-PROVEN` 7/7.
+2. **ZK מחובר לכספת** — `zkCommitment` (Schnorr Fiat–Shamir על secp256k1) ב-init, נבדק ב-unlock + שתי step-ups; מאמת עצמאי שני ל-Argon2id (שחיתות בכל verifier אחד → fail-closed). `tools/vault-zk-check.ts` 9/9 `ZK-WIRED-PROVEN`.
+3. **Auth ל-console** — bootstrap copy-once (`POST /api/developer/admin/bootstrap`) + `requireAdmin` על יצירה/שלילת מפתחות; `SAOS_ADMIN_TOKEN` מנגלה; unlock 10/min + init 5/min (הוכח חי: 10×409→429).
+4. **הכרעת ENERGY (מבוססת-ראיות)** — ה-daemon עצמו מטריח cover ≥101% (`bridgeMintTxs` → supply=0.99·locked); האינווריאנט תוקן ל-*over-issue* כקריטי: ENERGY 49.5/50 = ה-posture המתוכנן, cover 1.010101, criticalIssues 0.
+5. **ולידציית account מאוחדת** — `src/lib/account-name.ts` (חוקי steemd המלאים) בשני הפאנלים במקום ה-regex הרופף.
+
+**אירוע חי:** `AUTHORITY DRIFT` — account_update על headcorner (blk 109,410,651, 21:17 UTC) החליף את ה-active authority; ה-API מדווח FAILED כנה עם פירוט שני הכתובות — המוצר תופס סטיית-סמכות בזמן-אמת, בדיוק כמו שהובטח. ה-verifier שודרג לסווג זאת מפורשות.
+
 ## 🔱 SAOS Deep Dive — Breakthrough Proof (2026-09-08)
 
 **SAOS במרכז הבמה.** סריקת-עומק חיה של כל הרכיבים הריבוניים (GitHub API על 6 ריפו + probes על mainnet + ה-state החי) וארבעה מסמכי-אמת:

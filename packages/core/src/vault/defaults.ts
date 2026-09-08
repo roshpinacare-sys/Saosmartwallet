@@ -102,6 +102,7 @@ export function emptyState(vaultInstanceId: string): VaultStateDoc {
     createdAt: now,
     updatedAt: now,
     verifier: null,
+    zkCommitment: null,
     master: null,
     networks: {},
     soldiers: {},

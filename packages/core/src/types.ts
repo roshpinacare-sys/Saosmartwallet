@@ -242,6 +242,15 @@ export interface VaultStateDoc {
   updatedAt: number;
   /** KDF params + Argon2id verifier for the master password. */
   verifier: PasswordVerifier | null;
+  /**
+   * Enrollment commitment for the zero-knowledge password-knowledge check
+   * (Fiat–Shamir Schnorr over secp256k1 — see crypto/zk.ts), installed at
+   * initialize() alongside the Argon2id verifier. Public by design (a curve
+   * point): unlock() verifies a fresh transcript against it so TWO independent
+   * verifiers must agree on the same password — a mutated/corrupted Argon2id
+   * verifier alone can no longer produce a passing unlock.
+   */
+  zkCommitment: string | null;
   master: MasterVaultConfig | null;
   networks: Record<string, NetworkVaultConfig>;
   soldiers: Record<string, SoldierVaultConfig>;

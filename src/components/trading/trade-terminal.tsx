@@ -41,6 +41,7 @@ import {
   type BuildOrderResponse,
 } from "@/hooks/use-steem-market";
 import { useDexStore } from "@/lib/dex-store";
+import { accountNameError, isValidAccountName } from "@/lib/account-name";
 import { cn } from "@/lib/utils";
 import type { SignOrderRequest } from "@/lib/vault-contracts";
 import { Button } from "@/components/ui/button";
@@ -87,7 +88,6 @@ const TTL_OPTIONS = [
   { value: "604800", label: "7 days" },
 ];
 
-const ACCOUNT_RE = /^[a-z0-9.\-]{3,16}$/;
 
 export function TradeTerminal() {
   const { account, setAccount, pricePrefill } = useDexStore();
@@ -139,7 +139,7 @@ export function TradeTerminal() {
   const total = amountNum > 0 && priceNum > 0 ? Math.floor(amountNum * priceNum * 1000) / 1000 : 0;
 
   const valid =
-    ACCOUNT_RE.test(account) &&
+    isValidAccountName(account) &&
     walletOk &&
     priceNum > 0 &&
     amountNum > 0 &&
@@ -212,8 +212,9 @@ export function TradeTerminal() {
               size="sm"
               className="h-9 shrink-0 gap-1.5 px-3 text-[11px] uppercase tracking-wider"
               onClick={() => {
-                if (!ACCOUNT_RE.test(accountDraft)) {
-                  toast.error("invalid account name", { description: "3–16 chars: a-z 0-9 . -" });
+                const nameErr = accountNameError(accountDraft.trim().toLowerCase());
+                if (nameErr) {
+                  toast.error("invalid account name", { description: nameErr });
                   return;
                 }
                 setAccount(accountDraft);

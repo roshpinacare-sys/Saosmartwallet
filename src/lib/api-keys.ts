@@ -116,6 +116,66 @@ export async function meterCall(
   return quotaFor(keyId);
 }
 
+// ---------------------------------------------------------------------------
+// Atomic daily quota reservation
+// ---------------------------------------------------------------------------
+// The original gate was check-then-act on the ledger: read count, compare to
+// the limit, do the work, insert the ledger row. Under concurrency the read/
+// write interleave admits exactly one in-flight call OVER the limit (measured
+// live: used=1001 after a 25-way burn — docs/m1-429-liveburn.md). The gate is
+// now a single conditional upsert on QuotaCounter — SQLite serializes writes,
+// so `used` can never exceed the limit:
+//
+//   INSERT INTO QuotaCounter(keyId, dayUtc, used) VALUES(?, ?, 1)
+//   ON CONFLICT(keyId, dayUtc) DO UPDATE SET used = used + 1
+//     WHERE used < limit
+//
+// changes=0 ⇒ quota exhausted ⇒ 429 BEFORE any chain work (fail-closed).
+// The ledger remains the truth of EXECUTED calls; at completion of all
+// reserved calls the two converge.
+
+export interface QuotaReservation extends QuotaState {
+  ok: boolean;
+}
+
+/** UTC day string ("YYYY-MM-DD") — the reservation key component. */
+function utcDayKey(d = new Date()): string {
+  return startOfUtcDay(d).toISOString().slice(0, 10);
+}
+
+export async function reserveQuota(keyId: string): Promise<QuotaReservation> {
+  const day = utcDayKey();
+  // RETURNING returns THIS statement's post-upsert counter — the reported
+  // `used` is the reserver's own value, not a raced read-back.
+  const rows = await db.$queryRaw<Array<{ used: number }>>`
+    INSERT INTO "QuotaCounter" ("id", "keyId", "dayUtc", "used", "updatedAt")
+    VALUES (${createId()}, ${keyId}, ${day}, 1, ${new Date()})
+    ON CONFLICT("keyId", "dayUtc") DO UPDATE
+      SET "used" = "QuotaCounter"."used" + 1, "updatedAt" = ${new Date()}
+      WHERE "QuotaCounter"."used" < ${FREE_DAILY_QUOTA}
+    RETURNING "used"
+  `;
+  const granted = rows.length > 0;
+  // Lazy housekeeping: ~1% of reservations prune counters older than 8 days.
+  if (Math.random() < 0.01) {
+    const cutoff = new Date(startOfUtcDay().getTime() - 8 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    await db.quotaCounter.deleteMany({ where: { dayUtc: { lt: cutoff } } });
+  }
+  const usedNow = granted ? rows[0].used : FREE_DAILY_QUOTA;
+  return {
+    ok: granted,
+    used: usedNow,
+    limit: FREE_DAILY_QUOTA,
+    remaining: Math.max(0, FREE_DAILY_QUOTA - usedNow),
+    resetAt: Math.floor(nextUtcMidnight().getTime() / 1000),
+  };
+}
+
+/** cuid() without importing the generator — enough entropy for counter rows. */
+function createId(): string {
+  return `qc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export const QUOTA_HEADERS = (q: QuotaState): Record<string, string> => ({
   "X-RateLimit-Limit": String(q.limit),
   "X-RateLimit-Remaining": String(q.remaining),

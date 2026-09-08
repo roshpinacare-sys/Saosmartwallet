@@ -387,7 +387,11 @@ export async function verifyIdentityAnchor(usernameInput?: string): Promise<Anch
       chains,
       summary: sameScalarProof
         ? `PROVEN: the Steem active authority's secp256k1 point derives ${activeKeyEvm}, the on-chain EIP-191 signature recovers the same address, and the same key bytes are the live active authority on ${Math.max(chainsBound, 1)} Graphene chain(s) measured now (${chainsBound === 2 ? "Steem+Hive" : `${chainsBound} chain(s)`}). One scalar → Steem+Hive(+Blurt per the on-chain claim)+EVM.`
-        : "Anchor found on-chain but the math does NOT close — reported honestly, no verdict forced.",
+        : !claimedMatchesRecovered
+          ? "Anchor found on-chain but the EIP-191 signature does not recover the claimed EVM address — reported honestly, no verdict forced."
+          : !activeKeyEqualsRecovered
+            ? `AUTHORITY DRIFT: the anchor is internally valid (EIP-191 recovers its claimed address ${recovered}) but the account's CURRENT active authority derives ${activeKeyEvm} — the anchor was signed by a DIFFERENT scalar than the live active key. Either the active key was rotated after this anchor (block ${found.op.block}, ${found.op.timestamp}) or the anchor was never bound to it. Until a fresh anchor is signed by the current active key, identity is NOT proven — reported honestly, no verdict forced.`
+            : "Anchor found on-chain but the math does NOT close — reported honestly, no verdict forced.",
     };
   } catch (e) {
     return { ok: false, username, measuredAt, error: e instanceof Error ? e.message : "verification failed" };

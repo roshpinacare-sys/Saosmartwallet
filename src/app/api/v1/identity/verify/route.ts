@@ -5,7 +5,7 @@ import {
   PRODUCT_ENDPOINT,
   FREE_DAILY_QUOTA,
   meterCall,
-  quotaFor,
+  reserveQuota,
   resolveApiKey,
   type VerifyOutcome,
 } from "@/lib/api-keys";
@@ -49,15 +49,20 @@ async function handle(req: Request, username: string | undefined): Promise<NextR
     );
   }
 
-  const quota = await quotaFor(auth.keyId);
-  if (quota.remaining <= 0) {
+  // Atomic reservation gate — the single-statement conditional upsert in
+  // reserveQuota() makes `used` exceed the limit impossible under any
+  // concurrency (the old check-then-act admitted exactly one in-flight call
+  // over 1,000, measured live in docs/m1-429-liveburn.md). A denied
+  // reservation returns 429 BEFORE any chain work and consumes nothing.
+  const reservation = await reserveQuota(auth.keyId);
+  if (!reservation.ok) {
     return NextResponse.json(
       {
         ok: false,
         error: "daily quota exceeded — resets at next UTC midnight",
-        quota,
+        quota: reservation,
       },
-      { status: 429, headers: { "Cache-Control": "no-store", ...QUOTA_HEADERS(quota) } },
+      { status: 429, headers: { "Cache-Control": "no-store", ...QUOTA_HEADERS(reservation) } },
     );
   }
 

@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 
 import { VaultError, getVaultRuntime, getInstanceId, mapVaultError } from "@/lib/vault-runtime";
+import { clientIpOf, rateLimit } from "@/lib/rate-limit";
 import type { InitRequest, InitResponse } from "@/lib/vault-contracts";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,15 @@ interface InitBody {
 }
 
 export async function POST(req: Request) {
+  // One-shot ceremony — 5/min/IP is generous for the owner, hostile to abuse.
+  const rl = rateLimit(`vault-init:${clientIpOf(req)}`, 5, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: "too many init attempts — retry later" },
+      { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(rl.retryAfterSeconds) } },
+    );
+  }
+
   let body: InitBody;
   try {
     body = (await req.json()) as InitBody;
