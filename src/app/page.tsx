@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, Anchor, ArrowDownRight, ArrowUpRight, Ban, Bot, Coins, Layers, Landmark, List,
+  Activity, Anchor, ArrowDownRight, ArrowUpRight, Ban, Bot, Coins, Crown, Layers, Landmark, List,
   RefreshCcw, ShieldCheck, Wallet, Zap, Waves, GaugeCircle,
 } from "lucide-react";
 import { GoldButton, Panel, Pill, StatusDot, Stat, fmt, fmtInt, shortHash } from "@/components/dex/kit";
@@ -64,11 +64,14 @@ interface WorldResp {
   proofs: { seals: SealInfo[]; receipts: { kind: string; digest: string; at: number }[]; blockWindow: number };
   tape: TapeEv[];
 }
-interface RelayRecord { chain: "steem" | "hive" | "tron"; height: number; status: string; txid: string | null; at: string; attempt: number; verified: boolean | null; verifiedAt: string | null; error?: string }
+type RelayChain = "steem" | "hive" | "tron" | "eth" | "sol";
+interface RelayRecord { chain: RelayChain; height: number; status: string; txid: string | null; at: string; attempt: number; verified: boolean | null; verifiedAt: string | null; error?: string }
 interface RelayView {
   enabled: boolean; account: string | null; anchorId: string; queue: number; tronIdentity: string | null;
+  identities?: { eth: string | null; sol: string | null };
+  ethIntents?: { height: number; intentHash: string; signature: string; address: string; verified: boolean }[];
   metrics: { broadcasts: number; verified: number; mismatches: number; breakerTrips: number; economicWaits: number; lastVerifyLatencyMs: number | null };
-  chains: Record<"steem" | "hive" | "tron", {
+  chains: Record<RelayChain, {
     enabled: boolean; status: string; lastTxid: string | null; lastHeight: number | null; lastAt: string | null;
     lastError: string | null; lastVerifyError: string | null; anchored: number; verified: number; mismatches: number;
     breaker: { state: "closed" | "open" | "half-open"; failures: number; openedAt: number | null; trips: number };
@@ -76,6 +79,107 @@ interface RelayView {
   records: RelayRecord[];
 }
 interface MyOrder { id: number; base: string; quote: string; side: "buy" | "sell"; price: number; amount: number; filled: number }
+
+/* ══ משטח-הוכחת-הפריצה (Breakthrough Showcase) — מה-API הציבורי ══════════════ */
+interface ExecRowView {
+  sizeMu: number; bookCostMu: number; bookAvgPx: number; bookSlipBps: number; covered: boolean;
+  poolCostMu: number | null; poolEffPx: number | null; poolSlipBps: number | null;
+  savingsMu: number | null; savingsBps: number | null;
+}
+interface ShowcaseResp {
+  ok: boolean;
+  sovereignPair: { mid: number; poolMid: number; bookDepthMu: number; liveOrders: number; height: number; stateRoot: string };
+  A: ExecRowView[];
+  A2: ExecRowView[];
+  B: {
+    replay: { ops: number; okCount: number; roots: string[]; identical: boolean };
+    poolSandwich: { attackerPnlMu: number; victimOutClean: number; victimOutSandwiched: number; victimHarmMu: number };
+    bookSandwich: { attackerPnlMu: number; victimExtraCostMu: number; topLevelMu: number; bestBidPx: number; note: string };
+  };
+  C: {
+    fillsWindow: number; gridSharePct: number;
+    restingOrdersTotal: number; restingOrdersGrid: number;
+    restingLiquidityMu: number; restingLiquidityGridMu: number; restingGridPct: number;
+    lifetimeFills: number; fillsPerMin: number;
+  };
+  sovereignty: {
+    verified: number; broadcasts: number; mismatches: number; breakerTrips: number;
+    rails: number; bridgesRequired: number;
+    perChain: Record<string, { anchored: number; verified: number; status: string; lastTxid: string | null }>;
+  };
+}
+
+function useShowcase(): { data: ShowcaseResp | null; loading: boolean; rerun: () => void } {
+  const [data, setData] = useState<ShowcaseResp | null>(null);
+  const [loading, setLoading] = useState(false);
+  const run = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(api("/api/dex/showcase"), { cache: "no-store" });
+      const j = (await r.json()) as ShowcaseResp;
+      if (j.ok) setData(j);
+    } catch { /* הדמון עוד קם */ } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { void run(); }, [run]);
+  return { data, loading, rerun: () => void run() };
+}
+
+/* ══ עמדת-הסליקה: SIM→REAL — מבחן-כסף-אמת לסוכנים + יציבות-שוק ══════════════ */
+interface CensusAgent { name: string; role: string; credits: number; equity: number; liveOrders: number; balances: Record<string, number>; locked: Record<string, number> }
+interface SettleResp {
+  ok: boolean; at: string; height: number; stateRoot: string; halted: boolean; cached?: boolean;
+  census: { agents: CensusAgent[] };
+  ledger: {
+    ok: boolean;
+    credits: { sum: number; gasUsed: number; expected: number; minted?: number; ok: boolean };
+    assets: { asset: string; live: number; expected: number; ok: boolean; kind: string }[];
+    escrow: { accounts: number; lockedSum: number; ordersSum: number; exact: boolean; availOk: boolean; ok: boolean };
+    fees: { poolsTreasury: number; feeMeterPlusProfit: number; ok: boolean };
+    errors: string[];
+  };
+  exam: {
+    ok: boolean; determinismIdentical: boolean; roots: string[];
+    agents: { agent: string; score: number; pass: boolean; conservationAfterEach: boolean; tasks: { task: string; ok: boolean; note: string }[] }[];
+  };
+  realMoney: {
+    ok: boolean; liveRails: number; verifiedNow: number;
+    rails: { rail: string; identity: string; native: string; extra: string; ok: boolean; detail: string }[];
+    anchors: { rail: string; height: number; ok: boolean; verified: boolean; detail: string }[];
+  };
+  stability: {
+    pair: string; refPrice: number; fair: number; poolMid: number; bookMid: number;
+    dissonanceBps: { poolVsFair: number; bookVsRef: number; fairVsRef: number };
+    spreadBps: number; depth1pct: { bidMu: number; askMu: number }; topImbalanceBps: number;
+    sitting: boolean; reasons: string[];
+  };
+  runway?: {
+    burnPerHeight: number; totalCredits: number; systemRunwayBlocks: number; systemRunwayHours: number;
+    perAgent: { agent: string; credits: number; shareHours: number }[];
+    level: "ok" | "warn" | "crit"; note: string;
+  };
+  verdict: { ledgerOk: boolean; examOk: boolean; realMoneyOk: boolean; marketSitting: boolean; allSettled: boolean };
+}
+
+function useSettleDesk(): { data: SettleResp | null; loading: boolean; refresh: () => void } {
+  const [data, setData] = useState<SettleResp | null>(null);
+  const [loading, setLoading] = useState(false);
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(api("/api/dex/settle"), { cache: "no-store" });
+      const j = (await r.json()) as SettleResp;
+      if (j.ok) setData(j);
+    } catch { /* הדמון עוד קם */ } finally { setLoading(false); }
+  }, []);
+  useEffect(() => {
+    void refresh();
+    const t = setInterval(() => void refresh(), 32_000); // השרת-cache 25ש׳ — אנחנו 32ש׳
+    return () => clearInterval(t);
+  }, [refresh]);
+  return { data, loading, refresh };
+}
 
 /* ══ מנוע-זרימה: long-polling מבוסס-אירוע + AbortController ══════════════════
  * הלקוח תולה בקשה עם הגרסה-המקומית; השרת משיב רק כשהשרשרת התקדמה (או keepalive
@@ -199,28 +303,49 @@ function changePct(fair: number, ref: number): number {
 function Watchlist({ markets, selected, onSelect }: {
   markets: MarketView[]; selected: string | undefined; onSelect: (key: string) => void;
 }) {
+  const ordered = useMemo(
+    () => [...markets].sort((a, b) => (a.key === "SAOS/USDS" ? -1 : b.key === "SAOS/USDS" ? 1 : 0)),
+    [markets]
+  );
   return (
     <div className="space-y-2" data-testid="watchlist-panel">
-      {markets.map((m) => {
+      {ordered.map((m) => {
         const chg = changePct(m.fair, m.refPrice);
         const up = chg >= 0;
         const active = m.key === selected;
+        const sovereign = m.key === "SAOS/USDS";
         return (
           <button
             key={m.key} type="button" onClick={() => onSelect(m.key)}
-            className={`block w-full rounded-lg border px-3 py-2 text-right transition-colors ${active ? "border-amber-500/60 bg-zinc-800/70" : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700"}`}
+            className={`block w-full rounded-lg border px-3 py-2 text-right transition-colors ${
+              active
+                ? "border-amber-500/60 bg-zinc-800/70"
+                : sovereign
+                  ? "border-amber-500/40 bg-amber-500/[0.06] hover:border-amber-500/50"
+                  : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-700"
+            }`}
+            data-testid={sovereign ? "watchlist-sovereign-pair" : undefined}
           >
             <div className="flex items-center justify-between gap-2" dir="ltr">
-              <span className="font-mono text-xs font-black text-zinc-100">{m.key}</span>
+              <span className="flex items-center gap-1.5 font-mono text-xs font-black text-zinc-100">
+                {sovereign && <Crown className="h-3 w-3 text-amber-400" aria-hidden />}
+                {m.key}
+              </span>
               <span className={`font-mono text-xs font-bold ${up ? "text-green-400" : "text-red-400"}`} data-testid="watchlist-change">
                 {up ? "+" : ""}{chg.toFixed(2)}%
               </span>
             </div>
             <div className="mt-0.5 flex items-center justify-between gap-2" dir="ltr">
               <span className="font-mono text-sm font-bold text-amber-400">{m.fair > 0 ? fmt(m.fair, 2) : "—"}</span>
-              <span className={`font-mono text-[10px] ${m.spreadBps > 0 ? "text-zinc-500" : "text-red-400"}`}>
-                spread {m.spreadBps}bps
-              </span>
+              {sovereign ? (
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[8px] font-black uppercase tracking-widest text-amber-300">
+                  sovereign pair
+                </span>
+              ) : (
+                <span className={`font-mono text-[10px] ${m.spreadBps > 0 ? "text-zinc-500" : "text-red-400"}`}>
+                  spread {m.spreadBps}bps
+                </span>
+              )}
             </div>
           </button>
         );
@@ -235,9 +360,314 @@ function Watchlist({ markets, selected, onSelect }: {
   );
 }
 
+// ─── פאנל-הכתר: SAOS SOVEREIGN METRICS (testid=saos-sovereign-metrics) ──────
+// המוקד-הבלעדי: הוכחה-חיה שהערך-הבלעדי של SAOS נובע-מהקוד — מדידה, לא שיווק.
+function SovereignMetricsPanel({ showcase, loading, rerun }: {
+  showcase: ShowcaseResp | null; loading: boolean; rerun: () => void;
+}) {
+  const sc = showcase;
+  const biggestSave = useMemo(() => {
+    if (!sc?.A.length) return null;
+    return sc.A.reduce((best, r) => ((r.savingsBps ?? -1) > (best.savingsBps ?? -1) ? r : best), sc.A[0]!);
+  }, [sc]);
+  const clean = useMemo(() => {
+    if (!sc?.A2.length) return null;
+    return sc.A2.reduce((best, r) => ((r.savingsBps ?? -1) > (best.savingsBps ?? -1) ? r : best), sc.A2[0]!);
+  }, [sc]);
+
+  return (
+    <section
+      data-testid="saos-sovereign-metrics"
+      className="rounded-xl border border-amber-500/30 bg-gradient-to-l from-amber-500/[0.05] via-zinc-900/60 to-zinc-900/60 p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-black tracking-wide text-amber-200">
+          <Crown className="h-4 w-4 text-amber-400" aria-hidden />
+          SAOS SOVEREIGN METRICS
+          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-widest text-amber-300">
+            the sovereign pair · SAOS/USDS
+          </span>
+        </h2>
+        <GoldButton tone="ghost" onClick={rerun} disabled={loading} testid="showcase-rerun" className="px-2.5 py-1 text-[11px]">
+          <RefreshCcw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> RUN PROOF
+        </GoldButton>
+      </div>
+
+      {!sc && (
+        <p className="py-6 text-center font-mono text-[11px] text-zinc-500" data-testid="showcase-loading">
+          {loading ? "מריץ משטח-הוכחה על המצב-החי…" : "מנוע-ההוכחה מתחבר לדמון…"}
+        </p>
+      )}
+
+      {sc && (
+        <>
+          {/* 4 עדויות-ראש */}
+          <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            <div className="rounded-lg border border-green-500/30 bg-green-500/[0.05] px-3 py-2" data-testid="metric-mev">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">MEV EXTRACTED (BOOK)</div>
+              <div className="mt-0.5 font-mono text-lg font-black text-green-300" dir="ltr">
+                {sc.B.bookSandwich.attackerPnlMu <= 0 ? fmt(sc.B.bookSandwich.attackerPnlMu, 0) : `+${fmt(sc.B.bookSandwich.attackerPnlMu, 0)}`} µ
+              </div>
+              <div className="mt-0.5 text-[10px] leading-snug text-zinc-500">
+                תוקף-כריך על הספר מפסיד את הספרד · על AMM היה מרוויח <span className="font-mono text-red-300" dir="ltr">+{fmtInt(sc.B.poolSandwich.attackerPnlMu)}µ</span>
+              </div>
+            </div>
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/[0.05] px-3 py-2" data-testid="metric-determinism">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">REPLAY DETERMINISM</div>
+              <div className={`mt-0.5 font-mono text-lg font-black ${sc.B.replay.identical ? "text-violet-300" : "text-red-300"}`} dir="ltr">
+                {sc.B.replay.identical ? "PASS 3/3" : "FAIL"}
+              </div>
+              <div className="mt-0.5 font-mono text-[10px] text-zinc-500" dir="ltr">
+                {fmtInt(sc.B.replay.ops)} ops · root {shortHash(sc.B.replay.roots[0] ?? "", 8)}
+              </div>
+            </div>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2" data-testid="metric-grid-liquidity">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">GRID-MADE LIQUIDITY</div>
+              <div className="mt-0.5 font-mono text-lg font-black text-amber-300" dir="ltr">{sc.C.restingGridPct}%</div>
+              <div className="mt-0.5 font-mono text-[10px] text-zinc-500" dir="ltr">
+                {sc.C.restingOrdersGrid}/{sc.C.restingOrdersTotal} orders · {sc.C.fillsPerMin}/min fills
+              </div>
+            </div>
+            <div className="rounded-lg border border-purple-500/30 bg-purple-500/[0.05] px-3 py-2" data-testid="metric-anchors">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">SOVEREIGN ANCHORS</div>
+              <div className="mt-0.5 font-mono text-lg font-black text-purple-400" dir="ltr">{fmtInt(sc.sovereignty.verified)}</div>
+              <div className="mt-0.5 font-mono text-[10px] text-zinc-500" dir="ltr">
+                {sc.sovereignty.rails} rails · {fmtInt(sc.sovereignty.mismatches)} mismatches · 0 bridges
+              </div>
+            </div>
+          </div>
+
+          {/* טבלת-הוכחה A: אותו-פלט, מי-משלם-פחות */}
+          <div className="mt-3 overflow-x-auto" dir="ltr" data-testid="showcase-exec-table">
+            <table className="w-full min-w-[560px] border-separate border-spacing-0 font-mono text-[11px]">
+              <thead>
+                <tr className="text-[9px] uppercase tracking-wider text-zinc-500">
+                  <th className="px-2 py-1 text-left font-semibold">buy size (SAOS)</th>
+                  <th className="px-2 py-1 text-left font-semibold">book slip</th>
+                  <th className="px-2 py-1 text-left font-semibold">pool slip (live)</th>
+                  <th className="px-2 py-1 text-left font-semibold">pool slip (clean)</th>
+                  <th className="px-2 py-1 text-left font-semibold">savings on book</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sc.A.map((r, i) => {
+                  const c = sc.A2[i];
+                  return (
+                    <tr key={r.sizeMu} className="border-t border-zinc-800/60">
+                      <td className="px-2 py-1.5 text-zinc-200">{fmt(r.sizeMu, 0)}</td>
+                      <td className="px-2 py-1.5 font-bold text-green-300">{r.bookSlipBps} bps</td>
+                      <td className="px-2 py-1.5 text-red-300">{r.poolSlipBps !== null ? `${r.poolSlipBps} bps` : "—"}</td>
+                      <td className="px-2 py-1.5 text-zinc-400">{c?.poolSlipBps !== null && c?.poolSlipBps !== undefined ? `${c.poolSlipBps} bps` : "—"}</td>
+                      <td className="px-2 py-1.5 text-amber-300">
+                        {r.savingsMu !== null ? `${fmt(r.savingsMu, 0)} µ (${r.savingsBps ?? 0} bps)` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[10px] leading-snug text-zinc-500">
+            מדידה-חיה על הזוג-הריבוני: הספר ממלא תמיד במחיר-המייקר המדויק (book.ts · matchBook) — אפס-סליפ,
+            אפס-עמלת-טייקר; הבריכה (x*y=k + 30bps) סופגת כל-עסקה לתוך-הרזרבות וגובה גם-בבריכה-צודקה
+            (clean = reserves aligned to fair). הנזילות-המנוחה נוצרת-אוטונומית ע"י גריד-החיילים (mm.ts · arenaTick)
+            — אפס-LP-חיצוני, אפס-Impermanent-Loss קלאסי.
+          </p>
+          {biggestSave && biggestSave.savingsBps !== null && (
+            <p className="mt-1 font-mono text-[10px] text-amber-300/90" dir="ltr" data-testid="showcase-headline">
+              headline: at {fmt(biggestSave.sizeMu, 0)} SAOS — book is {biggestSave.savingsBps} bps cheaper ({fmt(biggestSave.savingsMu ?? 0, 0)} µ saved) vs live pool · {clean?.savingsBps ?? 0} bps vs clean pool
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ─── פאנל: עמדת-הסליקה SIM→REAL (testid=settlement-desk) — רוחב-מלא ────────
+// הפקודה: לבדוק את הסוכנים ולעשות להם מבחן עם כסף-אמת; לסדר, לייצב את השוק שהכל ישב.
+function SettlementDeskPanel({ report, loading, refresh, stabilize, stabilizing }: {
+  report: SettleResp | null; loading: boolean; refresh: () => void;
+  stabilize: () => void; stabilizing: boolean;
+}) {
+  const s = report;
+  const examOf = (name: string) => s?.exam.agents.find((a) => a.agent === name);
+  const anchorOf = (rail: string) => s?.realMoney.anchors.find((a) => a.rail === rail);
+  return (
+    <section
+      data-testid="settlement-desk"
+      className="rounded-xl border border-emerald-500/30 bg-gradient-to-l from-emerald-500/[0.04] via-zinc-900/60 to-zinc-900/60 p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-black tracking-wide text-emerald-200">
+          <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden />
+          SETTLEMENT DESK · SIM→REAL
+          <span
+            className={`rounded-full border px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-widest ${
+              s?.verdict.allSettled
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : "border-red-500/40 bg-red-500/10 text-red-300"
+            }`}
+            data-testid="settle-verdict"
+          >
+            {s ? (s.verdict.allSettled ? "ALL SETTLED — הכל יושב" : "NOT SETTLED") : "…"}
+          </span>
+        </h2>
+        <div className="flex items-center gap-2">
+          <GoldButton tone="ghost" onClick={stabilize} disabled={stabilizing} testid="settle-stabilize" className="px-2.5 py-1 text-[11px]">
+            <GaugeCircle className={`h-3 w-3 ${stabilizing ? "animate-pulse" : ""}`} /> STABILIZE NOW
+          </GoldButton>
+          <GoldButton tone="ghost" onClick={refresh} disabled={loading} testid="settle-refresh" className="px-2.5 py-1 text-[11px]">
+            <RefreshCcw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> AUDIT
+          </GoldButton>
+        </div>
+      </div>
+
+      {!s && (
+        <p className="py-6 text-center font-mono text-[11px] text-zinc-500" data-testid="settle-loading">
+          {loading ? "מריץ ביקורת-חשבונאות · מבחן-סוכנים · קריאות-כסף-אמת…" : "עמדת-הסליקה מתחברת לדמון…"}
+        </p>
+      )}
+
+      {s && (
+        <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {/* (1) מפקד-סוכנים ומבחנים */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3" data-testid="settle-census">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Agents · Census &amp; Exam</h3>
+              <span className={`font-mono text-[10px] font-bold ${s.exam.ok ? "text-emerald-300" : "text-red-300"}`}>
+                exam {s.exam.ok ? "PASS" : "FAIL"}{s.exam.determinismIdentical ? " · deterministic" : " · NON-DETERMINISTIC"}
+              </span>
+            </div>
+            <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+              {s.census.agents.map((w) => {
+                const ex = examOf(w.name);
+                return (
+                  <div key={w.name} className="flex items-center justify-between rounded-md border border-zinc-800/80 bg-zinc-950/60 px-2.5 py-1.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-mono text-[11px] font-bold text-zinc-200">{w.name}</span>
+                        <span className="rounded bg-zinc-800 px-1 font-mono text-[8px] uppercase text-zinc-400">{w.role}</span>
+                      </div>
+                      <div className="font-mono text-[9px] text-zinc-500" dir="ltr">
+                        equity {fmtInt(w.equity)}µ · {w.liveOrders} live · locked {fmtInt(Object.values(w.locked).reduce((a, b) => a + b, 0))}µ
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5" title={ex?.tasks.map((t) => `${t.task}:${t.ok ? "✓" : "✗"}`).join(" ") || ""}>
+                      {["quote", "cross", "cancel"].map((t) => {
+                        const task = ex?.tasks.find((x) => x.task === t);
+                        const on = task?.ok === true;
+                        return <span key={t} className={`h-1.5 w-1.5 rounded-full ${on ? "bg-emerald-400" : task ? "bg-red-400" : "bg-zinc-700"}`} />;
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-2 space-y-0.5 font-mono text-[9px] text-zinc-500" dir="ltr">
+              <div>ledger conservation: <span className={s.ledger.ok ? "text-emerald-300" : "text-red-300"}>{s.ledger.ok ? "EXACT" : "VIOLATION"}</span>
+                {s.ledger.ok ? "" : ` · ${s.ledger.errors[0] ?? ""}`}</div>
+              <div>escrow: {fmtInt(s.ledger.escrow.lockedSum)}µ locked === {fmtInt(s.ledger.escrow.ordersSum)}µ orders · credits Σ+gas−minted({fmtInt(s.ledger.credits.minted ?? 0)}) === genesis: {s.ledger.credits.ok ? "YES" : "NO"}</div>
+              <div>fees measured: {fmtInt(s.ledger.fees.poolsTreasury)}µ === meter+profit+minted(fuel): {s.ledger.fees.ok ? "YES" : "NO"}</div>
+              {s.runway && (
+                <div data-testid="sim-runway">
+                  FUEL RUNWAY · Σcredits {fmtInt(s.runway.totalCredits)}µ @ {fmtInt(Math.round(s.runway.burnPerHeight))}µ/blk
+                  → ~{s.runway.systemRunwayHours.toFixed(1)}h ({fmtInt(s.runway.systemRunwayBlocks)} blocks)
+                  · <span className={s.runway.level === "ok" ? "text-emerald-300" : s.runway.level === "warn" ? "text-amber-300" : "text-red-300"}>{s.runway.level.toUpperCase()}</span>
+                  <span className="text-zinc-600"> · closed SIM economy — refuel is transfer-only</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* (2) כסף-אמת: 5-רשתות חיות */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3" data-testid="settle-realmoney">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Real Money · 5 Rails Live</h3>
+              <span className={`font-mono text-[10px] font-bold ${s.realMoney.ok ? "text-emerald-300" : "text-amber-300"}`}>
+                {s.realMoney.liveRails}/5 live · {s.realMoney.verifiedNow} verified now
+              </span>
+            </div>
+            <div className="max-h-56 space-y-1 overflow-y-auto pr-1" dir="ltr">
+              {s.realMoney.rails.map((r) => {
+                const an = anchorOf(r.rail);
+                return (
+                  <div key={r.rail} className="rounded-md border border-zinc-800/80 bg-zinc-950/60 px-2.5 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <StatusDot tone={r.ok ? "green" : "red"} />
+                        <span className="font-mono text-[10px] font-black uppercase text-zinc-300">{r.rail}</span>
+                        <span className="truncate font-mono text-[9px] text-zinc-500">{r.identity}</span>
+                      </div>
+                      <span className="shrink-0 font-mono text-[10px] font-bold text-amber-300">{r.native}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2 font-mono text-[8px] text-zinc-600">
+                      <span className="truncate">{r.extra}</span>
+                      {an && (
+                        <span className={`shrink-0 ${an.verified ? "text-emerald-400" : an.height === 0 ? "text-zinc-500" : an.detail.includes("not indexed") || an.detail.includes("awaiting") ? "text-amber-400" : "text-red-400"}`}>
+                          {an.height === 0 ? "no anchor record (honest)" : `anchor h${an.height} ${an.verified ? "✓ re-verified" : an.detail.includes("not indexed") || an.detail.includes("awaiting") ? "· reconciling" : "· mismatch"}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 font-mono text-[9px] leading-snug text-zinc-500" dir="ltr">
+              book = SIM µ (honest). every seal = real anchor on public rails — re-read from public RPC right now.
+            </p>
+          </div>
+
+          {/* (3) יציבות-שוק: האם-הכל-יושב */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3" data-testid="settle-stability">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Market Stability · {s.stability.pair}</h3>
+              <span className={`rounded border px-1.5 py-0.5 font-mono text-[9px] font-black ${s.stability.sitting ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-amber-500/40 bg-amber-500/10 text-amber-300"}`}>
+                {s.stability.sitting ? "SITTING" : "CONVERGING"}
+              </span>
+            </div>
+            <div className="space-y-1 font-mono text-[10px]" dir="ltr">
+              {[
+                { k: "ladder ref", v: fmtInt(s.stability.refPrice) },
+                { k: "book fair", v: fmtInt(s.stability.fair), d: s.stability.dissonanceBps.fairVsRef },
+                { k: "book mid", v: fmtInt(s.stability.bookMid), d: s.stability.dissonanceBps.bookVsRef },
+                { k: "pool mid", v: fmtInt(s.stability.poolMid), d: s.stability.dissonanceBps.poolVsFair },
+              ].map((row) => (
+                <div key={row.k} className="flex items-center justify-between rounded-md border border-zinc-800/80 bg-zinc-950/60 px-2.5 py-1">
+                  <span className="text-zinc-500">{row.k}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-bold text-zinc-200">{row.v}</span>
+                    {row.d !== undefined && (
+                      <span className={`text-[9px] ${Math.abs(row.d) <= 60 ? "text-emerald-400" : Math.abs(row.d) <= 450 ? "text-amber-400" : "text-red-400"}`}>{row.d > 0 ? "+" : ""}{row.d} bps</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between rounded-md border border-zinc-800/80 bg-zinc-950/60 px-2.5 py-1">
+                <span className="text-zinc-500">spread · depth ±1%</span>
+                <span className="text-zinc-200">
+                  {s.stability.spreadBps} bps · <span className="text-green-400">{fmtInt(s.stability.depth1pct.bidMu)}µ</span> / <span className="text-red-400">{fmtInt(s.stability.depth1pct.askMu)}µ</span>
+                </span>
+              </div>
+            </div>
+            {s.stability.reasons.length > 0 && (
+              <ul className="mt-2 space-y-0.5 font-mono text-[9px] text-amber-300/80" dir="ltr">
+                {s.stability.reasons.slice(0, 3).map((r, i) => <li key={i}>· {r}</li>)}
+              </ul>
+            )}
+            <p className="mt-2 font-mono text-[9px] leading-snug text-zinc-500" dir="ltr">
+              pegkeeper: pool-lock vs fair every 2 ticks · ladder-band ±400bps every 4 · arena funds the floor from measured fees
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── פאנל: System Health & Relay (testid=system-health-panel) — טור-ימין ────
 function SystemHealthPanel({ st, relay, mempool }: { st: StateView | undefined; relay: RelayView | null; mempool: number }) {
-  const breakers = relay ? (["steem", "hive", "tron"] as const).map((c) => relay.chains[c].breaker.state) : [];
+  const breakers = relay ? (["steem", "hive", "tron", "eth", "sol"] as const).map((c) => relay.chains[c]?.breaker.state).filter((s): s is "closed" | "open" | "half-open" => !!s) : [];
   const breakerOpen = breakers.includes("open");
   const breakerHalf = breakers.includes("half-open");
   const mismatched = (relay?.metrics.mismatches ?? 0) > 0;
@@ -286,9 +716,12 @@ function SystemHealthPanel({ st, relay, mempool }: { st: StateView | undefined; 
       </div>
 
       <div className="mt-2 space-y-1.5" dir="ltr">
-        {relay ? (["steem", "hive", "tron"] as const).map((c) => {
+        {relay ? (["steem", "hive", "tron", "eth", "sol"] as const).map((c) => {
           const ch = relay.chains[c];
+          if (!ch) return null; // שרת-ישן ללא-השרשראות-החדשות — לא קורסים
           const last = relay.records.find((r) => r.chain === c && r.txid);
+          const pendingFunding = ch.enabled && /unfunded/i.test(ch.lastError ?? "");
+          const armedIdle = ch.enabled && ch.status === "idle";
           return (
             <div key={c} className="rounded-lg border border-zinc-800 bg-zinc-900/70 px-2.5 py-1.5">
               <div className="flex items-center justify-between gap-2">
@@ -299,11 +732,25 @@ function SystemHealthPanel({ st, relay, mempool }: { st: StateView | undefined; 
                   breaker: {ch.breaker.state}
                 </span>
               </div>
+              {pendingFunding && (
+                <div className="mt-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-amber-300" dir="ltr">
+                  pending funding — armed (signing live, broadcast gated)
+                </div>
+              )}
+              {armedIdle && (
+                <div className="mt-1 rounded border border-green-500/40 bg-green-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-green-300" dir="ltr">
+                  armed — identity loaded
+                </div>
+              )}
               <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[10px] text-zinc-500">
                 <span>{ch.anchored} anchored · {ch.verified} verified</span>
                 {last?.txid && (
                   <a
-                    href={c === "steem" ? `https://steemworld.org/tx/${last.txid}` : c === "hive" ? `https://hiveblocks.com/tx/${last.txid}` : `https://tronscan.org/#/transaction/${last.txid}`}
+                    href={c === "steem" ? `https://steemworld.org/tx/${last.txid}`
+                      : c === "hive" ? `https://hiveblocks.com/tx/${last.txid}`
+                      : c === "tron" ? `https://tronscan.org/#/transaction/${last.txid}`
+                      : c === "eth" ? `https://etherscan.io/tx/${last.txid}`
+                      : `https://explorer.solana.com/tx/${last.txid}?cluster=devnet`}
                     target="_blank" rel="noreferrer"
                     className="text-amber-400 underline-offset-2 hover:underline"
                   >
@@ -317,6 +764,17 @@ function SystemHealthPanel({ st, relay, mempool }: { st: StateView | undefined; 
           <div className="py-2 text-center font-mono text-[11px] text-zinc-600">relay telemetry connecting…</div>
         )}
       </div>
+
+      {relay?.identities && (relay.identities.eth || relay.identities.sol) && (
+        <div className="mt-2 space-y-0.5 rounded-lg border border-zinc-800 bg-zinc-900/40 px-2.5 py-1.5 font-mono text-[9px] text-zinc-500" dir="ltr">
+          <div className="font-bold uppercase tracking-widest text-zinc-400">fleet identities (anchored manifest)</div>
+          {relay.identities.eth && <div className="truncate">eth {relay.identities.eth}</div>}
+          {relay.identities.sol && <div className="truncate">sol {relay.identities.sol}</div>}
+          {relay.ethIntents && relay.ethIntents.length > 0 && (
+            <div className="truncate text-violet-300/80">eip-191 intent h{relay.ethIntents[0].height} · sig verified: {String(relay.ethIntents[0].verified)}</div>
+          )}
+        </div>
+      )}
 
       <p className="mt-2 font-mono text-[10px] text-zinc-600" dir="ltr">
         breaker trips {relay ? fmtInt(relay.metrics.breakerTrips) : "…"} · econ waits {relay ? fmtInt(relay.metrics.economicWaits) : "…"} · queue {relay ? fmtInt(relay.queue) : "…"}
@@ -699,14 +1157,33 @@ export default function DexTerminal() {
   const [marketKey, setMarketKey] = useState<string>("");
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const relay = useRelayStream(world?.version);
-  const myOrders = useMyOrders(world?.version);
+  const showcase = useShowcase();
+  const settle = useSettleDesk();
+  const [stabilizing, setStabilizing] = useState(false);
 
   const flash = useCallback((tone: "ok" | "err", text: string) => {
     setMsg({ tone, text });
     setTimeout(() => setMsg(null), 4000);
   }, []);
+
+  const stabilizeNow = useCallback(async () => {
+    setStabilizing(true);
+    try {
+      const r = await fetch(api("/api/dex/settle"), { method: "POST" });
+      const j = (await r.json()) as { ok: boolean; pushed?: { kind: string; detail: string }[] };
+      if (j.ok) flash("ok", `ייצוב: ${j.pushed?.map((p) => p.detail).join(" · ") || "הפרמטרים הודקו"}`);
+      else flash("err", "פעולת-הייצוב נדחתה");
+      void settle.refresh();
+      void load();
+    } catch {
+      flash("err", "כשל-רשת בייצוב");
+    } finally {
+      setStabilizing(false);
+    }
+  }, [flash, load, settle]);
+
+  const relay = useRelayStream(world?.version);
+  const myOrders = useMyOrders(world?.version);
 
   const post = useCallback(async (url: string, body?: unknown) => {
     setBusy(true);
@@ -727,7 +1204,8 @@ export default function DexTerminal() {
     if (!world) return undefined;
     const picked = world.markets.find((m) => m.key === marketKey);
     if (picked) return picked;
-    return [...world.markets].sort((a, b) => b.chart.length - a.chart.length)[0] ?? world.markets[0];
+    // הזוג-הריבוני הוא ברירת-המחדל-הבלעדית — SAOS הוא המלך
+    return world.markets.find((m) => m.key === "SAOS/USDS") ?? world.markets[0];
   }, [world, marketKey]);
 
   const opWallet = world?.wallets.find((w) => w.name === "operator");
@@ -749,7 +1227,7 @@ export default function DexTerminal() {
               <h1 className="text-base font-black tracking-tight text-zinc-50">
                 SAOS-DEX <span className="font-mono text-amber-400">SOVEREIGN TERMINAL</span>
               </h1>
-              <p className="text-[10px] text-zinc-500">ספר-הזמנות דטרמיניסטי · בריכות 30bps · עיגון-חי Steem/Hive/TRON</p>
+              <p className="text-[10px] text-zinc-500">ספר-דטרמיניסטי · ארנה-אוטונומית · עיגון-ריבוני ×5 רשתות · SAOS במרכז</p>
             </div>
           </div>
 
@@ -773,7 +1251,12 @@ export default function DexTerminal() {
             </Pill>
             <Pill tone="violet">TPS {st ? fmtInt(st.tps) : "…"}</Pill>
             <Pill tone="zinc">root {st ? shortHash(st.stateRoot, 8) : "…"}</Pill>
-            <Pill tone="amber">SIM — ספר-ריבוני, אין כסף-אמת</Pill>
+            {market?.key === "SAOS/USDS" && (
+              <Pill tone="gold" testid="header-sovereign-pill">
+                <Crown className="h-3 w-3" aria-hidden /> SOVEREIGN MARKET
+              </Pill>
+            )}
+            <Pill tone="amber" testid="header-sim-pill">SIM book · REAL-money audited ×5</Pill>
           </div>
         </div>
       </header>
@@ -787,6 +1270,17 @@ export default function DexTerminal() {
       )}
 
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-4">
+        {/* ═════ פאנל-הכתר: SAOS SOVEREIGN METRICS — ההוכחה החיה בראש-המסך ═════ */}
+        <SovereignMetricsPanel showcase={showcase.data} loading={showcase.loading} rerun={showcase.rerun} />
+
+        {/* ═════ עמדת-הסליקה: SIM→REAL — סוכנים-נבחנים · כסף-אמת · השוק-יושב ═════ */}
+        <div className="mt-4">
+          <SettlementDeskPanel
+            report={settle.data} loading={settle.loading} refresh={settle.refresh}
+            stabilize={() => void stabilizeNow()} stabilizing={stabilizing}
+          />
+        </div>
+
         {/* ═════ מבנה 3-טורי מחייב: 20% Watchlist · 50% גרף+ספר · 30% מסחר+בריאות ═════ */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-10">
           {/* ─── טור-שמאל (20%): רשימת-שווקים ─── */}
@@ -895,7 +1389,7 @@ export default function DexTerminal() {
       <footer className="mt-auto border-t border-zinc-800 bg-zinc-950">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-2 px-4 py-3 text-[10px] text-zinc-600" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <span className="flex items-center gap-1.5">
-            <Bot className="h-3.5 w-3.5" /> סימולציה-ריבונית — ספר-מקומי, אין כסף-אמת, אין הבטחות-תשואה
+            <Bot className="h-3.5 w-3.5" /> ספר-SIM ריבוני — חשבונאות-מדויקת-בברזל, נבחנת-מול כסף-אמת ועיגון-חי ×5 רשתות · אין הבטחות-תשואה
           </span>
           <span className="flex items-center gap-3">
             <span className="flex items-center gap-1"><Anchor className="h-3.5 w-3.5" /> עיגון חי · {relay ? `${fmtInt(relay.metrics.verified)} verified` : "…"}</span>
