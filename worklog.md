@@ -402,3 +402,23 @@ Work Log:
 
 Stage Summary:
 - SAOS is now center-stage and fully accounted for: 13/13 soldiers live on Steem, 23 measured loops, grid98's honesty engine (383,836 refused trades as proof of discipline), 1:1 wrapped economy with public mint evidence, cross-paradigm identity anchoring, and a zero-fee TRON checkpoint rail — all demonstrable in one browser tab with zero mock data. The folklore "130K tx/s" was replaced by the measured 32,603 tx/s. The honest gaps (no SAOS token schedule, ETH/SOL rails undeployed, dust-scale soldier economics, MEV) are documented as gaps. Everything pushed to main.
+
+---
+Task ID: PERF-PROOF
+Agent: Z.ai Code (main) — System Owner Mode
+Task: הוכחת ביצועים + מסקנות ביצועיות — fix server, prove the 3 live demos in browser, write docs/what-we-can-do-now.md, push.
+
+Work Log:
+- Inventory first: dev.log showed clean 200s (server was NOT down this session); git at 5a563b9 with SAOS Breakthrough (14ce9c1) already committed — 3 demo routes + ProofLab UI + saos libs existed from previous session; verified each live rather than trusting.
+- Server verification: /api/system/health → 200, 7/7 networks ONLINE, 2 live rails, 0 critical issues.
+- Discovered gap #1: /api/saos/hub (the owner's curl target) did not exist — only /api/eco/saos-hub. Created src/app/api/saos/hub/route.ts as canonical alias to saosHubCached(); verified HTTP 200 with full payload (core/engine/gates/soldiers/loops/pools/oracle/wrapped/tronBridge/anchors/facts/delegations).
+- Demo 1 live-proof: POST /api/saos/anchor-verify {headcorner} → ok:true, sameScalarProof:true; on-chain anchor trx 53e4c7e4db38ef45d6… block 109,389,994 (anchored 11 min before measurement — live stream); EIP-191 recovery == claimed EVM 0xF723186d21179672Ca6d9fc526Ffb718dbD99376; Steem+Hive same key bytes measured; Blurt honestly null (RPC unreachable).
+- Demo 2 live-proof: GET /api/saos/grid98-bench → real production engine (grid98.cjs --bench 20000) replayed 2,939,116 real archive txs in 20.0s = 146,956 tx/s measured now (12.7B/day ceiling); honesty gates: skippedForEdge 401,084 / rejected 130,499 / edgeLeak 109,919µ; 39.8MB archive provenance in runLog.
+- Demo 3 live-proof: GET /api/saos/fleet-status → 13/13 soldiers above RC floor (>10%); full SP/VP/RC per soldier; live ops minutes-old (headcorner custom_json 3m, ynet transfer 125m, powerspan reserve 4,141m — real, not staged).
+- Terminology reconciled: PROOFS/SOLDIER FLEET = 13 Steem soldiers; SAOS HUB roster = 19 rows (13 army + 6 TRON ring) — counted 19 "show live status" rows in the browser a11y tree; both numbers now documented honestly.
+- Browser verification (agent-browser): PROOFS tab renders all 3 demos; golden paths: Demo1 click VERIFY → "PROVEN" verdict with full proof chain (EVM addr, active key, anchor tx link, STEEM SAME KEY + HIVE SAME KEY + BLURT N/A honest note); Demo3 click headcorner → expanded detail (VP 28.79%, LAST ACTIVITY) via toggle; Demo2 click RUN LIVE BENCHMARK (15s) → UI-measured 117,305 TPS with live comparison bars (Ethereum 15 / Solana 2,000 / Grid98 "this run") + engine honesty note + provenance; SAOS HUB roster interactive (soldier detail opens); mobile 390px scrollW==390 (no h-scroll); desktop footer pushed naturally on long content; console clean, zero page errors; dev.log clean after all interactions.
+- lint: 0 errors in src/ (all 599 errors confined to .grid98-lab/ external cloned engine code — gitignored, frozen production engine, not our code).
+- Wrote docs/what-we-can-do-now.md: 3 proven capabilities with today's measured numbers + verification commands appendix; 4 business models each with problem/solution/revenue-path/missing-piece (all financial figures labeled speculative: Identity $3.6M/yr, HFT $6M/yr, Fleet-a-a-S $2M/yr, Bridge $1.8M/yr); "easiest start" = Model 1 with rationale (engine live, public on-chain proof, zero contract deployment, $0 cost) + concrete 4-week plan (metered API → npm SDK → outreach to 10 DeFi protocols → 3 pilot customers) with honest success criterion.
+
+Stage Summary:
+- The owner's four deliverables are done: server verified stable (7/7, 0 critical), 3 demos browser-proven with golden paths (PROVEN verdict · 117K–147K TPS live-measured from the UI · 13/13 fleet), docs/what-we-can-do-now.md grounded entirely in today's measurements with speculative labels on all money numbers, and /api/saos/hub now exists as the canonical endpoint. The 13-vs-19 soldier discrepancy is resolved and documented. Pushed to main.
