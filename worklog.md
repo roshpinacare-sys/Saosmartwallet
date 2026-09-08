@@ -422,3 +422,20 @@ Work Log:
 
 Stage Summary:
 - The owner's four deliverables are done: server verified stable (7/7, 0 critical), 3 demos browser-proven with golden paths (PROVEN verdict · 117K–147K TPS live-measured from the UI · 13/13 fleet), docs/what-we-can-do-now.md grounded entirely in today's measurements with speculative labels on all money numbers, and /api/saos/hub now exists as the canonical endpoint. The 13-vs-19 soldier discrepancy is resolved and documented. Pushed to main.
+
+---
+Task ID: AUDIT-RESP
+Agent: Z.ai Code (main) — System Owner Mode
+Task: מענה לביקורת הפורנזית הבלתי-תלויה (FORENSIC-AUDIT + ADDENDUM) — בדיקת אבטחה מלאה של Saosmartwallet (סעיף C + פעולת-חירום 6), תיקון מה שניתן מכאן, תיעוד מה נשאר לבעלים.
+
+Work Log:
+- קריאת שני מסמכי הביקורת (נדחפו ל-remote בין-הסשנים, ce1a26d): 3 עותקי כספת עם סיסמה גלויה בריפואים אחרים · עוגן ETH mainnet אמיתי מאומת (block 25,929,672 status 0x1) · אי-עקביות חשבונאית בספר העוגנים של saos-dex · PAT מלא-הרשאות · daemons חיים · דרישה מפורשת לבדוק את Saosmartwallet.
+- ביקורת הכספת שלנו (קוד): initialize() צורך סיסמה ומשאיר רק verifier Argon2id (memoryKiB 65536/iter 3/hashLen 32 + salt); addKey אוטם WIF מיד seal(utf8(wif), derivedKey); revealKeyFor = יציאה-גלויה יחידה מאחורי unlock+policy+revocation; תשובות API metadata בלבד; אפס console.log של סודות; אפס localStorage/sessionStorage/indexedDB בקומפוננטות.
+- הוכחה אמפירית חיה: lifecycle מבוקר (init+unlock עם סיסמת-בדיקה ייחודית) → סריקת בייטים של db/custom.db → 0 מופעי סיסמה; פענוח stateJson מ-SQLite → keys:{}, אפס שדות wif/private/secret/pass, verifier בלבד; התאמות שוליים פוענחו כ-public keys (STM…) ב-audit metadata + genesisHash — לא סודות.
+- היגיינת git: אפס tracked env/secret/pem/key; סריקת היסטוריה ל-WIF → 2 התאמות בתבניות-HTML של skills → base58check לא-תקין = אקראיות; אפס טוקנים.
+- reset למסירה: VaultState+AuditEvent deleteMany → GET /api/vault/status = initialized:false (משמעת M4).
+- תקלת-תשתית שנפתרה בדרך: השרת נפל אחרי kill-מכוון לצורך ה-reset; התברר שכל תהליך שמושגר מה-agent (nohup/setsid/disown/plain&) נחתך תוך ~45 שניות ע"י harness cgroup cleanup; המנגנון היחיד ששורד = .zscripts/dev.sh הרשמי (disown → אימוץ PID 1) עם stdin מנותק (< /dev/null — בלי זה prisma db push נתקע בהמתנה ל-TTY prompt). השרת חזר ויציב (health 200 / saos-hub 200 / vault clean).
+- docs/security-review-response.md: מענה ממצא-למצא — A/B/D/E עם בדיקה מקומית + הפניית בעלים; C = גוף הביקורת עם 6 סעיפי הוכחה; סעיף שאריות-סיכון כנות (DB לא מוצפן במנוחה, hot-stored סיווג, אין rate-limit ל-unlock, auto-lock 300s); רשימת 6 פעולות-בעלים (PAT, daemons, שריפה, מחיקה מ-3 הריפואים, ממשל 3 מסלולים, אינווריאנט עוגנים).
+
+Stage Summary:
+- Saosmartwallet עבר את הביקורת שדרשה אותה: הפגם של סיסמה-גלויה לא קיים כאן והוכח אמפירית (0 מופעים ב-DB אחרי lifecycle מלא). הכספת הוחזרה למצב מסירה נקי. הסיכון האמיתי — מפתחות fleet שרופים, PAT, daemons — מתועד כפעולות-בעלים בלבד. תשתית: מנגנון השרדות-השרת פוענח ומתועד (.zscripts/dev.sh + stdin detach). Pushed to main.
