@@ -1,0 +1,36 @@
+{
+  "name": "saos-id-verify",
+  "version": "0.1.0",
+  "description": "Official TypeScript client for the SAOS metered Identity Verification API — one secp256k1 scalar proven across Steem/Hive(+Blurt per the on-chain claim)+EVM, with on-chain anchor evidence. Zero dependencies.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "steem",
+    "hive",
+    "blurt",
+    "evm",
+    "identity",
+    "verification",
+    "cross-chain",
+    "secp256k1",
+    "saos"
+  ]
+}

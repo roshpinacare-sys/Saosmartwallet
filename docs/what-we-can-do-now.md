@@ -193,8 +193,25 @@ Ethereum L1 ~15 tx/s · Solana (real-world) ~2,000–4,000 tx/s · Grid98 — ה
 > פער-כנות שנשאר משבוע 1: ה-console היא owner-side (בלי auth לניהול-מפתחות)
 > כי ה-sandbox הוא מכונת-הבעלים; multi-tenant auth זה פריט שבוע 2+.
 
-**שבוע 2 — SDK דק:** חבילת JS אחת (`saos-id-verify`) שעוטפת את ה-API + דוגמת
-3-שורות לאינטגרציה. פרסום npm ציבורי.
+**שבוע 2 — SDK דק: ✅ הושלם באותו יום (2026-09-08).** חבילה
+`packages/saos-id-verify/` — לקוח TypeScript רשמי, אפס תלויות, fetch טהור
+(Node ≥18/Bun/Deno/דפדפן/edge):
+- טיפוסים משוכפלים byte-for-byte מה-API החי (PROVEN @block 109,389,994 ·
+  FAILED · 401) — union מטופס `VerifyProven | VerifyNotProven` + `rateLimit`
+  מ-parsing של `X-RateLimit-*`.
+- מחלקות שגיאה fail-closed: `SaosAuthError` (401) · `SaosQuotaError` (429,
+  כולל `retryAt`) · `SaosApiError` · `SaosNetworkError`. `baseUrl` חובה —
+  הלקוח מסרב להמציא endpoint.
+- **בנייה הוכחה:** `tsc` strict → `dist/` (ESM + declarations) נקי.
+- **דוגפוד חי דרך ה-SDK עצמו** (`tools/m1-w2-sdk-dogfood.ts`): PROVEN
+  `sameScalarProof=true` @block 109,389,994, latency 4,127ms, quota 3→4
+  (כולל FAILED שנספר בכנות), headers limit=1000/remaining/reset — ואז גם
+  **הארטיפקט המקומפל** (dist) אומת חי: PROVEN + 401.
+- אינטגרציה ב-console: טאב DEVELOPER → בלוק "OFFICIAL SDK" עם דוגמת
+  3-השורות (מייצרת את ה-snippet עם ה-origin וה-username החיים).
+- פער-כנות: `npm publish` בפועל היא פעולת-בעלים (דורשת credentials ל-registry);
+  החבילה publish-ready (build+files+README). הענף 429 נשאר לא-נשרף-חי, כמו
+  בשבוע 1.
 
 **שבוע 3 — Outreach ממוקד:** רשימה של 10 פרוטוקולי DeFi שיש להם חשיפה
 למשתמשי Steem/Hive (עסקאות curation, משחקים, social-fi) — לכל אחד דוא"ל אחת
