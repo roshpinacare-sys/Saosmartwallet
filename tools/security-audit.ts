@@ -113,6 +113,8 @@ async function main() {
 
   const WIF_RE = /\b5[KJ][1-9A-HJ-NP-Za-km-z]{50}\b/;
   const PEM_RE = /-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY( BLOCK)?-----/;
+  const TOKEN_RE =
+    /\b(gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|ASIA[0-9A-Z]{16}|sk-ant-[A-Za-z0-9_-]{30,})\b/;
   const HIGH_ENTROPY_RE =
     /(?:secret|password|token|apikey|api_key|private_key|privkey)\s*[:=]\s*["'][A-Za-z0-9+/_-]{32,}["']/gi;
 
@@ -129,6 +131,7 @@ async function main() {
     const hit =
       (WIF_RE.test(content) && "WIF private key") ||
       (PEM_RE.test(content) && "PEM private key block") ||
+      (TOKEN_RE.test(content) && "platform token (gh/AWS/Google/Anthropic)") ||
       (HIGH_ENTROPY_RE.test(content) && "hardcoded high-entropy secret assignment");
     if (hit) {
       secretPatternFiles += 1;
