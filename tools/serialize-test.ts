@@ -105,7 +105,7 @@ function cryptoSelfTests(): void {
   const recoveredPub = secp256k1
     .Signature.fromBytes(new Uint8Array(sig65.subarray(1)), "compact")
     .addRecoveryBit(sig65[0] - 31)
-    .recoverPublicKey(digest, { prehash: false })
+    .recoverPublicKey(digest)
     .toBytes(true);
   check("sign→recover returns the signer's public key", Buffer.from(recoveredPub).equals(Buffer.from(pub.bytes)));
   check("verify() accepts own signature", pub.verify(digest, sig65));
@@ -302,7 +302,7 @@ async function networkTests(rpcUrl: string, samples: number): Promise<void> {
         new Uint8Array(
           secp256k1.Signature.fromBytes(new Uint8Array(sig65.subarray(1)), "compact")
             .addRecoveryBit(sig65[0] - 31)
-            .recoverPublicKey(digest, { prehash: false })
+            .recoverPublicKey(digest)
             .toBytes(true),
         ),
       );

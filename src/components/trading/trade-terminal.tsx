@@ -6,8 +6,10 @@
  * the limit_order_create payload with BigInt math, stamps ref-block fields via
  * SteemAdapter.buildOperations, serializes with the oracle-verified engine and
  * returns an UNSIGNED preview. The dialog shows the exact bytes + digest.
- * Signing is gated (keystore ships in packages/core, M2) — this terminal
- * cannot broadcast, by construction.
+ * The user-entered price rides along into the SignOrderRequest so the vault's
+ * signing rebuild reproduces the previewed order exactly (byte-identical
+ * inputs); ref-block/60s fields are re-stamped fresh at sign time by design.
+ * Signing + broadcast are policy-gated through /api/vault/sign (M2 vault).
  */
 
 import { useMutation } from "@tanstack/react-query";
@@ -56,8 +58,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Side = "buy" | "sell";
 
-/** Builds the M2 SignOrderRequest from the M1 unsigned preview (STEEM leg, SBD-per-STEEM price). */
-function signRequestFromPreview(preview: BuildOrderResponse): SignOrderRequest {
+/** Builds the M2 SignOrderRequest from the M1 unsigned preview (STEEM leg, SBD-per-STEEM price).
+ *  `price` = the user-entered limit price — passed verbatim so the signing
+ *  rebuild reproduces the previewed amounts exactly (the lossy effectivePrice
+ *  round-trip on sells could shift min_to_receive by 1 satoshi). */
+function signRequestFromPreview(preview: BuildOrderResponse, price: string): SignOrderRequest {
   const leg = (s: string) => /^([\d.]+)/.exec(s)?.[1] ?? "0";
   const p = preview.operation.payload;
   return {
@@ -65,7 +70,7 @@ function signRequestFromPreview(preview: BuildOrderResponse): SignOrderRequest {
     account: p.owner,
     side: preview.side,
     amount: preview.side === "buy" ? leg(p.min_to_receive) : leg(p.amount_to_sell),
-    price: (Number(preview.effectivePrice) / 1e6).toFixed(6),
+    price,
     fillOrKill: p.fill_or_kill,
     orderid: p.orderid,
     orderExpiration: Math.floor(new Date(p.expiration).getTime() / 1000),
@@ -95,7 +100,9 @@ export function TradeTerminal() {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: feed } = useMarketFeed();
-  const { data: wallet } = useWallet(account);
+  // walletOk (isSuccess, not just data) — balance checks must FAIL CLOSED when
+  // the wallet hasn't loaded instead of silently passing the 0-balance guard.
+  const { data: wallet, isSuccess: walletOk } = useWallet(account);
 
   // store → local state sync using React's adjust-during-render pattern
   // (no effects — avoids cascading renders and satisfies set-state lint)
@@ -132,9 +139,10 @@ export function TradeTerminal() {
 
   const valid =
     ACCOUNT_RE.test(account) &&
+    walletOk &&
     priceNum > 0 &&
     amountNum > 0 &&
-    (side === "buy" ? sbdBalance === 0 || total <= sbdBalance * 1.0001 : steemBalance === 0 || amountNum <= steemBalance * 1.0001);
+    (side === "buy" ? total <= sbdBalance * 1.0001 : amountNum <= steemBalance * 1.0001);
 
   const build = useMutation({
     mutationFn: () =>
@@ -363,18 +371,20 @@ export function TradeTerminal() {
         {!valid && account && (amountNum > 0 || priceNum > 0) ? (
           <p className="flex items-center gap-1.5 text-[10px] text-[var(--warning)]">
             <Ban className="h-3 w-3" />
-            {side === "buy"
-              ? total > sbdBalance && sbdBalance > 0
-                ? "cost exceeds tracked SBD balance"
-                : "enter a valid price, amount and tracked account"
-              : amountNum > steemBalance && steemBalance > 0
-                ? "amount exceeds tracked STEEM balance"
-                : "enter a valid price, amount and tracked account"}
+            {!walletOk
+              ? "track the account first — balances must load before building an order"
+              : side === "buy"
+                ? total > sbdBalance
+                  ? "cost exceeds tracked SBD balance"
+                  : "enter a valid price and amount"
+                : amountNum > steemBalance
+                  ? "amount exceeds tracked STEEM balance"
+                  : "enter a valid price and amount"}
           </p>
         ) : null}
       </div>
 
-      <OrderPreviewDialog open={dialogOpen} onOpenChange={setDialogOpen} preview={preview} />
+      <OrderPreviewDialog open={dialogOpen} onOpenChange={setDialogOpen} preview={preview} price={priceNum > 0 ? priceNum.toFixed(6) : null} />
     </section>
   );
 }
@@ -383,16 +393,19 @@ function OrderPreviewDialog({
   open,
   onOpenChange,
   preview,
+  price,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   preview: BuildOrderResponse | null;
+  /** The user-entered limit price — the byte-exact rebuild input. */
+  price: string | null;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [signOpen, setSignOpen] = useState(false);
   const { data: vaultStatusData } = useVaultStatus();
   const vault = vaultStatusData?.status ?? null;
-  const signRequest = preview ? signRequestFromPreview(preview) : null;
+  const signRequest = preview && price ? signRequestFromPreview(preview, price) : null;
   const copy = async (label: string, value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -418,6 +431,8 @@ function OrderPreviewDialog({
                 {preview.side.toUpperCase()} · {preview.operation.payload.amount_to_sell} → {preview.operation.payload.min_to_receive}
                 {" · "}
                 effective {fmtPrice(Number(preview.effectivePrice) / 1e6)} SBD/STEEM
+                {" · "}
+                digest is re-stamped at sign time (fresh ref-block + 60s window)
               </>
             ) : null}
           </DialogDescription>

@@ -139,7 +139,8 @@ export class SteemMarketClient {
     const priceStr = e.real_price;
     const steemSat = e.steem;
     const sbdSat = e.sbd;
-    if (typeof priceStr !== "string" || !Number.isFinite(steemSat) || !Number.isFinite(sbdSat)) return null;
+    if (typeof priceStr !== "string" || typeof steemSat !== "number" || typeof sbdSat !== "number") return null;
+    if (!Number.isFinite(steemSat) || !Number.isFinite(sbdSat)) return null;
     const priceNum = Number(priceStr);
     if (!Number.isFinite(priceNum) || priceNum <= 0) return null;
     return {
@@ -201,9 +202,12 @@ export class SteemMarketClient {
 
   /**
    * Recent fills. Fetches the window [now−windowHours, now+2min] and returns
-   * NEWEST-first. Caveat: if the window contains more than `limit` fills the
-   * node returns the oldest `limit` — irrelevant for the thin internal market
-   * at current volume, re-checked by callers via presence of data.
+   * NEWEST-first. The node's condenser_api.get_trade_history only iterates
+   * ASCENDING (verified live 2026-09-08: a descending start>stop call returns
+   * an empty result), so with more than `limit` fills in the window it returns
+   * the OLDEST `limit` — callers must request the full upstream window (the
+   * /api/steem/history route fetches up to 1,000 and slices the newest tail
+   * itself). Documented bound, not a silent lie.
    */
   async tradeHistory(limit = 50, windowHours = 48): Promise<TradeFill[]> {
     const n = Math.min(1000, Math.max(1, Math.floor(limit)));

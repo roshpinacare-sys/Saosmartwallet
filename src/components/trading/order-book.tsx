@@ -19,8 +19,10 @@ import { cn } from "@/lib/utils";
 
 const LADDER_ROWS = 8;
 
+const POLL_MS = 5_000;
+
 export function OrderBook({ onPickPrice }: { onPickPrice: (price: string, sideHint: "bid" | "ask") => void }) {
-  const { data, isFetching, isError, error } = useOrderBook(25);
+  const { data, isFetching, isError, error, dataUpdatedAt } = useOrderBook(25);
   const { data: feed } = useMarketFeed();
 
   const { asksView, bidsView, maxTotal } = useMemo(() => {
@@ -30,18 +32,25 @@ export function OrderBook({ onPickPrice }: { onPickPrice: (price: string, sideHi
     return { asksView: asks, bidsView: bids, maxTotal: max };
   }, [data]);
 
+  // Depth chart amounts in STEEM: satoshis here are precision-3 (1 STEEM = 1e3 sats).
   const depth = useMemo(
     () => ({
-      asks: (data?.asks ?? []).slice(0, 14).map((l) => ({ priceNum: l.priceNum, amount: l.steemSatoshis / 1e6 })),
-      bids: (data?.bids ?? []).slice(0, 14).map((l) => ({ priceNum: l.priceNum, amount: l.steemSatoshis / 1e6 })),
+      asks: (data?.asks ?? []).slice(0, 14).map((l) => ({ priceNum: l.priceNum, amount: l.steemSatoshis / 1e3 })),
+      bids: (data?.bids ?? []).slice(0, 14).map((l) => ({ priceNum: l.priceNum, amount: l.steemSatoshis / 1e3 })),
     }),
     [data],
   );
 
   const last = feed ? Number(feed.ticker.latest) : null;
-  const bestAsk = asksView.length > 0 ? asksView[asksView.length - 1].priceNum : NaN;
+  // asks are sorted cheapest-first — index 0 is the BEST ask
+  const bestAsk = asksView.length > 0 ? asksView[0].priceNum : NaN;
   const bestBid = bidsView.length > 0 ? bidsView[0].priceNum : NaN;
   const mid = Number.isFinite(bestAsk) && Number.isFinite(bestBid) ? (bestAsk + bestBid) / 2 : NaN;
+
+  // honesty: the badge must reflect data AGE, not just fetch success
+  const bookAge = dataUpdatedAt > 0 ? Math.max(0, Date.now() - dataUpdatedAt) : Infinity;
+  const stale = bookAge > POLL_MS * 2;
+  const ageLabel = bookAge === Infinity ? "—" : bookAge < 60_000 ? `${Math.round(bookAge / 1000)}s` : `${Math.floor(bookAge / 60_000)}m`;
 
   return (
     <section className="glass flex flex-col overflow-hidden" aria-label="Order book">
@@ -52,7 +61,8 @@ export function OrderBook({ onPickPrice }: { onPickPrice: (price: string, sideHi
         right={
           <div className="flex items-center gap-2">
             {isFetching ? <Loader2 className="h-3 w-3 animate-spin text-[var(--text-tertiary)]" aria-hidden /> : null}
-            <LiveBadge active={!isError} />
+            <span className="num text-[9px] uppercase tracking-[0.14em] text-[var(--text-tertiary)]">book {ageLabel} old</span>
+            <LiveBadge active={!isError && !stale} />
           </div>
         }
       />

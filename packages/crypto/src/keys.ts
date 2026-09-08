@@ -134,7 +134,7 @@ function parseCompact(sig65: Uint8Array): { recid: number; sig64: Uint8Array } {
 export function recoverFromCompact(sig65: Uint8Array, digest: Uint8Array): Uint8Array {
   const { recid, sig64 } = parseCompact(sig65);
   const base = secp256k1.Signature.fromBytes(sig64, "compact");
-  return new Uint8Array(base.addRecoveryBit(recid).recoverPublicKey(digest, { prehash: false }).toBytes(true));
+  return new Uint8Array(base.addRecoveryBit(recid).recoverPublicKey(digest).toBytes(true));
 }
 
 /**
@@ -145,7 +145,7 @@ function findRecoveryBit(sig64: Uint8Array, digest: Uint8Array, expectedPub33: U
   const base = secp256k1.Signature.fromBytes(sig64, "compact");
   for (const recid of [0, 1, 2, 3]) {
     try {
-      const recovered = new Uint8Array(base.addRecoveryBit(recid).recoverPublicKey(digest, { prehash: false }).toBytes(true));
+      const recovered = new Uint8Array(base.addRecoveryBit(recid).recoverPublicKey(digest).toBytes(true));
       if (Buffer.from(recovered).equals(Buffer.from(expectedPub33))) return recid;
     } catch {
       // wrong recid → invalid point; try next

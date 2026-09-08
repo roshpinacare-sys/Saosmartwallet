@@ -130,11 +130,29 @@ export interface BuildOrderResponse {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
-  const body = (await res.json()) as T | { ok: false; error: string };
-  if (!res.ok || !("ok" in body) || body.ok !== true) {
-    throw new Error(("error" in body && body.error) || `request failed (${res.status})`);
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    // non-JSON (HTML error page, empty body) — fail with a useful message
+    throw new Error(`request failed (${res.status}) — non-JSON response`);
   }
-  return body;
+  if (
+    !res.ok ||
+    typeof body !== "object" ||
+    body === null ||
+    (body as { ok?: unknown }).ok !== true
+  ) {
+    const msg =
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof (body as { error?: unknown }).error === "string"
+        ? (body as { error: string }).error
+        : `request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return body as T;
 }
 
 // ---------------------------------------------------------------------------

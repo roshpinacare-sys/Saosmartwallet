@@ -45,7 +45,8 @@ export function MarketStrip() {
   const spread = useMemo(() => {
     const ask = book?.asks?.[0]?.price ?? null;
     const bid = book?.bids?.[0]?.price ?? null;
-    return ask !== null && bid !== null ? ask - bid : null;
+    // prices arrive as node-computed decimal strings — subtract numerically
+    return ask !== null && bid !== null ? Number(ask) - Number(bid) : null;
   }, [book]);
 
   const sovBid = saos?.book?.bids?.[0]?.price ?? null;

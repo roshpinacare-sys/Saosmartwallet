@@ -102,7 +102,7 @@ export function satsToAmount(sats: bigint, precision: number): string {
 
 /** Convert a decimal human amount string to satoshis with fixed precision. */
 export function amountToSats(amount: string, precision: number): bigint {
-  const m = /^(-)?(\d+)(?:\.(\d{1,\d+}))?$/.exec(amount.trim());
+  const m = /^(-)?(\d+)(?:\.(\d+))?$/.exec(amount.trim());
   if (!m) throw new Error(`invalid amount: "${amount}"`);
   const sign = m[1] ? -1n : 1n;
   const whole = m[2] ?? "0";

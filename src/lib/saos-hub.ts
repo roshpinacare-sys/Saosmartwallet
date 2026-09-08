@@ -224,7 +224,7 @@ export interface SaosHubSnapshot {
   oracle: SaosNetSnapshot["oracle"];
   wrapped: SaosNetSnapshot["wrapped"];
   tronBridge: SaosNetSnapshot["tronBridge"];
-  anchors: Array<{ id: string; chain: string; cpHeight: number | null; txid: string; detail: string; explorer: string }>;
+  anchors: Array<{ id: string; chain: string; cpHeight: number | null; txid: string | null; detail: string; explorer: string | null }>;
   facts: HubFact[];
   delegations: Delegation[];
 }
