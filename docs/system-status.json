@@ -1,0 +1,434 @@
+{
+  "ok": true,
+  "generatedAt": "2026-09-08T00:45:43.252Z",
+  "summary": {
+    "networksUp": "7/7",
+    "liveRails": 2,
+    "gatedRails": 4,
+    "criticalIssues": 0
+  },
+  "checks": {
+    "networks": {
+      "latencyMs": 674,
+      "chains": [
+        {
+          "id": "steem",
+          "name": "STEEM",
+          "family": "Graphene",
+          "kind": "L1 public — internal market (our DEX)",
+          "stateAgeSeconds": null,
+          "probedAt": "2026-09-08T00:45:43.252Z",
+          "status": "online",
+          "headHeight": 109386112,
+          "lagSeconds": 1,
+          "headId": "06851980f00eb184",
+          "version": null,
+          "note": "live probe via M0/M1 SteemMarketClient"
+        },
+        {
+          "id": "hive",
+          "name": "HIVE",
+          "family": "Graphene",
+          "kind": "L1 public — anchor rail (RC-gated)",
+          "stateAgeSeconds": null,
+          "probedAt": "2026-09-08T00:45:43.253Z",
+          "status": "online",
+          "headHeight": 109720587,
+          "lagSeconds": 2,
+          "headId": "068a340b37f3973b82106ffcce20bc49b040eee3",
+          "version": null,
+          "note": "live probe api.hive.blog"
+        },
+        {
+          "id": "blurt",
+          "name": "BLURT",
+          "family": "Graphene",
+          "kind": "L1 public — anchor rail (canonical sig)",
+          "stateAgeSeconds": null,
+          "probedAt": "2026-09-08T00:45:43.255Z",
+          "status": "online",
+          "headHeight": 63449845,
+          "lagSeconds": 2,
+          "headId": "03c82af56a0f0a076b0f77505d1d9f3cd51860c0",
+          "version": null,
+          "note": "live probe blurt-rpc.saboin.com"
+        },
+        {
+          "id": "tron",
+          "name": "TRON",
+          "family": "TVM (DPoS)",
+          "kind": "L1 public — zero-fee anchor rail",
+          "stateAgeSeconds": null,
+          "probedAt": "2026-09-08T00:45:43.255Z",
+          "status": "online",
+          "headHeight": 86052183,
+          "lagSeconds": 5,
+          "headId": "0000000005210d57…",
+          "version": null,
+          "note": "live probe api.trongrid.io"
+        },
+        {
+          "id": "saos-net",
+          "name": "SAOS-NET",
+          "family": "Sovereign (deterministic kernel)",
+          "kind": "L1 shadow chain — anchored to Steem/Hive/TRON",
+          "probedAt": "2026-09-08T00:45:43.555Z",
+          "status": "online",
+          "headHeight": 54664,
+          "lagSeconds": null,
+          "stateAgeSeconds": 1343,
+          "headId": "b6e39110428ecffd…",
+          "version": "saos-net/0",
+          "note": "daemon-pushed state, 22m old (github: steem repo)"
+        },
+        {
+          "id": "ethereum",
+          "name": "ETHEREUM",
+          "family": "EVM",
+          "kind": "L1 public — settlement + ERC-20 wrapped economy (M3)",
+          "stateAgeSeconds": null,
+          "probedAt": "2026-09-08T00:45:43.257Z",
+          "status": "online",
+          "headHeight": 25929146,
+          "lagSeconds": 8,
+          "headId": null,
+          "version": "0.053958887 gwei baseFee",
+          "note": "live probe ethereum-rpc.publicnode.com"
+        },
+        {
+          "id": "solana",
+          "name": "SOLANA",
+          "family": "PoH + PoS",
+          "kind": "L1 public — SPL wrapped economy (M3)",
+          "stateAgeSeconds": null,
+          "probedAt": "2026-09-08T00:45:43.258Z",
+          "status": "online",
+          "headHeight": 445205020,
+          "lagSeconds": null,
+          "headId": null,
+          "version": "epoch 1030 · slot 245020/432000",
+          "note": "live probe api.mainnet-beta.solana.com"
+        }
+      ],
+      "error": null
+    },
+    "bridges": {
+      "latencyMs": 0,
+      "rails": [
+        {
+          "id": "relay-steem",
+          "rail": "SAOS-NET → STEEM",
+          "mechanism": "custom_json saos-dex.anchor.v1 (active authority), every checkpoint seal",
+          "status": "live",
+          "evidence": "latest: da6318197cfeaac6dbf10be7e6b30a8a5f583f07 (cp#54660) · 15 anchors in feed",
+          "explorer": "https://steemworld.org/tx/da6318197cfeaac6dbf10be7e6b30a8a5f583f07",
+          "lastActivityAt": null
+        },
+        {
+          "id": "bridge-tron",
+          "rail": "SAOS-NET ⇄ TRON",
+          "mechanism": "TRX transfer amounts bit-encode checkpoint hashes; 6-address ring, zero net fee",
+          "status": "live",
+          "evidence": "cp#33612 → 1db5006b8dbb305e… @ TRON blk 86019974 · anchors measured: 4",
+          "explorer": "https://tronscan.org/#/transaction/1db5006b8dbb305e1ea41c58ce3c86142c43b14680cfdf18adb8dd4928dc8a66",
+          "lastActivityAt": null
+        },
+        {
+          "id": "relay-hive",
+          "rail": "SAOS-NET → HIVE",
+          "mechanism": "custom_json anchors, RC-budgeted (8% floor / 12% heavy-op gates)",
+          "status": "gated",
+          "evidence": "verified historically (d4cf936b… @ blk 10,970,856) — currently RC-regen wait",
+          "explorer": null,
+          "lastActivityAt": null
+        },
+        {
+          "id": "relay-blurt",
+          "rail": "SAOS-NET → BLURT",
+          "mechanism": "canonical signature format eader‖r‖s (header=31+recid)",
+          "status": "gated",
+          "evidence": "anchored on-chain before (e3201815…, bfce11c8…) · RPC live now (blurt-rpc.saboin.com) — anchors resume when the fleet gate reopens",
+          "explorer": null,
+          "lastActivityAt": null
+        },
+        {
+          "id": "bridge-steem-ethereum",
+          "rail": "STEEM → ETHEREUM",
+          "mechanism": "custom_json saos_bridge_lock (Steem, active authority) + oracle-signed ERC-20 mint against a bridge contract",
+          "status": "gated",
+          "evidence": "ADAPTER LIVE (M3, eip155:1) · BRIDGE_ABI defined · no contract deployed on mainnet — lock op defined, mint awaits deployment",
+          "explorer": null,
+          "lastActivityAt": null
+        },
+        {
+          "id": "bridge-steem-solana",
+          "rail": "STEEM → SOLANA",
+          "mechanism": "custom_json saos_bridge_lock (Steem) + oracle-signed SPL mint against a Solana program",
+          "status": "gated",
+          "evidence": "ADAPTER LIVE (M3, solana:mainnet-beta) · program IDs staged · no program deployed — mint awaits deployment",
+          "explorer": null,
+          "lastActivityAt": null
+        }
+      ],
+      "analytics": {
+        "anchoredTotal": 4,
+        "checkpointsVerified": 1479,
+        "checkpointsTotal": 64,
+        "lastAnchor": {
+          "at": null,
+          "txid": "1db5006b8dbb305e1ea41c58ce3c86142c43b14680cfdf18adb8dd4928dc8a66",
+          "chain": "tron",
+          "cpHeight": 33612
+        },
+        "wrapped": [
+          {
+            "asset": "WSTEEM",
+            "supply": 632,
+            "locked": 632,
+            "holders": 12
+          },
+          {
+            "asset": "WBLURT",
+            "supply": 64.227,
+            "locked": 64.227,
+            "holders": 12
+          },
+          {
+            "asset": "ENERGY",
+            "supply": 49.5,
+            "locked": 50,
+            "holders": 12
+          },
+          {
+            "asset": "WTRX",
+            "supply": 22.924,
+            "locked": 22.924,
+            "holders": 11
+          },
+          {
+            "asset": "WSBD",
+            "supply": 0.26,
+            "locked": 0.26,
+            "holders": 1
+          },
+          {
+            "asset": "WSOL",
+            "supply": 0.096126117,
+            "locked": 0.096126117,
+            "holders": 2
+          },
+          {
+            "asset": "WETH",
+            "supply": 0.004009819,
+            "locked": 0.004009819,
+            "holders": 2
+          },
+          {
+            "asset": "WDOGE",
+            "supply": 0.004,
+            "locked": 0.004,
+            "holders": 0
+          },
+          {
+            "asset": "PHIVE",
+            "supply": 0.002,
+            "locked": 0.002,
+            "holders": 1
+          },
+          {
+            "asset": "WXRP",
+            "supply": 0.001,
+            "locked": 0.001,
+            "holders": 0
+          },
+          {
+            "asset": "WBTC",
+            "supply": 3e-9,
+            "locked": 3e-9,
+            "holders": 1
+          },
+          {
+            "asset": "WBTT",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WHTX",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WJST",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WNFT",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WSUN",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WTUSD",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WUSD1",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WUSDD",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          },
+          {
+            "asset": "WUSDT",
+            "supply": 0,
+            "locked": 0,
+            "holders": 0
+          }
+        ],
+        "sourcedAt": "2026-09-08T00:45:43.926Z"
+      },
+      "routes": {
+        "steemEthereum": {
+          "from": "steem",
+          "to": "ethereum",
+          "readiness": "gated",
+          "gateReason": "No bridge contract deployed on Ethereum mainnet — lock op defined, mint leg awaits verified contract (BRIDGE_ABI ready)",
+          "estimatedTime": 783,
+          "fee": [
+            {
+              "network": "steem",
+              "amount": "0",
+              "currency": "STEEM"
+            },
+            {
+              "network": "ethereum",
+              "amount": "0.00000864142192",
+              "currency": "ETH"
+            }
+          ]
+        },
+        "steemSolana": {
+          "from": "steem",
+          "to": "solana",
+          "readiness": "gated",
+          "gateReason": "No bridge program deployed on Solana mainnet — lock op defined, mint leg awaits deployed program (program IDs staged)",
+          "estimatedTime": 16,
+          "fee": [
+            {
+              "network": "steem",
+              "amount": "0",
+              "currency": "STEEM"
+            },
+            {
+              "network": "solana",
+              "amount": "0.000005",
+              "currency": "SOL"
+            },
+            {
+              "network": "solana",
+              "amount": "0.00203928",
+              "currency": "SOL"
+            }
+          ]
+        }
+      },
+      "routesLatencyMs": 286,
+      "error": null
+    },
+    "vault": {
+      "latencyMs": 2,
+      "reachable": true,
+      "initialized": false,
+      "locked": true,
+      "networks": 0,
+      "soldiers": 0,
+      "securityScore": 0,
+      "auditIntegrityOk": true,
+      "findings": [
+        "vault is not initialized — run initialize() to set a master password verifier"
+      ]
+    },
+    "dex": {
+      "latencyMs": 874,
+      "reachable": true,
+      "bids": 19,
+      "asks": 50,
+      "latest": "0.09692558184081984",
+      "spreadPercent": 0.15397703105060973,
+      "headBlock": 109386112,
+      "lagSeconds": 3
+    }
+  },
+  "issues": [
+    {
+      "component": "bridge:relay-hive",
+      "severity": "notice",
+      "detail": "SAOS-NET → HIVE gated — verified historically (d4cf936b… @ blk 10,970,856) — currently RC-regen wait",
+      "action": "resume/undeploy per rail gate (honest state, no fabrication)"
+    },
+    {
+      "component": "bridge:relay-blurt",
+      "severity": "notice",
+      "detail": "SAOS-NET → BLURT gated — anchored on-chain before (e3201815…, bfce11c8…) · RPC live now (blurt-rpc.saboin.com) — anchors resume when the fleet gate reopens",
+      "action": "resume/undeploy per rail gate (honest state, no fabrication)"
+    },
+    {
+      "component": "bridge:bridge-steem-ethereum",
+      "severity": "notice",
+      "detail": "STEEM → ETHEREUM gated — ADAPTER LIVE (M3, eip155:1) · BRIDGE_ABI defined · no contract deployed on mainnet — lock op defined, mint awaits deployment",
+      "action": "resume/undeploy per rail gate (honest state, no fabrication)"
+    },
+    {
+      "component": "bridge:bridge-steem-solana",
+      "severity": "notice",
+      "detail": "STEEM → SOLANA gated — ADAPTER LIVE (M3, solana:mainnet-beta) · program IDs staged · no program deployed — mint awaits deployment",
+      "action": "resume/undeploy per rail gate (honest state, no fabrication)"
+    },
+    {
+      "component": "route:steem->ethereum",
+      "severity": "notice",
+      "detail": "No bridge contract deployed on Ethereum mainnet — lock op defined, mint leg awaits verified contract (BRIDGE_ABI ready)",
+      "action": "deploy the bridge contract/program on the target chain"
+    },
+    {
+      "component": "route:steem->solana",
+      "severity": "notice",
+      "detail": "No bridge program deployed on Solana mainnet — lock op defined, mint leg awaits deployed program (program IDs staged)",
+      "action": "deploy the bridge contract/program on the target chain"
+    },
+    {
+      "component": "vault",
+      "severity": "notice",
+      "detail": "vault not initialized — first-boot ceremony pending (clean handoff state)",
+      "action": "run the VAULT tab setup wizard"
+    }
+  ],
+  "selfHealing": {
+    "rpcFailover": "adapters hold ordered endpoint books; a failed probe advances to the next endpoint automatically",
+    "vault": "fail-closed everywhere: locked/missing-key/policy-deny all block signing; audit chain is tamper-evident",
+    "broadcast": "broadcast is capability-gated per adapter — disabled by default, never enabled implicitly",
+    "stateAgePolicy": "SAOS-NET state age is surfaced (stateAgeSeconds) and degrades honestly — never hidden"
+  },
+  "meta": {
+    "generator": "tools/system-status.ts (M4 System Owner)",
+    "server": "http://localhost:3000",
+    "gitSha": "fcb931f"
+  }
+}

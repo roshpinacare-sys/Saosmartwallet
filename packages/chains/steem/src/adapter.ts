@@ -47,8 +47,12 @@ export function validateAccountName(name: string): string {
   if (name.length < 3 || name.length > 16) {
     throw new SerializationError(`account name length must be 3..16: "${name}"`);
   }
+  // steemd is_valid_account_name: total length 3..16; each dot-segment must be
+  // ≥ 3 chars, start [a-z], middle [a-z0-9-], end [a-z0-9]. There is NO
+  // per-segment maximum beyond the 16-char total — verified against mainnet:
+  // "steem-venezuela" (15-char single segment) is a live account since 2020-08-08.
   for (const segment of name.split(".")) {
-    if (segment.length > 13) throw new SerializationError(`account segment too long: "${segment}"`);
+    if (segment.length < 3) throw new SerializationError(`account segment too short: "${segment}"`);
     if (!/^[a-z][a-z0-9-]*$/.test(segment) || !/[a-z0-9]$/.test(segment)) {
       throw new SerializationError(`invalid account name: "${name}"`);
     }
