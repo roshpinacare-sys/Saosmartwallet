@@ -480,3 +480,22 @@ Work Log:
 
 Stage Summary:
 - הריפו חזר למצב-מסירה מבחינת git (0 dirty), מחוזק מבנית נגד חזרת הדימום (core.fileMode=false), והידע הנסתר של הסוכנים נאסף ומחובר: מסמכי-היסוד של wallet-design הפכו רשמית לרשימת-עבודות מדורגת עם ראיות-קוד (F/R delta), ההמלצה ההיסטורית של האינדקסר תועדה כפער פתוח, tests/ זוהה כנכס, tool-results סווג כראיית-ביקורת לשימור. 4 החלטות-בעלים ממתינות. Pushed to main.
+
+---
+Task ID: MODEL1-W2
+Agent: Z.ai Code (main) — System Owner Mode
+Task: Model 1, Week 2 — the thin official npm SDK `saos-id-verify`: a publish-ready TypeScript package wrapping the metered Identity Verification API, live-dogfooded through the SDK itself (including the compiled dist artifact), wired into the DEVELOPER console, docs, push. (Also: confirmed on resume that the previous session had already completed AGENT-SURVEY and pushed it as 92f1846 — HEAD==origin/main, working tree clean, survey doc complete; server patrol health/hub/keys/usage all 200.)
+
+Work Log:
+- Captured the live API shapes byte-for-byte BEFORE writing the client: PROVEN (200, ok:true, anchor/verify/chains/summary/meta + X-RateLimit headers limit=1000/remaining/reset), FAILED (200, ok:false, outcome FAILED, honest metering), 401 (fail-closed body). Created a real key via /api/developer/keys ("W2 SDK dogfood") for the dogfood run.
+- packages/saos-id-verify/ — zero-dependency TypeScript client, plain fetch (Node ≥18/Bun/Deno/browser/edge): typed `VerifyProven | VerifyNotProven` union with `rateLimit` parsed from X-RateLimit-* headers; fail-closed error classes SaosAuthError(401) / SaosQuotaError(429, retryAt) / SaosApiError / SaosNetworkError; SaosIdentity class + one-shot verifyIdentity(); AbortController timeout (default 30s); baseUrl REQUIRED — the client refuses to invent an endpoint; injectable fetch.
+- package.json publish-ready (exports map, files: dist+README, engines node>=18, no fictional version history); tsconfig.build.json strict → dist/ (ESM + declarations); package .gitignore for dist/; README with the 3-line example, outcomes table, provenance + honest gaps.
+- Build proven: `tsc -p tsconfig.build.json` clean → dist/index.js + index.d.ts.
+- Live dogfood THROUGH THE SDK (tools/m1-w2-sdk-dogfood.ts, run via bun): [1] PROVEN ok=true sameScalarProof=true @block 109,389,994, server latency 4,127ms, chains steem:SAME hive:SAME blurt:n/a, quota 3/1000, headers parsed (limit=1000 remaining=997 reset=1788912000); [2] FAILED honest metering proven — quota 3→4 on "__no_such_account_sdk_w2__" (real work metered, not an exception); [3] 401 fail-closed — SaosAuthError(status=401) thrown for an unknown key. ALL 3 PATHS PROVEN.
+- Compiled-artifact proof: the dist build (what an npm consumer actually gets) executed live against the running API — PROVEN (quota 5) + SaosAuthError 401. No mock layer anywhere.
+- Console wiring: DEVELOPER → TRY IT gained an "OFFICIAL SDK — saos-id-verify (npm · week 2 · live-dogfooded)" disclosure block next to the curl one, generating the snippet with the live origin + current username from state.
+- Docs: what-we-can-do-now.md Week 2 marked ✅ shipped same-day (build proof, dogfood numbers, honest gaps: npm publish = owner action requiring registry credentials; 429 branch still not live-burned); README package table gained the saos-id-verify row + tools table gained the dogfood row + DEVELOPER tab row mentions the SDK block.
+- Browser verification (agent-browser): DEVELOPER tab renders; SDK block expands with real content (open:true, live origin http://localhost:3000, username headcorner, install line, honesty note); golden path RUN VERIFY via UI → OUTCOME PROVEN, LATENCY 3,743ms, QUOTA 6/1000 (994 remaining), anchor link to steemworld.org/tx/53e4c7e4… present; console clean (only React DevTools info + HMR), zero page errors; mobile 390 scrollW==390 (no h-scroll, SDK block visible), desktop 1440 clean; lint clean; dev.log clean.
+
+Stage Summary:
+- Model 1 Week 2 is DONE same-day: the identity verification now has its official SDK — a real, publish-ready npm package (strict build + declarations), proven not by claims but by executing the SDK itself AND its compiled artifact against the live metered API (PROVEN / FAILED-with-honest-metering / 401). The 3-line integration example in the console is generated from the real shipped API. Remaining honest gaps are owner actions: npm publish (registry credentials) and the 429 live-burn. Next step per plan: Week 3 — targeted outreach to 10 DeFi protocols with the live proof link. Pushed to main.

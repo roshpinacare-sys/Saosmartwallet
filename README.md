@@ -40,8 +40,10 @@
 | [`packages/chains/ethereum/`](./packages/chains/ethereum/) | EthereumAdapter (EIP-1559) — build/sign + ERC-20 + EIP-55 נגזרת ממפתח ה-vault · broadcast נעול | ✅ M3 |
 | [`packages/chains/solana/`](./packages/chains/solana/) | SolanaAdapter (Ed25519) — build/sign + SPL read · broadcast נעול | ✅ M3 |
 | [`packages/bridges/`](./packages/bridges/) | שכבת גשרים: router (מציאת-נתיב + quotes עמלות חיות) · monitor (סטטוס-מסילות מה-state החי) | ✅ M3 |
+| [`packages/saos-id-verify/`](./packages/saos-id-verify/README.md) | **ה-SDK הרשמי של Model 1 (שבוע 2):** לקוח TypeScript אפס-תלויות ל-`POST /api/v1/identity/verify` — union מטופס PROVEN/FAILED, מחלקות 401/429 fail-closed, parsing של X-RateLimit; build strict tsc → dist/ publish-ready | ✅ דוגפוד חי (PROVEN+FAILED+401 דרך ה-SDK וגם דרך dist) |
 | `tools/serialize-test.ts` | סוויטת אימות מול chain חי | ✅ **30/30 PASS** |
 | `tools/m1-op-test.ts` | סוויטת limit_order_create מול oracle | ✅ **27/27 PASS** |
+| `tools/m1-w2-sdk-dogfood.ts` | דוגפוד חי של SDK `saos-id-verify` מול ה-API הממוסחר (PROVEN/FAILED/401 דרך ה-SDK) | ✅ **3/3 PATHS** |
 | `tools/m3-adapter-check.ts` | סוויטת ETH/SOL מול mainnet חי (health/info/ERC20/SPL/build/sign/fail-closed) | ✅ **23/23 PASS** |
 
 **קריטריוני קבלה שעברו מול ה-chain האמיתי** (קריאה-בלבד): serialization **זהה ביט-אחר-ביט** ל-serializer של הצומת עצמו (10/10 עסקאות) · sha256 על ה-bytes שלנו = `transaction_id` מה-chain (10/10) · חתימות אמיתיות מה-chain משוחזרות בדיוק למפתחות ה-authority של החותם — הוכחת מסלול חתימה מלא בלי שידור.
@@ -91,7 +93,7 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 | **WALLET** | יתרות/SP/RC/פקודות פתוחות + **M3: חיפוש כתובות ETH (native+ERC-20) ו-SOL (native+SPL)** + סטטוס הכספת | api.steemit.com + adapters |
 | **VAULT** | Sovereign Key Vault: wizard 6-שלבי (**7 רשתות**) · Policy Engine · Backup/Shamir/Social/Dead-man · Audit chain עם דוחות json/csv/pdf | packages/core (M2+M3) |
 | **PROOFS** | 3 demos חיים: Identity Anchor (EIP-191 + ecrecover — sameScalarProof חי) · Grid98 Live Benchmark (ה-engine האמיתי, TPS נמדד עכשיו) · Soldier Fleet 13/13 (SP/VP/RC + ops אחרונים, refresh 10s) | `/api/saos/anchor-verify` · `/api/saos/grid98-bench` · `/api/saos/fleet-status` |
-| **DEVELOPER** | **ה-API המסחרי המדוד (Model 1, שבוע 1 — חי):** API keys (plaintext פעם-אחת, רק SHA-256 ב-DB) · try-it על `POST /api/v1/identity/verify` (verdict + latency מדודה + quota) · usage ledger (PROVEN/FAILED/ERROR, גרף 24h) · free tier 1,000/יום UTC | `/api/developer/keys` · `/api/developer/usage` · SQLite (Prisma) |
+| **DEVELOPER** | **ה-API המסחרי המדוד (Model 1, שבוע 1 — חי):** API keys (plaintext פעם-אחת, רק SHA-256 ב-DB) · try-it על `POST /api/v1/identity/verify` (verdict + latency מדודה + quota) · usage ledger (PROVEN/FAILED/ERROR, גרף 24h) · free tier 1,000/יום UTC · **שבוע 2:** בלוק ה-SDK הרשמי `saos-id-verify` עם דוגמת 3-שורות חיה | `/api/developer/keys` · `/api/developer/usage` · SQLite (Prisma) |
 
 **מקורות חיים:** `api.steemit.com` · `api.hive.blog` (+fallbacks) · `rpc.blurt.world`/`saboin` (+fallbacks) · `api.trongrid.io` · `ethereum-rpc.publicnode.com` (+fallbacks) · `api.mainnet-beta.solana.com` (+fallbacks) · daemon-state של SAOS-NET. כל ה-probes עם TTL cache בצד-השרת — כבוד ל-rate-limits.
 

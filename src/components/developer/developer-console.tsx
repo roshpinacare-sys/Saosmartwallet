@@ -287,10 +287,24 @@ function TryItPanel() {
   const [username, setUsername] = useState("headcorner");
   const r = verify.data;
 
-  const curl = `curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/v1/identity/verify \\
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const curl = `curl -X POST ${origin}/api/v1/identity/verify \\
   -H "Authorization: Bearer saos_live_…" \\
   -H "Content-Type: application/json" \\
-  -d '{"username":"headcorner"}'`;
+  -d '{"username":"${username}"}'`;
+
+  // Mirrors the shipped packages/saos-id-verify SDK (live-dogfooded by tools/m1-w2-sdk-dogfood.ts).
+  const sdk = `npm i saos-id-verify
+
+import { verifyIdentity } from "saos-id-verify";
+
+const r = await verifyIdentity({
+  baseUrl: "${origin || "https://<your-saos-gateway>"}",
+  apiKey: process.env.SAOS_API_KEY!,
+  username: "${username}",
+});
+
+if (r.ok) console.log(r.meta.outcome, r.verify.sameScalarProof, r.anchor.block);`;
 
   return (
     <section className="glass flex flex-col overflow-hidden" aria-labelledby="dev-try-title">
@@ -360,6 +374,18 @@ function TryItPanel() {
             CURL — EXACTLY WHAT AN INTEGRATOR RUNS
           </summary>
           <pre className="num mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-[var(--text-secondary)]">{curl}</pre>
+        </details>
+
+        <details className="rounded-md border border-[var(--border-subtle)] bg-black/20 p-3">
+          <summary className="num cursor-pointer text-[10px] font-bold tracking-[0.14em] text-[var(--saos)]">
+            OFFICIAL SDK — saos-id-verify (npm · week 2 · live-dogfooded)
+          </summary>
+          <pre className="num mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[10px] leading-relaxed text-[var(--text-secondary)]">{sdk}</pre>
+          <p className="mt-2 text-[10px] leading-relaxed text-[var(--text-tertiary)]">
+            Zero-dependency TypeScript client in packages/saos-id-verify — typed PROVEN/FAILED union,
+            SaosAuthError/SaosQuotaError fail-closed classes, X-RateLimit headers parsed. Build proven
+            (strict tsc → dist/), PROVEN + FAILED + 401 all executed live through the SDK itself.
+          </p>
         </details>
       </div>
     </section>
