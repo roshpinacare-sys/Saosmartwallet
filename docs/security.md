@@ -147,3 +147,38 @@ rolled on security-affecting pushes. Mechanically enforced by the gate
   bootstrap; state was reset to 0 rows (verified), bootstrap re-proven 201,
   and the live GET surface stays 405 (POST-only). No plaintext token ever
   left the process (201 copy-once by design).
+
+## 9. Live event — key-authority drift & fleet takeover (2026-09-08 23:15–23:50 UTC)
+
+Forensics measured directly against Steem mainnet:
+
+- The external operator's last successful broadcast (`saos-dex.anchor.v1`
+  chain-seal, ~36s cadence) was **22:41 UTC**; then silence.
+- On-chain authority rotations preceded it: soldier posting authorities
+  rotated **21:33 UTC** (e.g. cashmachine → STM7w45WCPwn…), headcorner ACTIVE
+  rotated 21:17 UTC (blk 109,410,651 — the known AUTHORITY DRIFT event).
+- The fleet envelope (`agent/fleet_keys.enc`, sealed 23:15 UTC, pass stored
+  beside it in the private repo — owner's design) restores the ENTIRE keys/
+  directory (`vault.json` with 11 accounts + `.vaultkey` + tron mnemonics +
+  agent `.env`) — but **every restored WIF mismatches the current on-chain
+  authorities**. The rotation happened after the last key-folder sync.
+- Consequence: **no signing is possible from this sandbox until the owner
+  supplies the current keys** (re-seal the envelope from the machine that
+  actually signs). All broadcast legs fail loudly and honestly
+  ("missing required posting authority" / "no anchor-writer fuel") — the
+  Zero-Mock discipline holds even in takeover.
+- What IS alive after takeover: guardian dual-slot persistent loops +
+  agent.cjs monitor (10/10 chains-ok) + saosnet --beat (local chain keeps
+  producing blocks/checkpoints/TRON pulse; anchor legs fail-honest) —
+  respawned automatically by the guardian's self-heal.
+
+## 10. Activation round — owner credentials via chat (not git)
+
+- Admin auth: `SAOS_ADMIN_TOKEN` set in the untracked `.env` (env override
+  mechanism) — requireAdmin proven live (401 without/with-wrong token;
+  200 create → revoke golden path; 8 probe keys revoked, 0 active).
+- Web vault (packages/core): initialized via `/api/vault/init` (Argon2id
+  verifier + ZK commitment), master password handed to the owner in chat
+  only; unlock→re-lock golden path proven live.
+- SDK distribution: GitHub Release `saos-id-verify-v0.1.0` + npm-format
+  tarball asset (real install channel; npmjs.org publish stays owner-only).
