@@ -128,6 +128,8 @@ bun run dev   # הטרמינל חי על / — נתונים חיים מ-api.stee
 
 **דוח-סטטוס חי:** `docs/system-status.json` + `docs/system-status.md` — נוצר ע"י `bun tools/system-status.ts` מול `/api/system/health` החי; כל מספר נמדד בזמן-יצירה, מה שלא נמדח = null עם הסיבה.
 
+**מפת-דרכים אסטרטגית (`docs/strategy-roadmap.md`):** ניתוח-עסקי מעוגן-חיים — 7 מודלים עסקיים (Wallet-as-a-Service · Bridge Aggregator · DEX Aggregator · Validator · White-Label · Security Audits · Institutional Custody) ממופים ליכולות-מאומתות מול שערי-חוסמים כנים; המלצה: bootstrap + open-core, סדר-בנייה מדורג (M5 Wallet MVP אוטונומי → פריסת חוזה-גשר/audit/פיילוט = החלטות-בעלים). zero-mock גם באסטרטגיה: הטענות-טכניות בניתוח אומתו מחדש באותו-יום (7/7 · 23/23 · 2 גשרים חיים), הטענות-פיננסיות סומנו כספקולטיביות.
+
 ### 🎨 Enterprise redesign (2026-09-07) — design system מקצועי מלא
 
 ה-UI נבנה מחדש מאפס ברמת Bloomberg Terminal / TradingView / dYdX — לא שיפור של הקיים, בנייה מחדש גמורה. שכבת הנתונים (packages, hooks, API routes) נותרה נעולה וללא שינוי.
