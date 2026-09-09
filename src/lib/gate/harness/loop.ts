@@ -10,6 +10,13 @@
  *    work; an independent checker brain (different provider/model) rules.
  *  · External state     → the loop's memory lives in GateRun (system of
  *    record), not in the context window; each step is persisted as it happens.
+ *  · Leases + recovery  → every run is claimed with an atomic lease that is
+ *    renewed after each persisted step; a crash stops the renewal, the heart's
+ *    reaper returns the run to the queue, and the maker RESUMES from the
+ *    persisted evidence trace instead of starting over (the trace IS the
+ *    checkpoint — TITAI durable-engine pattern, made real).
+ *  · Autonomy lineage   → runs carry origin (manual | schedule | trigger) and
+ *    terminal states emit events the heart may consume into bounded follow-ups.
  *  · Cross-run memory   → lessons distilled from the agent's PAST runs are
  *    injected into the maker's first prompt and stored on the run row —
  *    the agent stops repeating yesterday's mistakes.
@@ -29,6 +36,8 @@ import { db } from "@/lib/db";
 import { GateError } from "@/lib/gate/crypto";
 import { brainChat, parseBrain, type ChatMsg } from "./brain";
 import { getModule, modulesForPrompt, type ModuleCtx } from "./modules";
+import { workerId, claimRun, stillMine, renewLease, LEASE_MS, LEASE_CLEAR } from "./lease";
+import { emitEvent } from "./events";
 
 export interface TraceStep {
   i: number;
@@ -158,8 +167,12 @@ function ratchetedTranscript(steps: TraceStep[], recentFull = 2): string {
   return compact + "\n" + traceToTranscript(recent);
 }
 
-/** Persist-and-continue helper — external state is written BEFORE the next step runs. */
+/**
+ * Persist-and-continue helper — external state is written BEFORE the next step runs.
+ * A live run renews its lease on every save (heartbeat); a terminal save clears it.
+ */
 async function saveRun(id: string, data: { status?: string; steps?: TraceStep[]; verdict?: CheckerVerdict | null; report?: string | null; error?: string | null; finishedAt?: Date | null; durationMs?: number | null; tokens?: string | null }) {
+  const terminal = data.status !== undefined && ["done", "blocked", "failed"].includes(data.status);
   await db.gateRun.update({
     where: { id },
     data: {
@@ -170,7 +183,10 @@ async function saveRun(id: string, data: { status?: string; steps?: TraceStep[];
       ...(data.error !== undefined ? { error: data.error } : {}),
       ...(data.finishedAt !== undefined ? { finishedAt: data.finishedAt } : {}),
       ...(data.durationMs !== undefined ? { durationMs: data.durationMs } : {}),
-      ...(data.tokens !== undefined ? { tokens: data.tokens } : {}),
+      ...(data.tokens !== undefined ? { tokens: JSON.stringify(data.tokens) } : {}),
+      ...(terminal
+        ? LEASE_CLEAR
+        : { heartbeatAt: new Date(), leaseExpiresAt: new Date(Date.now() + LEASE_MS) }),
     },
   });
 }
@@ -245,16 +261,40 @@ interface MakerCall { thought?: string; tool?: string; args?: Record<string, unk
 /**
  * The goal loop. Fire-and-forget (the API route returns the run id;
  * the operator watches the trace build step-by-step).
+ *
+ * Two entry paths, one claim discipline:
+ *  · manual (API route) → claims its own lease here;
+ *  · heart dispatch     → already claimed, arrives with {claimed:true}.
+ * A crashed run is re-claimed later with attempt>1 → RECOVERY mode: the
+ * persisted trace is reloaded and the maker resumes from the evidence.
  */
-export async function processRun(runId: string): Promise<void> {
+export async function processRun(runId: string, opts: { claimed?: boolean; workerId?: string } = {}): Promise<void> {
+  if (!opts.claimed) {
+    const won = await claimRun(runId);
+    if (!won) return; // someone else owns it — never double-run
+  }
   const run = await db.gateRun.findUnique({ where: { id: runId } });
-  if (!run || run.status !== "queued") return;
+  if (!run || run.status !== "running") return;
+  const attempt = run.attempt;
+  if (attempt > run.maxAttempts) {
+    await db.gateRun.update({
+      where: { id: runId },
+      data: { status: "failed", error: `watchdog: חריגה מ-${run.maxAttempts} ניסיונות — נכשל בכנות`, finishedAt: new Date(), ...LEASE_CLEAR },
+    });
+    await emitEvent("run.failed", { agent: run.agentName, goal: run.goal, gaps: "" }, "harness");
+    return;
+  }
+  const recovering = attempt > 1;
 
   const doneMeans = JSON.parse(run.doneMeans) as string[];
   const modules = JSON.parse(run.modules) as string[];
   let lessons: string[] = [];
   try { lessons = JSON.parse(run.lessons || "[]"); } catch { lessons = []; }
-  const steps: TraceStep[] = [];
+  // recovery: the trace persisted before the crash is the checkpoint — reload it
+  let steps: TraceStep[] = [];
+  if (recovering) {
+    try { steps = JSON.parse(run.steps || "[]"); } catch { steps = []; }
+  }
   const toolCache = new Map<string, unknown>();
   const startedAt = Date.now();
   let tokPrompt = 0;
@@ -262,6 +302,7 @@ export async function processRun(runId: string): Promise<void> {
   let usageKnown = false;
   let freeRescues = 0;
   let repairRan = false;
+  let leaseLost = false;
 
   await saveRun(runId, { status: "running" });
   await db.gateAgent.updateMany({ where: { name: run.agentName }, data: { lastSeenAt: new Date() } });
@@ -344,17 +385,21 @@ export async function processRun(runId: string): Promise<void> {
     /* ── main loop — the budget is the hard token-blowout guard ── */
     let finished = false;
     let finalReport: string | null = null;
-    let firstUser = true;
 
     for (let i = 1; i <= run.budget && !finished; i++) {
-      const userContent = firstUser
-        ? `GOAL RECEIVED. Begin. Progress is empty — you are at step 1 of ${run.budget}.`
+      if (!(await stillMine(runId))) { leaseLost = true; break; } // a reaper/another worker took over — leave the row alone
+      await renewLease(runId);
+      const userContent = i === 1
+        ? (recovering
+          ? `RECOVERED (attempt ${attempt}/${run.maxAttempts}) — ההרצה קרסה באמצע והוחזרה על-ידי השומר. עקבות שנשמרו לפני הקריסה:\n${ratchetedTranscript(steps.filter((s) => s.side === "maker")).slice(-4000)}\n\nהמשך בדיוק מאיפה שנעצרת — אל תחזור על צעדים שכבר הוכיחו ראיות.`
+          : `GOAL RECEIVED. Begin. Progress is empty — you are at step 1 of ${run.budget}.`)
         : `PROGRESS SO FAR (ratchet — do not repeat completed work):\n${ratchetedTranscript(steps.filter((s) => s.side === "maker")).slice(-5000)}\n\nContinue toward the goal. Step ${i} of ${run.budget}.`;
-      firstUser = false;
       const r = await makerStep(i, userContent);
       finished = r.finished;
       if (r.report) finalReport = r.report;
     }
+
+    if (leaseLost) return; // silent handoff — the new owner owns the row now
 
     /* ── independent verdict (ALWAYS — the maker can't grade itself) ── */
     let verdict: CheckerVerdict | null = null;
@@ -375,11 +420,14 @@ export async function processRun(runId: string): Promise<void> {
       const gapsText = (verdict.gaps || failedChecks || "the pass-gate was not proven").slice(0, 1200);
       const gapMsg = `REPAIR ROUND — the independent checker REJECTED the work. Its verdict: "${verdict.notes}". Gaps that must still be proven: ${gapsText}. You have ${REPAIR_STEPS} steps to close the gaps with real tool evidence (or finish with an honest Hebrew report about what remains).`;
       for (let j = 1; j <= REPAIR_STEPS && !finished; j++) {
+        if (!(await stillMine(runId))) { leaseLost = true; return; }
+        await renewLease(runId);
         const progress = steps.filter((s) => s.side === "maker");
         const r = await makerStep(run.budget + j, `${gapMsg}\n\nEVIDENCE SO FAR:\n${ratchetedTranscript(progress).slice(-4500)}`, { repair: true });
         finished = r.finished;
         if (r.report) finalReport = r.report;
       }
+      if (leaseLost) return;
       try {
         const verdict2 = await runChecker({ checkerSpec: run.checker, goal: run.goal, doneMeans, steps });
         steps.push({ i: steps.length + 1, side: "checker", ok: verdict2.done, result: verdict2, at: new Date().toISOString() });
@@ -400,8 +448,13 @@ export async function processRun(runId: string): Promise<void> {
     const lines: string[] = [
       `🏁 הרצת-מטרה הסתיימה — סוכן ${run.agentName}`,
       `🎯 מטרה: ${run.goal}`,
-      `⚖️ פסיקת בודק עצמאי (${run.checker}): ${verdict ? (verdict.done ? "עבר את שער-המעבר — כל הקריטריונים הוכחו" : "לא הוכח — פתוח") : "הבודק לא ענה"}`,
     ];
+    if (run.origin !== "manual") {
+      lines.push(`🧬 מקור: ${run.origin === "schedule" ? "⏰ סיור מתוכנן (לב-האוטונומיה)" : "⚡ טריגר אירוע"}${recovering ? " · התאוששות מקריסה" : ""}`);
+    } else if (recovering) {
+      lines.push("🫀 התאוששות-מקריסה — העקבות חודשו מה-DB");
+    }
+    lines.push(`⚖️ פסיקת בודק עצמאי (${run.checker}): ${verdict ? (verdict.done ? "עבר את שער-המעבר — כל הקריטריונים הוכחו" : "לא הוכח — פתוח") : "הבודק לא ענה"}`);
     if (verdict?.checks?.length) {
       lines.push(...verdict.checks.map((c) => `${c.pass ? "✅" : "❌"} ${c.criterion}${c.evidence ? " — " + c.evidence.slice(0, 160) : ""}`));
     }
@@ -418,16 +471,24 @@ export async function processRun(runId: string): Promise<void> {
     await saveRun(runId, {
       status, report, finishedAt: new Date(),
       durationMs: Date.now() - startedAt,
-      tokens: usageKnown ? JSON.stringify({ prompt: tokPrompt, completion: tokCompletion }) : null,
+      tokens: usageKnown ? { prompt: tokPrompt, completion: tokCompletion } : null,
     });
+
+    /* ── emit the terminal event — the nervous system may react (bounded) ── */
+    await emitEvent(
+      status === "done" ? "run.done" : "run.blocked",
+      { agent: run.agentName, goal: run.goal, gaps: verdict && !verdict.done ? String(verdict.gaps || "").slice(0, 600) : "" },
+      "harness",
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     steps.push({ i: steps.length + 1, side: "maker", ok: false, error: msg, at: new Date().toISOString() });
     await saveRun(runId, {
       status: "failed", steps, error: msg, finishedAt: new Date(),
       durationMs: Date.now() - startedAt,
-      tokens: usageKnown ? JSON.stringify({ prompt: tokPrompt, completion: tokCompletion }) : null,
+      tokens: usageKnown ? { prompt: tokPrompt, completion: tokCompletion } : null,
     });
+    await emitEvent("run.failed", { agent: run.agentName, goal: run.goal, gaps: "" }, "harness");
     await db.gateMessage.create({
       data: { channel: "command", fromKind: "system", fromName: "harness", body: `🛑 הרצת-מטרה של ${run.agentName} נפלה: ${msg.slice(0, 400)}`, meta: JSON.stringify({ runId }) },
     }).catch(() => {});
