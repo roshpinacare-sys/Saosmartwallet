@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown, ChevronDown, Settings2, Info, RefreshCcw, CheckCircle2,
-  XCircle, Layers, ShieldCheck, Search, Loader2,
+  XCircle, Layers, ShieldCheck, Search, Loader2, Users,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -126,6 +126,13 @@ export function SwapView({ world, online, onNeedAuth }: {
   }
 
   const amountMax = balIn / MU;
+  // Task 58 · מחיר-ברירת-מחדל ל-CoW: מחיר-השוק-החי (fair) של-הזוג-הנבחר
+  const defaultCowPrice = useMemo(() => {
+    const m = (world?.markets ?? []).find(x => x.base === assetIn && x.quote === assetOut)
+      ?? (world?.markets ?? []).find(x => x.base === assetOut && x.quote === assetIn);
+    if (!m) return 0;
+    return m.base === assetIn ? m.fair : (m.fair > 0 ? Math.floor((MU * MU) / m.fair) : 0);
+  }, [world, assetIn, assetOut]);
   const ctaLabel: Record<CtaState, string> = {
     empty: 'הזן סכום',
     'no-route': 'אין נזילות לזוג הזה',
@@ -315,6 +322,9 @@ export function SwapView({ world, online, onNeedAuth }: {
       {/* market strip under the card */}
       <MarketStrip world={world} onPick={(base, q) => { setAssetIn(base); setAssetOut(q); setAmountStr(''); }} />
 
+      {/* Task 58 · CoW-אצווה — מכירות-אצווה-פר-בלוק במחיר-אחיד */}
+      <CowPanel world={world} onNeedAuth={onNeedAuth} defaultBase={assetIn} defaultQuote={assetOut} defaultPrice={defaultCowPrice} />
+
       {/* settings drawer */}
       <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
         <DialogContent className="dx-card max-w-sm border-[color:var(--line)]" dir="rtl">
@@ -432,6 +442,161 @@ export function SwapView({ world, online, onNeedAuth }: {
 
 function fmtSlip(v: number): string {
   return `${v}%`;
+}
+
+// ─── Task 58 · CoW-אצווה — פאנל-המכירות-האצווה (מחיר-אחיד · סנדוויץ'-בלתי-אפשרי) ──
+interface CowData {
+  ok: boolean;
+  height: number;
+  stats: { matched: number; batches: number; surplusMu: number; fallbackPool: number; fallbackBook: number };
+  pending: Array<{ id: number; owner: string; base: string; quote: string; side: 'buy' | 'sell'; price: number; amount: number; lockMu: number; atH: number }>;
+  recent: Array<{ h: number; action: string; note?: string; profitMu?: number }>;
+  honesty: string;
+}
+
+function CowPanel({ world, onNeedAuth, defaultBase, defaultQuote, defaultPrice }: {
+  world: World | null; onNeedAuth: () => void;
+  defaultBase: string; defaultQuote: string; defaultPrice: number;
+}) {
+  const [cow, setCow] = useState<CowData | null>(null);
+  const [base, setBase] = useState(defaultBase);
+  const [quote, setQuote] = useState(defaultQuote);
+  const [side, setSide] = useState<'buy' | 'sell'>('buy');
+  const [priceStr, setPriceStr] = useState(defaultPrice > 0 ? String(defaultPrice) : '');
+  const [amtStr, setAmtStr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const priceTouched = priceStr !== '' && defaultPrice > 0 && priceStr !== String(defaultPrice);
+
+  // התאמת-הזוג/המחיר לברירת-המחדל — היערכות-בזמן-רינדור (פאטרן-React המומלץ):
+  // נדבק-רק-אם-המשתמש לא ערך-ידנית את המחיר (priceTouched).
+  const [defSig, setDefSig] = useState(`${defaultBase}|${defaultQuote}|${defaultPrice}`);
+  const sig = `${defaultBase}|${defaultQuote}|${defaultPrice}`;
+  if (sig !== defSig) {
+    setDefSig(sig);
+    setBase(defaultBase);
+    setQuote(defaultQuote);
+    if (!priceTouched && defaultPrice > 0) setPriceStr(String(defaultPrice));
+  }
+
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const r = await fetch('/saos-dex/api/dex/cow', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        const j = (await r.json()) as CowData;
+        if (!stop && j.ok) setCow(j);
+      } catch { /* offline */ }
+      if (!stop) timer = setTimeout(poll, 3000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
+  }, []);
+
+  const priceMu = Math.floor(parseFloat(priceStr) || 0);
+  const amtMu = Math.floor((parseFloat(amtStr) || 0) * MU);
+  const estPayMu = priceMu > 0 && amtMu > 0 ? Math.floor((priceMu * amtMu) / MU) : 0;
+
+  async function submit(op: string, payload: Record<string, unknown>, tag: string) {
+    onNeedAuth();
+    setBusy(true); setMsg(null);
+    try {
+      const j = await dxPost('cow', { op, ...payload });
+      setMsg(j.ok
+        ? { ok: true, text: tag === 'order' ? 'הזמנת-האצווה נקלטה — תיסגר בסוף-הבלוק (≤3 שניות)' : 'בוטל' }
+        : { ok: false, text: String(j.note || j.error || 'נדחה') });
+    } catch {
+      setMsg({ ok: false, text: 'שגיאת רשת' });
+    }
+    setBusy(false);
+  }
+
+  return (
+    <div className="w-full max-w-[480px] mt-4 dx-card p-4" data-testid="cow-panel">
+      <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] text-[color:var(--text-3)]">
+            <Users className="w-3.5 h-3.5 text-[color:var(--pink)]" />
+            CoW-אצווה · מחיר-שווק-אחיד-פר-בלוק
+          </div>
+          <p className="text-[11px] text-[color:var(--text-2)] mt-1 leading-relaxed">
+            ההזמנה נסגרת בסוף-הבלוק מול-קונים/מוכרים אחרים במחיר-אחיד — העודף נשאר-אצלך. בלי-התאמה → בריכות ואז ספר. סנדוויץ'-בלתי-אפשרי מבנית.
+          </p>
+        </div>
+        <span className="text-[10px] rounded-full border border-[color:var(--green)]/40 bg-[color:var(--green-soft)] text-[color:var(--green)] px-2.5 py-1 font-semibold dx-num" dir="ltr">
+          {cow?.stats.batches ?? 0} אצווה · {fmtMu(cow?.stats.surplusMu ?? 0)}µ עודף
+        </span>
+      </div>
+
+      {/* form */}
+      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-3 mb-3">
+        <div className="flex gap-1.5 mb-2" role="group" aria-label="צד ההזמנה">
+          <button onClick={() => setSide('buy')} className={`h-8 px-3 rounded-lg text-[11px] font-bold ${side === 'buy' ? 'bg-[color:var(--green)]/20 text-[color:var(--green)] border border-[color:var(--green)]/40' : 'text-[color:var(--text-3)] border border-[color:var(--line)]'}`} data-testid="cow-side-buy">קנייה</button>
+          <button onClick={() => setSide('sell')} className={`h-8 px-3 rounded-lg text-[11px] font-bold ${side === 'sell' ? 'bg-[color:var(--red)]/20 text-[color:var(--red)] border border-[color:var(--red)]/40' : 'text-[color:var(--text-3)] border border-[color:var(--line)]'}`} data-testid="cow-side-sell">מכירה</button>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <input value={base} onChange={e => setBase(e.target.value.toUpperCase().replace(/[^A-Z0-9|]/g, '').slice(0, 10))}
+            className="dx-input font-data h-10 w-24" dir="ltr" placeholder="BASE" aria-label="מטבע-בסיס" data-testid="cow-base" />
+          <span className="self-center text-[color:var(--text-3)] text-xs">/</span>
+          <input value={quote} onChange={e => setQuote(e.target.value.toUpperCase().replace(/[^A-Z0-9|]/g, '').slice(0, 10))}
+            className="dx-input font-data h-10 w-24" dir="ltr" placeholder="QUOTE" aria-label="מטבע-ציטוט" data-testid="cow-quote" />
+          <input value={priceStr} onChange={e => setPriceStr(e.target.value.replace(/[^0-9.]/g, ''))}
+            className="dx-input dx-num h-10 w-28" dir="ltr" placeholder="מחיר" aria-label="מחיר-גבול" data-testid="cow-price" />
+          <input value={amtStr} onChange={e => setAmtStr(e.target.value.replace(/[^0-9.]/g, ''))}
+            className="dx-input dx-num h-10 w-28" dir="ltr" placeholder="כמות" aria-label="כמות" data-testid="cow-amount" />
+          <button
+            onClick={() => submit('order', { base, quote, side, price: priceMu, amount: amtMu }, 'order')}
+            disabled={busy || !(priceMu > 0) || !(amtMu > 0)}
+            className="dx-cta h-10 px-4 text-[12px]"
+            data-testid="cow-submit"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'הצטרף-לאצווה'}
+          </button>
+        </div>
+        {estPayMu > 0 && (
+          <div className="text-[9.5px] text-[color:var(--text-3)] mt-2 dx-num" dir="ltr">
+            {side === 'buy' ? `תשלום-מרבי ≈ ${fmtMu(estPayMu)} ${quote}` : `קבלה-מינימלית ≈ ${fmtMu(estPayMu)} ${quote}`} · עודף-מחיר נשאר-אצלך
+          </div>
+        )}
+        {msg && <div className={`text-[10.5px] mt-2 ${msg.ok ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>{msg.text}</div>}
+      </div>
+
+      {/* pending */}
+      {(cow?.pending ?? []).length > 0 && (
+        <div className="space-y-1 mb-3 max-h-40 overflow-y-auto" data-testid="cow-pending">
+          {cow!.pending.map(o => (
+            <div key={o.id} className="flex items-center justify-between text-[10px] rounded-lg bg-black/30 border border-[color:var(--line)] px-2.5 py-1.5">
+              <span className={`dx-num font-bold ${o.side === 'buy' ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`} dir="ltr">
+                {o.side === 'buy' ? 'קנייה' : 'מכירה'} {fmtMu(o.amount)} {o.base}
+              </span>
+              <span className="flex items-center gap-2 dx-num" dir="ltr">
+                <span>@{o.price}</span>
+                <span className="text-[color:var(--text-3)]">#{o.id} · {o.owner}</span>
+                <button onClick={() => submit('cancel', { orderId: o.id }, 'cancel')} disabled={busy} className="text-[color:var(--text-3)] hover:text-[color:var(--red)]" aria-label="ביטול">×</button>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* recent settlements */}
+      {(cow?.recent ?? []).length > 0 && (
+        <div className="space-y-1 max-h-36 overflow-y-auto" data-testid="cow-log">
+          {cow!.recent.slice(0, 4).map((j, i) => (
+            <div key={`${j.h}-${i}`} className="text-[9.5px] text-[color:var(--text-3)] flex gap-2 dx-num" dir="ltr">
+              <span>#{j.h}</span><span className="text-[color:var(--text-2)] flex-1 truncate">{j.note}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {world && (cow?.stats.matched ?? 0) === 0 && (cow?.stats.batches ?? 0) === 0 && (
+        <p className="text-[9.5px] text-[color:var(--text-3)] mt-1">
+          אין-אצוות-עדיין — ההזמנה-הראשונה תיפתח את המונים. ההתאמות נמדדות-חי מהגרעין.
+        </p>
+      )}
+    </div>
+  );
 }
 
 // ── live market strip — פס-השווקים מתחת לכרטיס ──

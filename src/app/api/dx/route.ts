@@ -27,7 +27,8 @@ const ALLOWED = new Set([
   'transfer', // POST — העברה בין ארנקים
   'economy',  // POST — Task 54: ve_lock/ve_unlock/ve_vote/bond_buy (כלכלה-מטורפת)
   'program',  // POST — Task 56: מסחר-אוטומטי חסר-קיפרים (DCA + טריגרים stop/take)
-  'launchpad', // POST — Task 57: מסילת-ההשקות (עקומה/LBP + קנייה/מכירה)
+  'launchpad', // POST — Task 57/58: מסילת-ההשקות (עקומה/LBP + קנייה/מכירה — רב-משתמשי)
+  'cow',      // POST — Task 58: הזמנות-אצווה CoW (מחיר-אחיד · עודף-לסוחרים)
 ]);
 
 export async function POST(req: NextRequest) {
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
         'x-saos-operator': token,
         'x-saos-dex-console': '1',
       },
-      body: JSON.stringify(body.payload || {}),
+      // Task 58 · זהות-אזרח: `as` = חשבון-הסשן-המאומת (requireOwner) — המנוע
+      // מייחס-את-הפעולה-לאזרח (רב-משתמשי: השקות/קניות/CoW-פר-חשבון-אמת).
+      body: JSON.stringify({ ...(body.payload || {}), as: owner }),
       signal: AbortSignal.timeout(15000),
     });
     const j = await r.json().catch(() => ({ ok: false, error: 'bad-engine-response' }));
