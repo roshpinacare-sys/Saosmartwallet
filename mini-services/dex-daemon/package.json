@@ -1,10 +1,10 @@
 {
   "name": "dex-daemon",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "private": true,
   "description": "SAOS-DEX sovereign daemon (port 3010) — THE-MICRORAIL: the platform supervisor keeps this alive like the main app; instrumentation.ts boots the chain with the server (guardian_boot).",
   "scripts": {
-    "dev": "cd /home/z/my-project/saos-dex && exec ./node_modules/.bin/next dev -p 3010 -H 127.0.0.1 2>&1 | tee dev.log",
-    "start": "cd /home/z/my-project/saos-dex && exec ./node_modules/.bin/next start -p 3010 -H 127.0.0.1"
+    "dev": "cd /home/z/my-project/saos-dex && DATABASE_URL=file:/home/z/my-project/saos-dex/db/dex.db exec ./node_modules/.bin/next dev -p 3010 -H 127.0.0.1 2>&1 | tee dev.log",
+    "start": "cd /home/z/my-project/saos-dex && DATABASE_URL=file:/home/z/my-project/saos-dex/db/dex.db exec ./node_modules/.bin/next start -p 3010 -H 127.0.0.1"
   }
 }
