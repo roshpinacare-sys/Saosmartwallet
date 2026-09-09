@@ -45,11 +45,11 @@ export async function POST(req: Request) {
     }
     setMaster(Buffer.from(masterHex, "hex"));
     await db.gateConfig.update({ where: { id: "gate" }, data: { unlockedAt: new Date() } });
-    await createSession("operator", "operator", ["*"]);
+    const token = await createSession("operator", "operator", ["*"]);
     await db.gateMessage.create({
       data: { fromKind: "system", fromName: "gate", body: `הכספת נפתחה במפתח-חי (${hc.chain} · ${hc.role}) — בלי סיסמת-מפעיל` },
     });
-    return ok({ unlocked: true, identity: hc, at: new Date().toISOString() });
+    return ok({ unlocked: true, token, identity: hc, at: new Date().toISOString() });
   } catch (e) {
     return fail(e);
   }

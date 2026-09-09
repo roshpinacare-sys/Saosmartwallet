@@ -32,11 +32,11 @@ export async function POST(req: Request) {
       },
     });
     setMaster(master);
-    await createSession("operator", "operator", ["*"]);
+    const token = await createSession("operator", "operator", ["*"]);
     await db.gateMessage.create({
       data: { fromKind: "system", fromName: "gate", body: "הכספת הריבונית אותחלה — מפתח-אב אקראי נאטם תחת סיסמת-המפעיל (AES-256-GCM · scrypt)" },
     });
-    return ok({ initialized: true, note: "שמור את סיסמת-המפעיל מחוץ למכונה — בלעדיה הכספת אינה נפתחת" });
+    return ok({ initialized: true, token, note: "שמור את סיסמת-המפעיל מחוץ למכונה — בלעדיה הכספת אינה נפתחת" });
   } catch (e) {
     return fail(e);
   }

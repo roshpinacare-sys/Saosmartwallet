@@ -21,11 +21,11 @@ export async function POST(req: Request) {
     }
     setMaster(master);
     await db.gateConfig.update({ where: { id: "gate" }, data: { unlockedAt: new Date() } });
-    const session = await createSession("operator", "operator", ["*"]);
+    const token = await createSession("operator", "operator", ["*"]);
     await db.gateMessage.create({
       data: { fromKind: "system", fromName: "gate", body: "הכספת נפתחה — המפעיל מחובר (סשן 30 יום)" },
     });
-    return ok({ unlocked: true, session: session.slice(0, 8) + "…", at: new Date().toISOString() });
+    return ok({ unlocked: true, token, at: new Date().toISOString() });
   } catch (e) {
     return fail(e);
   }

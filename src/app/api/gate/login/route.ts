@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     // ── 4. in-memory + fresh 30d session carrying the sealed master ───────
     setMaster(master);
     await revokeOtherSessions();
-    await createSession("operator", "operator", ["*"], master);
+    const token = await createSession("operator", "operator", ["*"], master);
     await db.gateConfig.update({ where: { id: "gate" }, data: { unlockedAt: new Date() } }).catch(() => {});
     await db.gateMessage.create({
       data: {
@@ -104,6 +104,7 @@ export async function POST(req: Request) {
 
     return ok({
       in: true,
+      token, // operator UI keeps it and sends it as `x-gate-token` (preview-iframe safe)
       identity: hc,
       bootstrapped,
       bootInfo,

@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     });
 
     setMaster(master);
-    await createSession("operator", "operator", ["*"]);
+    const token = await createSession("operator", "operator", ["*"]);
 
     // ── 5. encrypted local backup (gitignored) ────────────────────────────
     let backup: { file: string; bytes: number; entries: number } | null = null;
@@ -121,6 +121,7 @@ export async function POST(req: Request) {
 
     return ok({
       reset: true,
+      token,
       ownershipProof: proof,
       imported: bundle.entries.length,
       byKind: bundle.entries.reduce<Record<string, number>>((acc, e) => { acc[e.kind] = (acc[e.kind] || 0) + 1; return acc; }, {}),
