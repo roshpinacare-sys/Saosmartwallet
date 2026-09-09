@@ -277,6 +277,108 @@ export const MODULES: HarnessModule[] = [
     },
   },
   {
+    id: "memory.read",
+    name: "זיכרון-הצי",
+    kind: "skill",
+    desc: "בנק-הידע המשותף של הצי: ממצאים סופיים שנרשמו פעם-אחת (סטיות-authority, עובדות מאומתות, לקחים) — קרא אותו לפני שאתה חוקר מחדש; מה שכבר ידוע לצי לא שווה קריאת-רשת נוספת.",
+    args: `{"limit":"1-20 (optional, default 12)","kind":"drift|finding|fact (optional)"}`,
+    needsVault: false,
+    cacheable: false, // new findings can land while the run lives — never memoize
+    async exec(args) {
+      const limit = Math.min(Math.max(Number(args.limit) || 12, 1), 20);
+      const kind = typeof args.kind === "string" && args.kind ? String(args.kind) : null;
+      const rows = await db.gateMemory.findMany({
+        where: kind ? { kind } : undefined,
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+      });
+      // real usage telemetry — which knowledge the fleet actually consumes
+      void db.gateMemory
+        .updateMany({ where: { id: { in: rows.map((r) => r.id) } }, data: { refCount: { increment: 1 } } })
+        .catch(() => {});
+      return {
+        count: rows.length,
+        facts: rows.map((r) => ({ key: r.key, kind: r.kind, body: r.body, by: r.source, reads: r.refCount, at: r.updatedAt.toISOString() })),
+      };
+    },
+  },
+  {
+    id: "memory.write",
+    name: "רישום לזיכרון-הצי",
+    kind: "actor",
+    desc: "רישום ממצא סופי לבנק-הידע המשותף — רק אמת שלא תשתנה בקרוב (סטיית-authority, עובדה מאומתת בכלי). אותו key מעדכן את הרשומה הקיימת במקום לשכפל; אסור לכתוב מחירים, יתרות או נתונים חולפים.",
+    args: `{"key":"canonical-key (e.g. drift:headcorner)","kind":"drift|finding|fact","body":"≤500 chars, Hebrew"}`,
+    needsVault: false,
+    cacheable: false, // a real write — every call is a unique action
+    async exec(args, ctx) {
+      const key = String(args.key || "").trim().toLowerCase().replace(/\s+/g, "-").slice(0, 80);
+      const body = String(args.body || "").trim();
+      const kind = ["drift", "finding", "fact"].includes(String(args.kind)) ? String(args.kind) : "finding";
+      if (key.length < 4) throw new GateError("bad-input", "דרוש params.key קנוני (4+ תווים, למשל drift:headcorner)");
+      if (body.length < 8) throw new GateError("bad-input", "דרוש params.body — הידע עצמו (8+ תווים)");
+      const row = await db.gateMemory.upsert({
+        where: { key },
+        create: { key, kind, body: clamp(body, 500), source: ctx.agentName, runId: ctx.runId },
+        update: { kind, body: clamp(body, 500), source: ctx.agentName, runId: ctx.runId },
+      });
+      // total-cap: the bank must never bloat — evict the oldest beyond the cap
+      const CAP = 150;
+      const total = await db.gateMemory.count();
+      if (total > CAP) {
+        const olds = await db.gateMemory.findMany({ orderBy: { updatedAt: "asc" }, take: total - CAP, select: { id: true } });
+        if (olds.length) await db.gateMemory.deleteMany({ where: { id: { in: olds.map((o) => o.id) } } }).catch(() => {});
+      }
+      return { key: row.key, kind: row.kind, at: row.updatedAt.toISOString(), note: "נשמר בזיכרון-הצי — כל סוכן יקרא את זה לפני שיחקור מחדש" };
+    },
+  },
+  {
+    id: "goal.propose",
+    name: "יוזמת-יעד",
+    kind: "actor",
+    desc: "הצעת מטרה חדשה מיוזמתך: מטרה + נימוק + קריטריוני-סיום. ההצעה נכנסת לתור-ההכרעה — המפעיל מאשר ב-UI, או מדיניות אוטומטית מרוסנת (מקס-יומי לצי + תקציב-מקס) מזניקה לבד. אל תציע מה שאתה יכול לבצע עכשיו בכלים שלך — חובתך לבצע, לא להציע.",
+    args: `{"goal":"string (20+ chars)","rationale":"string","doneMeans":["string",...],"budget":"2-6 (optional)"}`,
+    needsVault: false,
+    cacheable: false, // a real submission — never memoize
+    async exec(args, ctx) {
+      const goal = String(args.goal || "").trim();
+      if (goal.length < 20) throw new GateError("bad-input", "דרוש params.goal אמיתי (20+ תווים) — מה בדיוק לעשות ולמה זה שווה");
+      const rationale = String(args.rationale || "").trim();
+      const means = Array.isArray(args.doneMeans)
+        ? args.doneMeans.map((d) => String(d).trim()).filter(Boolean).slice(0, 4).map((d) => d.slice(0, 200))
+        : [];
+      if (!means.length) throw new GateError("bad-input", "דרוש params.doneMeans — איך ידעו שהיעד הושלם (הצעה בלי שער-מעבר נדחית)");
+      const budget = Math.min(Math.max(Number(args.budget) || 4, 2), 6);
+      // one pending proposal per agent — initiative, not spam
+      const pending = await db.gateProposal.count({ where: { agentName: ctx.agentName, status: "pending" } });
+      if (pending >= 1) throw new GateError("rate-limited", "יש לך כבר הצעה פתוחה בתור — חכה להכרעה לפני הצעה חדשה");
+      const p = await db.gateProposal.create({
+        data: {
+          agentName: ctx.agentName,
+          goal: goal.slice(0, 400),
+          rationale: rationale ? rationale.slice(0, 400) : null,
+          doneMeans: JSON.stringify(means),
+          budget,
+        },
+      });
+      await db.gateMessage
+        .create({
+          data: {
+            channel: "command",
+            fromKind: "agent",
+            fromName: ctx.agentName,
+            body: `💡 יוזמת-יעד: "${goal.slice(0, 200)}"${rationale ? ` · נימוק: ${rationale.slice(0, 160)}` : ""} · תקציב מוצע: ${budget} — ממתינה להכרעה (מפעיל או מדיניות מרוסנת)`,
+            meta: JSON.stringify({ proposalId: p.id }),
+          },
+        })
+        .catch(() => {});
+      return {
+        proposalId: p.id,
+        status: p.status,
+        note: "ההצעה בתור — המפעיל רואה אותה בכרטיס לב-האוטונומיה; מדיניות מרוסנת עשויה להזניק אותה לבד",
+      };
+    },
+  },
+  {
     id: "fleet.status",
     name: "צי-החיילים",
     kind: "skill",
