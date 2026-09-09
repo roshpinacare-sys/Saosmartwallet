@@ -1,16 +1,16 @@
 {
   "ok": true,
-  "generatedAt": "2026-09-08T22:57:18.426Z",
+  "generatedAt": "2026-09-09T04:06:40.392Z",
   "summary": {
     "networksUp": "7/7",
-    "liveRails": 2,
+    "liveRails": 1,
     "gatedRails": 4,
     "criticalIssues": 0,
     "wrappedMismatches": 0
   },
   "checks": {
     "networks": {
-      "latencyMs": 888,
+      "latencyMs": 903,
       "chains": [
         {
           "id": "steem",
@@ -18,11 +18,11 @@
           "family": "Graphene",
           "kind": "L1 public — internal market (our DEX)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T22:57:18.426Z",
+          "probedAt": "2026-09-09T04:06:40.392Z",
           "status": "online",
-          "headHeight": 109412638,
-          "lagSeconds": 1,
-          "headId": "0685811e68b10e62",
+          "headHeight": 109418797,
+          "lagSeconds": 2,
+          "headId": "0685992dd4384e49",
           "version": null,
           "note": "live probe via M0/M1 SteemMarketClient"
         },
@@ -32,11 +32,11 @@
           "family": "Graphene",
           "kind": "L1 public — anchor rail (RC-gated)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T22:57:18.433Z",
+          "probedAt": "2026-09-09T04:06:40.399Z",
           "status": "online",
-          "headHeight": 109747151,
-          "lagSeconds": 1,
-          "headId": "068a9bcf5160497791d1840feabbd13b358c9bf4",
+          "headHeight": 109753323,
+          "lagSeconds": 2,
+          "headId": "068ab3eb126a9e0c48728da00927a14fc994356a",
           "version": null,
           "note": "live probe api.hive.blog"
         },
@@ -46,11 +46,11 @@
           "family": "Graphene",
           "kind": "L1 public — anchor rail (canonical sig)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T22:57:18.434Z",
+          "probedAt": "2026-09-09T04:06:40.401Z",
           "status": "online",
-          "headHeight": 63476076,
-          "lagSeconds": 1,
-          "headId": "03c8916c67d5f6f6a2e15f054a816f80cf029f64",
+          "headHeight": 63482163,
+          "lagSeconds": 2,
+          "headId": "03c8a93386a5bc4b621c1883f173f81722a65787",
           "version": null,
           "note": "live probe blurt-rpc.saboin.com"
         },
@@ -60,11 +60,11 @@
           "family": "TVM (DPoS)",
           "kind": "L1 public — zero-fee anchor rail",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T22:57:18.435Z",
+          "probedAt": "2026-09-09T04:06:40.402Z",
           "status": "online",
-          "headHeight": 86078767,
-          "lagSeconds": 4,
-          "headId": "000000000521752f…",
+          "headHeight": 86084947,
+          "lagSeconds": 2,
+          "headId": "0000000005218d53…",
           "version": null,
           "note": "live probe api.trongrid.io"
         },
@@ -73,14 +73,14 @@
           "name": "SAOS-NET",
           "family": "Sovereign (deterministic kernel)",
           "kind": "L1 shadow chain — anchored to Steem/Hive/TRON",
-          "probedAt": "2026-09-08T22:57:18.727Z",
+          "probedAt": "2026-09-09T04:06:40.896Z",
           "status": "online",
-          "headHeight": 63638,
+          "headHeight": 72958,
           "lagSeconds": null,
-          "stateAgeSeconds": 3571,
-          "headId": "d5b2162c380f0c47…",
+          "stateAgeSeconds": 1006,
+          "headId": "eb08867502c7bcc9…",
           "version": "saos-net/0",
-          "note": "daemon-pushed state, 60m old (github: steem repo)"
+          "note": "daemon-pushed state, 17m old (github: steem repo)"
         },
         {
           "id": "ethereum",
@@ -88,12 +88,12 @@
           "family": "EVM",
           "kind": "L1 public — settlement + ERC-20 wrapped economy (M3)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T22:57:18.437Z",
+          "probedAt": "2026-09-09T04:06:40.403Z",
           "status": "online",
-          "headHeight": 25935776,
-          "lagSeconds": 8,
+          "headHeight": 25937316,
+          "lagSeconds": 6,
           "headId": null,
-          "version": "0.044266198 gwei baseFee",
+          "version": "0.091401532 gwei baseFee",
           "note": "live probe ethereum-rpc.publicnode.com"
         },
         {
@@ -102,27 +102,27 @@
           "family": "PoH + PoS",
           "kind": "L1 public — SPL wrapped economy (M3)",
           "stateAgeSeconds": null,
-          "probedAt": "2026-09-08T22:57:18.438Z",
+          "probedAt": "2026-09-09T04:06:40.404Z",
           "status": "online",
-          "headHeight": 445457243,
+          "headHeight": 445515822,
           "lagSeconds": null,
           "headId": null,
-          "version": "epoch 1031 · slot 65243/432000",
+          "version": "epoch 1031 · slot 123822/432000",
           "note": "live probe api.mainnet-beta.solana.com"
         }
       ],
       "error": null
     },
     "bridges": {
-      "latencyMs": 90,
+      "latencyMs": 92,
       "rails": [
         {
           "id": "relay-steem",
           "rail": "SAOS-NET → STEEM",
           "mechanism": "custom_json saos-dex.anchor.v1 (active authority), every checkpoint seal",
-          "status": "live",
-          "evidence": "latest: 867fe4dd6ca8f6f223576e3caf40fc2eb2350408 (cp#63348) · 6 anchors in feed",
-          "explorer": "https://steemworld.org/tx/867fe4dd6ca8f6f223576e3caf40fc2eb2350408",
+          "status": "offline",
+          "evidence": "no anchors in current feed",
+          "explorer": null,
           "lastActivityAt": null
         },
         {
@@ -173,7 +173,7 @@
       ],
       "analytics": {
         "anchoredTotal": 4,
-        "checkpointsVerified": 2073,
+        "checkpointsVerified": 2087,
         "checkpointsTotal": 64,
         "lastAnchor": {
           "at": null,
@@ -303,7 +303,7 @@
             "holders": 0
           }
         ],
-        "sourcedAt": "2026-09-08T22:57:19.404Z"
+        "sourcedAt": "2026-09-09T04:06:41.387Z"
       },
       "routes": {
         "steemEthereum": {
@@ -320,7 +320,7 @@
             },
             {
               "network": "ethereum",
-              "amount": "0.0000070883396",
+              "amount": "0.00001463224512",
               "currency": "ETH"
             }
           ]
@@ -350,31 +350,35 @@
           ]
         }
       },
-      "routesLatencyMs": 306,
+      "routesLatencyMs": 364,
       "error": null
     },
     "vault": {
-      "latencyMs": 12,
+      "latencyMs": 13,
       "reachable": true,
-      "initialized": false,
+      "initialized": true,
       "locked": true,
-      "networks": 0,
-      "soldiers": 0,
-      "securityScore": 0,
+      "networks": 7,
+      "soldiers": 13,
+      "securityScore": 50,
       "auditIntegrityOk": true,
       "findings": [
-        "vault is not initialized — run initialize() to set a master password verifier"
+        "no keys sealed yet — add at least one network key",
+        "all keys are hot-stored — seal at least one cold or air-gapped key",
+        "no backup created yet — export the state doc via exportState()",
+        "social recovery is not configured — register recovery contacts up to a threshold",
+        "dead-man switch is disabled — configure beneficiaries and an inactivity window"
       ]
     },
     "dex": {
-      "latencyMs": 678,
+      "latencyMs": 650,
       "reachable": true,
       "bids": 19,
       "asks": 50,
       "latest": "0.09713049029224470",
-      "spreadPercent": 0.28212667050987417,
-      "headBlock": 109412638,
-      "lagSeconds": 2
+      "spreadPercent": 0.2412196063296015,
+      "headBlock": 109418797,
+      "lagSeconds": 3
     },
     "wrappedInvariant": {
       "latencyMs": 0,
@@ -608,8 +612,8 @@
     {
       "component": "vault",
       "severity": "notice",
-      "detail": "vault not initialized — first-boot ceremony pending (clean handoff state)",
-      "action": "run the VAULT tab setup wizard"
+      "detail": "vault initialized but locked",
+      "action": "unlock to sign"
     }
   ],
   "selfHealing": {
@@ -621,6 +625,6 @@
   "meta": {
     "generator": "tools/system-status.ts (M4 System Owner)",
     "server": "http://localhost:3000",
-    "gitSha": "9cd9881"
+    "gitSha": "5b3703a"
   }
 }
