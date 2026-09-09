@@ -69,6 +69,32 @@ async function call(path: string, opts: RequestInit = {}, auth?: 'owner' | 'agen
   const g2 = await call('/api/guard', {}, 'owner');
   console.log('  guard state:', g2.status, 'ownerLock=', g2.body?.ownerLock, '(expect true)');
 
+  console.log('=== 9) Bearer-carrier session (iframe-proof, cookie-less) ===');
+  // Exact regression for "הכל נעלם": preview iframes block cookies — the session
+  // must survive on the Authorization header alone, with NO cookie ever sent.
+  const noCookie = async (path: string, token?: string, method = 'GET'): Promise<{ status: number; body: any }> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const r = await fetch(BASE + path, { method, headers });
+    let body: any = null;
+    try { body = await r.json(); } catch { /* */ }
+    return { status: r.status, body };
+  };
+  // (reuses the same memo WIF already decrypted above — login with NO cookie jar)
+  const l2 = await fetch(BASE + '/api/vault/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ account: 'headcorner', chain: 'steem', wif }) });
+  const l2body = await l2.json();
+  console.log('  login (no cookie jar):', l2.status, 'token-in-body=', !!l2body.token, '(expect true)');
+  const sBearer = await noCookie('/api/vault/status', l2body.token);
+  console.log('  status via Bearer only:', sBearer.status, 'me=', sBearer.body?.me, 'balances-fetched=', Object.keys(sBearer.body?.balances || {}).length, '(expect 200 owner:headcorner)');
+  const cBearer = await noCookie('/api/chat', l2body.token);
+  console.log('  chat via Bearer only:', cBearer.status, 'messages=', cBearer.body?.messages?.length, '(expect 200)');
+  const sBad = await noCookie('/api/vault/status', 'forged-token-123');
+  console.log('  forged Bearer:', sBad.status, '(expect 401)');
+  // restore owner cookie session for any later sections
+  cookie = '';
+  const l3 = await call('/api/vault/login', { method: 'POST', body: JSON.stringify({ account: 'headcorner', chain: 'steem', wif }) });
+  console.log('  cookie login restored:', l3.status);
+
   console.log('=== E2E DONE ===');
   await db.$disconnect();
 })().catch(e => { console.error('FATAL', e); process.exit(1); });

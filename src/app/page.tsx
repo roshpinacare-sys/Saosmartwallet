@@ -16,12 +16,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ShieldCheck, ShieldAlert, KeyRound, Users, MessageSquare, ListChecks, RefreshCw, Lock, ChevronDown, Radio, Fingerprint, Trash2, LogIn, Copy, Bot, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, KeyRound, Users, MessageSquare, ListChecks, RefreshCw, Lock, ChevronDown, Radio, Fingerprint, Trash2, LogIn, LogOut, Copy, Bot, Eye, EyeOff } from 'lucide-react';
 
 type RoleKey = { role: string; verified: boolean; lastVerifiedAt: string | null; pubKey: string | null; fingerprint: string; source: string; lastError: string | null };
 type StatusData = {
+  me: string;
   totals: { keys: number; verified: number; accounts: number };
   byAccount: Record<string, Record<string, RoleKey>>;
+  balances: Record<string, Record<string, string>>;
   guard: { ownerLock: boolean; note: string; updatedAt: string | null };
   agents: Array<{ name: string; capabilities: string; status: string; lastSeenAt: string | null }>;
   sessions: number; tasksOpen: number;
@@ -31,6 +33,28 @@ type TaskT = { id: string; title: string; detail: string; createdBy: string; ass
 type AuditRow = { id: string; action: string; detail: string; createdAt: string };
 
 const ROLES = ['owner', 'active', 'posting', 'memo'] as const;
+
+// ── session persistence (dual-carrier) ─────────────────────────────────────
+// The token lives BOTH in an httpOnly cookie (server-set) AND in localStorage
+// (sent as Bearer on every request). Cross-origin iframe previews block
+// third-party cookies — the Bearer carrier is what keeps you logged in there.
+// זה התיקון ל"הכל נעלם": ההתחברות כבר לא תלויה ב-cookies.
+const TOKEN_KEY = 'sv_session_token';
+function getToken(): string { try { return window.localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } }
+function storeToken(t: string) { try { if (t) window.localStorage.setItem(TOKEN_KEY, t); else window.localStorage.removeItem(TOKEN_KEY); } catch { /* */ } }
+function authHeaders(): Record<string, string> { const t = getToken(); return t ? { Authorization: `Bearer ${t}` } : {}; }
+
+function BalLine({ b }: { b?: Record<string, string> }) {
+  if (!b || !b.liquid) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-mono text-zinc-500 border-t border-zinc-800/60 pt-1.5" dir="ltr">
+      <span className="text-emerald-400/70">{b.liquid}</span>
+      {b.debt && b.debt !== '0.000 SBD' && b.debt !== '0.000 HBD' && <span className="text-amber-400/70">{b.debt}</span>}
+      {b.vests && <span>{Number(b.vests.replace(' VESTS', '')).toLocaleString('en-US', { maximumFractionDigits: 0 })} VESTS</span>}
+      {b.savings && b.savings !== '0.000 STEEM' && b.savings !== '0.000 HIVE' && <span>savings: {b.savings}</span>}
+    </div>
+  );
+}
 
 function RoleChip({ k, chain }: { k: RoleKey; chain: string }) {
   const isChain = chain === 'steem' || chain === 'hive';
@@ -75,8 +99,12 @@ export default function SovereignCenter() {
 
   const refresh = useCallback(async () => {
     try {
-      const r = await fetch('/api/vault/status', { cache: 'no-store' });
-      if (r.status === 401) { setAuthed(false); setBooted(true); return; }
+      const r = await fetch('/api/vault/status', { cache: 'no-store', headers: authHeaders() });
+      if (r.status === 401) {
+        setAuthed(false); setBooted(true);
+        if (getToken()) setLoginMsg({ ok: false, text: 'תוקף החיבור פג או בוטל — התחבר שוב עם כל מפתח. הכספת נשמרת מוצפנת ושלמה.' });
+        return;
+      }
       const j = await r.json();
       if (j.ok) { setStatus(j); setAuthed(true); }
     } catch { /* offline */ }
@@ -85,21 +113,21 @@ export default function SovereignCenter() {
 
   const refreshChat = useCallback(async () => {
     try {
-      const r = await fetch('/api/chat', { cache: 'no-store' });
+      const r = await fetch('/api/chat', { cache: 'no-store', headers: authHeaders() });
       if (r.ok) { const j = await r.json(); if (j.ok) setMessages(j.messages); }
     } catch { /* */ }
   }, []);
 
   const refreshTasks = useCallback(async () => {
     try {
-      const r = await fetch('/api/task', { cache: 'no-store' });
+      const r = await fetch('/api/task', { cache: 'no-store', headers: authHeaders() });
       if (r.ok) { const j = await r.json(); if (j.ok) setTasks(j.tasks); }
     } catch { /* */ }
   }, []);
 
   const refreshAudit = useCallback(async () => {
     try {
-      const r = await fetch('/api/audit', { cache: 'no-store' });
+      const r = await fetch('/api/audit', { cache: 'no-store', headers: authHeaders() });
       if (r.ok) { const j = await r.json(); if (j.ok) setAuditRows(j.logs); }
     } catch { /* */ }
   }, []);
@@ -123,7 +151,7 @@ export default function SovereignCenter() {
     const boot = setTimeout(() => { refreshChat(); refreshTasks(); refreshAudit(); }, 0);
     // fallback polling — keeps chat/tasks fresh even when the relay socket is unreachable
     const t = setInterval(() => { refresh(); refreshChat(); refreshTasks(); }, 8000);
-    const v = setInterval(() => { fetch('/api/vault/verify', { method: 'POST' }).then(() => refresh()).catch(() => { }); }, 300000);
+    const v = setInterval(() => { fetch('/api/vault/verify', { method: 'POST', headers: authHeaders() }).then(() => refresh()).catch(() => { }); }, 300000);
     return () => { clearTimeout(boot); clearInterval(t); clearInterval(v); };
   }, [authed, refresh, refreshChat, refreshTasks, refreshAudit]);
 
@@ -139,6 +167,7 @@ export default function SovereignCenter() {
       });
       const j = await r.json();
       if (j.ok) {
+        storeToken(j.token || ''); // Bearer carrier — ההתחברות שורדת רענון-עמוד וסגירת-טאב
         setLoginMsg({ ok: true, text: j.message, roles: j.roles });
         setWif('');
         await refresh(); await refreshChat();
@@ -153,14 +182,20 @@ export default function SovereignCenter() {
 
   async function verifyAll() {
     setVerifying(true);
-    try { await fetch('/api/vault/verify', { method: 'POST' }); await refresh(); } catch { /* */ }
+    try { await fetch('/api/vault/verify', { method: 'POST', headers: authHeaders() }); await refresh(); } catch { /* */ }
     setVerifying(false);
+  }
+
+  function doLogout() {
+    storeToken('');
+    setAuthed(false); setStatus(null);
+    setLoginMsg(null); setWif('');
   }
 
   async function toggleLock(enable: boolean) {
     let confirm = '';
     if (!enable) { confirm = 'אני הבעלים ואני מאשר ביטול נעילת-owner'; }
-    const r = await fetch('/api/guard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enable, confirm }) });
+    const r = await fetch('/api/guard', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ enable, confirm }) });
     const j = await r.json();
     if (!j.ok) alert(j.error || 'נכשל');
     await refresh();
@@ -170,7 +205,7 @@ export default function SovereignCenter() {
     const content = chatInput.trim();
     if (!content) return;
     setChatInput('');
-    await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+    await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ content }) });
     refreshChat();
   }
 
@@ -178,14 +213,14 @@ export default function SovereignCenter() {
     const title = taskTitle.trim();
     if (!title) return;
     setTaskTitle('');
-    await fetch('/api/task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, assignedTo: taskAgent }) });
+    await fetch('/api/task', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title, assignedTo: taskAgent }) });
     refreshTasks();
   }
 
   async function registerAgent() {
     const name = agentName.trim();
     if (!name) return;
-    const r = await fetch('/api/agent/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, capabilities: agentCaps }) });
+    const r = await fetch('/api/agent/register', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ name, capabilities: agentCaps }) });
     const j = await r.json();
     if (j.ok) { setNewToken(j.token); setAgentName(''); await refresh(); }
     else alert(j.error || 'נכשל');
@@ -282,6 +317,7 @@ export default function SovereignCenter() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+            <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-mono"><Fingerprint className="w-3 h-3 ml-1" />{status?.me || ''}</Badge>
             <Badge variant="outline" className="bg-zinc-900 border-zinc-700 text-zinc-300 font-mono"><KeyRound className="w-3 h-3 ml-1" />{status?.totals.verified}/{status?.totals.keys} מאומתים</Badge>
             <Badge variant="outline" className={status?.guard.ownerLock ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}>
               <Lock className="w-3 h-3 ml-1" />owner-lock {status?.guard.ownerLock ? 'פעיל' : 'כבוי!'}
@@ -290,6 +326,9 @@ export default function SovereignCenter() {
             <Badge variant="outline" className={relay ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}>
               <Radio className="w-3 h-3 ml-1" />relay {relay ? 'חי' : 'polling'}
             </Badge>
+            <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200" onClick={doLogout}>
+              <LogOut className="w-3 h-3 ml-1" />התנתק
+            </Button>
           </div>
         </div>
       </header>
@@ -322,6 +361,8 @@ export default function SovereignCenter() {
                       return k ? <RoleChip key={`${c}:${r}`} k={k} chain={c} /> : null;
                     }))}
                   </div>
+                  <BalLine b={status?.balances?.[`${acct}@steem`]} />
+                  <BalLine b={status?.balances?.[`${acct}@hive`]} />
                 </div>
               ))}
             </div>

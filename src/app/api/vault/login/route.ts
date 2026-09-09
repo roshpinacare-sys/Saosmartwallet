@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
   const { pub, result } = await verifyWif(wif, account, chain);
 
   if (!result.ok) {
-    await audit('login-rejected', `${account}/${chain}: ${result.error}`);
-    return NextResponse.json({ ok: false, error: `המפתח לא שולט ב-${account} על ${chain}: ${result.error}` }, { status: 401 });
+    await audit('login-rejected', `${account}/${chain}: ${result.error || 'no-error-details'}`);
+    return NextResponse.json({ ok: false, error: `המפתח לא שולט ב-${account} על ${chain}: ${result.error || 'אין פירוט'}` }, { status: 401 });
   }
 
   // Save the key encrypted (idempotent upsert) so the network stays connected.
@@ -48,6 +48,10 @@ export async function POST(req: NextRequest) {
 
   const res = NextResponse.json({
     ok: true,
+    // Token returned in the body too — the client persists it in localStorage so
+    // the session survives cross-origin iframe previews where cookies are blocked.
+    token: session.token,
+    session: { label: `owner:${account}`, expiresAt: session.expiresAt },
     roles: result.roles,
     balances: result.balances,
     saved: { id: saved.id, role: saved.role },

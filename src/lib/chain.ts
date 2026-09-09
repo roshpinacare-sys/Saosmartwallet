@@ -89,5 +89,10 @@ export async function verifyWif(wif: string, account: string, chain: Chain, pubO
   const acct = await getAccount(chain, account);
   if (!acct) return { pub, result: { ok: false, account, chain, roles: [], error: `account ${account} not found on ${chain}` } };
   const roles = rolesForPub(acct, pub);
-  return { pub, result: { ok: roles.length > 0, account, chain, roles, balances: acct.balances } };
+  if (roles.length === 0) {
+    // Valid key format, live account, but this key is NOT in any authority —
+    // tell the operator exactly that instead of a bare "undefined".
+    return { pub, result: { ok: false, account, chain, roles: [], balances: acct.balances, error: 'המפתח תקין אך אינו נמצא ב-authorities של החשבון (מפתח ישן או שייך לחשבון אחר?)' } };
+  }
+  return { pub, result: { ok: true, account, chain, roles, balances: acct.balances } };
 }
