@@ -61,13 +61,22 @@ export function steemBroadcastAdapter(): SteemAdapter {
 }
 
 /**
- * condenser_api.get_open_orders — the live DEX orders of an account.
- * Read-path with the same verified failover list as the market client.
+ * The live DEX orders of an account — database_api.list_limit_orders
+ * (order "by_account", filtered to the exact seller; the listing continues
+ * past the account alphabetically, so the filter is required). Verified live
+ * 2026-09-09: api.steemit.com does NOT expose this method — the failover list
+ * (api.justyy.com does) is what makes this read real.
  */
 export async function steemOpenOrders(account: string): Promise<
-  Array<{ orderid: number; type: "ask" | "bid"; price: number; amount: string; expiration: string }>
+  Array<{ orderid: number; type: "ask" | "bid"; price: number; amount: string; forSale: string; expiration: string }>
 > {
-  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "condenser_api.get_open_orders", params: [[account]] });
+  const body = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "database_api.list_limit_orders",
+    params: { start: [account, 0], limit: 100, order: "by_account" },
+  });
+  const NAI: Record<string, string> = { "@@000000013": "STEEM", "@@000000021": "SBD" };
   let lastErr: unknown = null;
   for (const url of RPC_URLS) {
     try {
@@ -79,25 +88,37 @@ export async function steemOpenOrders(account: string): Promise<
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = (await res.json()) as {
-        result?: Array<{ orderid: number; sell_price?: { base?: string; quote?: string }; for_sale?: number; expiration?: string }>;
-      };
-      const rows = Array.isArray(j.result) ? j.result : [];
-      return rows.slice(0, 25).map((o) => {
-        const base = o.sell_price?.base || "";
-        const quote = o.sell_price?.quote || "";
-        // ask = selling STEEM for SBD (base "X STEEM"); bid = buying STEEM (base "X SBD")
-        const type: "ask" | "bid" = base.includes("STEEM") ? "ask" : "bid";
-        const p = base.match(/([\d.]+)\s+\w+/);
-        const q = quote.match(/([\d.]+)\s+\w+/);
-        const price = p && q && Number(q[1]) > 0 ? Number(p[1]) / Number(q[1]) : 0;
-        return {
-          orderid: Number(o.orderid),
-          type,
-          price: Math.round(price * 1e6) / 1e6,
-          amount: base,
-          expiration: o.expiration || "",
+        result?: {
+          orders?: Array<{
+            seller?: string;
+            orderid?: number;
+            for_sale?: string | number;
+            expiration?: string;
+            sell_price?: { base?: { amount?: string; nai?: string }; quote?: { amount?: string; nai?: string } };
+          }>;
         };
-      });
+        error?: { message?: string };
+      };
+      if (j.error) throw new Error(j.error.message || "rpc error");
+      const rows = Array.isArray(j.result?.orders) ? j.result!.orders! : [];
+      return rows
+        .filter((o) => String(o.seller || "").toLowerCase() === account.toLowerCase())
+        .slice(0, 25)
+        .map((o) => {
+          const baseSym = NAI[String(o.sell_price?.base?.nai || "")] || "?";
+          const baseAmt = Number(o.sell_price?.base?.amount || 0);
+          const quoteAmt = Number(o.sell_price?.quote?.amount || 0);
+          const type: "ask" | "bid" = baseSym === "STEEM" ? "ask" : "bid";
+          const price = baseAmt > 0 && quoteAmt > 0 ? Math.round((baseAmt / quoteAmt) * 1e6) / 1e6 : 0;
+          return {
+            orderid: Number(o.orderid),
+            type,
+            price,
+            amount: `${baseAmt.toFixed(3)} ${baseSym}`,
+            forSale: `${(Number(o.for_sale) / 1000).toFixed(3)}`,
+            expiration: o.expiration || "",
+          };
+        });
     } catch (e) {
       lastErr = e;
     }

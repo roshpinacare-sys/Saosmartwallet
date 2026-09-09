@@ -1095,3 +1095,28 @@ Stage Summary:
 - שתי המגבלות-הפתוחות האחרונות נפתרו בקוד חי ומאומת: הצי עכשיו יוזם (הסוכן מציע — הגבול מחליט) ולומד-יחד (ממצא סופי נרשם פעם-אחת ומלמד כל ריצה עתידית).
 - "מה עוד מגביל אותנו" — התשובה הכנה היחידה שנותרה במסמך-הביקורת: חתימה ריבונית מבוקרת (steem-order לא-חתום + אישור-מפעיל) — הצעד-הפתוח הבא בסדר-ערך.
 - קבצים: prisma/schema.prisma · src/lib/gate/harness/{modules,loop,heart}.ts · src/app/api/gate/{proposals,memory,heart}/route.ts · src/app/page.tsx · docs/autonomy-audit.md · db/custom.db.
+
+---
+Task ID: 12
+Agent: main (Z.ai Code)
+Task: "תמשיך תבחן עוד פערים ועוד דברים פורצי דרך לרשת שנוכל ליישם בנוסף לייעל את גשר הפיקוד הריבוני האוטונומי הרבה יותר לייעל הכל להמשיך לדחוף" + "וודא שאתה דוחף לריפו בסוף" — SOVEREIGN-HAND + BRIDGE-ENGINE: יישום הצעד-הפתוח האחרון מהביקורת (חתימה ריבונית מבוקרת), עידון-הגשר ל-SSE, ואזעקות-שוק.
+
+Work Log:
+- נבדק מה הושג (worklog 1-11 + audit): הצעד-הפתוח היחיד שנותר בסדר-ערך — חתימה ריבונית מבוקרת; לצידו שני פערים-פורצי-דרך שנתגלו בסריקה: הגשר מדגום עיוור כל 5 שניות, והרשת עיוורת לשוק בין ריצות.
+- schema: GateOrder — תור-חתימות (spec קנוני + preview + notional + status/decidedBy/txId/broadcastId/blockNum); db:push תקין.
+- ליבת-החתימה (src/lib/gate/harness/orders.ts, חדש): createOrderFromAgent (מסילות: פקודה-ממתינה אחת לסוכן · ≤100 STEEM · 6 חתימות/יום לצי · פקיעה 60 דק') · approveOrder — דרוש master (כספת-פתוחה), מפתח-active של headcorner מהכספת בלבד, rebuild מה-spec הקנוני (חוזה-הדטרמיניזם של steem-order.ts: orderid+orderExpiration קבועים), חתימה עם roles=["active"], שידור עם ה-adapter הנפרד שמאפשר-broadcast מפורש, ורישום כפול: GateOrder + GateAction + גשר · rejectOrder · expireStaleOrders.
+- steem-server.ts: steemBroadcastAdapter() (allowBroadcast:true — ה-M0-gate נפתח רק כאן, בנתיב-החתימה המאושר) · steemOpenOrders() — database_api.list_limit_orders by_account עם סינון-מוכר מדויק; אומת חי ש-api.steemit.com אינו חושף את המתודה — ה-failover (justyy) הוא מה שהופך את הקריאה לאמיתית.
+- המחסן 18→20: steem.order.build (actor — בנייה בלי מפתחות, לא נוגעת בכסף; create|cancel) · steem.openorders (skill, cacheable) · chat.send מרוסן נגד-ספאם (8/ריצה, 40/שעה לסוכן).
+- לב: stageOrders (פקיעה כנה של ממתינות) + stageMarket (טיקר חי כל פעימה-שישית, watermark ב-GateState, אירוע market.move על ≥3% עם קירור 30 דק') · ensureTriggerPolicy מזריע טריגר market.move לסוכנים חמושים ב-market.watch · fillTemplate: {price}/{prev}/{pct} · מוני-דופק: ordersExpired + marketMoves.
+- API: /api/gate/orders (GET תור+rails+vaultOpen · PATCH approve=rebuild→sign→broadcast / reject) · /api/gate/stream (SSE — הודעות ב-Δ עם cursor, hello/bye, heartbeat, סגירה ~55s ו-reconnect אוטומטי, ניקוי על abort).
+- UI: פאנל "יד-ריבונית — תור-החתימות" (חתום ושדר/דחייה, txId אמיתי, אזהרת כספת-נעולה, מונה signed/6) · גשר חי ב-SSE עם אינדיקטור live/polling ו-fallback · 3 endpoints חדשים במסוף-API · מוני-לב חדשים.
+- שני באגים אמיתיים שנתפסו חי באימות: ① Date.now() & 0xffffffff = int32 חתום (שלילי מאז 2026-06) → % 0x100000000 (גם ב-steem-order.ts); ② גרפן מנתח time_point_sec ב-ISO מכווץ ("20260909T225349") — אומת מטריצית מול שני צמתים (dashed-ISO ואפוק מתים לפני בדיקת-החתימה) → broadcast() מייצר פורמט נכון (הבינארי נשאר תקין).
+- גילוי-ריבונות (סיבת-השורש של AUTHORITY DRIFT): WIF-52-תווי = [0x80‖32B‖0x01‖chk]; steem-js משתמש בכל 33 הבתים כסקלר (ה-WARN הישן = דריכת-הגזירה) — הסקלר-האפקטיבי (33B mod n) אומת חי מול authority-posting של headcorner; toSigningKey משחזר זאת עם בדיקת-סיכום + mod n (@noble) — ומסביר גם את נגזרת-ה-EVM השונה.
+- אימות-חי מקצה-לקצה (אפס דמו): ריצת-סוכן — market.watch → steem.openorders (0) → steem.order.build (מכירת 0.100 STEEM @ 9.999, orderid 2288593990) → chat.report → פסיקת-בודק done ✓ · אישור-מפעיל → חתימת-כספת → שידור tx 5798c77c8a2ef4ca7ab4f64ce6ac0475cb8ab234 → ההזמנה חיה בספר-ההזמנות האמיתי (list_limit_orders: for_sale 0.100 STEEM @ 9.999) · ריצת-ביטול (op=cancel) → אישור → tx 085916fa31470b61c029738b004f6df4226c95af → 0 הזמנות-פתוחות — מחזור-חיים מלא על השרשרת.
+- דפדפן (דסקטופ + מובייל 390px, אפס גלילה-אופקית): כניסה במפתח-חי → הפאנל מציג signed 2/6 · שתי פקודות חתומות עם txId אמיתי · היסטוריית-כישלונות כנה · live stream ON · דופק beat 83 עם המונים החדשים · אפס שגיאות-קונסולה · lint נקי.
+
+Stage Summary:
+- הסוכנים קיבלו יד: מכינים פקודות-DEX אמיתיות מול ספר-ההזמנות החי — והכספת חותמת רק באישור-מפעיל מפורש, עם עדות-שרשרת נרשמת. ריבונות-המפתחות לא נשברה: המפתח-הפעיל יוצא מהכספת רק בזיכרון-התהליך, רק לחתימה, רק אחרי הכרעה.
+- הגשר הריבוני עודן: דחיפה חיה (SSE) במקום דגימה עיוורת, מסילות-ספאם, ואזעקות-שוק שהופכות תזוזת-מחיר אמיתית לריצה מרוסנת.
+- הביקורת נסגרה: כל 4 הסעיפים של "לאן אנחנו הולכים" בוצעו ואומתו חי; שני באגי-שידור וסיבת-השורש של סטיית-ה-authority נתגלו ותועדו בדרך (docs/autonomy-audit.md 3c).
+- קבצים: prisma/schema.prisma · src/lib/gate/harness/{orders,modules,heart}.ts · src/lib/steem-server.ts · src/lib/steem-order.ts · packages/chains/steem/src/adapter.ts · src/app/api/gate/{orders,stream}/route.ts · src/app/page.tsx · docs/autonomy-audit.md · db/custom.db.

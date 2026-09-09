@@ -147,7 +147,9 @@ export async function buildSteemOrderTx(spec: SteemOrderSpec): Promise<SteemOrde
     orderid = spec.orderid;
   } else {
     // Caller-chosen uint32 order id — timestamp-derived, cancelable later.
-    orderid = Date.now() & 0xffffffff;
+    // (% not &: bitwise & yields a SIGNED int32 — negative since 2026-06 —
+    // and would fail our own [0, 4294967295] validation.)
+    orderid = Date.now() % 0x100000000;
   }
   const fillOrKill = spec.fillOrKill === true;
 
