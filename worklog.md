@@ -841,3 +841,21 @@ Stage Summary:
 - Account theft mechanically confirmed and attributed to the external operator environment; new keys unrecoverable from this machine + repo (12/12 seals stale).
 - Recovery paths given to owner: (1) find the other environment/session and export ITS local keys, (2) Steem stolen-accounts recovery via @steem with the previous owner WIF (30-day deadline ~2026-10-08), (3) honest fallback: accounts unrecoverable (modest balances: 0.67 STEEM/0.26 SBD/~2.9K SP; 9.68 HIVE/~8 HP).
 - All local key material validated intact; encrypted backups in private repo are complete (ciphertext + key files), so nothing else is at risk of sandbox loss.
+
+---
+Task ID: RECOVERY-1
+Agent: Z.ai Code (main)
+Task: חקירה דחופה — רוטציית-owner לא מורשית על @headcorner + סקר-מפתחות-ראשיים מלא והעלאה לריפו לשמירת-המפעיל
+
+Work Log:
+- steem API מכני: headcorner קיים (created 2018-03-02) · רוטציית-owner יחידה בהיסטוריה: 2026-09-08T21:17:33Z · previous owner pub = STM5aUKy… תואם בדיוק ל-OWNER_WIF_PUB ב-agent/.env
+- ynet: קיים · רוטציה 2026-09-04T07:42:27Z · owner-pub קודם לא הוחזק במכונה
+- סקר-מפתחות מלא: agent/.env (סט-ישן מאומת 4/4) · vault.json (10 חיילים × 4 תפקידים = 40 WIFs מאומתים WIF→pub) · wallets-registry.json (12 ארנקים EVM/TRON/SOL/BTC) · זרע-ריבוני 96-hex (vault.cjs verify fresh = VERIFIED 12/12) · 2 מנמוניקי-טרון · .vaultkey · key-broker.token · fleet-pass · PAT · SAOS_ADMIN_TOKEN
+- פוענחו בזיכרון: fleet_keys.enc (9 קבצים) + 2 מעטפות vault.enc + 12 חותמות-היסטוריה ב-/tmp (fk-*.enc, 21:27Z→06:19Z) — **כולן עם המפתח-הישן**
+- 252 ניסיונות-גזירה מ-8 סודות-מועמדים × 4 תפקידים × 9 סדרי-שרשור: 0 התאמות · cross-match מול כל-44 ה-WIFs: 0 · /tmp + bash_history: ריק · אין PushEvent בזמן-הרוטציה
+- נבנה MASTER-KEYS-RECOVERY-2026-09-09.md תוכנתית מהקבצים (אפס-הקלדה-ידנית) · commit+push ל-roshpinacare-sys/Saosmartwallet
+
+Stage Summary:
+- המפתחות החדשים של headcorner = **null מאומת**: מעולם לא נשמרו במכונה; הרוטציה בוצעה עם המפתח-הישן מ-agent/.env (המפעיל: "לכולם היתה גישה") · אין מנגנון-רוטציה בקוד
+- שחזור headcorner מהמכונה: בלתי-אפשרי (recovery_account=steem ברירת-מחדל) · סיכון-מיידי: 10 החיילים עדיין נשלטים מהמכונה — מומלץ סיבוב-מיידי בפקודת-המפעיל
+- ארטיפקט: MASTER-KEYS-RECOVERY-2026-09-09.md (21KB) — כל-המפתחות-הראשיים לשמירת-המפעיל ומחיקה
