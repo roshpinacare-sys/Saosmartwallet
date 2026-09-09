@@ -1,44 +1,32 @@
 "use client";
 
 /**
- * SOVEREIGN GATE — מרחב-ההתחברות הריבוני.
- * שנולד מהתאונה: 2026-09-08, רוטציית-owner על headcorner דרך קובץ-מפתחות
- * גלוי ש"לכולם היתה גישה" אליו. מעכשיו: אפס מפתחות בטקסט-גלוי, כספת
- * מוצפנת (AES-256-GCM תחת סיסמת-מפעיל), סשן מתמשך, ושער-API לסוכנים.
+ * SOVEREIGN GATE — פשוט. כניסה אחת עם מפתח, בלי סיסמה, בלי דפדפנים מסובכים.
+ * מדביקים מפתח headcorner נוכחי (STEEM/HIVE) → נכנסים ישר לעבודה.
+ * בפנים: המפתחות (עם "הצג" לצפייה בפרטי), סוכנים עם API, וצ'אט-פיקוד.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 import {
-  ShieldCheck, ShieldAlert, Lock, Unlock, KeyRound, Bot, Send,
-  RefreshCw, Copy, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Plus,
+  KeyRound, ShieldCheck, LogOut, Copy, Eye, EyeOff, Bot, Send, RefreshCw,
+  Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle,
 } from "lucide-react";
 
 interface GateStatus {
   initialized: boolean;
   unlocked: boolean;
-  hint: string | null;
+  keySeals: number;
   session: { kind: string; name: string; scopes: string[] } | null;
   counts: { vaultEntries: number; activeAgents: number; messages: number };
 }
 
-interface KeyReport {
-  kind: string;
-  label: string;
-  pubs: string[];
-  controls: { chain: string; account: string; role: string; pub: string }[];
-  liveChecked: boolean;
-  notes: string[];
-}
-
-interface InventoryEntry {
+interface Entry {
   id: string;
   kind: string;
   chain: string | null;
@@ -51,670 +39,462 @@ interface InventoryEntry {
 }
 
 interface AgentRow {
-  id: string;
-  name: string;
-  active: boolean;
-  createdAt: string;
-  lastSeenAt: string;
+  id: string; name: string; memo: string | null; active: boolean;
+  createdAt: string; lastSeenAt: string;
 }
 
 interface Msg {
-  id: string;
-  fromKind: string;
-  fromName: string;
-  body: string;
-  createdAt: string;
+  id: string; channel: string; fromKind: string; fromName: string; body: string; createdAt: string;
 }
 
-export default function SovereignGate() {
-  const [status, setStatus] = useState<GateStatus | null>(null);
-  const [pass, setPass] = useState("");
-  const [showPass, setShowPass] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [newPass, setNewPass] = useState("");
+type BootInfo = { imported: number; keySeals: number } | null;
 
+export default function Page() {
+  const [booting, setBooting] = useState(true);
+  const [session, setSession] = useState<GateStatus["session"]>(null);
+  const [counts, setCounts] = useState<GateStatus["counts"] | null>(null);
+  const [keySeals, setKeySeals] = useState(0);
+
+  // login
   const [keyInput, setKeyInput] = useState("");
-  const [report, setReport] = useState<KeyReport | null>(null);
-  const [savedNote, setSavedNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [bootInfo, setBootInfo] = useState<BootInfo>(null);
 
-  const [unlockKeyInput, setUnlockKeyInput] = useState("");
-  const [resetKey, setResetKey] = useState("");
-  const [resetPass, setResetPass] = useState("");
-  const [resetPass2, setResetPass2] = useState("");
-  const [showResetCard, setShowResetCard] = useState(false);
-  const [resetNote, setResetNote] = useState<string | null>(null);
+  // vault
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [revealing, setRevealing] = useState<string | null>(null);
 
-  const [inventory, setInventory] = useState<InventoryEntry[]>([]);
-  const [summary, setSummary] = useState<string>("");
-  const [chains, setChains] = useState<{ steemOk?: boolean; hiveOk?: boolean; githubOk?: boolean | null }>({});
-
+  // agents
   const [agents, setAgents] = useState<AgentRow[]>([]);
-  const [agentName, setAgentName] = useState("");
-  const [freshToken, setFreshToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [newAgent, setNewAgent] = useState("");
+  const [agentToken, setAgentToken] = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [draft, setDraft] = useState("");
-  const feedRef = useRef<HTMLDivElement>(null);
+  // chat
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const loadStatus = useCallback(async () => {
-    const r = await fetch("/api/gate/status", { cache: "no-store" });
-    const j = await r.json();
-    if (j.ok) setStatus(j as GateStatus & { ok: boolean });
+  const loadAll = useCallback(async () => {
+    const [inv, ag, ms] = await Promise.all([
+      fetch("/api/gate/inventory").then((r) => r.json()).catch(() => null),
+      fetch("/api/gate/agents").then((r) => r.json()).catch(() => null),
+      fetch("/api/gate/messages").then((r) => r.json()).catch(() => null),
+    ]);
+    if (inv?.ok) { setEntries(inv.entries || []); setInvLoading(false); }
+    if (ag?.ok) setAgents(ag.agents || []);
+    if (ms?.ok) setMsgs(ms.messages || []);
   }, []);
 
-  const loadMessages = useCallback(async () => {
+  const refreshStatus = useCallback(async () => {
     try {
-      const r = await fetch("/api/gate/messages", { cache: "no-store" });
-      const j = await r.json();
-      if (j.ok) setMessages(j.messages || []);
-    } catch { /* feed poll failure — silent */ }
-  }, []);
-
-  const loadInventory = useCallback(async () => {
-    const r = await fetch("/api/gate/inventory", { cache: "no-store" });
-    const j = await r.json();
-    if (j.ok && !j.locked) {
-      setInventory(j.entries || []);
-      setChains(j.chains || {});
-      setSummary(`סה"כ ${j.summary.total} · מאומת-live ${j.summary.verified} · נכשל ${j.summary.failed} · ללא-בדיקת-רשת ${j.summary.noLive}`);
-    } else if (j.ok) {
-      setInventory([]);
-      setSummary("הכספת נעולה — פתח כדי לאמת live");
-    }
-  }, []);
-
-  const loadAgents = useCallback(async () => {
-    const r = await fetch("/api/gate/agents", { cache: "no-store" });
-    const j = await r.json();
-    if (j.ok) setAgents(j.agents || []);
-  }, []);
-
-  useEffect(() => {
-    loadStatus();
-    loadMessages();
-  }, [loadStatus, loadMessages]);
-
-  useEffect(() => {
-    if (status?.session) {
-      loadInventory();
-      loadAgents();
-    }
-  }, [status?.session, loadInventory, loadAgents]);
-
-  useEffect(() => {
-    const t = setInterval(() => { loadMessages(); }, 5000);
-    return () => clearInterval(t);
-  }, [loadMessages]);
-
-  async function setupOrUnlock() {
-    setBusy("unlock"); setErr(null);
-    try {
-      const first = status && !status.initialized;
-      const r = await fetch("/api/gate/" + (first ? "setup" : "unlock"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passphrase: pass }),
-      });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "כשל");
-      setPass(""); setNewPass("");
-      if (first) {
-        // first operator after setup — auto-import the whole system once
-        await fetch("/api/gate/import-lab", { method: "POST" });
+      const r = await fetch("/api/gate/status").then((x) => x.json());
+      if (r?.ok) {
+        setSession(r.session);
+        setCounts(r.counts);
+        setKeySeals(r.keySeals || 0);
+        return Boolean(r.session);
       }
-      await loadStatus();
-      await loadInventory();
-      await loadAgents();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally { setBusy(null); }
-  }
+    } catch { /* server unreachable — stay on whatever we show */ }
+    return false;
+  }, []);
 
-  async function unlockWithKey() {
-    setBusy("unlock-key"); setErr(null);
+  useEffect(() => {
+    (async () => {
+      const loggedIn = await refreshStatus();
+      if (loggedIn) { setInvLoading(true); await loadAll(); }
+      setBooting(false);
+    })();
+  }, [refreshStatus, loadAll]);
+
+  // chat poll while logged in
+  useEffect(() => {
+    if (!session) return;
+    const t = setInterval(() => {
+      fetch("/api/gate/messages").then((r) => r.json()).then((j) => { if (j?.ok) setMsgs(j.messages || []); }).catch(() => {});
+    }, 5000);
+    return () => clearInterval(t);
+  }, [session]);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
+
+  async function login() {
+    setErr(null); setBusy(true);
     try {
-      const r = await fetch("/api/gate/unlock-key", {
+      const r = await fetch("/api/gate/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: unlockKeyInput }),
-      });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "כשל");
-      setUnlockKeyInput("");
-      await loadStatus();
-      await loadInventory();
-      await loadAgents();
-      await loadMessages();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally { setBusy(null); }
+        body: JSON.stringify({ key: keyInput.trim() }),
+      }).then((x) => x.json());
+      if (!r.ok) {
+        setErr(r.error || "הכניסה נכשלה");
+      } else {
+        setKeyInput("");
+        if (r.bootstrapped && r.bootInfo) setBootInfo({ imported: r.bootInfo.imported, keySeals: r.bootInfo.keySeals });
+        setSession({ kind: "operator", name: "operator", scopes: ["*"] });
+        setInvLoading(true);
+        await refreshStatus();
+        await loadAll();
+        toast.success("נכנסת — הכספת פתוחה");
+      }
+    } catch {
+      setErr("השרת לא נענה — נסה שוב");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function resetVault() {
-    setBusy("reset"); setErr(null); setResetNote(null);
+  async function logout() {
+    await fetch("/api/gate/lock", { method: "POST" }).catch(() => {});
+    setSession(null); setEntries([]); setAgents([]); setMsgs([]); setBootInfo(null); setRevealed({});
+    toast("יצאת — הכספת ננעלה");
+  }
+
+  async function reveal(id: string) {
+    if (revealed[id]) { // toggle hide
+      setRevealed((s) => { const n = { ...s }; delete n[id]; return n; });
+      return;
+    }
+    setRevealing(id);
     try {
-      if (resetPass !== resetPass2) throw new Error("הסיסמה החדשה אינה תואמת בין שני השדות");
-      const r = await fetch("/api/gate/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: resetKey, newPassphrase: resetPass }),
-      });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "כשל");
-      setResetNote(
-        `שוחזר בהצלחה: ${j.imported} סודות ייובאו · חותמות-מפתח: ${j.keySeals?.length || 0} · גיבוי: ${j.backup ? "נכתב ✓" : "נכשל"}` +
-        (j.nulls?.length ? ` · nullים כנים: ${j.nulls.length}` : ""),
-      );
-      setResetKey(""); setResetPass(""); setResetPass2("");
-      await loadStatus();
-      await loadInventory();
-      await loadAgents();
-      await loadMessages();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally { setBusy(null); }
+      const r = await fetch("/api/gate/reveal", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }),
+      }).then((x) => x.json());
+      if (r.ok) setRevealed((s) => ({ ...s, [id]: r.priv }));
+      else toast.error(r.error || "הצפייה נכשלה");
+    } finally {
+      setRevealing(null);
+    }
   }
 
-  async function lockVault() {
-    setBusy("lock");
-    await fetch("/api/gate/lock", { method: "POST" });
-    setInventory([]); setAgents([]); setReport(null);
-    await loadStatus();
-    setBusy(null);
+  function copy(text: string, label: string) {
+    navigator.clipboard.writeText(text).then(() => toast.success("הועתק: " + label)).catch(() => toast.error("ההעתקה נכשלה"));
   }
 
-  async function identifyKey(save: boolean) {
-    setBusy(save ? "save" : "identify"); setErr(null); setSavedNote(null);
-    try {
-      const r = await fetch("/api/gate/key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: keyInput, save }),
-      });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "כשל");
-      setReport(j.report);
-      if (save && j.saved?.length) setSavedNote(`נשמר מוצפן: ${j.saved.length} רשומות`);
-      if (save) { await loadInventory(); await loadStatus(); }
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally { setBusy(null); }
+  async function createAgent() {
+    const name = newAgent.trim();
+    if (!name) return;
+    const r = await fetch("/api/gate/agents", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+    }).then((x) => x.json());
+    if (r.ok) {
+      setAgentToken(r.token);
+      setNewAgent("");
+      const ag = await fetch("/api/gate/agents").then((x) => x.json());
+      if (ag.ok) setAgents(ag.agents || []);
+      toast.success("הסוכן צורף");
+    } else toast.error(r.error || "יצירת סוכן נכשלה");
   }
 
-  async function verifyNow() {
-    setBusy("verify");
-    await loadInventory();
-    await loadStatus();
-    setBusy(null);
+  async function revokeAgent(name: string) {
+    const r = await fetch("/api/gate/agents?name=" + encodeURIComponent(name), { method: "DELETE" }).then((x) => x.json());
+    if (r.ok) {
+      setAgents((a) => a.map((x) => (x.name === name ? { ...x, active: false } : x)));
+      toast("הסוכן בוטל");
+    }
   }
 
-  async function attachAgent() {
-    setBusy("agent"); setErr(null);
-    try {
-      const r = await fetch("/api/gate/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: agentName }),
-      });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "כשל");
-      setFreshToken(j.token);
-      setAgentName("");
-      await loadAgents();
-      await loadMessages();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally { setBusy(null); }
+  async function sendMsg() {
+    const body = chatInput.trim();
+    if (!body) return;
+    setChatInput("");
+    const r = await fetch("/api/gate/messages", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }),
+    }).then((x) => x.json());
+    if (r.ok) {
+      const ms = await fetch("/api/gate/messages").then((x) => x.json());
+      if (ms.ok) setMsgs(ms.messages || []);
+    } else toast.error(r.error || "השליחה נכשלה");
   }
 
-  async function sendMessage() {
-    if (!draft.trim()) return;
-    setBusy("send");
-    try {
-      await fetch("/api/gate/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: draft }),
-      });
-      setDraft("");
-      await loadMessages();
-    } finally { setBusy(null); }
+  const verifiedCount = entries.filter((e) => e.liveOk === true).length;
+  const failedCount = entries.filter((e) => e.liveOk === false).length;
+
+  /* ─────────────────────────── lock screen ─────────────────────────── */
+  if (booting) {
+    return (
+      <div dir="rtl" className="flex-1 flex items-center justify-center min-h-[80vh]">
+        <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+      </div>
+    );
   }
 
-  const unlocked = Boolean(status?.unlocked);
-  const operatorIn = Boolean(status?.session);
+  if (!session) {
+    return (
+      <div dir="rtl" className="flex-1 flex flex-col min-h-[85vh]">
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="w-full max-w-md">
+            <div className="rounded-2xl border border-border bg-card p-8 shadow-lg">
+              <div className="flex flex-col items-center text-center gap-2 mb-6">
+                <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                  <ShieldCheck className="h-7 w-7 text-emerald-500" />
+                </div>
+                <h1 className="text-xl font-bold tracking-tight">SOVEREIGN GATE</h1>
+                <p className="text-sm text-muted-foreground">כניסה אחת עם מפתח — בלי סיסמה</p>
+              </div>
 
+              <label htmlFor="gate-key" className="sr-only">מפתח</label>
+              <Input
+                id="gate-key"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && keyInput.trim() && !busy) login(); }}
+                placeholder="הדבק כאן מפתח STEEM / HIVE"
+                className="font-mono text-sm h-11 mb-3"
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+              />
+              <Button onClick={login} disabled={busy || !keyInput.trim()} className="w-full h-11 text-base gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                {busy ? <><Loader2 className="h-4 w-4 animate-spin" /> בודק מול השרשרת…</> : <><KeyRound className="h-4 w-4" /> כניסה</>}
+              </Button>
+
+              {err && (
+                <p role="alert" className="mt-3 text-sm text-rose-500 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2">
+                  {err}
+                </p>
+              )}
+
+              <p className="mt-5 text-xs text-muted-foreground leading-relaxed text-center">
+                כל מפתח נוכחי של <span className="font-mono">@headcorner</span> עובד — STEEM או HIVE,
+                כל תפקיד (owner · active · posting · memo).
+                <br />
+                האימות מול השרשרת בלייב. נכנסים ונשארים מחוברים 30 יום.
+              </p>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  /* ─────────────────────────── dashboard ─────────────────────────── */
   return (
-    <div dir="rtl" className="flex min-h-screen flex-col bg-stone-950 text-stone-100">
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6">
-        {/* header */}
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/40">
-              <KeyRound className="h-6 w-6 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">שער-ריבון · SOVEREIGN GATE</h1>
-              <p className="text-sm text-stone-400">התחברות חכמה עם כל מפתח · כספת מוצפנת · שער-סוכנים</p>
-            </div>
+    <div dir="rtl" className="flex-1 flex flex-col min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0" />
+            <span className="font-bold tracking-tight">SOVEREIGN GATE</span>
+            <Badge variant="outline" className="text-emerald-500 border-emerald-500/40 shrink-0">מחובר</Badge>
           </div>
           <div className="flex items-center gap-2">
-            {status?.initialized ? (
-              unlocked ? (
-                <Badge className="gap-1 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
-                  <Unlock className="h-3.5 w-3.5" /> כספת פתוחה · מחובר
-                </Badge>
-              ) : (
-                <Badge className="gap-1 bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40">
-                  <Lock className="h-3.5 w-3.5" /> כספת נעולה
-                </Badge>
-              )
-            ) : (
-              <Badge className="gap-1 bg-stone-500/15 text-stone-300 ring-1 ring-stone-500/40">
-                <ShieldAlert className="h-3.5 w-3.5" /> טרם-אותחל
-              </Badge>
+            {counts && (
+              <span className="hidden sm:block text-xs text-muted-foreground">
+                {counts.vaultEntries} סודות · {counts.activeAgents} סוכנים · {keySeals} חותמות-מפתח
+              </span>
             )}
-            {status?.session && (
-              <Badge variant="outline" className="border-stone-700 text-stone-300">
-                סשן: {status.session.kind === "operator" ? "מפעיל" : status.session.name}
-              </Badge>
-            )}
+            <Button variant="outline" size="sm" onClick={logout} className="gap-1.5">
+              <LogOut className="h-4 w-4" /> יציאה
+            </Button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {err && (
-          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {err}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6">
+        {bootInfo && (
+          <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm">
+            הכספת הוקמה אוטומטית ונאטמה תחת <b>{bootInfo.keySeals}</b> מפתחות-headcorner נוכחיים ·
+            יובאו מחדש <b>{bootInfo.imported}</b> סודות · נוצר גיבוי מוצפן מקומי. אין יותר סיסמה — המפתחות שלך הם הכניסה.
           </div>
         )}
 
-        {/* unlock card — shown until THIS browser holds an operator session */}
-        {!operatorIn && (
-          <Card className="mb-6 border-stone-800 bg-stone-900/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Lock className="h-5 w-5 text-amber-400" />
-                {status?.initialized ? "פתיחת-הכספת" : "אתחול-ראשון של הכספת"}
-              </CardTitle>
-              <CardDescription>
-                {status?.initialized
-                  ? unlocked
-                    ? "הכספת פתוחה בשרת — הזן סיסמת-מפעיל כדי לקבל סשן מפעיל בדפדפן זה (נשמר 30 יום)."
-                    : "הזן סיסמת-מפעיל כדי לפתוח את מפתח-האב (נשאר בזיכרון-התהליך בלבד). הסשן שלך נשמר 30 יום."
-                  : "קבע סיסמת-מפעיל. מפתח-אב אקראי ייווצר וייאטם תחתה — וכל המפתחות של המערכת ייכנסו מוצפנים."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative flex-1">
-                <Input
-                  type={showPass ? "text" : "password"}
-                  value={pass}
-                  onChange={(e) => setPass(e.target.value)}
-                  placeholder="סיסמת-מפעיל (8+ תווים)"
-                  className="border-stone-700 bg-stone-950 pl-10 text-stone-100"
-                  onKeyDown={(e) => e.key === "Enter" && setupOrUnlock()}
-                />
-                <button
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
-                  aria-label="הצג/הסתר סיסמה"
-                >
-                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <Button onClick={setupOrUnlock} disabled={busy !== null || pass.length < 8} className="bg-emerald-600 hover:bg-emerald-500">
-                {busy === "unlock" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
-                {status?.initialized ? "פתח והתחבר" : "אתחל והתחבר"}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        <Tabs defaultValue="keys" dir="rtl">
+          <TabsList className="mb-4">
+            <TabsTrigger value="keys" className="gap-1.5"><KeyRound className="h-4 w-4" /> מפתחות</TabsTrigger>
+            <TabsTrigger value="agents" className="gap-1.5"><Bot className="h-4 w-4" /> סוכנים</TabsTrigger>
+            <TabsTrigger value="chat" className="gap-1.5"><Send className="h-4 w-4" /> צ׳אט-פיקוד</TabsTrigger>
+          </TabsList>
 
-        {/* unlock-by-key — the passphrase is never a single point of failure */}
-        {!operatorIn && status?.initialized && (
-          <Card className="mb-6 border-emerald-900/60 bg-emerald-950/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg text-emerald-200">
-                <KeyRound className="h-5 w-5 text-emerald-400" />
-                פתח עם מפתח — בלי סיסמה
-              </CardTitle>
-              <CardDescription className="text-stone-400">
-                הדבק כל מפתח שכרגע מחזיק authority על <b>headcorner</b> ב-STEEM או ב-HIVE (owner/active/posting/memo).
-                המערכת מאמתת אותו live מול השרשרת ופותחת את הכספת — גם אם הסיסמה אבדה.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                value={unlockKeyInput}
-                onChange={(e) => setUnlockKeyInput(e.target.value)}
-                placeholder="הדבק כאן מפתח-פרטי אחד (5… / K… / L…)"
-                className="min-h-[64px] border-stone-700 bg-stone-950 font-mono text-sm text-stone-100"
-              />
-              <Button onClick={unlockWithKey} disabled={busy !== null || unlockKeyInput.trim().length < 40} className="bg-emerald-600 hover:bg-emerald-500">
-                {busy === "unlock-key" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
-                אמת live ופתח
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* emergency recovery — ownership-proof vault reset */}
-        {!operatorIn && status?.initialized && !unlocked && (
-          <Card className="mb-6 border-amber-900/50 bg-amber-950/10">
-            <CardHeader>
-              <button
-                onClick={() => setShowResetCard(!showResetCard)}
-                className="flex w-full items-center gap-2 text-left"
-                aria-expanded={showResetCard}
-              >
-                <ShieldAlert className="h-5 w-5 text-amber-400" />
-                <span className="text-lg font-semibold text-amber-200">שחזור-חירום: איפוס-כספת בהוכחת-בעלות</span>
-                <span className="mr-auto text-xs text-stone-500">{showResetCard ? "הסתר ▲" : "פתח ▼"}</span>
-              </button>
-              {showResetCard && (
-                <CardDescription className="text-stone-400">
-                  נדרש מפתח <b>owner/active</b> שמחזיק authority נוכחי על headcorner (מאומת live). האיפוס בונה מפתח-אב חדש,
-                  מייבא מחדש את כל הסודות ממקורות-השחזור ששרדו, וחותם את הכספת גם תחת הסיסמה החדשה וגם תחת המפתחות הנוכחיים.
-                </CardDescription>
+          {/* ── מפתחות ── */}
+          <TabsContent value="keys">
+            <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+              <Badge variant="outline">סה״כ {entries.length}</Badge>
+              <Badge variant="outline" className="text-emerald-500 border-emerald-500/40">
+                <CheckCircle2 className="h-3 w-3 ml-1" /> מאומתים live {verifiedCount}
+              </Badge>
+              {failedCount > 0 && (
+                <Badge variant="outline" className="text-rose-500 border-rose-500/40">
+                  <XCircle className="h-3 w-3 ml-1" /> נכשלו {failedCount}
+                </Badge>
               )}
-            </CardHeader>
-            {showResetCard && (
-              <CardContent className="space-y-3">
-                <Textarea
-                  value={resetKey}
-                  onChange={(e) => setResetKey(e.target.value)}
-                  placeholder="מפתח owner/active של headcorner (5… / K… / L…)"
-                  className="min-h-[64px] border-stone-700 bg-stone-950 font-mono text-sm text-stone-100"
-                />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    type="password"
-                    value={resetPass}
-                    onChange={(e) => setResetPass(e.target.value)}
-                    placeholder="סיסמת-מפעיל חדשה (8+ תווים)"
-                    className="border-stone-700 bg-stone-950 text-stone-100"
-                  />
-                  <Input
-                    type="password"
-                    value={resetPass2}
-                    onChange={(e) => setResetPass2(e.target.value)}
-                    placeholder="אימות סיסמה חדשה"
-                    className="border-stone-700 bg-stone-950 text-stone-100"
-                  />
+              <Button variant="ghost" size="sm" onClick={() => { setInvLoading(true); loadAll(); }} className="gap-1.5 mr-auto">
+                <RefreshCw className={"h-3.5 w-3.5" + (invLoading ? " animate-spin" : "")} /> רענון + אימות live
+              </Button>
+            </div>
+
+            {invLoading && entries.length === 0 ? (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm py-10 justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" /> טוען ומאמת מול השרשרות…
+              </div>
+            ) : (
+              <ScrollArea className="h-[calc(100vh-320px)] min-h-64 rounded-xl border border-border">
+                <div className="divide-y divide-border">
+                  {entries.map((e) => {
+                    const priv = revealed[e.id];
+                    return (
+                      <div key={e.id} className="px-4 py-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary" className="font-mono text-xs">{e.chain || e.kind}</Badge>
+                          <span className="font-mono text-sm font-semibold">{e.account || "—"}</span>
+                          {e.role && <Badge variant="outline" className="text-xs">{e.role}</Badge>}
+                          <LiveDot ok={e.liveOk} />
+                          <span className="text-xs text-muted-foreground truncate max-w-52 hidden md:inline" title={e.detail}>{e.detail}</span>
+                          <div className="mr-auto flex items-center gap-1.5">
+                            {e.pub && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="העתק מפתח-ציבורי" onClick={() => copy(e.pub!, "מפתח-ציבורי")}>
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => reveal(e.id)} disabled={revealing === e.id}>
+                              {revealing === e.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : priv ? <><EyeOff className="h-3.5 w-3.5" /> הסתר</>
+                                : <><Eye className="h-3.5 w-3.5" /> הצג מפתח</>}
+                            </Button>
+                          </div>
+                        </div>
+                        {e.pub && !priv && (
+                          <p className="mt-1.5 font-mono text-xs text-muted-foreground truncate" dir="ltr">{e.pub}</p>
+                        )}
+                        {priv && (
+                          <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 flex items-start gap-2" dir="ltr">
+                            <code className="flex-1 font-mono text-xs break-all whitespace-pre-wrap">{priv}</code>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copy(priv, "מפתח פרטי")}>
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {entries.length === 0 && !invLoading && (
+                    <p className="text-center text-muted-foreground text-sm py-10">אין רשומות</p>
+                  )}
                 </div>
-                <Button
-                  onClick={resetVault}
-                  disabled={busy !== null || resetKey.trim().length < 40 || resetPass.length < 8 || resetPass2.length < 8}
-                  className="bg-amber-600 hover:bg-amber-500"
-                >
-                  {busy === "reset" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                  הוכח בעלות ושחזר הכל
-                </Button>
-                {resetNote && <p className="text-sm text-emerald-400">{resetNote}</p>}
-              </CardContent>
+              </ScrollArea>
             )}
-          </Card>
-        )}
+          </TabsContent>
 
-        {operatorIn && (
-          <Tabs defaultValue="keys" className="gap-6">
-            <TabsList className="bg-stone-900 text-stone-300">
-              <TabsTrigger value="keys" className="gap-1 data-[state=active]:text-emerald-300"><KeyRound className="h-4 w-4" /> התחברות-מפתח</TabsTrigger>
-              <TabsTrigger value="inventory" className="gap-1 data-[state=active]:text-emerald-300"><ShieldCheck className="h-4 w-4" /> מחובר-להכל</TabsTrigger>
-              <TabsTrigger value="agents" className="gap-1 data-[state=active]:text-emerald-300"><Bot className="h-4 w-4" /> סוכנים</TabsTrigger>
-              <TabsTrigger value="chat" className="gap-1 data-[state=active]:text-emerald-300"><Send className="h-4 w-4" /> צ'אט-פיקוד</TabsTrigger>
-            </TabsList>
-
-            {/* ── key connect tab ── */}
-            <TabsContent value="keys" className="space-y-4">
-              <Card className="border-stone-800 bg-stone-900/60">
-                <CardHeader>
-                  <CardTitle className="text-lg">התחבר עם כל מפתח</CardTitle>
-                  <CardDescription>
-                    הדבק כל מפתח — WIF של STEEM/HIVE (5… / K… / L…), מפתח EVM (0x…), מפתח TRON, מנמוניק, PAT של GitHub.
-                    המערכת מזהה מה הוא ומה הוא שולט-בו <b>live מהשרשרות</b>, ואז (אם תבקש) שומר אותו מוצפן.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Textarea
-                    value={keyInput}
-                    onChange={(e) => setKeyInput(e.target.value)}
-                    placeholder="הדבק כאן מפתח אחד…"
-                    className="min-h-[72px] border-stone-700 bg-stone-950 font-mono text-sm text-stone-100"
+          {/* ── סוכנים ── */}
+          <TabsContent value="agents">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-xl border border-border p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2"><Plus className="h-4 w-4 text-emerald-500" /> צירוף סוכן חדש</h3>
+                <div className="flex gap-2">
+                  <Input
+                    value={newAgent}
+                    onChange={(e) => setNewAgent(e.target.value)}
+                    placeholder="שם-סוכן (אנגלית, למשל: my-agent)"
+                    className="font-mono text-sm"
                   />
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={() => identifyKey(false)} disabled={busy !== null || !keyInput.trim()} variant="outline" className="border-stone-700">
-                      {busy === "identify" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                      זהה live
-                    </Button>
-                    <Button onClick={() => identifyKey(true)} disabled={busy !== null || !keyInput.trim()} className="bg-emerald-600 hover:bg-emerald-500">
-                      {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                      זהה ושמור מוצפן
-                    </Button>
-                    <Button onClick={lockVault} disabled={busy !== null} variant="outline" className="border-stone-700 text-stone-400 hover:text-stone-200">
-                      <Lock className="h-4 w-4" /> נעל כספת
-                    </Button>
+                  <Button onClick={createAgent} disabled={!newAgent.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">צור</Button>
+                </div>
+                {agentToken && (
+                  <div className="mt-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3">
+                    <p className="text-xs text-emerald-400 mb-1.5">טוקן הסוכן — מוצג פעם אחת בלבד, שמור עכשיו:</p>
+                    <div className="flex items-start gap-2" dir="ltr">
+                      <code className="flex-1 font-mono text-xs break-all">{agentToken}</code>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copy(agentToken, "טוקן סוכן")}>
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  {savedNote && <p className="text-sm text-emerald-400">{savedNote}</p>}
-                  {report && (
-                    <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm">
-                      <div className="mb-2 flex items-center gap-2">
-                        <Badge className="bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">{report.kind}</Badge>
-                        <span className="text-stone-300">{report.label}</span>
-                        {report.liveChecked && <Badge variant="outline" className="border-emerald-700 text-emerald-400">אומת live</Badge>}
+                )}
+                <div className="mt-4 rounded-lg bg-muted/40 p-3 text-xs leading-relaxed">
+                  <p className="font-semibold mb-1.5">חיבור סוכן דרך API:</p>
+                  <pre className="font-mono text-[11px] whitespace-pre-wrap" dir="ltr">{`Authorization: Bearer <TOKEN>
+
+POST /api/gate/messages  { "body": "…" }
+POST /api/gate/actions   { "action": "message.post"   , "params": { "body": "…" } }
+                         { "action": "report.status"   }
+                         { "action": "vault.list-pubs" }
+                         { "action": "verify.run"      }`}</pre>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border p-4">
+                <h3 className="font-semibold mb-3">סוכנים ({agents.filter((a) => a.active).length} פעילים)</h3>
+                <ScrollArea className="max-h-96">
+                  <div className="space-y-2">
+                    {agents.map((a) => (
+                      <div key={a.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+                        <Bot className={"h-4 w-4 shrink-0 " + (a.active ? "text-emerald-500" : "text-muted-foreground")} />
+                        <span className="font-mono text-sm font-medium">{a.name}</span>
+                        {a.active ? <Badge variant="outline" className="text-emerald-500 border-emerald-500/40 text-xs">פעיל</Badge>
+                          : <Badge variant="outline" className="text-muted-foreground text-xs">בוטל</Badge>}
+                        <span className="text-xs text-muted-foreground mr-auto hidden sm:inline">
+                          נראה לאחרונה: {new Date(a.lastSeenAt).toLocaleString("he-IL")}
+                        </span>
+                        {a.active && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-500" title="ביטול סוכן" onClick={() => revokeAgent(a.name)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
-                      {report.pubs.length > 0 && (
-                        <div className="mb-2 space-y-1">
-                          <p className="text-stone-500">זהויות-ציבוריות שנגזרו:</p>
-                          {report.pubs.map((p) => (
-                            <p key={p} className="break-all font-mono text-xs text-stone-400">{p}</p>
-                          ))}
-                        </div>
-                      )}
-                      {report.controls.length > 0 ? (
-                        <div>
-                          <p className="mb-1 text-stone-500">המפתח שולט ב:</p>
-                          <ul className="space-y-1">
-                            {report.controls.map((c, i) => (
-                              <li key={i} className="flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                                <span>{c.chain} · {c.account} · {c.role}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : (
-                        report.liveChecked && <p className="flex items-center gap-2 text-stone-400"><XCircle className="h-4 w-4 text-amber-400" /> לא נמצא authority תואם בשרשרות</p>
-                      )}
-                      {report.notes.map((n, i) => <p key={i} className="mt-2 text-xs text-stone-500">{n}</p>)}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                    ))}
+                    {agents.length === 0 && <p className="text-sm text-muted-foreground py-6 text-center">אין סוכנים עדיין</p>}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          </TabsContent>
 
-            {/* ── inventory tab ── */}
-            <TabsContent value="inventory" className="space-y-4">
-              <Card className="border-stone-800 bg-stone-900/60">
-                <CardHeader className="flex-row items-start justify-between space-y-0">
-                  <div>
-                    <CardTitle className="text-lg">מלאי-החיבור · מחובר להכל</CardTitle>
-                    <CardDescription>{summary || "…"}</CardDescription>
-                  </div>
-                  <Button onClick={verifyNow} disabled={busy !== null} size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-                    {busy === "verify" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                    אמת הכל עכשיו
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <Badge variant="outline" className={chains.steemOk ? "border-emerald-700 text-emerald-400" : chains.steemOk === false ? "border-red-700 text-red-400" : "border-stone-700 text-stone-500"}>steem: {chains.steemOk === true ? "live" : chains.steemOk === false ? "לא נענה" : "—"}</Badge>
-                    <Badge variant="outline" className={chains.hiveOk ? "border-emerald-700 text-emerald-400" : chains.hiveOk === false ? "border-red-700 text-red-400" : "border-stone-700 text-stone-500"}>hive: {chains.hiveOk === true ? "live" : chains.hiveOk === false ? "לא נענה" : "—"}</Badge>
-                    {chains.githubOk !== null && chains.githubOk !== undefined && (
-                      <Badge variant="outline" className={chains.githubOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>github: {chains.githubOk ? "live" : "נכשל"}</Badge>
-                    )}
-                  </div>
-                  <ScrollArea className="max-h-96 rounded-lg border border-stone-800">
-                    <div className="divide-y divide-stone-800">
-                      {inventory.length === 0 && <p className="p-4 text-sm text-stone-500">אין רשומות — הדבק מפתח בלשונית התחברות-מפתח.</p>}
-                      {inventory.map((e) => (
-                        <div key={e.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                          <div className="min-w-0">
-                            <p className="truncate">
-                              <span className="font-semibold">{e.chain || e.kind}</span>
-                              {e.account && <span> · {e.account}</span>}
-                              {e.role && <span> · {e.role}</span>}
-                            </p>
-                            <p className="truncate font-mono text-xs text-stone-500">{e.pub || e.detail}</p>
-                          </div>
-                          {e.liveOk === true && <Badge className="shrink-0 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">live ✓</Badge>}
-                          {e.liveOk === false && <Badge className="shrink-0 bg-red-500/15 text-red-300 ring-1 ring-red-500/40">לא-תואם</Badge>}
-                          {e.liveOk === null && <Badge variant="outline" className="shrink-0 border-stone-700 text-stone-400">מוצפן</Badge>}
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── agents tab ── */}
-            <TabsContent value="agents" className="space-y-4">
-              <Card className="border-stone-800 bg-stone-900/60">
-                <CardHeader>
-                  <CardTitle className="text-lg">צרף סוכן (כמוני) דרך API</CardTitle>
-                  <CardDescription>
-                    כל סוכן מקבל טוקן ויכול לכתוב לנו בצ'אט-הפיקוד ולבצע פעולות-מותרות. הטוקן מאוחסן כ-hash — ומוצג <b>פעם-אחת</b>.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={agentName}
-                      onChange={(e) => setAgentName(e.target.value)}
-                      placeholder="שם-הסוכן (למשל: anchor-agent)"
-                      className="flex-1 border-stone-700 bg-stone-950 text-stone-100"
-                    />
-                    <Button onClick={attachAgent} disabled={busy !== null || !/^[a-zA-Z0-9_-]{2,32}$/.test(agentName)} className="bg-emerald-600 hover:bg-emerald-500">
-                      <Plus className="h-4 w-4" /> צרף סוכן
-                    </Button>
-                  </div>
-                  {freshToken && (
-                    <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4">
-                      <p className="mb-2 text-sm text-emerald-300">טוקן-הסוכן (מוצג פעם-אחת — העתק עכשיו):</p>
-                      <div className="flex items-center gap-2">
-                        <code className="flex-1 break-all rounded bg-stone-950 p-2 font-mono text-xs text-emerald-200">{freshToken}</code>
-                        <Button
-                          size="sm" variant="outline" className="border-emerald-700"
-                          onClick={() => { navigator.clipboard.writeText(freshToken); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                        >
-                          {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                        </Button>
+          {/* ── צ'אט ── */}
+          <TabsContent value="chat">
+            <div className="rounded-xl border border-border flex flex-col h-[calc(100vh-300px)] min-h-80">
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+                <div className="space-y-2.5">
+                  {msgs.map((m) => (
+                    <div key={m.id} className="flex gap-2 items-start">
+                      <Badge variant={m.fromKind === "operator" ? "default" : m.fromKind === "agent" ? "secondary" : "outline"} className="shrink-0 text-xs mt-0.5">
+                        {m.fromKind === "operator" ? "אתה" : m.fromKind === "agent" ? m.fromName : "מערכת"}
+                      </Badge>
+                      <div className="min-w-0">
+                        <p className="text-sm break-words whitespace-pre-wrap">{m.body}</p>
+                        <p className="text-[10px] text-muted-foreground">{new Date(m.createdAt).toLocaleString("he-IL")}</p>
                       </div>
                     </div>
-                  )}
-                  <Separator className="bg-stone-800" />
-                  <div>
-                    <p className="mb-2 text-sm font-semibold text-stone-300">סוכנים מחוברים ({agents.filter((a) => a.active).length} פעילים)</p>
-                    <div className="space-y-2">
-                      {agents.length === 0 && <p className="text-sm text-stone-500">אין עדיין סוכנים.</p>}
-                      {agents.map((a) => (
-                        <div key={a.id} className="flex items-center justify-between rounded-lg border border-stone-800 bg-stone-950 px-3 py-2 text-sm">
-                          <div>
-                            <p className="font-semibold">{a.name}</p>
-                            <p className="text-xs text-stone-500">נראה-לאחרונה: {new Date(a.lastSeenAt).toLocaleString("he-IL")}</p>
-                          </div>
-                          <Badge variant={a.active ? "default" : "outline"} className={a.active ? "bg-emerald-500/15 text-emerald-300" : "border-stone-700 text-stone-500"}>
-                            {a.active ? "פעיל" : "מבוטל"}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <Separator className="bg-stone-800" />
-                  <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-xs text-stone-400">
-                    <p className="mb-2 font-semibold text-stone-300">מדריך-API לסוכנים (curl):</p>
-                    <pre className="overflow-x-auto whitespace-pre-wrap font-mono leading-6">{`# כתיבה לצ'אט-הפיקוד:
-curl -X POST '<origin>/api/gate/messages' \\
-  -H 'Authorization: Bearer <TOKEN>' \\
-  -H 'Content-Type: application/json' \\
-  -d '{"body":"שלום, אני הסוכן שלך"}'
-
-# ביצוע פעולה מותרת:
-curl -X POST '<origin>/api/gate/actions' \\
-  -H 'Authorization: Bearer <TOKEN>' \\
-  -H 'Content-Type: application/json' \\
-  -d '{"action":"report.status","params":{}}'
-
-# פעולות: message.post · report.status · vault.list-pubs · verify.run`}</pre>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── chat tab ── */}
-            <TabsContent value="chat">
-              <Card className="border-stone-800 bg-stone-900/60">
-                <CardHeader>
-                  <CardTitle className="text-lg">צ'אט-פיקוד · מפעיל + סוכנים</CardTitle>
-                  <CardDescription>כל הסוכנים שצירפת כותבים כאן ומבצעים לפי הצורך. עדכון-חי כל 5 שניות.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div ref={feedRef} className="max-h-96 overflow-y-auto rounded-lg border border-stone-800 bg-stone-950 p-3">
-                    <div className="space-y-2">
-                      {messages.length === 0 && <p className="text-sm text-stone-500">אין הודעות — התחל שיחה.</p>}
-                      {messages.map((m) => (
-                        <div key={m.id} className="rounded-md px-3 py-2 text-sm" style={{
-                          background: m.fromKind === "operator" ? "rgba(16,185,129,0.08)" : m.fromKind === "agent" ? "rgba(245,158,11,0.08)" : "rgba(120,113,108,0.08)",
-                        }}>
-                          <p className="mb-0.5 text-xs text-stone-500">
-                            {m.fromKind === "operator" ? "👤 מפעיל" : m.fromKind === "agent" ? `🤖 סוכן ${m.fromName}` : "⚙️ מערכת"}
-                            {" · "}{new Date(m.createdAt).toLocaleTimeString("he-IL")}
-                          </p>
-                          <p className="whitespace-pre-wrap text-stone-200">{m.body}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                      placeholder="כתוב לצ'אט-הפיקוד…"
-                      className="flex-1 border-stone-700 bg-stone-950 text-stone-100"
-                    />
-                    <Button onClick={sendMessage} disabled={busy !== null || !draft.trim()} className="bg-emerald-600 hover:bg-emerald-500">
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
-
-        {/* security posture */}
-        <Card className="mt-6 border-stone-800 bg-stone-900/40">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-stone-300">
-              <ShieldCheck className="h-5 w-5 text-emerald-400" /> מדוע זה לא יקרה שוב
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm text-stone-400 sm:grid-cols-2">
-            <p>🔒 <b className="text-stone-200">אפס-טקסט-גלוי</b> — כל מפתח נשמר AES-256-GCM בתוך מסד-הנתונים; אין קובץ-מפתחות לקרוא.</p>
-            <p>🔑 <b className="text-stone-200">פתיחה-במפתח, לא רק סיסמה</b> — מפתח-האב נאטם גם תחת כל מפתח-headcorner הנוכחי; אבדן-סיסמה כבר לא נועל אותך בחוץ.</p>
-            <p>🚫 <b className="text-stone-200">סוכנים רואים pubs בלבד</b> — אין API שחושף חומר-פרטי; כל פעולת-סוכן נרשמת באודיט.</p>
-            <p>🍪 <b className="text-stone-200">סשן מתמשך 30 יום</b> — httpOnly cookie; טוקן מאוחסן כ-hash בלבד.</p>
-          </CardContent>
-        </Card>
-
-        <footer className="mt-auto border-t border-stone-900 pb-6 pt-6 text-center text-xs text-stone-600" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
-          SOVEREIGN GATE · born from the headcorner incident (2026-09-08) · אפס-מפתחות-בטקסט-גלוי, מעכשיו והלאה
-        </footer>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+              </div>
+              <div className="border-t border-border p-3 flex gap-2">
+                <Input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && chatInput.trim()) sendMsg(); }}
+                  placeholder="כתוב לצ'אט-הפיקוד — הסוכנים רואים הכל…"
+                />
+                <Button onClick={sendMsg} disabled={!chatInput.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
+
+      <Footer />
     </div>
+  );
+}
+
+function LiveDot({ ok }: { ok: boolean | null }) {
+  if (ok === true) return <span className="inline-flex items-center gap-1 text-xs text-emerald-500"><CheckCircle2 className="h-3.5 w-3.5" /> live</span>;
+  if (ok === false) return <span className="inline-flex items-center gap-1 text-xs text-rose-500"><XCircle className="h-3.5 w-3.5" /> לא בשרשרת</span>;
+  return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><MinusCircle className="h-3.5 w-3.5" /> ללא בדיקה</span>;
+}
+
+function Footer() {
+  return (
+    <footer className="mt-auto border-t border-border bg-background">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="font-mono">SOVEREIGN GATE · AES-256-GCM</span>
+        <span>כניסה במפתח-חי בלבד · סשן 30 יום · המפתחות גלויים בלחיצה</span>
+      </div>
+    </footer>
   );
 }

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
-import { masterReady } from "@/lib/gate/crypto";
-import { requireOperator } from "@/lib/gate/session";
+import { masterReady, setMaster } from "@/lib/gate/crypto";
+import { requireOperator, openSessionMaster } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { verifyAll } from "@/lib/gate/verify";
 
@@ -10,6 +10,11 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await requireOperator();
+    if (!masterReady()) {
+      // wake from the session's sealed master (server restarted mid-session)
+      const m = await openSessionMaster();
+      if (m) setMaster(m);
+    }
     if (!masterReady()) {
       const count = await db.vaultEntry.count();
       return ok({ locked: true, entries: [], counts: { total: count }, note: "הכספת נעולה — פתח כדי לאמת live" });

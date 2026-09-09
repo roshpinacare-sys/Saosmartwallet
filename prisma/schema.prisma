@@ -51,6 +51,8 @@ model GateSession {
   kind       String // operator | account
   name       String // "operator" | account name
   scopes     String // JSON array of account@chain scopes
+  encMaster  String? // JSON {ct,iv,tag} — the master key sealed under scrypt(token, sealSalt): lets the session itself re-open the vault (view keys) even after a server restart, without ever storing the token
+  sealSalt   String? // hex — per-session salt for the token-derived KEK
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
   expiresAt  DateTime
