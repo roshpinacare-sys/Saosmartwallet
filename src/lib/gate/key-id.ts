@@ -151,7 +151,8 @@ function classify(raw: string): KeyKind {
   const s = raw.trim();
   if (/^(ghp_|github_pat_)[A-Za-z0-9_]+$/.test(s)) return "github-pat";
   if (/^saos_admin_[A-Za-z0-9_-]+$/.test(s)) return "admin-token";
-  if (/^5[HJK][1-9A-HJ-NP-Za-km-z]{50}$/.test(s) || /^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(s)) return "steem-wif";
+  // WIF: uncompressed = '5'+50 base58 (51 chars total); compressed = K/L+51 (52 total)
+  if (/^5[1-9A-HJ-NP-Za-km-z]{50}$/.test(s) || /^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(s)) return "steem-wif";
   if (/^0x[0-9a-fA-F]{64}$/.test(s)) return "evm-key";
   if (/^[0-9a-fA-F]{64}$/.test(s)) return "hex-priv";
   if (s.split(/\s+/).length >= 12 && /^[a-z\s]+$/.test(s)) return "mnemonic";

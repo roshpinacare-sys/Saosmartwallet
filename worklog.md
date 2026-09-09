@@ -903,3 +903,29 @@ Stage Summary:
 - The vault is REBUILT and the operator is PERMANENTLY un-lockoutable: the passphrase is now ONE of two unlock factors — ANY current headcorner key (steem/hive, any role) opens the gate live-verified, and if keys ever rotate, the emergency reset path rebuilds from the operator-held key file (upload/הדקור.txt).
 - "מחובר להכל" proven live in one snapshot: steem ✓ hive ✓ github ✓ + 48 entries chain/derivation-verified; agents can attach via UI/API, write to command chat, execute whitelisted actions, and are audit-logged; forbidden actions rejected.
 - Secrets posture: 0 plaintext keys in git (ciphertext DB only + gitignored encrypted backup); the ONLY plaintext copy of the fleet secrets is the recovery file in /tmp (dies with the sandbox — by design) and the operator's own הדקור.txt.
+
+---
+Task ID: 3
+Agent: Z.ai Code (main)
+Task: פישוט קיצוני של SOVEREIGN GATE לפי דרישת המפעיל — "פשוט להתחבר ולעבוד": כניסה אחת במפתח בלבד (בלי סיסמה, בלי כרטיסי-שחזור ב-UI), צפייה במפתחות הפרטיים מתוך המערכת, ו-push לריפו.
+
+Work Log:
+- אבחון התלונה "התחברתי זה לא עשה כלום": הכספת כבר אופסה (8 key-seals, 96 רשומות — נבדק ישירות ב-DB) אך המסך היה עמוס בכרטיסי-סיסמה/שחזור, ו-flow הפתיחה לא היה חד-מסלולי. החלטה: בנייה מחדש של ה-UX סביב כניסה אחת.
+- schema: GateSession += encMaster (JSON GCM seal של מפתח-האב תחת scrypt(token, sealSalt)) + sealSalt; db push תקין. הסשן עצמו נושא עותק חתום של מפתח-האב — הטוקן הגולמי קיים רק ב-cookie, ולכן ה-DB לבדו לא פותח דבר.
+- crypto.ts: נוספו getMaster() (ללא זריקה) ו-openSecretWith(master, e) לפענוח עם master מפורש.
+- session.ts: createSession(..., master?) אוטם את ה-master בתוך הסשן; openSessionMaster() פותח מה-cookie; revokeOtherSessions() לכניסה חדשה (מפעיל יחיד — הכניסה החדשה מבטלת סשנים ישנים); SessionInfo כולל canOpenMaster.
+- API חדש POST /api/gate/login: מפתח אחד → identifyKey live מול steem/hive → כל תפקיד של headcorner נכנס → פתיחה ב-key-seal; אם אין-חותם והמפתח owner/active → הקמה-עצמית מלאה (recovery bundle → master חדש → 8 חותמות → wipe+reimport → גיבוי מוצפן) בלי סיסמה בכלל (kdfSalt/encMaster של GateConfig = null). שגיאות ברורות בעברית: bad-key / not-headcorner-key / chains-down / need-owner-key.
+- API חדש POST /api/gate/reveal {id}: צפייה במפתח-פרטי בודד למפעיל מחובר; master מהזיכרון או מהעותק החתום-בסשן (שורד restart); כל חשיפה נרשמת ב-audit (channel=audit).
+- status/inventory: WAKE אוטומטי — סשן תקף פותח את הכספת מחדש בשקט אחרי restart; סשן שאינו יכול לפתוח מדווח כלא-מחובר (מונע "מחובר וכלום לא עובד").
+- page.tsx נכתב מחדש לגמרי: מסך-נעילה = כרטיס אחד (שדה מפתח + כפתור כניסה + שגיאה); דשבורד = 3 לשוניות: מפתחות (96 רשומות, סטטוס live, "הצג מפתח" → פענוח בלחיצה עם העתקה/הסתרה), סוכנים (יצירה עם טוקן-פעם-אחת, ביטול, הדרכת API), צ'אט-פיקוד (פיד משותף + poll 5 שניות). פוטר דביק mt-auto. dir=rtl.
+- תיקון באג אמיתי ב-classify (key-id.ts): WIF לא-דחוס (5…, 51 תווים) סווג "unknown" בגלל regex שדרש 52 תווים → תוקן ל-{50} אחרי 5. אומת: מפתח-legacy תקין אך rotated-out מקבל כעת not-headcorner-key (ולא "לא מזוהה").
+- באג פריסה במובייל: ScrollArea בצ'אט עם flex-1 בלי min-h-0 התנפח לגובה-התוכן ודחף את הפוטר מעל התוכן → הוחלף ב-div overflow-y-auto; אומת גיאומטרית (bodyH=winH, footer bottom=viewport bottom) ב-390px וב-1280px.
+- דיון מבלבל על "קובץ פגום" הסתיים: הקובץ היה תקין — שכבת-התצוגה של פלט הכלים בלעה את הרצף [m (דמוי-escape); קודי-תווים הוכיחו שהבייטים הם 5b 6d 73 67 73 5d = [msgs].
+- בדיקות end-to-end אמיתיות (curl + Agent Browser): כניסה עם STEEM owner WIF → in (key-seal); כניסה עם HIVE posting WIF → in; inventory → 96 רשומות, 48 live-verified, chains+github OK; reveal → PAT + מפתחes פרטיים נפענחו נכון; סוכן verifier-agent נוצר, כתב לצ'אט, הריץ report.status/vault.list-pubs/verify.run, אודיט נרשם; שלילות: קלט-זבל → bad-key, מפתח-זר → not-headcorner-key, קצר → bad-input; UI: כניסה/צפייה/סוכן/צ'אט/יציאה נבדקו בדפדפן במובייל+דסקטופ ללא שגיאות קונסולה.
+- היגיינת-ריפו לפני push: upload/ ו-backups/ gitignored; אפס ghp_ בקבצים מתועדים; מועמדי-WIF בדקו base58check — כולם כוזבים; db/custom.db מכיל צופן-GCM בלבד (מדיניות קיימת).
+
+Stage Summary:
+- התוצר: כניסה פשוטה אחת — מדביקים כל מפתח headcorner נוכחי (STEEM/HIVE, כל תפקיד) → נכנסים ישר לעבודה; נשארים מחוברים 30 יום; המפתחות הפרטיים צפים בלחיצת "הצג" בתוך המערכת; סוכנים מחוברים ב-API עם טוקן; אפס סיסמאות ב-flow הראשי.
+- עמודות סשן חדשות בשימוש: encMaster/sealSalt — העותק החתום של מפתח-האב חי בסשן בלבד, הטוקן רק ב-cookie (httpOnly), ה-DB לבדו חסר-תועלת.
+- קבצים: prisma/schema.prisma · src/lib/gate/{crypto,session,key-id}.ts · src/app/api/gate/{login,reveal}/route.ts (חדשים) · status/inventory (wake) · page.tsx (מחדש).
+- אימות: lint נקי; כל הזרימות נבדקו מקצה-לקצה ב-API ובדפדפן אמיתי; אפס מפתחות-גלוי בגיט.

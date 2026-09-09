@@ -52,8 +52,12 @@ export function setMaster(key: Buffer | null) {
 export function masterReady(): boolean {
   return g.__gateMaster instanceof Buffer && g.__gateMaster.length === 32;
 }
+/** Returns the in-memory master or null (never throws) — used for session-sealed fallback. */
+export function getMaster(): Buffer | null {
+  return masterReady() ? (g.__gateMaster as Buffer) : null;
+}
 export function requireMaster(): Buffer {
-  if (!masterReady()) throw new GateError("vault-locked", "הכספת נעולה — דרוש נעילה-פתיחה עם סיסמת-המפעיל");
+  if (!masterReady()) throw new GateError("vault-locked", "הכספת נעולה — התחבר מחדש עם מפתח");
   return g.__gateMaster as Buffer;
 }
 export function sealSecret(plaintext: string): { encPriv: string; privIv: string; privTag: string } {
@@ -62,6 +66,10 @@ export function sealSecret(plaintext: string): { encPriv: string; privIv: string
 }
 export function openSecret(e: { encPriv: string; privIv: string; privTag: string }): string {
   return openWith(requireMaster(), { ct: e.encPriv, iv: e.privIv, tag: e.privTag });
+}
+/** Open a secret with an explicit master (session-sealed path) instead of the in-memory one. */
+export function openSecretWith(master: Buffer, e: { encPriv: string; privIv: string; privTag: string }): string {
+  return openWith(master, { ct: e.encPriv, iv: e.privIv, tag: e.privTag });
 }
 
 /** sha256 hex — used for hashing session/agent tokens at rest. */
