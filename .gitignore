@@ -71,3 +71,6 @@ fleet_keys.meta.json
 upload/
 .grid98-lab/
 !/.grid98-lab/package.json
+
+# encrypted local gate backups (gitignored — ciphertext only)
+/backups/

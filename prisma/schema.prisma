@@ -18,6 +18,7 @@ model GateConfig {
   sealIv      String? // hex
   sealTag     String? // hex
   hint        String?
+  keySeals    String? // JSON — [{pub,kdfSalt,encMaster,sealIv,sealTag,addedAt}]: the SAME master sealed under each proven control-key (open the vault with ANY current key — passphrase is never a single point of failure again)
   createdAt   DateTime @default(now())
   unlockedAt  DateTime?
 }

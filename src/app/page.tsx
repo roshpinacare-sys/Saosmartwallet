@@ -78,6 +78,13 @@ export default function SovereignGate() {
   const [report, setReport] = useState<KeyReport | null>(null);
   const [savedNote, setSavedNote] = useState<string | null>(null);
 
+  const [unlockKeyInput, setUnlockKeyInput] = useState("");
+  const [resetKey, setResetKey] = useState("");
+  const [resetPass, setResetPass] = useState("");
+  const [resetPass2, setResetPass2] = useState("");
+  const [showResetCard, setShowResetCard] = useState(false);
+  const [resetNote, setResetNote] = useState<string | null>(null);
+
   const [inventory, setInventory] = useState<InventoryEntry[]>([]);
   const [summary, setSummary] = useState<string>("");
   const [chains, setChains] = useState<{ steemOk?: boolean; hiveOk?: boolean; githubOk?: boolean | null }>({});
@@ -160,6 +167,51 @@ export default function SovereignGate() {
       await loadStatus();
       await loadInventory();
       await loadAgents();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally { setBusy(null); }
+  }
+
+  async function unlockWithKey() {
+    setBusy("unlock-key"); setErr(null);
+    try {
+      const r = await fetch("/api/gate/unlock-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: unlockKeyInput }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "כשל");
+      setUnlockKeyInput("");
+      await loadStatus();
+      await loadInventory();
+      await loadAgents();
+      await loadMessages();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally { setBusy(null); }
+  }
+
+  async function resetVault() {
+    setBusy("reset"); setErr(null); setResetNote(null);
+    try {
+      if (resetPass !== resetPass2) throw new Error("הסיסמה החדשה אינה תואמת בין שני השדות");
+      const r = await fetch("/api/gate/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: resetKey, newPassphrase: resetPass }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "כשל");
+      setResetNote(
+        `שוחזר בהצלחה: ${j.imported} סודות ייובאו · חותמות-מפתח: ${j.keySeals?.length || 0} · גיבוי: ${j.backup ? "נכתב ✓" : "נכשל"}` +
+        (j.nulls?.length ? ` · nullים כנים: ${j.nulls.length}` : ""),
+      );
+      setResetKey(""); setResetPass(""); setResetPass2("");
+      await loadStatus();
+      await loadInventory();
+      await loadAgents();
+      await loadMessages();
     } catch (e) {
       setErr((e as Error).message);
     } finally { setBusy(null); }
@@ -317,6 +369,92 @@ export default function SovereignGate() {
                 {status?.initialized ? "פתח והתחבר" : "אתחל והתחבר"}
               </Button>
             </CardContent>
+          </Card>
+        )}
+
+        {/* unlock-by-key — the passphrase is never a single point of failure */}
+        {!operatorIn && status?.initialized && !unlocked && (
+          <Card className="mb-6 border-emerald-900/60 bg-emerald-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-emerald-200">
+                <KeyRound className="h-5 w-5 text-emerald-400" />
+                פתח עם מפתח — בלי סיסמה
+              </CardTitle>
+              <CardDescription className="text-stone-400">
+                הדבק כל מפתח שכרגע מחזיק authority על <b>headcorner</b> ב-STEEM או ב-HIVE (owner/active/posting/memo).
+                המערכת מאמתת אותו live מול השרשרת ופותחת את הכספת — גם אם הסיסמה אבדה.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Textarea
+                value={unlockKeyInput}
+                onChange={(e) => setUnlockKeyInput(e.target.value)}
+                placeholder="הדבק כאן מפתח-פרטי אחד (5… / K… / L…)"
+                className="min-h-[64px] border-stone-700 bg-stone-950 font-mono text-sm text-stone-100"
+              />
+              <Button onClick={unlockWithKey} disabled={busy !== null || unlockKeyInput.trim().length < 40} className="bg-emerald-600 hover:bg-emerald-500">
+                {busy === "unlock-key" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
+                אמת live ופתח
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* emergency recovery — ownership-proof vault reset */}
+        {!operatorIn && status?.initialized && !unlocked && (
+          <Card className="mb-6 border-amber-900/50 bg-amber-950/10">
+            <CardHeader>
+              <button
+                onClick={() => setShowResetCard(!showResetCard)}
+                className="flex w-full items-center gap-2 text-left"
+                aria-expanded={showResetCard}
+              >
+                <ShieldAlert className="h-5 w-5 text-amber-400" />
+                <span className="text-lg font-semibold text-amber-200">שחזור-חירום: איפוס-כספת בהוכחת-בעלות</span>
+                <span className="mr-auto text-xs text-stone-500">{showResetCard ? "הסתר ▲" : "פתח ▼"}</span>
+              </button>
+              {showResetCard && (
+                <CardDescription className="text-stone-400">
+                  נדרש מפתח <b>owner/active</b> שמחזיק authority נוכחי על headcorner (מאומת live). האיפוס בונה מפתח-אב חדש,
+                  מייבא מחדש את כל הסודות ממקורות-השחזור ששרדו, וחותם את הכספת גם תחת הסיסמה החדשה וגם תחת המפתחות הנוכחיים.
+                </CardDescription>
+              )}
+            </CardHeader>
+            {showResetCard && (
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={resetKey}
+                  onChange={(e) => setResetKey(e.target.value)}
+                  placeholder="מפתח owner/active של headcorner (5… / K… / L…)"
+                  className="min-h-[64px] border-stone-700 bg-stone-950 font-mono text-sm text-stone-100"
+                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    type="password"
+                    value={resetPass}
+                    onChange={(e) => setResetPass(e.target.value)}
+                    placeholder="סיסמת-מפעיל חדשה (8+ תווים)"
+                    className="border-stone-700 bg-stone-950 text-stone-100"
+                  />
+                  <Input
+                    type="password"
+                    value={resetPass2}
+                    onChange={(e) => setResetPass2(e.target.value)}
+                    placeholder="אימות סיסמה חדשה"
+                    className="border-stone-700 bg-stone-950 text-stone-100"
+                  />
+                </div>
+                <Button
+                  onClick={resetVault}
+                  disabled={busy !== null || resetKey.trim().length < 40 || resetPass.length < 8 || resetPass2.length < 8}
+                  className="bg-amber-600 hover:bg-amber-500"
+                >
+                  {busy === "reset" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  הוכח בעלות ושחזר הכל
+                </Button>
+                {resetNote && <p className="text-sm text-emerald-400">{resetNote}</p>}
+              </CardContent>
+            )}
           </Card>
         )}
 
@@ -567,7 +705,7 @@ curl -X POST '<origin>/api/gate/actions' \\
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-stone-400 sm:grid-cols-2">
             <p>🔒 <b className="text-stone-200">אפס-טקסט-גלוי</b> — כל מפתח נשמר AES-256-GCM בתוך מסד-הנתונים; אין קובץ-מפתחות לקרוא.</p>
-            <p>🧠 <b className="text-stone-200">מפתח-אב בזיכרון בלבד</b> — נאטם תחת סיסמת-המפעיל (scrypt); הפעלה-מחדש של השרת נועלת אוטומטית.</p>
+            <p>🔑 <b className="text-stone-200">פתיחה-במפתח, לא רק סיסמה</b> — מפתח-האב נאטם גם תחת כל מפתח-headcorner הנוכחי; אבדן-סיסמה כבר לא נועל אותך בחוץ.</p>
             <p>🚫 <b className="text-stone-200">סוכנים רואים pubs בלבד</b> — אין API שחושף חומר-פרטי; כל פעולת-סוכן נרשמת באודיט.</p>
             <p>🍪 <b className="text-stone-200">סשן מתמשך 30 יום</b> — httpOnly cookie; טוקן מאוחסן כ-hash בלבד.</p>
           </CardContent>
