@@ -438,11 +438,26 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     for (let i = 1; i <= run.budget && !finished; i++) {
       if (!(await stillMine(runId))) { leaseLost = true; break; } // a reaper/another worker took over — leave the row alone
       await renewLease(runId);
+      /* ── anti-stall guard: identical call ≥2× IN A ROW proves nothing new ──
+       * Live-caught pathology: a maker looped chain.ethereum 8× (all cache
+       * hits — zero network cost, but budget turns burned) and never reached
+       * the other armed modules. The cache keeps it cheap; this nudge keeps
+       * it MOVING. Prompt-level only — no behavior is ever refused. */
+      const makerSoFar = steps.filter((s) => s.side === "maker" && s.tool && s.tool !== "finish");
+      const sigOf = (s: { tool?: string; args?: Record<string, unknown> | undefined }) => `${s.tool}:${JSON.stringify(s.args || {})}`;
+      let sameRun = 0;
+      if (makerSoFar.length) {
+        const last = sigOf(makerSoFar[makerSoFar.length - 1]);
+        for (let k = makerSoFar.length - 1; k >= 0; k--) { if (sigOf(makerSoFar[k]) === last) sameRun++; else break; }
+      }
+      const stallNudge = sameRun >= 2
+        ? `\n\n⏸️ ANTI-STALL: you already called ${makerSoFar[makerSoFar.length - 1].tool} ${sameRun}× in a row and received the SAME (cached) answer every time. Repeating it proves nothing and burns budget. Either call a DIFFERENT module you still need, or finish with your Hebrew report if the evidence is complete.`
+        : "";
       const userContent = i === 1
         ? (recovering
           ? `RECOVERED (attempt ${attempt}/${run.maxAttempts}) — ההרצה קרסה באמצע והוחזרה על-ידי השומר. עקבות שנשמרו לפני הקריסה:\n${ratchetedTranscript(steps.filter((s) => s.side === "maker")).slice(-4000)}\n\nהמשך בדיוק מאיפה שנעצרת — אל תחזור על צעדים שכבר הוכיחו ראיות.`
           : `GOAL RECEIVED. Begin. Progress is empty — you are at step 1 of ${run.budget}.`)
-        : `PROGRESS SO FAR (ratchet — do not repeat completed work):\n${ratchetedTranscript(steps.filter((s) => s.side === "maker")).slice(-5000)}\n\nContinue toward the goal. Step ${i} of ${run.budget}.`;
+        : `PROGRESS SO FAR (ratchet — do not repeat completed work):\n${ratchetedTranscript(steps.filter((s) => s.side === "maker")).slice(-5000)}\n\nContinue toward the goal. Step ${i} of ${run.budget}.${stallNudge}`;
       const r = await makerStep(i, userContent);
       finished = r.finished;
       if (r.report) finalReport = r.report;

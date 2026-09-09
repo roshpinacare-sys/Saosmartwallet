@@ -1120,3 +1120,24 @@ Stage Summary:
 - הגשר הריבוני עודן: דחיפה חיה (SSE) במקום דגימה עיוורת, מסילות-ספאם, ואזעקות-שוק שהופכות תזוזת-מחיר אמיתית לריצה מרוסנת.
 - הביקורת נסגרה: כל 4 הסעיפים של "לאן אנחנו הולכים" בוצעו ואומתו חי; שני באגי-שידור וסיבת-השורש של סטיית-ה-authority נתגלו ותועדו בדרך (docs/autonomy-audit.md 3c).
 - קבצים: prisma/schema.prisma · src/lib/gate/harness/{orders,modules,heart}.ts · src/lib/steem-server.ts · src/lib/steem-order.ts · packages/chains/steem/src/adapter.ts · src/app/api/gate/{orders,stream}/route.ts · src/app/page.tsx · docs/autonomy-audit.md · db/custom.db.
+
+---
+Task ID: 13
+Agent: Z.ai Code (main)
+Task: "תמשיך לחזק את המערכת ככל הניתן תסיק פוטנציאל מה יש לנו בידיים מהבנת כל התיקיות ומה נוכל ליישם כדי להפיק ערך פריצת דרך ואימות מודלים של טכנולוגיה חדשנית בבלוקצ'יין מה חסר לנו מה אתה רואה תיישם אתה הערכים הגבוהים ביותר ודחוף לריפו" — MULTI-CHAIN SOVEREIGN EYES + ANTI-STALL GUARD.
+
+Work Log:
+- Task 12 נסגר תחילה: אימות-עצמאי מול צומת-ציבורי של שתי העדויות-שרשרת (create tx 5798c77c… @ block 109441448 · cancel tx 085916fa… @ block 109441504 · get_open_orders = 0 — מחזור-חיים סגור על השרשרת האמיתית) · SSE נבדק חי (event: hello) · GateAction + גשר + pricewatch-watermark (0.09729 חי) נבדקו ב-DB · lint 0 · ה-push הושלם (42db361..904f999).
+- סריקת-פוטנציאל על כל התיקיות: packages/chains/index.ts מחזיק EthereumAdapter + SolanaAdapter מלאים עם נקודות-קצה שאומתו חי (4 צמתים ETH / 2 SOL, failover, broadcast fail-closed) — והכספת מחזיקה ethereum:wallet ×12, solana:wallet ×12 (+ tron ×12+2 בלי adapter — לא נכתוב קריפטו ביד, קפא). 20 המודולים לא כיסו אף אחת מהשרשראות — עיוורון-ריבונות שלם.
+- src/lib/multichain-server.ts (חדש): ethereumEyes() / solanaEyes() — chainInfo חי + יתרות לכל ארנקי-הכספת (כתובות-ציבור מ-VaultEntry.pub בלבד), allSettled לכל ארנק (כישלון-ארנק לא מפיל את הדוח), סכומי-על BigInt שלמים-מדויקים על wei/lamports גלמיים, ספירת-SPL לא-אפסיים (Token+Token-2022), cap 16 ארנקים.
+- modules.ts: מודולי `chain.ethereum` (fleet|health|address) + `chain.solana` (fleet|health|tokens) — connector, cacheable עם cacheKeyOf קנוני, needsVault:false, קריאה-בלבד (אין נתיב-חתימה — M0 לא נפתח). המחסן: 20 → 22.
+- אימות חי ישיר: ETH chainId 1 · גובה 25,943,145 · 12/12 חי · 0.0022 ETH סה"כ · SOL slot 445,737,384 · epoch 1031 · nodeVersion 4.2.2 · 12/12 חי · 0.066 SOL · 429 מ-mainnet-beta נבלע ב-retry של ה-adapter.
+- פתולוגיה שנתפסה חי בריצת-E2E: מייצר לולא על chain.ethereum ×8 (cache-hit — אפס רשת, תקציב נשרף) ומת. תיקון מדוד ב-loop.ts — נאדג anti-stall (פרומפט-בלבד, שום סירוב) כשאותה קריאה חוזרת ≥2 ברצף. הוכח חי: [eth×8 נתקע] → [eth→eth(cache)→sol→chat.report→finish], הדוח העברי עם המספרים החיים (גובה 25,943,191 / slot 445,739,147) בגשר; בודק 3/4 (FAIL יחיד = פדנטיות "once" מול cache-hit — כנות-בודק).
+- ריצות-E2E: 4 ריצות אמת (nvidia ×2, zai ×2) — שני המודולים החזירו נתוני-צי חיים בכל ריצה דרך לולאת-ה-harness האמיתית; lint 0 לאורך כל הדרך.
+- docs/autonomy-audit.md: גל-רביעי (3d) — הפוטנציאל-החבוי, העיניים, האימות, מגן-ההתקדמות, ומה-עדיין-פתוח בכנות (חתימת ETH/SOL במסילות SOVEREIGN-HAND = הצעד-הבא בסדר-הערך; TRON קפא עד adapter; _clamped head מוגבל — המייצר יכול לצלול mode=address).
+
+Stage Summary:
+- הצי קיבל עיניים על שתי שרשראות-ענק שהכספת כבר החזיקה: 24 ארנקים חיים לסוכנים, אפס מפתחות בסיכון, אפס דמו — כל מספר בדוח הוא קריאת-RPC אמיתית עם failover.
+- לולאת-הריצה חזקה יותר: מגן-התקדמות מונע שריפת-תקציב על לולאות-עצירה — נמדד חי לפני/אחר.
+- גבולות כנים נשמרו: TRON לא מומש (אין adapter — לא נכתוב קריפטו ביד), חתימת ETH/SOL נשארת סגורה עד בונה-לא-חתום משלהן (M0).
+- קבצים: src/lib/multichain-server.ts (חדש) · src/lib/gate/harness/modules.ts · src/lib/gate/harness/loop.ts · docs/autonomy-audit.md · db/custom.db · worklog.md.
