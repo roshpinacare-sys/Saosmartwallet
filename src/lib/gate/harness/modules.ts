@@ -21,6 +21,9 @@ import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
+import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
+import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
+import { formatEther } from "ethers";
 
 export type ModuleKind = "skill" | "connector" | "actor";
 
@@ -130,6 +133,50 @@ export const MODULES: HarnessModule[] = [
       return await adapter.getBalances(account);
     },
     cacheKeyOf: (args) => `${String(args.query || "balances")}:${String(args.account || "headcorner").replace(/^@/, "").toLowerCase()}`,
+  },
+  {
+    id: "chain.ethereum",
+    name: "קורא ETHEREUM",
+    kind: "connector",
+    desc: "עיניים חיות על Ethereum — הפוטנציאל שהיה חבוי: לכספת יש 12 ארנקי-EVM והסוכנים היו עיוורים אליהם. ברירת-מחדל (fleet): גובה-בלוק, עמלות-גז אמת ויתרת חיה של כל ארנקי-הכספת (כתובות-ציבור בלבד, ללא מפתחות, failover על 4 צמתים-חיים). גם health וגם בדיקת-כתובת בודדת. קריאה-בלבד — אין נתיב-חתימה כאן.",
+    args: `{"mode":"fleet|health|address","address":"0x… (address mode only)"}`,
+    needsVault: false,
+    cacheable: true,
+    cacheKeyOf: (args) => `eth:${String(args.mode || "fleet")}:${String(args.address || "").toLowerCase()}`,
+    async exec(args) {
+      const mode = String(args.mode || "fleet");
+      if (mode === "health") return await getEthereumAdapter().health();
+      if (mode === "address") {
+        const address = String(args.address || "").trim();
+        if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new GateError("bad-input", "דרוש params.address תקין (0x + 40 תווים הקס)");
+        const adapter = getEthereumAdapter();
+        const a = await adapter.getAccountInfo(address);
+        return { ...a, balanceEth: formatEther(BigInt(a.balance)) };
+      }
+      return await ethereumEyes();
+    },
+  },
+  {
+    id: "chain.solana",
+    name: "קורא SOLANA",
+    kind: "connector",
+    desc: "עיניים חיות על Solana — האוצר השני שהיה נעול: 12 ארנקי-SOL בכספת, עכשיו חיים לסוכנים. ברירת-מחדל (fleet): סלוט חי, יתרת-למפורט של כל ארנק ומספר-הטוקנים הלא-אפסיים (SPL, Token+Token-2022) — כתובות-ציבור בלבד, failover חי. גם health וגם סריקת-SPL מלאה לכתובת בודדת. קריאה-בלבד.",
+    args: `{"mode":"fleet|health|tokens","address":"base58 (tokens mode only)"}`,
+    needsVault: false,
+    cacheable: true,
+    cacheKeyOf: (args) => `sol:${String(args.mode || "fleet")}:${String(args.address || "")}`,
+    async exec(args) {
+      const mode = String(args.mode || "fleet");
+      const adapter = getSolanaAdapter();
+      if (mode === "health") return await adapter.health();
+      if (mode === "tokens") {
+        const address = String(args.address || "").trim();
+        if (address.length < 32 || address.length > 44) throw new GateError("bad-input", "דרוש params.address תקין (base58, 32-44 תווים)");
+        const tokens = await adapter.getTokenBalances(address);
+        return { address, count: tokens.length, tokens };
+      }
+      return await solanaEyes();
+    },
   },
   {
     id: "web.search",
