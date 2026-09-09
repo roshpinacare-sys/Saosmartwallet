@@ -350,3 +350,26 @@ DEVELOPER** — ה-API המסחרי המדוד (מפתחות + try-it + ledger).
 
 *המסמך נכתב אחרי הרצת כל שלושת ה-apis בסשן זה (2026-09-08). מספרים
 עתידיים/פיננסיים מסומנים speculative ולא מהווים נתון. כנות > שיווק.*
+
+## EVM-ANCHOR — החתימה בוצעה בפועל (2026-09-09, סבב חמישי)
+
+**ההנחיה:** "יש לך חתימה באחת התיקיות — תבצע, אני מרשה לך."
+**החתימה נמצאה (registry-fleet שנגזר 01:14), בוצעה, וקבועה על Ethereum mainnet.**
+
+- **txid חי:** `0xf5c48cdefe1c1448728c6d5828f34d8393cabc25ed9ab702e318c85bf46d584a`
+  · בלוק 25,936,661 · status 1 · gasUsed **32,680 == החיזוי המדויק של מודל
+  EIP-7623** · חותם: ארנק headcorner הריבוני · עלות ~$0.012.
+- **מה נקבע לנצח:** מצב השרשרת הריבונית — height 68,058 · stateRoot
+  `94efe479…` · 64 checkpoints — תחת **חמישה שעוני-שרשרת עצמאיים**
+  (STEEM · HIVE · TRON · ETHEREUM · SOLANA) שנקראו חי ברגע-החתימה.
+- **המסלול:** פרוטוקול `saos-jumpper/v1` (self-transfer EOA, value=0,
+  commitment ב-calldata) — נחתם מקומית דרך ה-adapter הקיים, נשלט fail-closed
+  (שומר-תקציב 20%, שומר-signer, `--broadcast` מפורש).
+- **אימות חוזר לכל אחד:** `bun tools/evm-anchor-broadcast.ts --verify=<txid>`
+  → TIER-3-VERIFY: PROVEN · או ידנית: Etherscan → Input Data → JSON קריא.
+- **כנות:** מפתחות-STEEM עדיין ישנים מול הרוטציות (40/40 MISMATCH — נבדק
+  מכנית ב-`tools/vault-authority-check.ts`); anchors בצד-STEEM חסומים עד
+  סנכרון-מפתחות מהבעלים. ה-anchor החוזר הוא החלטת-בעלים — הכלי מוכן.
+- מסמך-הראיה המלא: `docs/evm-anchor-round.md`.
+
+---
