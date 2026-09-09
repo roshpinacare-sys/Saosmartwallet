@@ -1,8 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// SOVEREIGN GATE — operator key-vault + agent gateway schema
 
 generator client {
   provider = "prisma-client-js"
@@ -13,121 +9,86 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// ---------------------------------------------------------------------------
-// Sovereign Key Vault (M2 — packages/core persistence)
-// ---------------------------------------------------------------------------
-
-/// Singleton row ("vault") holding the full non-secret vault state document:
-/// hierarchy metadata, policy rule sets, EncryptedKey envelopes (ciphertext +
-/// iv + tag — safe at rest; plaintext keys exist only in volatile memory while
-/// unlocked). The master-password verifier is an Argon2id parameter hash.
-model VaultState {
-  id          String   @id @default("vault")
-  version     Int      @default(1)
-  stateJson   String
-  genesisHash String
+// Singleton config row (id = "gate"): master key sealed with scrypt(passphrase)
+model GateConfig {
+  id          String   @id // "gate"
+  initialized Boolean  @default(false)
+  kdfSalt     String? // hex — scrypt salt for passphrase
+  encMaster   String? // hex — AES-256-GCM(masterKey, key=scrypt(passphrase))
+  sealIv      String? // hex
+  sealTag     String? // hex
+  hint        String?
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  unlockedAt  DateTime?
 }
 
-/// Tamper-evident audit chain. eventHash = SHA-256(previousEventHash ‖ canonical
-/// event). seq is a dense sequence assigned by the audit engine. timestamp is
-/// epoch MILLISECONDS — BigInt, because Int32 overflows in 1970+68 years.
-model AuditEvent {
-  id                String  @id @default(cuid())
-  seq               Int     @unique
-  timestamp         BigInt
-  type              String
-  actorJson         String
-  targetJson        String
-  result            String
-  reason            String?
-  previousEventHash String
-  eventHash         String
+// Every secret/key lives here ENCRYPTED. priv bytes never leave server unencrypted.
+model VaultEntry {
+  id         String    @id @default(cuid())
+  kind       String // steem-key | evm-key | tron-key | sol-key | mnemonic | token | note
+  chain      String? // steem | hive | ethereum | tron | solana | github | infra
+  account    String? // headcorner, cashmachine, ...
+  role       String? // owner | active | posting | memo | wallet | infrastructure
+  pub        String? // derived public key / address (not secret)
+  encPriv    String // hex — AES-256-GCM(private material, masterKey)
+  privIv     String // hex
+  privTag    String // hex
+  status     String // verified | rotated-out | unverifiable | imported
+  verifyNote String?
+  source     String? // upload-file | agent-env | vault-json | operator-input | registry
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([chain, account, role, pub])
 }
 
-// ---------------------------------------------------------------------------
-// Model 1 — Metered Identity Verification API (Week 1 of docs/what-we-can-do-now.md)
-// ---------------------------------------------------------------------------
-
-/// Developer API key for the metered product endpoint (POST /api/v1/identity/verify).
-/// The raw key (`saos_live_` + 32 random bytes, base64url) is shown EXACTLY ONCE
-/// at creation; only its SHA-256 hash is ever stored. `prefix` keeps the first 16
-/// characters so the console can display and the product endpoint can label the
-/// caller without revealing the secret.
-model ApiKey {
-  id         String        @id @default(cuid())
-  name       String
-  prefix     String        @unique
-  keyHash    String        @unique
-  active     Boolean       @default(true)
-  createdAt  DateTime      @default(now())
-  lastUsedAt DateTime?
-  records    UsageRecord[]
+// Persistent login sessions ("תישאר מחובר") — cookie token stored hashed
+model GateSession {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique // sha256 hex of cookie token
+  kind       String // operator | account
+  name       String // "operator" | account name
+  scopes     String // JSON array of account@chain scopes
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
 }
 
-/// One row per executed product call — the usage ledger. outcome is
-/// PROVEN | FAILED | ERROR (the service did real chain work in every case,
-/// so every executed call consumes quota — stated honestly in the console).
-model UsageRecord {
+// Attached agents ("סוכנים כמוך") — API tokens
+model GateAgent {
+  id         String    @id @default(cuid())
+  name       String    @unique
+  tokenHash  String    @unique // sha256 of bearer token (token shown once at creation)
+  memo       String?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+}
+
+// The shared chat feed — operator + agents write here
+model GateMessage {
   id        String   @id @default(cuid())
-  keyId     String
-  key       ApiKey   @relation(fields: [keyId], references: [id], onDelete: Cascade)
-  endpoint  String
-  outcome   String
-  username  String?
-  latencyMs Int
+  channel   String   @default("command") // command | audit
+  fromKind  String // operator | agent | system
+  fromName  String
+  body      String
+  meta      String? // JSON
   createdAt DateTime @default(now())
 
-  @@index([keyId, createdAt])
   @@index([createdAt])
 }
 
-/// Atomic per-key daily quota reservation counter (one row per key per UTC
-/// day). The gate is a single conditional INSERT..ON CONFLICT..DO UPDATE
-/// (used < limit) — check-then-act on the ledger admitted exactly one
-/// in-flight call over the limit under concurrency (measured live in
-/// docs/m1-429-liveburn.md); the reservation closes that off-by-one. The
-/// ledger stays the truth of EXECUTED calls; at completion of all reserved
-/// calls the two converge (a crash between reserve and meter errs
-/// conservative: quota consumed without a ledger row).
-model QuotaCounter {
+// Audit of every executed action
+model GateAction {
   id        String   @id @default(cuid())
-  keyId     String
-  dayUtc    String
-  used      Int      @default(0)
-  updatedAt DateTime @updatedAt
-
-  @@unique([keyId, dayUtc])
-  @@index([dayUtc])
-}
-
-/// Owner gate for key-management routes (create/revoke keys) — closes the
-/// auth gap declared at Model 1 Week 1. The admin token is shown ONCE at
-/// bootstrap (same copy-once discipline as API keys); only its SHA-256 is
-/// stored. When env SAOS_ADMIN_TOKEN is set it takes precedence (ops
-/// override); the DB credential is the sandbox default path.
-model AdminCredential {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  label     String
+  agentName String
+  action    String
+  params    String? // JSON
+  ok        Boolean
+  result    String? // JSON / text
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
