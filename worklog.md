@@ -823,3 +823,21 @@ Stage Summary:
 - vault-verify is now durably green: real package.json at lab root makes guardian's "deps-reinstalled" real for future crash-recovery.
 - gitkeeper (canonical-state pusher) is dead and ABSENT from this box — manual publish-before-anchor is now part of the anchor protocol until restored (deliberate simplification: publish exactly when anchoring).
 - Known honest limits unchanged (owner-side): STEEM/HIVE posting authority (post-rotation keys), npm publish saos-id-verify, public BASE_URL.
+
+---
+Task ID: KEY-RESCUE-1
+Agent: Z.ai Code (main)
+Task: "קרה מקרה ואחד הסוכנים שינה את המפתח הראשי שלי לsteemit של headcorner... חייב למצוא את המפתחות הראשיים" — emergency forensic + owner key recovery.
+
+Work Log:
+- Chain-verified: @headcorner owner/active/posting ALL rotated at 2026-09-08T21:17:33 (tx 8313cdcb9da74ba0d63a5302b72e3d7e6dcc6c81, blk 109410651); HIVE same rotation 6s later (21:17:39); 10 soldier accounts rotated 21:33. recovery_account=steem on both chains. Account EXISTS (id 783644) — login fails because old password no longer maps to owner.
+- Key hunt on this machine (all mechanical, zero fabrication): full-filesystem plaintext scan for the 3 new pub keys = 0 hits; agent/.env holds PRE-rotation WIFs (pubs STM5aUKyd9/STM5HhJD5/STM8m3rB — all VALID self-consistent); vault.json roster (10 soldiers + ynet delegated) has no headcorner; vault.enc decrypted via keys/.vaultkey (scrypt N=2^15 GCM) — no new keys; fleet_keys.enc decrypted via meta pass — no new keys; 312 derivation recipes (seed/old-WIFs/vaultkey/broker-token bases × 14 recipes × classic toWif) — 0 matches; soldier-ground-truth recipe validation — 0 recipes validate (master-derive uses an unknown master password, likely the external operator's).
+- Repo archaeology (roshpinacare-sys/steem): downloaded ALL 12 historical fleet_keys.enc+meta commits (2026-09-08T21:28 → 09-09T03:52), decrypted every one — ALL contain the same pre-rotation .env; the rotator NEVER pushed its new keys.
+- Verdict (matches ACTIVATE-ALL's own "external operator DOWN 22:41" forensics): a DIFFERENT environment (owner's other agent session — the commander that ran saos-dex.anchor.v1 cadence until 22:41) rotated the keys at 21:17 and died WITHOUT persisting the new keys to the repo or anywhere reachable. On THIS box only pre-rotation keys exist.
+- Delivered to owner IN CHAT ONLY (never git/logs, same policy as ACTIVATE-ALL web-vault password): pre-rotation headcorner WIFs (owner/active/posting/memo — the previous-owner key required for Steem stolen-accounts recovery, 30-day window until ~2026-10-08), sovereign seed (all army EVM×7/TRON/SOL/BTC wallets), both TRON mnemonics, .vaultkey, fleet_keys.meta pass. GitHub token referenced by path (upload/Roshcaregt.txt) not re-printed.
+- Explained why plaintext keys must NOT go into git (history survives delete) — encrypted repo backups (fleet_keys.enc/vault.enc + their keys, all committed by gitkeeper) already make every secret recoverable from the repo on any machine.
+
+Stage Summary:
+- Account theft mechanically confirmed and attributed to the external operator environment; new keys unrecoverable from this machine + repo (12/12 seals stale).
+- Recovery paths given to owner: (1) find the other environment/session and export ITS local keys, (2) Steem stolen-accounts recovery via @steem with the previous owner WIF (30-day deadline ~2026-10-08), (3) honest fallback: accounts unrecoverable (modest balances: 0.67 STEEM/0.26 SBD/~2.9K SP; 9.68 HIVE/~8 HP).
+- All local key material validated intact; encrypted backups in private repo are complete (ciphertext + key files), so nothing else is at risk of sandbox loss.
