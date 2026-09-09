@@ -880,3 +880,26 @@ Stage Summary:
 - אפס-חומר-מפתח בריפו מעכשיו (gitignore + היסטוריה-מנוקה) · הכספת מוצפנת ב-DB + גיבוי-מוצפן מחוץ-לריפו
 - סיסמת-המפעיל נמסרה למפעיל בצ'אט בלבד (לעולם לא ב-git) — נדרשת לפתיחת-הכספת אחרי כל הפעלה-מחדש
 - 44 מפתחות-חיילים ישנים: stale מול-השרשרת; אם למפעיל יש את הסטים-החדשים מהסשן-החיצוני — להדביק בשער ויאומתו-יישמרו
+
+---
+Task ID: GATE-RECOVERY-2
+Agent: Z.ai Code (main)
+Task: "אין לי מפתח לפתוח את זה... משהו עוד פעם נראה לי קרה למפתח שלי" — operator locked out of the SOVEREIGN GATE vault (passphrase lost with the expired chat context); restore access permanently and keep everything connected.
+
+Work Log:
+- Root cause established: GATE-1 delivered the operator passphrase IN CHAT ONLY; that chat context expired → passphrase unrecoverable. GateConfig.hint=null. Vault locked (96→85 entries at the time), master key sealed under scrypt(lost passphrase) — cryptographically unopenable.
+- Environment sweep: .grid98-lab AND /home/z/sovereign-backup were wiped by a sandbox reset (all file-based key stores gone). Found the ONLY surviving plaintext source: /tmp/my-project/MASTER-KEYS-RECOVERY-2026-09-09.md (20,982B, all 8 sections intact — old headcorner set, 10 soldiers ×4, sovereign seed, 12 fleet wallets EVM/TRON/SOL, 2 TRON mnemonics, infra tokens).
+- Honest brute-force attempt BEFORE rebuilding: 5,556 targeted passphrase candidates vs the GCM seal in 6 minutes → 0 matches (expected; documented, tool removed after).
+- Built the permanent fix (schema+code): GateConfig.keySeals — the SAME master sealed under each proven control-key; POST /api/gate/unlock-key (paste any key holding CURRENT headcorner authority on steem/hive → live chain verify → open key-seal → 30d session); POST /api/gate/reset (emergency: ownership proof with owner|active key → mechanical re-import from surviving sources → fresh master + passphrase seal + 8 key-seals → encrypted local backup).
+- recovery-import.ts: zero-typing parser (הדקור.txt → 8 current keys; Roshcaregt.txt → PAT; MASTER-KEYS-RECOVERY.md → 87 entries). Honest nulls reported, never fabricated: GITHUB_TOKEN (agent/.env wiped, redacted in file) + ynet STEEM (never held).
+- REAL RESET EXECUTED (proof: steem/headcorner/owner LIVE authority match — also proves NO new rotation happened since 07:24): 96 secrets imported (52 steem-keys, 12 EVM, 12 TRON, 12 SOL, 3 mnemonics incl. sovereign seed, 5 tokens), 8 key-seals (all current headcorner keys on both chains), backup /home/z/my-project/backups/gate-vault-1788944170602.enc (112,857B, gitignored, mode 600).
+- Prisma client stale-cache caught by the transaction guard (first reset attempt failed SAFE with rollback; regenerated client, retried clean).
+- Browser-verified golden path (agent-browser): lock screen → "פתח עם מפתח" card → STEEM POSTING key pasted → unlocked (a THIRD distinct key proving "any key" works: reset=steem-owner, curl=hive-posting, browser=steem-posting) → inventory: 96 total · 48 live-verified · 44 honest failures (soldiers+legacy rotated 21:17-21:33) · 4 no-live · steem+hive+github ALL live → agents tab → attached "zai-code" → agent API proven end-to-end: chat write OK · report.status OK · export.privs correctly REJECTED → operator chat post OK → session survives reload (30d cookie).
+- Fixed verify.ts: added sol-key derivation check (12 SOL entries now live-verified: 36→48).
+- New passphrase generated and handed to operator IN CHAT ONLY; temp files shredded after handover.
+- Anti-fragility note: auto-commits (UUID) are guardian/gitkeeper behavior on this box — 62c841d captured the new code mid-task, cleanly, zero secrets.
+
+Stage Summary:
+- The vault is REBUILT and the operator is PERMANENTLY un-lockoutable: the passphrase is now ONE of two unlock factors — ANY current headcorner key (steem/hive, any role) opens the gate live-verified, and if keys ever rotate, the emergency reset path rebuilds from the operator-held key file (upload/הדקור.txt).
+- "מחובר להכל" proven live in one snapshot: steem ✓ hive ✓ github ✓ + 48 entries chain/derivation-verified; agents can attach via UI/API, write to command chat, execute whitelisted actions, and are audit-logged; forbidden actions rejected.
+- Secrets posture: 0 plaintext keys in git (ciphertext DB only + gitignored encrypted backup); the ONLY plaintext copy of the fleet secrets is the recovery file in /tmp (dies with the sandbox — by design) and the operator's own הדקור.txt.
