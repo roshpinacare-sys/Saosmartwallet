@@ -130,11 +130,11 @@ export default function SovereignGate() {
   }, [loadStatus, loadMessages]);
 
   useEffect(() => {
-    if (status?.unlocked) {
+    if (status?.session) {
       loadInventory();
       loadAgents();
     }
-  }, [status?.unlocked, loadInventory, loadAgents]);
+  }, [status?.session, loadInventory, loadAgents]);
 
   useEffect(() => {
     const t = setInterval(() => { loadMessages(); }, 5000);
@@ -232,6 +232,7 @@ export default function SovereignGate() {
   }
 
   const unlocked = Boolean(status?.unlocked);
+  const operatorIn = Boolean(status?.session);
 
   return (
     <div dir="rtl" className="min-h-screen bg-stone-950 text-stone-100">
@@ -277,8 +278,8 @@ export default function SovereignGate() {
           </div>
         )}
 
-        {/* unlock card */}
-        {!unlocked && (
+        {/* unlock card — shown until THIS browser holds an operator session */}
+        {!operatorIn && (
           <Card className="mb-6 border-stone-800 bg-stone-900/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -287,7 +288,9 @@ export default function SovereignGate() {
               </CardTitle>
               <CardDescription>
                 {status?.initialized
-                  ? "הזן סיסמת-מפעיל כדי לפתוח את מפתח-האב (נשאר בזיכרון-התהליך בלבד). הסשן שלך נשמר 30 יום."
+                  ? unlocked
+                    ? "הכספת פתוחה בשרת — הזן סיסמת-מפעיל כדי לקבל סשן מפעיל בדפדפן זה (נשמר 30 יום)."
+                    : "הזן סיסמת-מפעיל כדי לפתוח את מפתח-האב (נשאר בזיכרון-התהליך בלבד). הסשן שלך נשמר 30 יום."
                   : "קבע סיסמת-מפעיל. מפתח-אב אקראי ייווצר וייאטם תחתה — וכל המפתחות של המערכת ייכנסו מוצפנים."}
               </CardDescription>
             </CardHeader>
@@ -317,7 +320,7 @@ export default function SovereignGate() {
           </Card>
         )}
 
-        {unlocked && (
+        {operatorIn && (
           <Tabs defaultValue="keys" className="gap-6">
             <TabsList className="bg-stone-900 text-stone-300">
               <TabsTrigger value="keys" className="gap-1 data-[state=active]:text-emerald-300"><KeyRound className="h-4 w-4" /> התחברות-מפתח</TabsTrigger>
@@ -409,8 +412,8 @@ export default function SovereignGate() {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-3 flex flex-wrap gap-2">
-                    <Badge variant="outline" className={chains.steemOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>steem: {chains.steemOk ? "live" : "לא נענה"}</Badge>
-                    <Badge variant="outline" className={chains.hiveOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>hive: {chains.hiveOk ? "live" : "לא נענה"}</Badge>
+                    <Badge variant="outline" className={chains.steemOk ? "border-emerald-700 text-emerald-400" : chains.steemOk === false ? "border-red-700 text-red-400" : "border-stone-700 text-stone-500"}>steem: {chains.steemOk === true ? "live" : chains.steemOk === false ? "לא נענה" : "—"}</Badge>
+                    <Badge variant="outline" className={chains.hiveOk ? "border-emerald-700 text-emerald-400" : chains.hiveOk === false ? "border-red-700 text-red-400" : "border-stone-700 text-stone-500"}>hive: {chains.hiveOk === true ? "live" : chains.hiveOk === false ? "לא נענה" : "—"}</Badge>
                     {chains.githubOk !== null && chains.githubOk !== undefined && (
                       <Badge variant="outline" className={chains.githubOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>github: {chains.githubOk ? "live" : "נכשל"}</Badge>
                     )}
