@@ -935,10 +935,15 @@ const KIND_META: Record<ModuleDef["kind"], { label: string; cls: string }> = {
   actor: { label: "מבצע", cls: "text-amber-300 border-amber-500/40" },
 };
 
+type ModStats = Record<string, { calls: number; cached: number; failed: number; msTotal: number }>;
+
 function ModuleChip({
-  m, on, onClick,
-}: { m: ModuleDef; on: boolean; onClick?: () => void }) {
+  m, on, onClick, stats,
+}: { m: ModuleDef; on: boolean; onClick?: () => void; stats?: ModStats }) {
   const meta = KIND_META[m.kind];
+  const st = stats?.[m.id];
+  const cachePct = st && st.calls ? Math.round((st.cached / st.calls) * 100) : 0;
+  const avgMs = st && st.calls - st.cached ? Math.round(st.msTotal / (st.calls - st.cached)) : null;
   return (
     <button
       type="button"
@@ -957,6 +962,14 @@ function ModuleChip({
         {on && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mr-auto" />}
       </span>
       <span className="block mt-1 text-[11px] leading-snug text-zinc-500">{m.desc}</span>
+      {st && st.calls > 0 && (
+        <span className="block mt-1.5 text-[10px] font-mono text-zinc-400" dir="ltr">
+          <span className="text-zinc-500">נמדד:</span> {st.calls} calls
+          {st.cached > 0 && <span className="text-emerald-400"> · cache {cachePct}%</span>}
+          {avgMs !== null && <span className="text-sky-300"> · ~{avgMs}ms</span>}
+          {st.failed > 0 && <span className="text-rose-400"> · {st.failed} fail</span>}
+        </span>
+      )}
     </button>
   );
 }
@@ -1221,6 +1234,7 @@ function Agents() {
   /* ── data ── */
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [mods, setMods] = useState<ModuleDef[]>([]);
+  const [modStats, setModStats] = useState<ModStats>({});
   const [brains, setBrains] = useState<{ maker: string[]; checker: string[] }>({ maker: [], checker: [] });
   const [nv, setNv] = useState<{ keySealed: boolean; source: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1249,10 +1263,10 @@ function Agents() {
   const load = useCallback(async () => {
     const [ar, mo] = await Promise.all([
       apiJson<{ ok: boolean; agents: AgentRow[] }>("/api/gate/agents"),
-      apiJson<{ ok: boolean; modules: ModuleDef[]; brains: { maker: string[]; checker: string[] }; nvidia: { keySealed: boolean; source: string } }>("/api/gate/modules"),
+      apiJson<{ ok: boolean; modules: ModuleDef[]; brains: { maker: string[]; checker: string[] }; nvidia: { keySealed: boolean; source: string }; stats?: ModStats }>("/api/gate/modules"),
     ]);
     if (ar?.ok) setAgents(ar.agents || []);
-    if (mo?.ok) { setMods(mo.modules || []); setBrains(mo.brains || { maker: [], checker: [] }); setNv(mo.nvidia || null); }
+    if (mo?.ok) { setMods(mo.modules || []); setBrains(mo.brains || { maker: [], checker: [] }); setNv(mo.nvidia || null); setModStats(mo.stats || {}); }
     const rs = await apiJson<{ ok: boolean; runs: RunRow[]; stats?: AgentStat[] }>("/api/gate/run");
     if (rs?.ok) { setRuns(rs.runs || []); setStats(rs.stats || []); }
     setLoading(false);
@@ -1382,7 +1396,7 @@ function Agents() {
             <div className="max-h-72 overflow-y-auto scroll-thin space-y-2 pl-1">
               {loading && <div className="flex items-center gap-2 text-sm text-zinc-500 py-4 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> טוען מדף…</div>}
               {!loading && mods.map((m) => (
-                <ModuleChip key={m.id} m={m} on={sel.includes(m.id)} onClick={() => setSel((s) => (s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id]))} />
+                <ModuleChip key={m.id} m={m} stats={modStats} on={sel.includes(m.id)} onClick={() => setSel((s) => (s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id]))} />
               ))}
               {!loading && mods.length === 0 && <p className="text-sm text-zinc-500 py-6 text-center">המדף ריק</p>}
             </div>
@@ -1429,7 +1443,7 @@ function Agents() {
                   {a.active && (
                     <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
                       {mods.map((m) => (
-                        <ModuleChip key={m.id} m={m} on={armed.includes(m.id)} onClick={() => rearm(a, armed.includes(m.id) ? armed.filter((x) => x !== m.id) : [...armed, m.id])} />
+                        <ModuleChip key={m.id} m={m} stats={modStats} on={armed.includes(m.id)} onClick={() => rearm(a, armed.includes(m.id) ? armed.filter((x) => x !== m.id) : [...armed, m.id])} />
                       ))}
                     </div>
                   )}

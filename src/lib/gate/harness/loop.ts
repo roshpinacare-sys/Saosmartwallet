@@ -219,18 +219,47 @@ export async function execModule(
   const canonical = m.cacheKeyOf ? m.cacheKeyOf(args || {}) : JSON.stringify(args || {});
   const cacheKey = m.cacheable ? `${modId}:${canonical}` : "";
   if (cache && cacheKey && cache.has(cacheKey)) {
+    void bumpModuleStats(modId, "cache");
     return { ok: true, result: cache.get(cacheKey), cached: true };
   }
+  const t0 = Date.now();
   try {
     const result = await m.exec(args || {}, ctx);
     if (cache && cacheKey) cache.set(cacheKey, result);
     await audit(ctx.agentName, `harness.${modId}`, args, true, result);
+    void bumpModuleStats(modId, "call", Date.now() - t0); // tool-only ms — real latency, no brain time
     return { ok: true, result };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await audit(ctx.agentName, `harness.${modId}`, args, false, { error: msg });
+    void bumpModuleStats(modId, "fail", Date.now() - t0);
     return { ok: false, result: { error: msg } };
   }
+}
+
+/**
+ * Module effectiveness — real counters persisted across reboots (GateState).
+ * "יעילות היא נתון": every armory chip eventually shows what its module REALLY
+ * did — calls, cache-hit share, honest failures, tool-only average ms.
+ * Fire-and-forget: telemetry must never break a run.
+ */
+export interface ModStat { calls: number; cached: number; failed: number; msTotal: number }
+export async function bumpModuleStats(modId: string, kind: "call" | "cache" | "fail", ms = 0): Promise<void> {
+  try {
+    const row = await db.gateState.findUnique({ where: { key: "modstats" } });
+    let stats: Record<string, ModStat> = {};
+    try { stats = row ? JSON.parse(row.value) : {}; } catch { stats = {}; }
+    const s = stats[modId] || { calls: 0, cached: 0, failed: 0, msTotal: 0 };
+    if (kind === "call") { s.calls += 1; s.msTotal += ms; }
+    else if (kind === "cache") { s.calls += 1; s.cached += 1; }
+    else { s.failed += 1; }
+    stats[modId] = s;
+    await db.gateState.upsert({
+      where: { key: "modstats" },
+      create: { key: "modstats", value: JSON.stringify(stats) },
+      update: { value: JSON.stringify(stats) },
+    });
+  } catch { /* telemetry must never break the loop */ }
 }
 
 /** The independent checker — generator/evaluator separation made code. */
@@ -503,22 +532,32 @@ export async function buildLessons(agentName: string, excludeRunId?: string): Pr
   const past = await db.gateRun.findMany({
     where: { agentName, status: { in: ["done", "blocked", "failed"] }, ...(excludeRunId ? { id: { not: excludeRunId } } : {}) },
     orderBy: { createdAt: "desc" },
-    take: 5,
+    take: 8,
   });
   const lessons: string[] = [];
+  const gapHits = new Map<string, number>(); // repeated-gap detector: the same gap twice is a PLAN problem
   for (const r of past) {
     let verdict: CheckerVerdict | null = null;
     let steps: TraceStep[] = [];
     try { verdict = JSON.parse(r.verdict || "null"); } catch { verdict = null; }
     try { steps = JSON.parse(r.steps || "[]"); } catch { steps = []; }
     const provenTools = [...new Set(steps.filter((s) => s.side === "maker" && s.ok && s.tool && s.tool !== "finish").map((s) => s.tool as string))].slice(0, 3).join(", ");
+    const makerSteps = steps.filter((s) => s.side === "maker").length;
+    const secs = r.durationMs ? Math.round(r.durationMs / 1000) : null;
     if (r.status === "done") {
-      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} עברה — הכלים שהוכיחו ראיות מהר: ${provenTools || "-"} · שמור על אותו סדר-פעולות יעיל`);
+      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} עברה${secs ? ` ב-${secs}s` : ""}${makerSteps ? ` עם ${makerSteps} צעדים מתוך תקציב ${r.budget}` : ""} — הכלים שהוכיחו ראיות: ${provenTools || "-"} · שמור על אותו סדר-פעולות יעיל`);
     } else if (r.status === "blocked") {
-      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} נחסמה${verdict?.gaps ? ` — הפערים שנשארו: ${verdict.gaps.slice(0, 220)}` : ""} · סגור את הפערים האלה עם ראיות-כלים כבר בתחילת העבודה`);
+      const gaps = String(verdict?.gaps || "");
+      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} נחסמה${gaps ? ` — הפערים שנשארו: ${gaps.slice(0, 220)}` : ""} · סגור את הפערים האלה עם ראיות-כלים כבר בתחילת העבודה`);
+      for (const g of gaps.split(/[;,\n]+/).map((x) => x.trim().toLowerCase()).filter((x) => x.length >= 8)) gapHits.set(g, (gapHits.get(g) || 0) + 1);
     } else if (r.status === "failed" && r.error) {
       lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} נפלה — השגיאה: ${r.error.slice(0, 180)} · הימנע מהקריאה שגרמה לזה`);
     }
   }
-  return lessons;
+  // repeated-gap detector — the same gap twice means plan differently from step one
+  const repeated = [...gapHits.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 2);
+  for (const [gap, n] of repeated) {
+    lessons.unshift(`⚠️ פער-חוזר (${n} ריצות): ${gap.slice(0, 160)} — זו כבר תבנית; תכנן את הצעד-הראשון במפורש מולו`);
+  }
+  return lessons.slice(0, 8);
 }
