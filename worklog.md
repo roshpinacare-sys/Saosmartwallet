@@ -733,3 +733,25 @@ Stage Summary:
 - העיצוב החדש חי: light Sovereign Ledger, hero emerald אחד לכל תצוגה, RTL מלא
 - התיקיה כולה חשופה ב-UI לראשונה: כספת (148 מפתחות/144 חיים/28 ישויות) + 5 מגדלים + סוכנים + ביקורת
 - lint: 0 errors
+
+---
+Task ID: 53 (DEX-UNISWAP)
+Agent: main (Z.ai Code)
+Task: "זה עיצוב מחורבן... תקים את הdex כמו הדקס הכי מפורסם... תבחן מי הדקס הכי מוביל היום... ותעשה לי אותו פה וחבר אותו לקוד... תמשיך ודחוף לריפו"
+
+Work Log:
+- מחקר (סוכן-משנה R-1, 15 חיפושים + מקורות-חי): Uniswap = ה-DEX המוביל (V4+V3 ~$3.1B/24h, $3T יומני-מצטבר; מקורות interface@main נחתכו verbatim: טוקני-Spore, מכונת-מצבי-CTA, he-IL). התבנית: כרטיס-סוואפ ממורכז, Pools/Positions, Portfolio, PRO (Hyperliquid כבנצ'מרק-מקצועי)
+- חוזי-מנוע חיים נחלצו מכל 27 נתיבי /api/dex (state long-poll, route router-3-רגליים, swap/order/cancel/pool/wrap/transfer, relay/proofs/onramp) + שערי-האימות (operatorAuth fail-closed + consoleGuard)
+- גשר מאובטח /api/dx: requireOwner (סשן-כספת) → הזרקת DEX_OPERATOR_TOKEN (מ-.env של השרת, הוזרק מהדמון בלי-הדפסה) + x-saos-dex-console → whitelist בלבד (8 פעולות; reset/כבדים לא)
+- globals.css חדש: Spore-dark מותאם-RTL (#131313/#1F1F1F, hairlines 10/16%, pink #FF37C7 פעם-אחת-לתצוגה, green #21C95E, amber/red) + שכבת .sv-theme שממפה מחדש את כל ה-utilities הבהירים של תצוגות-הפלטפורמה (כספת/מגדלים/מבצעים/ביקורת/הגדרות → כהה אוטומטית בלי-לגעת בלוגיקה)
+- 5 תצוגות DEX חדשות על המנוע האמיתי: swap (ראוטר-אטומי/בריכה-ישירה, מגן-סטייה, מקבלים-לפחות, פירוק-עמלה 70/30, רגלי-מסלול, מודאל-סקירה, מכונת-CTA), pro (lightweight-charts אזור-פינק, ספר-עומק ויזואלי, לימיט/שוק, ההזמנות-שלי+ביטול, סרט-חי, ארנת-החיילים), pools (עמדות-LP שלי, add פרופורציונלי, remove pro-rata עם סליידר), portfolio (שווי-חי במחירי-ייחוס-אוצר, ספרי-14-ארנקים, העברה-פנימית), anchors (relay ל-7 שרשראות כולל fleet/eth/sol, txid→סיירים, חותם-מרקל מאומת-עצמו, onramp עם מדידה-כפויה)
+- nav חדש: navbar עליון סטייל-Uniswap (brand-פינק, pills בורסה, דרופדאון-פלטפורמה, פיל-שרשרת-חי #height+seal countdown, badge-זהות עם-תפריט) + מובייל: פס-עליון + bottom-bar 4+sheet
+- תיקונים-בדרך: שגיאת-תחביר ctaLabel (מפתח 'no-route'), 6× set-state-in-effect (yield-אסינכרוני/timeout-0/גזירה-ב-render עם effectivePrice), useMemo שנדחה ע"י react-compiler, TopNav נסתר-במובייל, .next נמחק-תחת-שרת-חי → החייאה ב-double-fork (הדמון-3010 שרד דרך instrumentation)
+- אימות-דפדפן מלא (1440×900 + iPhone 14): התחברות-אמיתית (posting → owner:headcorner), סוואג'-אמיתי 100 SAOS→71.03 USDS נחת-בשרשרת (2199→2099 SAOS, +71.24 USDS, tape h26495+), לימיט 0.74 מולא-מיד ע"י bot-b (maker=operator h26510), לימיט-עמוק 0.45 → הוצב (243586) → בוטל, LP: add 5 SAOS → LP 4121 → remove 50% → 2061 (+0.504 SAOS חזרה), צ'אט נשמרה, עיגונים/כספת/מגדלים/מבצעים/ביקורת כולם כהים-וקריאים, אפס-שגיאות-קונסולה-טריות
+- lint: 0 errors (רק אזהרת-font קיימת). push: 686149e..1c40097 → origin/main @ roshpinacare-sys/saos-control-center (token inline בלבד, remote-URL נקי, סריקת-סודות על-staged: 0 פגיעות, אימות-מרחוק: route.ts 3179B חי)
+
+Stage Summary:
+- הבורסה הריבונית חיה ב-/ : חוויית Uniswap מלאה בעברית-RTL על מנוע-הקונצנזוס האמיתי (גובה-חי 26K+, 22K+ fills, ארנה עושה-שוק אמיתי)
+- המוטציות מאובטחות-שכבה-כפולה: סשן-בעלים בדפדפן + טוקן-מפעיל בשרת בלבד
+- כנות: relay-העיגון מוצג כנה (steem/hive disabled fail-closed בגלל authority-mismatch מהרוטציה — דורש ייבוא-מפתח-נכון ל-.env של הדמון; לא נגעתי — זו החלטת-מפעיל)
+- פתוח: המחיר-בכרטיס הוא ציטוט-ראוטר חי; ה-PRO chart משתמש בסרט-השווקים החופשי; quote-integrity banner ("המחיר עודכן") קיים ב-hook אך עדיין לא מוצג-כפס — מועמד לאיטרציה הבאה
