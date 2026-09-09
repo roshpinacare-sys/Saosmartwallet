@@ -214,7 +214,10 @@ export async function execModule(
 ): Promise<{ ok: boolean; result: unknown; cached?: boolean }> {
   const m = getModule(modId);
   if (!m) return { ok: false, result: `unknown module "${modId}"` };
-  const cacheKey = m.cacheable ? `${modId}:${JSON.stringify(args || {})}` : "";
+  // Canonical key: a module with defaulted args normalizes its own key, so
+  // `{}` and `{"username":"headcorner"}` are ONE probe — not two paid calls.
+  const canonical = m.cacheKeyOf ? m.cacheKeyOf(args || {}) : JSON.stringify(args || {});
+  const cacheKey = m.cacheable ? `${modId}:${canonical}` : "";
   if (cache && cacheKey && cache.has(cacheKey)) {
     return { ok: true, result: cache.get(cacheKey), cached: true };
   }
