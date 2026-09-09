@@ -15,11 +15,12 @@
 import { db } from "@/lib/db";
 import { masterReady, GateError } from "@/lib/gate/crypto";
 import { verifyAll } from "@/lib/gate/verify";
-import { steemAdapter, steemMarket } from "@/lib/steem-server";
+import { steemAdapter, steemMarket, steemOpenOrders } from "@/lib/steem-server";
 import { fleetStatusCached } from "@/lib/fleet-status";
 import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
+import { createOrderFromAgent } from "./orders";
 
 export type ModuleKind = "skill" | "connector" | "actor";
 
@@ -197,7 +198,7 @@ export const MODULES: HarnessModule[] = [
     id: "chat.send",
     name: "דיבור בין-סוכנים",
     kind: "actor",
-    desc: "שליחת הודעה ישירה לסוכן אחר בצי (chaintalk): ההודעה נרשמת בגשר ונכנסת לתיבת-הנמען. אם תזכירו את שם-הנמען עם @ — הוא עשוי לקום ולפעול (טריגר מרוסן).",
+    desc: "שליחת הודעה ישירה לסוכן אחר בצי (chaintalk): ההודעה נרשמת בגשר ונכנסת לתיבת-הנמען. אם תזכירו את שם-הנמען עם @ — הוא עשוי לקום ולפעול (טריגר מרוסן). הגשר מרוסן נגד ספאמ: מקס 8 הודעות לריצה ו-40 לשעה לכל סוכן.",
     args: `{"to":"agent-name","body":"string (≤800 chars)"}`,
     needsVault: false,
     cacheable: false,
@@ -206,6 +207,13 @@ export const MODULES: HarnessModule[] = [
       let body = String(args.body || "").trim();
       if (!to || to === ctx.agentName) throw new GateError("bad-input", "דרוש params.to — שם סוכן אחר");
       if (!body) throw new GateError("bad-input", "דרוש params.body");
+      // bridge anti-spam rails — a looping agent must never drown the operator
+      const [perRun, perHour] = await Promise.all([
+        db.gateMessage.count({ where: { fromName: ctx.agentName, meta: { contains: ctx.runId } } }),
+        db.gateMessage.count({ where: { fromName: ctx.agentName, createdAt: { gte: new Date(Date.now() - 3_600_000) } } }),
+      ]);
+      if (perRun >= 8) throw new GateError("rate-limited", "תקרת-הגשר לריצה מוצו (8 הודעות) — סיכם בדוח אחד");
+      if (perHour >= 40) throw new GateError("rate-limited", "תקרת-הגשר השעתית מוצו (40) — הגשר הוא ערוץ-פיקוד, לא יומן");
       const peer = await db.gateAgent.findFirst({ where: { name: to, active: true } });
       if (!peer) throw new GateError("bad-input", `אין סוכן פעיל בשם "${to}"`);
       // no double-@ — strip a leading mention of the target if the maker already wrote it
@@ -376,6 +384,41 @@ export const MODULES: HarnessModule[] = [
         status: p.status,
         note: "ההצעה בתור — המפעיל רואה אותה בכרטיס לב-האוטונומיה; מדיניות מרוסנת עשויה להזניק אותה לבד",
       };
+    },
+  },
+  {
+    id: "steem.order.build",
+    name: "יד-ריבונית: בניית פקודה",
+    kind: "actor",
+    desc: "הכנת פקודת-DEX אמיתית לשוק STEEM/SBD בשם המפקד headcorner. בנייה אינה נוגעת במפתחות ואינה מזיזה כסף: הפקודה נכנסת לתור-החתימה, והכספת חותמת עם המפתח-הפעיל רק לאחר אישור-מפעיל מפורש. תקרות: פקודה ממתינה אחת לסוכן, 100 STEEM לפקודה, 6 חתימות/יום לצי. חובה: בנה מול מחיר-שוק אמיתי (market.watch) — פקודה מרוחקת מהספר תידחה על-ידי המפעיל.",
+    args: `{"op":"create|cancel (default create)","side":"buy|sell","amount":"0.100","price":"0.098","ttlSeconds":3600,"cancelOrderid":123}`,
+    needsVault: false,
+    cacheable: false, // a real submission — every build is a unique pending order
+    async exec(args, ctx) {
+      const p = await createOrderFromAgent({
+        agentName: ctx.agentName,
+        runId: ctx.runId,
+        op: typeof args.op === "string" ? args.op : undefined,
+        side: typeof args.side === "string" ? args.side : undefined,
+        amount: typeof args.amount === "string" ? args.amount : undefined,
+        price: typeof args.price === "string" ? args.price : undefined,
+        ttlSeconds: Number(args.ttlSeconds) || undefined,
+        cancelOrderid: Number(args.cancelOrderid) || undefined,
+      });
+      return { ...p, meaning: "הפקודה ממתינה בתור — המפעיל רואה אותה בכרטיס לב-האוטונומיה; באישורו הכספת תחתום והשרשרת תענה ב-txId אמיתי" };
+    },
+  },
+  {
+    id: "steem.openorders",
+    name: "הזמנות-פתוחות",
+    kind: "skill",
+    desc: "ההזמנות הפתוחות של המפקד headcorner על ה-DEX החי: מזהה-הזמנה, סוג (ask/bid), מחיר, גודל ותפוגה. קרא לפני שאתה בונה פקודה חדשה — אל תכפיל הזמנה קיימת.",
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const rows = await steemOpenOrders("headcorner");
+      return { count: rows.length, orders: rows, account: "headcorner" };
     },
   },
   {

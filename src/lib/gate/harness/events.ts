@@ -13,7 +13,8 @@ export type GateEventType =
   | "message.mentions" // operator/agent addressed an agent in the bridge — payload {agent, body, by}
   | "run.blocked" // a run finished blocked — payload {agent, goal, gaps}
   | "run.failed" // a run crashed — payload {agent, goal, gaps:""}
-  | "run.done"; // a run passed the gate — payload {agent, goal}
+  | "run.done" // a run passed the gate — payload {agent, goal}
+  | "market.move"; // the heart watched the real DEX price cross a threshold — payload {price, prev, pct}
 
 /** Write one stimulus. Never throws — an event must never break its emitter. */
 export async function emitEvent(type: GateEventType, payload: Record<string, unknown>, source: string): Promise<void> {
