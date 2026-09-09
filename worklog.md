@@ -1008,3 +1008,29 @@ Stage Summary:
 - זכירה-בטוחה חיה: כניסה אחת במפתח → הדפדפן זכור 90 יום → כניסות-חוזרות בלי מפתח עם אותה רמת-אבטחה (hash-only בשרת, GCM מאמת החזקה, שלילה מיידית, ושלילה-אוטומטית באיפוס-כספת).
 - קבצים: prisma/schema.prisma (GateRun.lessons/durationMs/tokens + GateDevice) · src/lib/gate/harness/{loop,modules}.ts · src/lib/gate/device.ts (חדש) · src/app/api/gate/{run,login,reset}/route.ts · src/app/api/gate/device/{route,login,forget} (חדשים) · src/app/page.tsx · db/custom.db.
 - lint נקי · אפס סודות ב-git · מפתח-nvidia נשאר צופן-GCM בכספת (פריט 97).
+
+---
+Task ID: 8
+Agent: main (Z.ai Code)
+Task: "תמשיך וודא עבודה של סוכנים אוטונומית בגשר הפיקוד בחן אותם היטב בחן את כל התיקיות בגיטהאב כולל קבצי הזיפ יש שם תוכן רלוונטי שיכול להועיל לך להרכיב את זה טוב יותר למערכת חזק הכל וודא יעילות למה כמה מי מו מה איך הכל מכל הבחינות הנדסה קשה לאוטונומיה על הרשת שלנו תמשיך ודחוף" — מחקר תוכן-ה-GitHub כולו (כולל ה-ZIPs), ובניית לב-האוטונומיה: סוכנים שקמים לבד.
+
+Work Log:
+- נסרקו 12 הריפו-ים של החשבון ב-GitHub API: אותרו 15 קובצי-ZIP ב-steem (download/research/zips + download/recovery) ו-10 ב-Project-files; 5 ה-ZIPs הרלוונטיים הורדו וחולצו ל-engineering/autonomy-input/ (gitignored) + תיקיית agent/ של ריפו-steem (304 קבצים: agent.cjs, DAEMONS.md, THE_WEAVE.md, ENGINEER_BRIEF.md).
+- נלמדו דפוסי-אוטונומיה מ-production: צבא-סוכני-steem (daemon+loops, watermark, daily caps, --once, LIVE-GATE), SRS (resume-interrupted, snapshots), ECOS (diamond heartbeat, governanceTick "הפעימה-החסרה", agentBus, HITL), TFA (memory graph), workspace-TCP (leases+reaper+outbox), TITAI (durable engine: lease+heartbeat, העקבות=checkpoint).
+- פערים שאובחנו: אפס-אוטונומיה עד עכשיו — כל ריצה דרשה לחיצה; אין schedule/trigger/lease/reaper/תקשורת-בין-סוכנים/kill-switch.
+- schema: GateRun += origin/meta/leaseOwner/leaseExpiresAt/heartbeatAt/attempt/maxAttempts/updatedAt; טבלאות חדשות GateSchedule/GateEvent/GateTrigger/GateState; GateConfig += autonomyEnabled; GateAgent += autonomy.
+- לב-האוטונומיה (src/lib/gate/harness/heart.ts + lease.ts + events.ts + src/instrumentation.ts): פעימה 20s בתוך תהליך-Next (בלי פורט נוסף, globalThis-pinned); סדר-פעימה: kill-switch → reaper → scheduler → triggers → dispatch → pulse; CAS-claim על status=queued + חוזה-חכירה 180s שמתחדש בכל צעד-נשמר; caps: 2 ריצות-במקביל, 1 מטרה/סוכן, 2 dispatch/פעימה; מקס-יומי+dayKey, קירור לטריגרים; הדחייה-הכנה של סוכן לא-חמוש; החלפת מוח ל-zai כשהכספת חתומה (meta.brainNote) — ריבונות לא נשברת.
+- התאוששות-מקריסה: reaper מחזיר ריצות-קרוסות לתור; attempt>1 ⇒ RECOVERY — המייצר טוען את העקבות-שנשמרו וממשיך מהראיה (העקבות=checkpoint, TITAI); attempt≥2 ⇒ failed כנה.
+- טריגרים: emitEvent (outbox) מגשר-הפיקוד (@-mentions אמיתיים) ומסוף-ריצות (run.done/blocked/failed); ensureTriggerPolicy מסתנכרן כל-פעימה — סוכן שנחמש מאוחר מקבל טריגר-אוטומטית; טריגר run.blocked=@self = מרדף-תיקון עצמי חסום (cooldown 5min, מקס 2/יום).
+- מודולים חדשים: chat.send (הודעה ישירה בין-סוכנים + אירוע-מנשא) ו-inbox.read (תיבת-נמען) — chaintalk מיניאטורי; תוקן כפילות-@ כשהגוף כבר פותח ב-@מקבל.
+- API: GET/POST /api/gate/heart (דופק + kill-switch) · GET/POST/PATCH/DELETE /api/gate/schedule; messages POST מזהה-מנשאים; agents GET/PATCH חושפים autonomy.
+- UI (section 04): כרטיס לב-האוטונומיה — דופק חי (beat-age, מונים-צביריים ששורדים restart), סיורים (רשימה+טופס-יצירה+Switch+מחיקה), זרם-אירועים, מדיניות-טריגרים, מתג-אוטונומיה; יומן-ריצות עם תגי-שושלת ⏰ סיור / ⚡ טריגר / 🫀 התאושש; ApiConsole += 4 endpoints; eslint מתעלם מ-engineering/** (חומר-מחקר).
+- תיקונים-תוך-כדי (מהבחינה החיה): סיור-מוזרק לסוכן-לא-חמוש (anchor-agent) → נחסם כנה → ריטוגרט + חוסן-מדיניות (טריגרים לחמושים בלבד, guard לא-חמוש בלב); מוני-דופק איפוס ב-restart → מוזרמים צביריים מה-DB.
+- אימות-קצה-לקצה חי (כל ריצה אוטונומית נוצרה בלי לחיצה): סיור→blocked כנה→אירוע→מרדף-תיקון→חסימה-חסומה (cap עבד) · @harness-rider→ריצה→done עם ראיות (reachable:true, 4/5 צעדים, 3709→560 tokens, 32.8s) · תיאום-בין-סוכנים: @anchor-agent→inbox.read→chat.send→harness-rider done; הבודק חסם את anchor-agent על "אין הוכחת-תשובה" — השער מסרב לציון-עצמי · kill-switch OFF→הפעימה לא נורת 26s→ON→נורת בפעימה · ריצה-קרוסה מזויפת (lease-מת, attempt=1)→reaped→attempt=2→המשך-מהעקבות→done · סיור-שנוצר-מה-UI ירה תוך דקה ו-done · דפדפן: דופק חי, תגי-שושלת, מובייל 390px ללא גלילה-אופקית, פוטר דביק, auto-login ממכשיר-מהימן אחרי reload · אפס שגיאות-קונסולה.
+
+Stage Summary:
+- השער חי: סוכנים קמים לבד — סיורים בקצב אמיתי (30min/60min/יומי), טריגרים ששומעים את הגשר ואת הכישלונות, תיאום בין-סוכנים, התאוששות-מקריסה מהעקבות — והכול מרוסן (תקציבים, מקס-יומי, קירור, kill-switch, בודק-עצמאי).
+- יעילות = נתון: למה (origin+meta), כמה (durationMs+tokens+מוני-דופק צביריים), מי (סוכן+מוח+בודק), מה (goal+doneMeans), איך (caps+cooldowns+ראיות-כלים).
+- מחקר ה-ZIPs תועד ב-docs/autonomy-research.md (הקלט הגולמי נשאר מקומי ב-gitignore).
+- קבצים: prisma/schema.prisma · src/instrumentation.ts · src/lib/gate/harness/{heart,lease,events,loop,modules}.ts · src/app/api/gate/{heart,schedule,messages,agents}/route.ts · src/app/page.tsx · docs/autonomy-research.md · eslint.config.mjs · .gitignore.
+- lint נקי · אפס סודות ב-git · ה-ZIPs והתוכן-החיצוני לא נכנסים לrepo.

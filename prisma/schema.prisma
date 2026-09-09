@@ -11,8 +11,9 @@ datasource db {
 
 // Singleton config row (id = "gate"): master key sealed with scrypt(passphrase)
 model GateConfig {
-  id          String   @id // "gate"
-  initialized Boolean  @default(false)
+  id               String   @id // "gate"
+  autonomyEnabled  Boolean  @default(true) // the autonomy kill-switch — the Gate Heart checks it FIRST on every beat
+  initialized      Boolean  @default(false)
   kdfSalt     String? // hex — scrypt salt for passphrase
   encMaster   String? // hex — AES-256-GCM(masterKey, key=scrypt(passphrase))
   sealIv      String? // hex
@@ -68,6 +69,7 @@ model GateAgent {
   modules    String? // JSON array of harness-module ids the agent is armed with (skills/connectors)
   brain      String? // brain spec "provider:model" — nvidia:openai/gpt-oss-20b | zai:default
   active     Boolean   @default(true)
+  autonomy   Boolean   @default(true) // may the heart launch this agent on its own (schedules + triggers)?
   createdAt  DateTime  @default(now())
   lastSeenAt DateTime  @default(now())
 }
@@ -84,6 +86,13 @@ model GateRun {
   checker    String   // checker brain spec — ALWAYS a different brain than maker (generator/evaluator separation)
   budget     Int // max maker steps (token-blowout guard)
   status     String // queued | running | done | blocked | failed
+  origin     String    @default("manual") // manual | schedule | trigger — WHO wanted this run (autonomy lineage, answered in the pulse panel)
+  meta       String? // JSON — {scheduleId?, triggerId?, eventId?, note?} — the why behind an autonomous run
+  leaseOwner String? // worker id that claimed this run (crash-safety: the trace IS the checkpoint)
+  leaseExpiresAt DateTime?
+  heartbeatAt    DateTime? // renewed after every persisted step
+  attempt        Int       @default(0) // incremented on every claim — >1 means this run RECOVERED from a crash
+  maxAttempts    Int       @default(2)
   verdict    String? // JSON — independent checker verdict {done, checks[], gaps, notes}
   steps      String? // JSON array — append-only evidence trace [{i,thought,tool,args,ok,result,ms,at}]
   report     String? // final Hebrew report written to the command bridge
@@ -92,9 +101,72 @@ model GateRun {
   tokens     String? // JSON {prompt, completion} — real brain usage when the provider reports it (null when unknown — never faked)
   error      String?
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
   finishedAt DateTime?
 
   @@index([createdAt])
+  @@index([status])
+}
+
+// The Gate Heart — schedules: goals the agents run ON THEIR OWN, on cadence.
+// (steem-army daemon loops + ECOS automationScheduler pattern: persisted so
+// autonomy survives reboots without anyone pressing a button)
+model GateSchedule {
+  id        String   @id @default(cuid())
+  label     String // human-readable patrol name (Hebrew)
+  agentName String
+  goal      String
+  doneMeans String // JSON array
+  modules   String? // JSON array — defaults to the agent's armed modules
+  brain     String?
+  budget    Int      @default(5)
+  kind      String   @default("interval") // interval | daily
+  everyMs   Int? // interval kind
+  hourUtc   Int? // daily kind (0-23)
+  maxPerDay Int      @default(8)
+  dayCount  Int      @default(0)
+  dayKey    String? // "2026-09-09" (UTC) — daily cap reset
+  enabled   Boolean  @default(true)
+  lastRunAt DateTime?
+  nextRunAt DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+// Autonomy events — the nervous system's stimuli (bridge mentions, run verdicts).
+// At-least-once: the heart consumes them into trigger fires (workspace outbox pattern).
+model GateEvent {
+  id        String   @id @default(cuid())
+  type      String // message.mentions | run.blocked | run.failed | run.done
+  payload   String? // JSON — {agent, body?, goal?, gaps?, by?}
+  source    String // operator | agent | harness
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Trigger rules — WHEN an event becomes an autonomous run (cooldown + daily cap = bounded).
+model GateTrigger {
+  id           String   @id @default(cuid())
+  on           String // "message.mentions" | "run.blocked" | "run.failed"
+  agentName    String // the agent that acts ("@self" = the agent named in the event payload)
+  goalTemplate String // {body} {goal} {gaps} {agent} placeholders
+  doneMeans    String // JSON array
+  budget       Int      @default(4)
+  cooldownMs   Int      @default(300000)
+  maxPerDay    Int      @default(3)
+  dayCount     Int      @default(0)
+  dayKey       String?
+  lastFiredAt  DateTime?
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+// Tiny KV — the heart's own pulse record + future watermarks (chain.watch state).
+model GateState {
+  key       String   @id
+  value     String // JSON
+  updatedAt DateTime @updatedAt
 }
 
 // Trusted devices ("זכור אותי בצורה בטוחה") — after a live-key login the operator

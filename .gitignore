@@ -74,3 +74,6 @@ upload/
 
 # encrypted local gate backups (gitignored — ciphertext only)
 /backups/
+
+# autonomy research input — external ZIPs + extracted content (local-only)
+engineering/autonomy-input/

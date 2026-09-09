@@ -181,6 +181,54 @@ export const MODULES: HarnessModule[] = [
       return { messageId: m.id };
     },
   },
+  {
+    id: "chat.send",
+    name: "דיבור בין-סוכנים",
+    kind: "actor",
+    desc: "שליחת הודעה ישירה לסוכן אחר בצי (chaintalk): ההודעה נרשמת בגשר ונכנסת לתיבת-הנמען. אם תזכירו את שם-הנמען עם @ — הוא עשוי לקום ולפעול (טריגר מרוסן).",
+    args: `{"to":"agent-name","body":"string (≤800 chars)"}`,
+    needsVault: false,
+    cacheable: false,
+    async exec(args, ctx) {
+      const to = String(args.to || "").trim();
+      let body = String(args.body || "").trim();
+      if (!to || to === ctx.agentName) throw new GateError("bad-input", "דרוש params.to — שם סוכן אחר");
+      if (!body) throw new GateError("bad-input", "דרוש params.body");
+      const peer = await db.gateAgent.findFirst({ where: { name: to, active: true } });
+      if (!peer) throw new GateError("bad-input", `אין סוכן פעיל בשם "${to}"`);
+      // no double-@ — strip a leading mention of the target if the maker already wrote it
+      const lead = new RegExp(`^@${to}\\s*`, "i");
+      body = body.replace(lead, "").trim();
+      const m = await db.gateMessage.create({
+        data: { channel: "command", fromKind: "agent", fromName: ctx.agentName, body: `@${to} ${body}`.slice(0, 1000), meta: JSON.stringify({ runId: ctx.runId, to }) },
+      });
+      const { emitEvent } = await import("./events");
+      await emitEvent("message.mentions", { agent: to, body: `@${to} ${body}`.slice(0, 800), by: ctx.agentName }, "agent");
+      return { messageId: m.id, deliveredTo: to };
+    },
+  },
+  {
+    id: "inbox.read",
+    name: "תיבת-נמען",
+    kind: "skill",
+    desc: "קריאת ההודעות האחרונות שפונו אליך בגשר (הודעות ישירות עם @שם-שלך). קרא לפני שאתה טוען שאין לך הקשר.",
+    args: "{}",
+    needsVault: false,
+    cacheable: false, // messages arrive while the run lives — never memoize
+    async exec(_args, ctx) {
+      const [direct, mentions] = await Promise.all([
+        db.gateMessage.findMany({ where: { meta: { contains: `"to":"${ctx.agentName}"` } }, orderBy: { createdAt: "desc" }, take: 10 }),
+        db.gateMessage.findMany({ where: { body: { contains: "@" + ctx.agentName } }, orderBy: { createdAt: "desc" }, take: 10 }),
+      ]);
+      const seen = new Set<string>();
+      const items = [...direct, ...mentions]
+        .filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)))
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+        .slice(-15)
+        .map((m) => ({ from: m.fromName, kind: m.fromKind, body: m.body.slice(0, 400), at: m.createdAt.toISOString() }));
+      return { count: items.length, items };
+    },
+  },
 ];
 
 export function getModule(id: string): HarnessModule | undefined {

@@ -16,6 +16,7 @@ export async function GET(req: Request) {
         createdAt: a.createdAt, lastSeenAt: a.lastSeenAt,
         modules: a.modules ? (JSON.parse(a.modules) as string[]) : [],
         brain: a.brain,
+        autonomy: a.autonomy,
       })),
     });
   } catch (e) {
@@ -59,16 +60,17 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     await requireOperator();
-    const { name, modules, brain } = await req.json();
+    const { name, modules, brain, autonomy } = await req.json();
     if (typeof name !== "string" || !name) throw new GateError("bad-input", "דרוש name");
-    const data: { modules?: string | null; brain?: string | null } = {};
+    const data: { modules?: string | null; brain?: string | null; autonomy?: boolean } = {};
     if (Array.isArray(modules)) data.modules = JSON.stringify(modules.filter((m: unknown) => typeof m === "string"));
     if (typeof brain === "string") data.brain = brain || null;
-    if (!("modules" in data) && !("brain" in data)) throw new GateError("bad-input", "אין מה לעדכן — דרוש modules או brain");
+    if (typeof autonomy === "boolean") data.autonomy = autonomy;
+    if (!("modules" in data) && !("brain" in data) && !("autonomy" in data)) throw new GateError("bad-input", "אין מה לעדכן — דרוש modules או brain או autonomy");
     const res = await db.gateAgent.updateMany({ where: { name }, data });
     if (!res.count) throw new GateError("bad-agent", "אין סוכן כזה");
     await db.gateMessage.create({
-      data: { fromKind: "system", fromName: "gate", body: `סוכן "${name}" חומש מחדש: ${data.modules ? JSON.parse(data.modules).length + " מודולים" : "modules ללא-שינוי"}${data.brain ? ` · מוח ${data.brain}` : ""}` },
+      data: { fromKind: "system", fromName: "gate", body: `סוכן "${name}" עודכן: ${data.modules ? JSON.parse(data.modules).length + " מודולים" : "modules ללא-שינוי"}${data.brain ? ` · מוח ${data.brain}` : ""}${data.autonomy !== undefined ? ` · אוטונומיה ${data.autonomy ? "הופעלה" : "כובתה"}` : ""}` },
     });
     return ok({ armed: name, modules: data.modules ? JSON.parse(data.modules) : undefined, brain: data.brain ?? undefined });
   } catch (e) {

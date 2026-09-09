@@ -25,7 +25,7 @@ import {
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
-  Smartphone, Unplug,
+  Smartphone, Unplug, HeartPulse, Clock, Zap,
 } from "lucide-react";
 
 /* ══════════════════════════ auth plumbing ══════════════════════════ */
@@ -93,12 +93,12 @@ interface Inventory {
 interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
   createdAt: string; lastSeenAt: string;
-  modules?: string[] | null; brain?: string | null;
+  modules?: string[] | null; brain?: string | null; autonomy?: boolean;
 }
 interface ModuleDef { id: string; name: string; kind: "skill" | "connector" | "actor"; desc: string; args: string; needsVault: boolean }
 interface TraceStep { i: number; side: "maker" | "checker"; thought?: string; tool?: string; args?: Record<string, unknown>; ok?: boolean; result?: unknown; error?: string; ms?: number; cached?: boolean; rescued?: boolean; repair?: boolean; at: string }
 interface CheckerVerdict { done: boolean; checks: { criterion: string; pass: boolean; evidence: string }[]; gaps: string; notes: string }
-interface RunRow { id: string; agentName: string; goal: string; brain: string; checker: string; budget: number; status: string; createdAt: string; finishedAt: string | null; report?: string | null; makerSteps?: number; durationMs?: number | null; tokens?: string | null }
+interface RunRow { id: string; agentName: string; goal: string; brain: string; checker: string; budget: number; status: string; createdAt: string; finishedAt: string | null; report?: string | null; makerSteps?: number; durationMs?: number | null; tokens?: string | null; origin?: string; attempt?: number; meta?: string | null }
 interface RunDetail extends RunRow {
   doneMeans: string[]; modules: string[];
   steps: TraceStep[]; verdict: CheckerVerdict | null; error?: string | null;
@@ -108,6 +108,11 @@ interface AgentStat { agent: string; runs: number; done: number; blocked: number
 interface DeviceRow { id: string; label: string; createdAt: string; lastUsedAt: string; expiresAt: string; revoked: boolean }
 interface Msg { id: string; channel: string; fromKind: string; fromName: string; body: string; createdAt: string }
 interface ActionRow { id: string; agentName: string; action: string; params: string; ok: boolean; result: string; createdAt: string }
+interface ScheduleRow { id: string; label: string; agentName: string; goal: string; kind: string; everyMs: number | null; hourUtc: number | null; budget: number; maxPerDay: number; dayCount: number; dayKey: string | null; enabled: boolean; lastRunAt: string | null; nextRunAt: string }
+interface EventRow { id: string; type: string; payload: { agent?: string; body?: string; goal?: string; gaps?: string; by?: string } | null; source: string; consumed: boolean; createdAt: string }
+interface TriggerRow { id: string; on: string; agentName: string; goalTemplate: string; budget: number; cooldownMs: number; maxPerDay: number; dayCount: number; enabled: boolean }
+interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; eventsSeen: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
+interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[] }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -125,6 +130,10 @@ const ENDPOINTS: Ep[] = [
   { method: "GET", path: "/api/gate/modules", desc: "מחסן-המודולים לחימוש סוכנים", auth: "operator" },
   { method: "POST", path: "/api/gate/run", desc: "הרצת מטרה עם לולאת-חוכמה (מייצר + בודק עצמאי + לקחים)", auth: "operator", body: '{ "agentName": "…", "goal": "…", "doneMeans": ["…"] }' },
   { method: "GET", path: "/api/gate/run", desc: "יומן הרצות + יעילות-צי אמיתית", auth: "operator" },
+  { method: "GET", path: "/api/gate/heart", desc: "דופק לב-האוטונומיה: סיורים, טריגרים, אירועים ותור", auth: "operator" },
+  { method: "POST", path: "/api/gate/heart", desc: "מתג-הפסק לאוטונומיה (kill-switch)", auth: "operator", body: '{ "autonomyEnabled": false }' },
+  { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
+  { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
   { method: "POST", path: "/api/gate/device", desc: "חימוש מכשיר-מהימן (זכור אותי בצורה בטוחה)", auth: "operator", body: '{ "label": "Chrome · Windows" }' },
   { method: "POST", path: "/api/gate/device/login", desc: "כניסה חוזרת ממכשיר מוכר — בלי מפתח", auth: "public", body: '{ "deviceToken": "…" }' },
   { method: "GET", path: "/api/gate/device", desc: "רשימת המכשירים-המהימנים", auth: "operator" },
@@ -1000,6 +1009,214 @@ function TraceStepView({ s }: { s: TraceStep }) {
   );
 }
 
+/* ══════════════════════════ 04 · autonomy heart ══════════════════════════ */
+
+const HEART_TICK_MS_CLIENT = 20000;
+
+function AutonomyCard({ agents }: { agents: AgentRow[] }) {
+  const [h, setH] = useState<HeartData | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  /* patrol form */
+  const [label, setLabel] = useState("");
+  const [pAgent, setPAgent] = useState("");
+  const [pGoal, setPGoal] = useState("");
+  const [everyMin, setEveryMin] = useState(30);
+  const [maxDay, setMaxDay] = useState(8);
+  const [formOpen, setFormOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await apiJson<HeartData>("/api/gate/heart");
+    if (r?.ok) setH(r);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  useEffect(() => {
+    const t = setInterval(() => { load(); }, 8000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  async function toggleAutonomy(v: boolean) {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>("/api/gate/heart", { method: "POST", body: JSON.stringify({ autonomyEnabled: v }) });
+      if (r?.ok) { toast.success(v ? "לב-האוטונומיה הופעל" : "האוטונומיה נעצרה — ניקוי נקי"); await load(); }
+      else toast.error(r?.error || "המתג נכשל");
+    } finally { setBusy(false); }
+  }
+
+  async function createSchedule() {
+    if (!label.trim() || !pAgent || pGoal.trim().length < 12) { toast.error("שם-סיור, סוכן ומטרה (12+ תווים)"); return; }
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>("/api/gate/schedule", {
+        method: "POST",
+        body: JSON.stringify({ label: label.trim(), agentName: pAgent, goal: pGoal.trim(), everyMinutes: everyMin, maxPerDay: maxDay }),
+      });
+      if (r?.ok) {
+        toast.success("הסיור נקבע — הפעימה הראשונה תוך דקה, בלי לחיצה שלך");
+        setLabel(""); setPGoal(""); setFormOpen(false);
+        await load();
+      } else toast.error(r?.error || "יצירת הסיור נכשלה");
+    } finally { setBusy(false); }
+  }
+
+  async function toggleSched(s: ScheduleRow) {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>("/api/gate/schedule", { method: "PATCH", body: JSON.stringify({ id: s.id, enabled: !s.enabled }) });
+      if (r?.ok) await load(); else toast.error(r?.error || "העדכון נכשל");
+    } finally { setBusy(false); }
+  }
+
+  async function delSched(id: string) {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>(`/api/gate/schedule?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (r?.ok) { toast("הסיור נמחק — ההיסטוריה שלו נשארת ביומן"); await load(); }
+      else toast.error(r?.error || "המחיקה נכשלה");
+    } finally { setBusy(false); }
+  }
+
+  const beatAgeS = h?.pulse?.lastTickAt ? Math.max(0, Math.round((Date.now() - new Date(h.pulse.lastTickAt).getTime()) / 1000)) : null;
+  const beatState = !h?.pulse ? "dark" : beatAgeS !== null && beatAgeS <= HEART_TICK_MS_CLIENT / 1000 * 3 ? "ok" : beatAgeS !== null && beatAgeS <= 120 ? "warn" : "stall";
+  const c = h?.pulse?.counters;
+  const activeAgents = agents.filter((a) => a.active);
+
+  return (
+    <motion.div {...rise} className="mt-6">
+      <GlowCard className="p-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <h3 className="font-bold flex items-center gap-2">
+            <HeartPulse className={"h-4 w-4 " + (beatState === "ok" ? "text-emerald-400" : beatState === "warn" ? "text-amber-400" : beatState === "stall" ? "text-rose-400" : "text-zinc-600")} />
+            לב-האוטונומיה
+          </h3>
+          <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+            <Switch checked={h ? h.autonomyEnabled : false} disabled={busy || !h} onCheckedChange={toggleAutonomy} aria-label="מתג אוטונומיה" />
+            {h ? (h.autonomyEnabled ? "אוטונומיה פעילה" : "אוטונומיה כבויה") : "…"}
+          </label>
+        </div>
+        <p className="text-[11px] text-zinc-500 leading-relaxed mb-4">
+          הסוכנים קמים לבד: סיורים מתוכננים (קצב אמיתי שנשמר ב-DB) · טריגרים שמגיבים לאירועים בגשר ולריצות שנחסמו ·
+          חוזי-חכירה שמשיבים ריצות קרוסות מהעקבות שנשמרו · והכול מרוסן — תקציב-צעדים, מקסימום-יומי, קירור בין-הפעלות, ומוח-בודק שונה.
+        </p>
+
+        {/* pulse line */}
+        <div className="flex items-center gap-2.5 flex-wrap mb-4 font-mono text-[11px]" dir="ltr">
+          <span className={"inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 " + (beatState === "ok" ? "border-emerald-500/40 text-emerald-300" : beatState === "warn" ? "border-amber-500/40 text-amber-300" : beatState === "stall" ? "border-rose-500/40 text-rose-300" : "border-zinc-800 text-zinc-600")}>
+            <span className={"h-2 w-2 rounded-full " + (beatState === "ok" ? "bg-emerald-400 animate-pulse" : beatState === "warn" ? "bg-amber-400" : beatState === "stall" ? "bg-rose-400" : "bg-zinc-700")} aria-hidden />
+            beat {h?.pulse?.beats ?? 0}{beatAgeS !== null ? ` · ${beatAgeS}s ago` : ""}
+          </span>
+          <span className="rounded-lg border border-zinc-800 px-2 py-1 text-zinc-400">queued {h?.counts.queued ?? "–"}</span>
+          <span className="rounded-lg border border-zinc-800 px-2 py-1 text-zinc-400">running {h?.counts.running ?? "–"}</span>
+          {c && (
+            <span className="text-zinc-500 flex gap-2 flex-wrap">
+              <span title="ריצות שהלב שיגר מהתור">dispatched {c.dispatched}</span>
+              <span className="text-emerald-400/80" title="ריצות שהתאוששו מקריסה">recovered {c.recovered}</span>
+              <span title="סיורים שהוזנקו מתוכננים">patrols {c.schedulesFired}</span>
+              <span title="ריצות שהוזנקו מטריגרי-אירוע">triggers {c.triggersFired}</span>
+              <span title="ריצות קרוסות שהשומר החזיר לתור">reaped {c.reaped}</span>
+            </span>
+          )}
+          {h?.pulse?.error && <span className="text-rose-300" dir="ltr">⚠ {h.pulse.error}</span>}
+        </div>
+
+        {/* schedules + form */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-zinc-400 flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-emerald-400" /> סיורים מתוכננים ({h?.schedules.length ?? 0})</p>
+              <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 text-emerald-300 hover:bg-emerald-500/10" onClick={() => setFormOpen(!formOpen)}>
+                <Plus className="h-3 w-3" /> קבע סיור
+              </Button>
+            </div>
+            <div className="max-h-56 overflow-y-auto scroll-thin space-y-2 pl-1">
+              {h && h.schedules.map((s) => (
+                <div key={s.id} className={"rounded-xl border px-3 py-2.5 flex items-center gap-2.5 flex-wrap " + (s.enabled ? "border-zinc-800 bg-black/40" : "border-zinc-800/60 bg-black/20 opacity-60")}>
+                  <Clock className={"h-3.5 w-3.5 shrink-0 " + (s.enabled ? "text-emerald-400" : "text-zinc-600")} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-zinc-200 truncate">{s.label}</p>
+                    <p className="text-[10px] text-zinc-500 font-mono" dir="ltr">
+                      {s.agentName} · {s.kind === "daily" ? `daily ${String(s.hourUtc).padStart(2, "0")}:00 UTC` : `every ${Math.round((s.everyMs || 0) / 60000)}m`} · {s.dayCount}/{s.maxPerDay} today
+                    </p>
+                    <p className="text-[10px] text-zinc-600 truncate">{s.goal}</p>
+                  </div>
+                  <span className="text-[9px] text-zinc-600 font-mono shrink-0" title="הפעימה הבאה" dir="ltr">
+                    next {new Date(s.nextRunAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <Switch checked={s.enabled} disabled={busy} onCheckedChange={() => toggleSched(s)} aria-label={`הפעל/השהה ${s.label}`} />
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-rose-400/70" aria-label="מחק סיור" onClick={() => delSched(s.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              {h && h.schedules.length === 0 && <p className="text-xs text-zinc-600 py-4 text-center">אין סיורים — הסוכנים רק מחכים לפקודה שלך</p>}
+              {!h && <p className="text-xs text-zinc-600 py-4 text-center">טוען דופק…</p>}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-zinc-400 flex items-center gap-1.5 mb-2"><Zap className="h-3.5 w-3.5 text-amber-300" /> אירועים וטריגרים</p>
+            <div className="max-h-56 overflow-y-auto scroll-thin space-y-1.5 pl-1 mb-3">
+              {h && h.events.slice(0, 8).map((e) => (
+                <div key={e.id} className="rounded-lg border border-zinc-800/80 bg-black/40 px-2.5 py-1.5 flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className={"text-[9px] font-mono " + (e.consumed ? "text-zinc-500 border-zinc-800" : "text-amber-300 border-amber-500/40 animate-pulse")} dir="ltr">{e.type}</Badge>
+                  <span className="text-[10px] text-zinc-400 truncate flex-1" dir="ltr">
+                    {e.payload?.agent ? `@${e.payload.agent}` : ""}{e.payload?.body ? ` "${e.payload.body.slice(0, 60)}"` : ""}{e.payload?.goal ? ` "${e.payload.goal.slice(0, 50)}"` : ""}
+                  </span>
+                  <span className="text-[9px] text-zinc-600 font-mono shrink-0">{new Date(e.createdAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+              ))}
+              {h && h.events.length === 0 && <p className="text-xs text-zinc-600 py-2 text-center">אין אירועים — הגשר שקט</p>}
+            </div>
+            <div className="rounded-xl border border-zinc-800/60 bg-black/20 p-2.5">
+              <p className="text-[10px] text-zinc-500 mb-1.5">מדיניות-טריגרים (מוזרעת אוטומטית, מרוסנת):</p>
+              <div className="space-y-1">
+                {h && h.triggers.map((t) => (
+                  <p key={t.id} className="text-[10px] font-mono text-zinc-500" dir="ltr">
+                    {t.enabled ? "✓" : "✗"} {t.on} → {t.agentName} · budget {t.budget} · cooldown {Math.round(t.cooldownMs / 1000)}s · {t.dayCount}/{t.maxPerDay} today
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* create patrol form */}
+        <AnimatePresence>
+          {formOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+              <div className="mt-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4 space-y-2.5">
+                <div className="grid gap-2.5 sm:grid-cols-2">
+                  <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="שם-הסיור (לדוגמה: בדיקת-שרשרת תקופתית)" className="text-sm bg-zinc-950/80 border-zinc-800" />
+                  <select value={pAgent} onChange={(e) => setPAgent(e.target.value)} className="w-full rounded-md border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm font-mono text-zinc-200" dir="ltr" aria-label="סוכן לסיור">
+                    <option value="">— בחר סוכן —</option>
+                    {activeAgents.map((a) => <option key={a.id} value={a.name}>{a.name}</option>)}
+                  </select>
+                </div>
+                <Textarea value={pGoal} onChange={(e) => setPGoal(e.target.value)} placeholder="מה הסוכן עושה בכל סבב? לדוגמה: בדוק את בריאות השרשרת ואת יתרות headcorner, ודווח לגשר בעברית בשורה-אחת" className="min-h-[64px] text-sm bg-zinc-950/80 border-zinc-800" />
+                <div className="flex items-center gap-3 flex-wrap text-xs text-zinc-400">
+                  <span className="flex items-center gap-1.5">קצב:
+                    <select value={everyMin} onChange={(e) => setEveryMin(Number(e.target.value))} className="rounded-md border border-zinc-800 bg-zinc-950/80 px-2 py-1 text-xs font-mono text-zinc-200" dir="ltr" aria-label="קצב הסיור בדקות">
+                      {[15, 30, 60, 180, 480, 1440].map((m) => <option key={m} value={m}>{m >= 1440 ? "24h" : m >= 60 ? `${m / 60}h` : `${m}m`}</option>)}
+                    </select>
+                  </span>
+                  <span className="flex items-center gap-1.5">מקס/יום:
+                    <Input type="number" min={1} max={48} value={maxDay} onChange={(e) => setMaxDay(Math.max(1, Math.min(48, Number(e.target.value) || 1)))} className="w-16 h-8 text-xs bg-zinc-950/80 border-zinc-800" dir="ltr" />
+                  </span>
+                  <span className="text-[10px] text-zinc-600">קריטריוני-סיום ברירת-מחדל: כלים חיים + דוח עברית לגשר</span>
+                </div>
+                <Button onClick={createSchedule} disabled={busy || !label.trim() || !pAgent || pGoal.trim().length < 12} className="w-full gap-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold">
+                  {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clock className="h-4 w-4" />} קבע סיור אוטונומי
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlowCard>
+    </motion.div>
+  );
+}
+
 function Agents() {
   /* ── data ── */
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -1108,7 +1325,9 @@ function Agents() {
 
   return (
     <section className="py-14">
-      <SectionHead num="04" title="מחסן-החימוש" sub="סוכן בלי מודולים הוא טוקן חסר-ידיים. מחברים, חומשים, נותנים מטרה עם קריטריוני-סיום — ובודק עצמאי פוסק. לולאה סגורה, ראיות אמיתיות." />
+      <SectionHead num="04" title="מחסן-החימוש" sub="סוכן בלי מודולים הוא טוקן חסר-ידיים. מחברים, חומשים, נותנים מטרה עם קריטריוני-סיום — ובודק עצמאי פוסק. והלב? הסוכנים קמים גם לבד — סיורים, טריגרים והתאוששות-מקריסה, בלי שתלחץ כלום." />
+
+      <AutonomyCard agents={agents} />
 
       {/* attach + module rack */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -1319,6 +1538,10 @@ function Agents() {
                   className="w-full text-right rounded-xl border border-zinc-800/80 bg-black/40 px-3 py-2 flex items-center gap-2 flex-wrap hover:border-zinc-600 transition-colors">
                   <span className={"h-2 w-2 rounded-full shrink-0 " + (r.status === "done" ? "bg-emerald-400" : r.status === "blocked" ? "bg-amber-400" : r.status === "failed" ? "bg-rose-400" : "bg-zinc-500 animate-pulse")} aria-hidden />
                   <span className="font-mono text-xs text-zinc-300" dir="ltr">{r.agentName}</span>
+                  {r.origin && r.origin !== "manual" && (
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (r.origin === "schedule" ? "text-sky-300 border-sky-500/40" : "text-amber-300 border-amber-500/40")} dir="ltr">{r.origin === "schedule" ? "⏰ סיור" : "⚡ טריגר"}</Badge>
+                  )}
+                  {(r.attempt ?? 0) > 1 && <Badge variant="outline" className="text-[9px] font-mono text-emerald-300 border-emerald-500/40 shrink-0" dir="ltr">🫀 התאושש</Badge>}
                   <span className="text-xs text-zinc-500 truncate max-w-[40%]">{r.goal}</span>
                   {typeof r.makerSteps === "number" && (
                     <span className="font-mono text-[10px] text-zinc-600" dir="ltr">
