@@ -1,21 +1,16 @@
 'use client';
 
-// ─── מרכז-השליטה הריבוני — Sovereign Ledger redesign ───────────────────────
-// Light paper canvas · deep-emerald hero · white ledger cards.
-// All logic preserved 1:1: smart login (any key × 3 chains) · AES-256-GCM
-// vault · live on-chain verification · owner-lock · agent API · realtime
-// chat/tasks · audit log · the five SAOS towers (anchor foundry).
+// ─── SAOS DEX — הבורסה הריבונית · ממשק Uniswap-class על המנוע האמיתי ───────
+// בורסה · מסחר מקצועי · בריכות · תיק · עיגונים — חיים מ-/saos-dex/api/dex/state
+// הפלטפורמה הריבונית (כספת/מגדלים/מבצעים/ביקורת/הגדרות) נשארת מחוברת 1:1.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Copy, KeyRound } from 'lucide-react';
-import { Sigil } from '@/components/sv/sigil';
-import { Sidebar, MobileNav, MobileTopbar } from '@/components/sv/sidebar';
 import { LoginDialog } from '@/components/sv/login-dialog';
-import { OverviewView } from '@/components/sv/overview';
 import { VaultView } from '@/components/sv/vault-view';
 import { TowersView } from '@/components/sv/towers-view';
 import { OpsView } from '@/components/sv/ops-view';
@@ -23,15 +18,21 @@ import { AuditView } from '@/components/sv/audit-view';
 import { SettingsView } from '@/components/sv/settings-view';
 import { getToken, storeToken, authHeaders, fmtAgo } from '@/components/sv/shared';
 import type { StatusData, ChatMsg, TaskT, AuditRow, SaosStatus } from '@/components/sv/shared';
-import type { ViewId } from '@/components/sv/sidebar';
+import { TopNav, MobileNav, type ViewId } from '@/components/dex/nav';
+import { useDexWorld, fmtInt } from '@/components/dex/common';
+import { SwapView } from '@/components/dex/swap-view';
+import { ProView } from '@/components/dex/pro-view';
+import { PoolsView } from '@/components/dex/pools-view';
+import { PortfolioView } from '@/components/dex/portfolio-view';
+import { AnchorsView } from '@/components/dex/anchors-view';
 
-export default function SovereignCenter() {
+export default function SovereignDex() {
   const [booted, setBooted] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [status, setStatus] = useState<StatusData | null>(null);
   const [saos, setSaos] = useState<SaosStatus | null>(null);
   const [relay, setRelay] = useState(false);
-  const [view, setView] = useState<ViewId>('overview');
+  const [view, setView] = useState<ViewId>('swap');
   const [lastSync, setLastSync] = useState<number | null>(null);
 
   const [loginMsg, setLoginMsg] = useState<{ ok: boolean; text: string; roles?: string[] } | null>(null);
@@ -43,6 +44,9 @@ export default function SovereignCenter() {
   const [tasks, setTasks] = useState<TaskT[]>([]);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [newToken, setNewToken] = useState<string | null>(null);
+
+  // ── the live engine ──
+  const { world, online, refetchNow } = useDexWorld();
 
   const refreshSaos = useCallback(async () => {
     try {
@@ -57,7 +61,7 @@ export default function SovereignCenter() {
   const needAuth = useCallback(() => {
     if (getToken()) return false;
     setLoginOpen(true);
-    setLoginMsg({ ok: false, text: 'התחבר דרך התפריט כדי לבצע פעולות — הצפייה פתוחה תמיד.' });
+    setLoginMsg({ ok: false, text: 'התחבר דרך התפריט כדי לבצע פעולות מסחר — הצפייה פתוחה תמיד.' });
     return true;
   }, []);
 
@@ -117,7 +121,6 @@ export default function SovereignCenter() {
 
   useEffect(() => {
     if (!authed) return;
-    // fallback polling — keeps chat/tasks fresh even when the relay socket is unreachable
     const t = setInterval(() => { refresh(); refreshChat(); refreshTasks(); }, 8000);
     const v = setInterval(() => { fetch('/api/vault/verify', { method: 'POST', headers: authHeaders() }).then(() => refresh()).catch(() => { }); }, 300000);
     return () => { clearInterval(t); clearInterval(v); };
@@ -133,7 +136,7 @@ export default function SovereignCenter() {
       });
       const j = await r.json();
       if (j.ok) {
-        storeToken(j.token || ''); // Bearer carrier — ההתחברות שורדת רענון-עמוד וסגירת-טאב
+        storeToken(j.token || ''); // Bearer carrier — שורד רענון וסגירת-טאב
         setLoginMsg({ ok: true, text: j.message, roles: j.roles });
         setLoginOpen(false);
         await refresh(); await refreshChat(); await refreshTasks(); await refreshAudit();
@@ -193,68 +196,92 @@ export default function SovereignCenter() {
   if (!booted) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-screen gap-4">
-        <Sigil size="lg" live />
-        <div className="text-zinc-500 text-[13px]">מאתחל את מרכז-השליטה...</div>
-        <div className="font-data text-[10px] text-zinc-400" dir="ltr">AES-256-GCM VAULT · LIVE CHAIN VERIFY</div>
+        <span className="w-14 h-14 rounded-full bg-[color:var(--pink)] text-white font-black text-xl flex items-center justify-center shadow-[0_0_44px_-6px_rgba(255,55,199,0.8)]">S</span>
+        <div className="text-[color:var(--text-2)] text-[13px]">מאתחל את הבורסה הריבונית...</div>
+        <div className="dx-num text-[10px] text-[color:var(--text-3)]">SAOS DEX · MERKLE-SEALED CONSENSUS · LIVE ANCHORS</div>
       </div>
     );
   }
 
-  // ── dashboard — תמיד גלוי (שימוש אישי); ההתחברות דרך התפריט ──
   return (
-    <div className="flex-1 flex flex-col md:flex-row min-h-screen">
-      <Sidebar view={view} onNavigate={setView} status={status} relay={relay} authed={authed} onLogin={() => { setLoginMsg(null); setLoginOpen(true); }} onLogout={doLogout} />
+    <div className="flex-1 flex flex-col min-h-screen">
+      <TopNav view={view} onNavigate={setView} status={status} world={world} online={online} relay={relay} authed={authed}
+        onLogin={() => { setLoginMsg(null); setLoginOpen(true); }} onLogout={doLogout} />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <MobileTopbar status={status} relay={relay} authed={authed} onLogin={() => { setLoginMsg(null); setLoginOpen(true); }} onLogout={doLogout} />
+      <main key={view} className="flex-1 w-full max-w-[1400px] mx-auto px-3 md:px-6 pt-14 md:pt-6 pb-24 md:pb-8 animate-rise">
+        {view === 'swap' && (
+          <SwapView world={world} online={online} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} />
+        )}
+        {view === 'pro' && (
+          <ProView world={world} online={online} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} />
+        )}
+        {view === 'pools' && (
+          <PoolsView world={world} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} onDone={refetchNow} />
+        )}
+        {view === 'portfolio' && (
+          <PortfolioView world={world} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} onDone={refetchNow} />
+        )}
+        {view === 'anchors' && <AnchorsView world={world} />}
 
-        <main key={view} className="flex-1 w-full max-w-[1440px] mx-auto px-4 md:px-7 py-5 md:py-7 space-y-4 pb-28 md:pb-10 animate-rise">
-          {view === 'overview' && (
-            <OverviewView status={status} saos={saos} relay={relay} lastSync={lastSync} auditRows={auditRows} tasks={tasks} onNavigate={setView} verifying={verifying} onVerifyAll={verifyAll} />
-          )}
-          {view === 'vault' && (
+        {/* platform views — the sovereign control center, dark-skinned */}
+        {view === 'vault' && (
+          <div className="sv-theme">
             <VaultView status={status} verifying={verifying} onVerifyAll={verifyAll} />
-          )}
-          {view === 'towers' && (
-            <TowersView saos={saos} onSaosRefresh={refreshSaos} />
-          )}
-          {view === 'ops' && (
-            <OpsView status={status} authed={authed} messages={messages} onSend={sendChat} tasks={tasks} onCreateTask={createTask} onRegisterAgent={registerAgent} />
-          )}
-          {view === 'audit' && (
-            <AuditView rows={auditRows} />
-          )}
-          {view === 'settings' && (
-            <SettingsView status={status} authed={authed} verifying={verifying} onToggleLock={toggleLock} onVerifyAll={verifyAll} onLogout={doLogout} />
-          )}
-        </main>
-
-        <footer className="hidden md:block mt-auto border-t border-[#e8e8e3] bg-white px-7 py-3.5">
-          <div className="max-w-[1440px] mx-auto flex items-center justify-between flex-wrap gap-2 text-[11px] text-zinc-400">
-            <span>מרכז-השליטה הריבוני · כספת AES-256-GCM · אימות-חי מול השרשרת · חמשת מגדלי SAOS · relay בזמן-אמת</span>
-            <span className="font-data" dir="ltr">
-              {status?.totals.verified}/{status?.totals.keys} VERIFIED{lastSync ? ` · SYNC ${fmtAgo(new Date(lastSync).toISOString())}` : ''}
-            </span>
           </div>
-        </footer>
-      </div>
+        )}
+        {view === 'towers' && (
+          <div className="sv-theme">
+            <TowersView saos={saos} onSaosRefresh={refreshSaos} />
+          </div>
+        )}
+        {view === 'ops' && (
+          <div className="sv-theme">
+            <OpsView status={status} authed={authed} messages={messages} onSend={sendChat} tasks={tasks} onCreateTask={createTask} onRegisterAgent={registerAgent} />
+          </div>
+        )}
+        {view === 'audit' && (
+          <div className="sv-theme">
+            <AuditView rows={auditRows} />
+          </div>
+        )}
+        {view === 'settings' && (
+          <div className="sv-theme">
+            <SettingsView status={status} authed={authed} verifying={verifying} onToggleLock={toggleLock} onVerifyAll={verifyAll} onLogout={doLogout} />
+          </div>
+        )}
+      </main>
 
-      <MobileNav view={view} onNavigate={setView} />
+      <footer className="hidden md:block mt-auto border-t border-[color:var(--line)] bg-[color:var(--canvas-deep)] px-7 py-3.5">
+        <div className="max-w-[1400px] mx-auto flex items-center justify-between flex-wrap gap-2 text-[11px] text-[color:var(--text-3)]">
+          <span>
+            SAOS DEX · מנוע-קונצנזוס חתום-מרקל · עיגון Steem/Hive/TRON · כספת AES-256-GCM · relay בזמן-אמת
+          </span>
+          <span className="dx-num" dir="ltr">
+            {world ? `#${fmtInt(world.state.height)} · ${fmtInt(world.state.fills)} fills · ${fmtInt(world.state.swaps)} swaps` : ''}
+            {lastSync ? ` · SYNC ${fmtAgo(new Date(lastSync).toISOString())}` : ''}
+          </span>
+        </div>
+      </footer>
+
+      <MobileNav view={view} onNavigate={setView} authed={authed} world={world} online={online}
+        onLogin={() => { setLoginMsg(null); setLoginOpen(true); }} onLogout={doLogout} />
 
       {/* new agent token dialog */}
       <Dialog open={!!newToken} onOpenChange={o => !o && setNewToken(null)}>
-        <DialogContent className="bg-white border-[#e8e8e3] max-w-md rounded-2xl">
+        <DialogContent className="dx-card border-[color:var(--line)] max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base text-zinc-900"><KeyRound className="w-4 h-4 text-emerald-600" />טוקן הסוכן — מוצג פעם אחת!</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <KeyRound className="w-4 h-4 text-[color:var(--green)]" />טוקן הסוכן — מוצג פעם אחת!
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-zinc-500 leading-relaxed">העבר את הטוקן לסוכן. לא ניתן לצפות בו שוב (נשמר רק hash).</p>
+            <p className="text-xs text-[color:var(--text-2)] leading-relaxed">העבר את הטוקן לסוכן. לא ניתן לצפות בו שוב (נשמר רק hash).</p>
             <div className="flex gap-2">
-              <Input readOnly value={newToken || ''} className="bg-zinc-50 border-emerald-200 font-data text-xs" dir="ltr" />
+              <Input readOnly value={newToken || ''} className="bg-[color:var(--raised)] border-[color:var(--line)] font-data text-xs text-[color:var(--text-1)]" dir="ltr" />
               <button
                 onClick={() => navigator.clipboard.writeText(newToken || '')}
                 aria-label="העתק טוקן"
-                className="w-10 h-10 shrink-0 rounded-lg border border-[#e0e0da] bg-white hover:bg-zinc-50 flex items-center justify-center text-zinc-500 hover:text-zinc-800 transition-colors"
+                className="w-10 h-10 shrink-0 rounded-lg dx-chip flex items-center justify-center text-[color:var(--text-2)] hover:text-[color:var(--text-1)] transition-colors"
               >
                 <Copy className="w-4 h-4" />
               </button>

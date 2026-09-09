@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SAOS — מרכז-השליטה הריבוני",
+  title: "SAOS DEX — הבורסה הריבונית",
   description:
-    "מערכת ריבונית אישית: כספת מפתחות מוצפנת עם אימות-חי מול השרשרת, צירוף סוכנים דרך API, צ׳אט ומשימות בזמן-אמת ויומן-ביקורת. Steem · Hive · Blurt.",
+    "בורסה ריבונית: מסחר ספר-עומק ובריכות AMM עם קונצנזוס חתום-מרקל, עיגון-חי על Steem/Hive/TRON וכספת מפתחות מוצפנת. Steem · Hive · Blurt.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f6f3",
+  themeColor: "#131313",
   width: "device-width",
   initialScale: 1,
 };

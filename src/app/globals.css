@@ -1,31 +1,47 @@
 @import "tailwindcss";
 
-/* ─── SAOS Sovereign Ledger — light design system ───────────────────────────
-   A calm paper canvas, white ledger cards, hairline discipline.
-   Emerald = sovereignty + verified/live. Amber = gated/warn. Rose = dead.
-   One saturated moment per view: the deep-emerald hero band.
-   Numbers, addresses, roots → JetBrains Mono, tabular-nums, LTR islands. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SAOS DEX — Sovereign Exchange design system
+   Based on the Uniswap "Spore" institutional token sheet (source teardown):
+   dark surfaces #131313/#1F1F1F · hairlines rgba(255,255,255,.10/.16)
+   text #FCFCFC / 67% / 42% · ONE accent per view: pink #FF37C7
+   success #21C95E · warning #FFBF17 · critical #FF593C
+   cards 16–20px · pills full · JetBrains Mono tabular-nums for every number
+   Hebrew RTL shell; numbers/tokens/charts stay LTR islands.
+   ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --canvas: #f6f6f3;
-  --card: #ffffff;
-  --well: #f2f2ee;
-  --hairline: #e8e8e3;
-  --hairline-strong: #d8d8d1;
-  --ink: #1b1b1f;
-  --ink-mid: #5c5c64;
-  --ink-low: #94949c;
-  --brand: #059669;
-  --brand-deep: #047857;
-  --brand-ink: #064e3b;
-  --brand-soft: #ecfdf5;
-  --amber: #b45309;
-  --amber-soft: #fffbeb;
-  --rose: #e11d48;
-  --rose-soft: #fff1f2;
+  --canvas: #131313;
+  --canvas-deep: #0e0e0e;
+  --card: #1f1f1f;
+  --card-hover: #242424;
+  --raised: #1a1a1a;
+  --well: #272727;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text-1: #fcfcfc;
+  --text-2: rgba(255, 255, 255, 0.67);
+  --text-3: rgba(255, 255, 255, 0.42);
+  --pink: #ff37c7;
+  --pink-hover: #e500a5;
+  --pink-soft: rgba(255, 55, 199, 0.1);
+  --green: #21c95e;
+  --green-soft: rgba(33, 201, 94, 0.12);
+  --amber: #ffbf17;
+  --amber-soft: rgba(255, 191, 23, 0.12);
+  --red: #ff593c;
+  --red-soft: rgba(255, 89, 60, 0.12);
+  /* legacy aliases — the platform views keep their variable names */
+  --ink: var(--text-1);
+  --ink-mid: var(--text-2);
+  --ink-low: var(--text-3);
+  --brand: var(--green);
+  --brand-soft: var(--green-soft);
+  --amber-legacy: var(--amber);
+  --rose: var(--red);
 }
 
 html {
-  color-scheme: light;
+  color-scheme: dark;
   scroll-behavior: smooth;
 }
 
@@ -34,7 +50,7 @@ body {
     "Heebo", "Rubik", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew",
     system-ui, -apple-system, sans-serif;
   background: var(--canvas);
-  color: var(--ink);
+  color: var(--text-1);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -42,134 +58,190 @@ body {
 
 /* data face — every number/address/key lives here */
 .font-data {
-  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
-    monospace;
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
-/* ledger card — white surface, hairline, two-layer soft shadow */
+::selection { background: rgba(255, 55, 199, 0.35); }
+
+/* dark scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); border-radius: 99px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ── legacy re-theme layer ──────────────────────────────────────────────────
+   The platform views (כספת/מבצעים/ביקורת/מגדלים/הגדרות) were written with
+   light Tailwind utilities. Instead of rewriting them 1:1, this scoped layer
+   re-maps those utilities to the dark token sheet — same markup, new skin. */
+.sv-theme .bg-white { background-color: var(--card); }
+.sv-theme .bg-zinc-50 { background-color: var(--well); }
+.sv-theme .bg-zinc-100 { background-color: rgba(255, 255, 255, 0.08); }
+.sv-theme .bg-zinc-200 { background-color: rgba(255, 255, 255, 0.12); }
+.sv-theme .hover\:bg-zinc-50:hover { background-color: var(--card-hover); }
+.sv-theme .hover\:bg-zinc-100:hover { background-color: rgba(255, 255, 255, 0.12); }
+.sv-theme .text-zinc-900, .sv-theme .text-zinc-800, .sv-theme .text-zinc-700 { color: var(--text-1); }
+.sv-theme .text-zinc-600, .sv-theme .text-zinc-500, .sv-theme .text-zinc-400 { color: var(--text-2); }
+.sv-theme .text-zinc-300 { color: var(--text-2); }
+.sv-theme .border-zinc-200, .sv-theme .border-zinc-100 { border-color: var(--line); }
+.sv-theme .border-\[\#e8e8e3\], .sv-theme .border-\[\#eeeeea\],
+.sv-theme .border-\[\#e0e0da\], .sv-theme .border-\[\#e5e5e0\] { border-color: var(--line) !important; }
+.sv-theme .emerald-50 { background-color: var(--green-soft); }
+.sv-theme .bg-emerald-50 { background-color: var(--green-soft); }
+.sv-theme .bg-emerald-100 { background-color: rgba(33, 201, 94, 0.18); }
+.sv-theme .text-emerald-700, .sv-theme .text-emerald-600, .sv-theme .text-emerald-800 { color: var(--green); }
+.sv-theme .border-emerald-200, .sv-theme .border-emerald-500 { border-color: rgba(33, 201, 94, 0.35); }
+.sv-theme .bg-rose-50 { background-color: var(--red-soft); }
+.sv-theme .text-rose-700, .sv-theme .text-rose-600 { color: var(--red); }
+.sv-theme .border-rose-200 { border-color: rgba(255, 89, 60, 0.35); }
+.sv-theme .bg-amber-50 { background-color: var(--amber-soft); }
+.sv-theme .text-amber-700, .sv-theme .text-amber-600 { color: var(--amber); }
+.sv-theme .border-amber-200 { border-color: rgba(255, 191, 23, 0.35); }
+.sv-theme .bg-emerald-500, .sv-theme .bg-amber-500, .sv-theme .bg-rose-500 { opacity: 0.9; }
+
+/* legacy surfaces → dark */
 .sv-card {
   background: var(--card);
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  box-shadow:
-    0 1px 2px rgba(24, 24, 27, 0.04),
-    0 6px 20px -6px rgba(24, 24, 27, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 18px;
 }
-
 .sv-well {
-  background: var(--well);
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
-
-/* the single expressive moment — deep emerald brand band */
 .sv-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 20px;
   background:
-    radial-gradient(900px 380px at 88% -30%, rgba(52, 211, 153, 0.28) 0%, transparent 60%),
-    linear-gradient(140deg, #053f2f 0%, #065f46 55%, #047857 100%);
-  color: #f0fdf7;
-  box-shadow:
-    0 1px 2px rgba(6, 78, 59, 0.25),
-    0 18px 44px -18px rgba(6, 78, 59, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-.sv-hero::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(500px 220px at 8% 120%, rgba(255, 255, 255, 0.07) 0%, transparent 60%);
+    radial-gradient(900px 380px at 88% -30%, rgba(255, 55, 199, 0.14) 0%, transparent 60%),
+    linear-gradient(150deg, #1a1a1a 0%, #1f1f1f 60%, #242424 100%);
+  color: var(--text-1);
+  border: 1px solid var(--line-strong);
 }
 
-/* live-pulse status ring — honest heartbeat */
+/* ── DEX primitives ────────────────────────────────────────────────────────── */
+
+/* main exchange card (swap / forms) */
+.dx-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.dx-raised {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+/* uniswap-style amount input row */
+.dx-input {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.dx-input:hover { background: #212121; }
+.dx-input:focus-within { border-color: rgba(255, 255, 255, 0.28); }
+
+/* full-pill CTA — the single pink moment */
+.dx-cta {
+  background: var(--pink);
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: background-color 0.15s ease, transform 0.06s ease, opacity 0.15s ease;
+}
+.dx-cta:hover:not(:disabled) { background: var(--pink-hover); }
+.dx-cta:active:not(:disabled) { transform: scale(0.985); }
+.dx-cta:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* secondary pill */
+.dx-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-1);
+  border-radius: 999px;
+  transition: background-color 0.15s ease;
+}
+.dx-ghost:hover { background: rgba(255, 255, 255, 0.14); }
+
+.dx-chip {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.dx-chip-active {
+  background: var(--pink-soft);
+  border: 1px solid rgba(255, 55, 199, 0.4);
+  border-radius: 999px;
+  color: #ff8ad9;
+}
+
+/* nav item */
+.dx-nav {
+  color: var(--text-2);
+  border-radius: 999px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.dx-nav:hover { color: var(--text-1); background: rgba(255, 255, 255, 0.06); }
+.dx-nav-active { color: var(--text-1); background: rgba(255, 255, 255, 0.1); }
+
+/* token medallion — deterministic pastel per symbol */
+.dx-token {
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* details row in the swap accordion */
+.dx-detail {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+/* live pulse */
 @keyframes ring-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
-  70% { box-shadow: 0 0 0 9px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(33, 201, 94, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(33, 201, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(33, 201, 94, 0); }
 }
 .pulse-ring { animation: ring-pulse 2.4s ease-out infinite; }
-@keyframes ring-pulse-amber {
-  0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.3); }
-  70% { box-shadow: 0 0 0 9px rgba(217, 119, 6, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
-}
-.pulse-ring-amber { animation: ring-pulse-amber 2.4s ease-out infinite; }
 
-.label-caps {
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-low);
-  font-weight: 600;
-}
-
-.label-caps-onbrand {
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(240, 253, 244, 0.66);
-  font-weight: 600;
-}
-
-/* custom scrollbar — slim neutral */
-.scroll-slim::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-slim::-webkit-scrollbar-track { background: transparent; }
-.scroll-slim::-webkit-scrollbar-thumb {
-  background: rgba(24, 24, 27, 0.16);
-  border-radius: 8px;
-}
-.scroll-slim::-webkit-scrollbar-thumb:hover { background: rgba(24, 24, 27, 0.28); }
-
-/* range slider styling (sovereign emerald) */
-input[type="range"].sovereign-range {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  border-radius: 9999px;
-  background: linear-gradient(to left, rgba(5, 150, 105, 0.35), #e4e4e7);
-  outline: none;
-}
-input[type="range"].sovereign-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 9999px;
-  background: #059669;
-  border: 3px solid #ffffff;
-  cursor: pointer;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.22), 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-input[type="range"].sovereign-range::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 9999px;
-  background: #059669;
-  border: 3px solid #ffffff;
-  cursor: pointer;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.22);
-}
-
-@keyframes pulse-brand {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-.animate-pulse-brand { animation: pulse-brand 2.2s ease-in-out infinite; }
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
+/* price-updated banner */
+@keyframes slide-fade {
+  from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-rise { animation: rise 0.35s ease-out both; }
+.animate-rise { animation: slide-fade 0.25s ease-out both; }
+
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.animate-spin-slow { animation: spin-slow 1.1s linear infinite; }
+
+/* depth bars in the orderbook */
+.dx-depth-bid { background: linear-gradient(270deg, rgba(33, 201, 94, 0.16), rgba(33, 201, 94, 0.04)); }
+.dx-depth-ask { background: linear-gradient(90deg, rgba(255, 89, 60, 0.16), rgba(255, 89, 60, 0.04)); }
+
+/* number island — every figure in the RTL shell */
+.dx-num {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+.label-caps {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise, .pulse-ring, .pulse-ring-amber, .animate-pulse-brand {
-    animation: none !important;
-  }
+  .pulse-ring, .animate-rise, .animate-spin-slow { animation: none; }
+  html { scroll-behavior: auto; }
 }

@@ -1,0 +1,347 @@
+'use client';
+
+// ─── מסחר מקצועי · Pro — טרמינל סדרתי על הספר הריבוני ─────────────────────
+// גרף חי (lightweight-charts) · ספר-עומק ויזואלי · פקודות לימיט/שוק ·
+// ניהול-הזמנות פתוחות עם ביטול · סרט-עסקאות · ארנה (שחקני-עשיית-שוק).
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createChart, AreaSeries, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
+import { Loader2, X, Activity, Swords } from 'lucide-react';
+import { TokenMedallion, fmtMu, fmtPrice, fmtInt, dxPost, type World, type Market, MU } from './common';
+
+type Side = 'buy' | 'sell';
+type OrderKind = 'limit' | 'market';
+
+export function ProView({ world, online, onNeedAuth }: {
+  world: World | null; online: boolean; onNeedAuth: () => void;
+}) {
+  const markets = world?.markets ?? [];
+  const [pairKey, setPairKey] = useState('');
+  const market: Market | undefined = useMemo(
+    () => markets.find(m => m.key === pairKey) ?? markets[0],
+    [markets, pairKey],
+  );
+
+  const [side, setSide] = useState<Side>('buy');
+  const [kind, setKind] = useState<OrderKind>('limit');
+  const [priceStr, setPriceStr] = useState('');
+  const [amountStr, setAmountStr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [myOrders, setMyOrders] = useState<Array<{ id: number; base: string; quote: string; side: string; price: number; amount: number; filled: number }>>([]);
+
+  const base = market?.base ?? 'SAOS';
+  const quote = market?.quote ?? 'USDS';
+  // מחיר-אפקטיבי לטופס — קלט-המשתמש, ואחרת השער-החי (גזירה בלי effect)
+  const effectivePrice = priceStr || (market ? String(market.fair / MU) : '');
+
+  const refreshOrders = useCallback(async () => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/my-orders', { cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) setMyOrders(j.orders || []);
+    } catch { /* */ }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(refreshOrders, 0);
+    const i = setInterval(refreshOrders, 6000);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [refreshOrders]);
+
+  // לימיט-מחיר מאותחל לשער החי בכל החלפת זוג — בלי effect: גזירה ב-render
+  // דרך value-המחושב (priceStr ריק ⇒ מוצג השער) ובזמן-הקלדה priceStr שולט.
+  async function submit() {
+    if (!market) return;
+    const amount = Math.floor(parseFloat(amountStr) * MU || 0);
+    const price = Math.floor(parseFloat(effectivePrice) * MU || 0);
+    if (amount <= 0 || (kind === 'limit' && price <= 0)) {
+      setNote({ ok: false, text: 'הזן כמות ומחיר תקינים' });
+      return;
+    }
+    setBusy(true); setNote(null);
+    const j = await dxPost('order', {
+      action: kind === 'market' ? 'fill' : 'order',
+      base, quote, side, price: kind === 'limit' ? price : undefined, amount,
+    });
+    if (j.ok) {
+      setNote({ ok: true, text: 'הוגש לבלוק הבא (≤3 שנ׳)' });
+      setAmountStr('');
+      setTimeout(refreshOrders, 3500);
+    } else {
+      const e = String(j.error || '');
+      setNote({
+        ok: false,
+        text: e.includes('auth') || e.includes('unauthorized') ? 'נדרשת התחברות-בעלים' : (j.note || j.error || 'נכשל'),
+      });
+      if (e.includes('auth') || e.includes('unauthorized')) onNeedAuth();
+    }
+    setBusy(false);
+  }
+
+  async function cancel(id: number) {
+    await dxPost('cancel', { orderId: id });
+    setTimeout(refreshOrders, 3000);
+  }
+
+  const fillPct = myOrders.length ? (myOrders[0].filled / myOrders[0].amount) * 100 : 0;
+
+  return (
+    <div dir="ltr" className="grid grid-cols-1 xl:grid-cols-[1fr_300px_320px] gap-3 pb-6" data-testid="pro-view">
+      {/* chart + tape column */}
+      <div className="space-y-3 min-w-0 order-2 xl:order-1">
+        <div className="dx-card p-3">
+          <PairHeader market={market} online={online} />
+          <PriceChart market={market} />
+        </div>
+        <TapePanel world={world} />
+      </div>
+
+      {/* orderbook */}
+      <div className="dx-card p-3 order-1 xl:order-2" data-testid="orderbook">
+        <div className="text-[11px] label-caps mb-2">ספר-עומק</div>
+        <BookSide rows={market?.asks ?? []} kind="ask" />
+        <div className="flex items-center justify-between py-2 my-1 border-y border-[color:var(--line)]">
+          <span className="dx-num text-lg font-semibold">{market ? fmtPrice(market.fair) : '—'}</span>
+          <span className="dx-num text-[10px] text-[color:var(--text-3)]">
+            spread {market ? (market.spreadBps / 100).toFixed(2) + '%' : '—'}
+          </span>
+        </div>
+        <BookSide rows={market?.bids ?? []} kind="bid" />
+      </div>
+
+      {/* trading form + orders */}
+      <div className="space-y-3 order-3">
+        <div className="dx-card p-4" data-testid="trading-form">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-full dx-chip mb-3">
+            {(['buy', 'sell'] as Side[]).map(s => (
+              <button
+                key={s} onClick={() => setSide(s)}
+                className={`h-9 rounded-full text-sm font-semibold transition-colors ${side === s
+                  ? (s === 'buy' ? 'bg-[color:var(--green)] text-black' : 'bg-[color:var(--red)] text-white')
+                  : 'text-[color:var(--text-2)]'}`}
+              >
+                {s === 'buy' ? 'קנייה' : 'מכירה'}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-full dx-chip mb-3">
+            {(['limit', 'market'] as OrderKind[]).map(k => (
+              <button key={k} onClick={() => setKind(k)}
+                className={`h-8 rounded-full text-xs transition-colors ${kind === k ? 'bg-white/12 text-[color:var(--text-1)]' : 'text-[color:var(--text-2)]'}`}>
+                {k === 'limit' ? 'לימיט' : 'שוק'}
+              </button>
+            ))}
+          </div>
+          {kind === 'limit' && (
+            <label className="block mb-2">
+              <span className="text-[11px] label-caps">מחיר ({quote})</span>
+              <input
+                dir="ltr" inputMode="decimal" value={effectivePrice} onChange={e => setPriceStr(e.target.value.replace(/[^0-9.]/g, ''))}
+                className="dx-num w-full mt-1 h-11 px-3 rounded-xl dx-raised text-left outline-none focus:border-[color:var(--line-strong)] border border-[color:var(--line)]"
+              />
+            </label>
+          )}
+          <label className="block">
+            <span className="text-[11px] label-caps">כמות ({base})</span>
+            <input
+              dir="ltr" inputMode="decimal" placeholder="0.0" value={amountStr}
+              onChange={e => setAmountStr(e.target.value.replace(/[^0-9.]/g, ''))}
+              className="dx-num w-full mt-1 h-11 px-3 rounded-xl dx-raised text-left outline-none focus:border-[color:var(--line-strong)] border border-[color:var(--line)]"
+              data-testid="pro-amount"
+            />
+          </label>
+          <button
+            onClick={submit} disabled={busy}
+            className={`w-full h-11 mt-3 rounded-full text-sm font-semibold transition-opacity disabled:opacity-50 ${side === 'buy' ? 'bg-[color:var(--green)] text-black' : 'bg-[color:var(--red)] text-white'}`}
+            data-testid="pro-submit"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin-slow inline-block" /> : (side === 'buy' ? 'קנה' : 'מכור')} {base}
+          </button>
+          {note && (
+            <p className={`text-[11px] mt-2 text-center ${note.ok ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>
+              {note.text}
+            </p>
+          )}
+        </div>
+
+        {/* open orders */}
+        <div className="dx-card p-4" data-testid="my-orders">
+          <div className="text-[11px] label-caps mb-2">ההזמנות שלי ({myOrders.length})</div>
+          {myOrders.length === 0 && <p className="text-xs text-[color:var(--text-3)] py-3 text-center">אין הזמנות פתוחות</p>}
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {myOrders.map(o => (
+              <div key={o.id} className="dx-raised p-2.5 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold">
+                    <span className={o.side === 'buy' ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}>{o.side === 'buy' ? 'קנייה' : 'מכירה'}</span>
+                    {' '}<span className="dx-num">{fmtMu(o.filled)}/{fmtMu(o.amount)}</span> {o.base}
+                  </div>
+                  <div className="text-[10px] text-[color:var(--text-3)] dx-num">@ {fmtPrice(o.price)} {o.quote}</div>
+                  <div className="h-0.5 rounded-full bg-white/10 mt-1.5 overflow-hidden">
+                    <div className="h-full bg-[color:var(--pink)]" style={{ width: `${Math.min(100, (o.filled / o.amount) * 100)}%` }} />
+                  </div>
+                </div>
+                <button onClick={() => cancel(o.id)} aria-label={`ביטול הזמנה ${o.id}`}
+                  className="w-7 h-7 shrink-0 rounded-full dx-chip flex items-center justify-center hover:border-[color:var(--red)] hover:text-[color:var(--red)] transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* arena */}
+        <ArenaPanel world={world} />
+      </div>
+    </div>
+  );
+}
+
+function PairHeader({ market, online }: { market?: Market; online: boolean }) {
+  if (!market) return <div className="h-12" />;
+  const up = market.fair >= market.refPrice;
+  return (
+    <div className="flex items-center gap-3 mb-2 flex-wrap" dir="rtl">
+      <TokenMedallion sym={market.base} size={30} />
+      <div>
+        <div className="text-sm font-bold dx-num" dir="ltr">{market.key}</div>
+        <div className="flex items-center gap-2 text-[10px] text-[color:var(--text-3)]">
+          <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-[color:var(--green)] pulse-ring' : 'bg-[color:var(--red)]'}`} />
+          ספר ריבוני חי
+        </div>
+      </div>
+      <div className="mr-auto text-left" dir="ltr">
+        <div className={`dx-num text-xl font-bold ${up ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>
+          {fmtPrice(market.fair)}
+        </div>
+        <div className="dx-num text-[10px] text-[color:var(--text-3)]">
+          TWAP {fmtPrice(market.twap)} · ref {fmtPrice(market.refPrice)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PriceChart({ market }: { market?: Market }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const chart = createChart(ref.current, {
+      layout: {
+        background: { color: 'transparent' },
+        textColor: 'rgba(255,255,255,0.55)',
+        fontSize: 11,
+        attributionLogo: false,
+      },
+      grid: {
+        vertLines: { color: 'rgba(255,255,255,0.04)' },
+        horzLines: { color: 'rgba(255,255,255,0.04)' },
+      },
+      rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)' },
+      timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: true },
+      crosshair: { mode: 0 },
+      height: 340,
+      autoSize: true,
+    });
+    const series = chart.addSeries(AreaSeries, {
+      lineColor: '#FF37C7',
+      topColor: 'rgba(255,55,199,0.32)',
+      bottomColor: 'rgba(255,55,199,0.02)',
+      lineWidth: 2,
+      priceFormat: { type: 'price', precision: 3, minMove: 0.001 },
+    });
+    chartRef.current = chart;
+    seriesRef.current = series;
+    return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!seriesRef.current || !market) return;
+    const pts = (market.chart || [])
+      .slice(-400)
+      .map(p => ({ time: Math.floor(p.t / 1000) as UTCTimestamp, value: p.p / MU }))
+      .filter((x, i, arr) => i === 0 || x.time > arr[i - 1].time);
+    if (pts.length) seriesRef.current.setData(pts);
+    chartRef.current?.timeScale().fitContent();
+  }, [market?.key, market?.chart?.length, market]);
+
+  return <div ref={ref} className="w-full h-[340px]" data-testid="lightweight-charts-container" />;
+}
+
+function BookSide({ rows, kind }: { rows: Array<{ price: number; total: number; orders: number }>; kind: 'bid' | 'ask' }) {
+  const list = kind === 'ask' ? rows.slice(0, 7) : rows.slice(0, 7);
+  const maxTotal = Math.max(...list.map(r => r.total), 1);
+  const empty = list.length === 0;
+  return (
+    <div className={kind === 'ask' ? '' : ''} data-testid={`book-${kind}`}>
+      {empty && <p className="text-[10px] text-[color:var(--text-3)] py-2 text-center">אין סדרים בצד הזה</p>}
+      {list.map(r => (
+        <div key={r.price} className="relative flex items-center justify-between h-[22px] px-2 text-[11px]">
+          <div
+            className={`absolute inset-y-0 ${kind === 'ask' ? 'right-0 dx-depth-ask' : 'left-0 dx-depth-bid'}`}
+            style={{ width: `${(r.total / maxTotal) * 100}%` }}
+          />
+          <span className={`dx-num relative ${kind === 'ask' ? 'text-[color:var(--red)]' : 'text-[color:var(--green)]'}`}>
+            {fmtPrice(r.price)}
+          </span>
+          <span className="dx-num relative text-[color:var(--text-2)]">{fmtMu(r.total, 0)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TapePanel({ world }: { world: World | null }) {
+  const tape = world?.tape ?? [];
+  return (
+    <div className="dx-card p-3" data-testid="tape">
+      <div className="text-[11px] label-caps mb-2 flex items-center gap-1.5">
+        <Activity className="w-3 h-3" /> סרט-עסקאות חי
+      </div>
+      <div className="max-h-56 overflow-y-auto">
+        {tape.map((t, i) => (
+          <div key={`${t.h}-${i}`} className="flex items-center justify-between h-[24px] px-1 text-[11px]">
+            <span className="dx-num text-[color:var(--text-2)]">{fmtMu(t.amountMu, 1)} {t.base}</span>
+            <span className="dx-num">{fmtPrice(t.price)}</span>
+            <span className="dx-num text-[color:var(--text-3)]">@{t.h}</span>
+          </div>
+        ))}
+        {tape.length === 0 && <p className="text-xs text-[color:var(--text-3)] py-3 text-center">עדיין אין עסקאות</p>}
+      </div>
+    </div>
+  );
+}
+
+function ArenaPanel({ world }: { world: World | null }) {
+  const arena = world?.arena;
+  if (!arena) return null;
+  return (
+    <div className="dx-card p-4" data-testid="arena-panel">
+      <div className="text-[11px] label-caps mb-2 flex items-center gap-1.5">
+        <Swords className="w-3 h-3" /> ארנת עשיית-השוק · {arena.params.enabled ? 'פעילה' : 'כבויה'}
+      </div>
+      <div className="space-y-2">
+        {arena.soldiers.map(s => (
+          <div key={s.name} className="dx-raised p-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold dx-num">{s.name}</span>
+              <span className={`dx-num ${(s.pnl || 0) >= 0 ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>
+                {(s.pnl >= 0 ? '+' : '') + fmtMu(s.pnl)}
+              </span>
+            </div>
+            <div className="text-[10px] text-[color:var(--text-3)] dx-num mt-0.5">
+              equity {fmtMu(s.equity)} · {s.liveQuotes} quotes
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="text-[10px] text-[color:var(--text-3)] mt-2 leading-relaxed">
+        ארבעה חיילים עושים שוק אמיתי בספר — {arena.params.spreadBps}bps עם requote {arena.params.requoteBps}bps
+      </p>
+    </div>
+  );
+}
