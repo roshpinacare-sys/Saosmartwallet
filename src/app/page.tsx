@@ -25,7 +25,7 @@ import {
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
-  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain,
+  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain, Hand, Radio,
 } from "lucide-react";
 
 /* ══════════════════════════ auth plumbing ══════════════════════════ */
@@ -115,8 +115,10 @@ interface ProposalRow { id: string; agentName: string; goal: string; rationale: 
 interface ProposalPolicyRow { autoApprove: boolean; maxAutoPerDay: number; maxBudget: number }
 interface CheckerStatsRow { verdicts: number; firstPass: number; repairPass: number; blocked: number; errors: number }
 interface MemoryRow { id: string; key: string; kind: string; body: string; source: string; refCount: number; updatedAt: string }
-interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
+interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired?: number; marketMoves?: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
 interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[]; proposals?: ProposalRow[]; proposalPolicy?: ProposalPolicyRow; checkerStats?: CheckerStatsRow | null }
+interface OrderRow { id: string; agentName: string; runId: string | null; op: string; account: string; spec: string; preview: string; notionalSteem: number; status: string; decidedBy: string | null; previewTxId: string | null; broadcastId: string | null; blockNum: number | null; error: string | null; createdAt: string; decidedAt: string | null }
+interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalSteem: number; maxSignedPerDay: number; pendingExpiryMs: number; defaultTtlSeconds: number }; account: string; signedToday: number; vaultOpen: boolean; error?: string }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -140,6 +142,9 @@ const ENDPOINTS: Ep[] = [
   { method: "PATCH", path: "/api/gate/proposals", desc: "הכרעת הצעת-יעד: אישור מזניק ריצה אמיתית (origin=proposal)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
   { method: "PUT", path: "/api/gate/proposals", desc: "מדיניות-יוזמות: אישור-אוטומטי מרוסן (מקס-יומי + תקציב)", auth: "operator", body: '{ "autoApprove": true, "maxAutoPerDay": 2, "maxBudget": 4 }' },
   { method: "GET", path: "/api/gate/memory", desc: "זיכרון-הצי: בנק-הממצאים הסופיים המשותף", auth: "operator" },
+  { method: "GET", path: "/api/gate/orders", desc: "יד-ריבונית: תור-החתימות (פקודות DEX שהסוכנים הכינו) + מדדי-הגבול", auth: "operator" },
+  { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל ומשדרת לשרשרת (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
+  { method: "GET", path: "/api/gate/stream", desc: "גשר-הפיקוד בזמן-אמת (SSE) — הודעות חדשות נדחפות, בלי דגימה", auth: "operator" },
   { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
   { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
   { method: "POST", path: "/api/gate/device", desc: "חימוש מכשיר-מהימן (זכור אותי בצורה בטוחה)", auth: "operator", body: '{ "label": "Chrome · Windows" }' },
@@ -1038,6 +1043,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   const [h, setH] = useState<HeartData | null>(null);
   const [busy, setBusy] = useState(false);
   const [mem, setMem] = useState<MemoryRow[]>([]);
+  const [orders, setOrders] = useState<OrdersData | null>(null);
 
   /* patrol form */
   const [label, setLabel] = useState("");
@@ -1055,11 +1061,15 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     const r = await apiJson<{ ok: boolean; facts?: MemoryRow[] }>("/api/gate/memory");
     if (r?.ok) setMem(r.facts || []);
   }, []);
-  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); }, [load, loadMem]);
+  const loadOrders = useCallback(async () => {
+    const r = await apiJson<OrdersData>("/api/gate/orders");
+    if (r?.ok) setOrders(r);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); }, [load, loadMem, loadOrders]);
   useEffect(() => {
-    const t = setInterval(() => { load(); loadMem(); }, 8000);
+    const t = setInterval(() => { load(); loadMem(); loadOrders(); }, 8000);
     return () => clearInterval(t);
-  }, [load, loadMem]);
+  }, [load, loadMem, loadOrders]);
 
   async function toggleAutonomy(v: boolean) {
     setBusy(true);
@@ -1123,6 +1133,17 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     } finally { setBusy(false); }
   }
 
+  async function decideOrder(id: string, decision: "approve" | "reject") {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; broadcastId?: string; error?: string }>("/api/gate/orders", { method: "PATCH", body: JSON.stringify({ id, decision }) });
+      if (r?.ok) {
+        toast.success(decision === "approve" ? `הכספת חתמה והשידור עבר — txId ${String(r.broadcastId).slice(0, 14)}…` : "הפקודה נדחתה — לא נחתמה");
+        await loadOrders();
+      } else toast.error(r?.error || "ההכרעה נכשלה");
+    } finally { setBusy(false); }
+  }
+
   const beatAgeS = h?.pulse?.lastTickAt ? Math.max(0, Math.round((Date.now() - new Date(h.pulse.lastTickAt).getTime()) / 1000)) : null;
   const beatState = !h?.pulse ? "dark" : beatAgeS !== null && beatAgeS <= HEART_TICK_MS_CLIENT / 1000 * 3 ? "ok" : beatAgeS !== null && beatAgeS <= 120 ? "warn" : "stall";
   const c = h?.pulse?.counters;
@@ -1143,7 +1164,9 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
         </div>
         <p className="text-[11px] text-zinc-500 leading-relaxed mb-4">
           הסוכנים קמים לבד: סיורים מתוכננים (קצב אמיתי שנשמר ב-DB) · טריגרים שמגיבים לאירועים בגשר ולריצות שנחסמו ·
+          אזעקות-שוק — הלב צופה במחיר ה-DEX החי ומפיק market.move על תזוזה של ≥3% ·
           יוזמות-יעד מרוסנות — הסוכן מציע, הגבול מחליט · זיכרון-צי משותף — ממצא סופי נרשם פעם-אחת ומלמד את כל הצי ·
+          יד-ריבונית — הסוכן מכין פקודת-DEX אמיתית, הכספת חותמת עם המפתח-הפעיל רק באישורך המפורש ·
           חוזי-חכירה שמשיבים ריצות קרוסות מהעקבות שנשמרו · והכול מרוסן — תקציב-צעדים, מקסימום-יומי, קירור בין-הפעלות, ומוח-בודק שונה.
         </p>
 
@@ -1162,6 +1185,8 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               <span title="סיורים שהוזנקו מתוכננים">patrols {c.schedulesFired}</span>
               <span title="ריצות שהוזנקו מטריגרי-אירוע">triggers {c.triggersFired}</span>
               <span title="יוזמות-יעד שהוזנקו מהצעות סוכנים">initiatives {c.proposalsFired}</span>
+              <span title="פקודות-DEX ממתינות שפגו ללא הכרעה">orders-expired {c.ordersExpired ?? 0}</span>
+              <span title="אזעקות-שוק שהלב הפיק על תזוזת מחיר אמתית">market-alarms {c.marketMoves ?? 0}</span>
               <span title="ריצות קרוסות שהשומר החזיר לתור">reaped {c.reaped}</span>
             </span>
           )}
@@ -1297,6 +1322,57 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                 checker gate: {h.checkerStats.verdicts} verdicts · {Math.round(((h.checkerStats.firstPass + h.checkerStats.repairPass) / h.checkerStats.verdicts) * 100)}% pass ({h.checkerStats.firstPass} first-try · {h.checkerStats.repairPass} repaired) · {h.checkerStats.blocked} blocked{h.checkerStats.errors ? ` · ${h.checkerStats.errors} errors` : ""}
               </p>
             )}
+          </div>
+        </div>
+
+        {/* sovereign hand — the controlled signing queue */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <p className="text-xs text-zinc-400 flex items-center gap-1.5">
+              <Hand className="h-3.5 w-3.5 text-orange-300" />
+              יד-ריבונית — תור-החתימות ({orders?.orders?.filter((o) => o.status === "pending").length ?? 0} ממתינות)
+            </p>
+            <span className="text-[10px] text-zinc-500 font-mono" dir="ltr">
+              signed {orders?.signedToday ?? 0}/{orders?.rails.maxSignedPerDay ?? 6} today · ≤{orders?.rails.maxNotionalSteem ?? 100} STEEM · {orders?.account ?? "headcorner"}@active
+            </span>
+          </div>
+          {orders && !orders.vaultOpen && (orders?.orders?.some((o) => o.status === "pending") ?? false) && (
+            <p className="text-[10px] text-amber-300/90 mb-2">הכספת נעולה — פתח אותה כדי לחתום על פקודות ממתינות (אישור על כספת-סגורה נדחה בכנות)</p>
+          )}
+          <div className="max-h-56 overflow-y-auto scroll-thin space-y-2 pl-1">
+            {orders?.orders?.map((o) => {
+              let pv: { side?: string; amount?: string; price?: string; total?: string; orderid?: number; note?: string } = {};
+              try { pv = JSON.parse(o.preview || "{}"); } catch { /* dim row */ }
+              const what = o.op === "limit_order_cancel"
+                ? `ביטול הזמנה #${pv.orderid ?? "?"}`
+                : `${pv.side === "buy" ? "קניית" : "מכירת"} ${pv.amount ?? "?"} @ ${pv.price ?? "?"}`;
+              return (
+                <div key={o.id} className={"rounded-xl border px-3 py-2.5 " + (o.status === "pending" ? "border-orange-500/30 bg-orange-500/5" : o.status === "signed" ? "border-emerald-500/25 bg-emerald-500/5" : "border-zinc-800 bg-black/40 opacity-70")}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (o.status === "pending" ? "text-orange-300 border-orange-500/40" : o.status === "signed" ? "text-emerald-300 border-emerald-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{o.status}</Badge>
+                    <span className="text-[11px] font-mono text-zinc-400 shrink-0">{o.agentName}</span>
+                    <span className="text-[10px] text-zinc-300">{what}</span>
+                    <span className="text-[9px] text-zinc-600 font-mono shrink-0" dir="ltr">#{pv.orderid ?? "—"}</span>
+                    {o.decidedBy && <span className="text-[9px] text-zinc-600 shrink-0">הוכרע ע"י {o.decidedBy === "operator" ? "המפעיל" : o.decidedBy}</span>}
+                    {o.status === "pending" && (
+                      <span className="mr-auto flex gap-1.5">
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-300 hover:bg-emerald-500/10" disabled={busy} onClick={() => decideOrder(o.id, "approve")}>חתום ושדר</Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-rose-300 hover:bg-rose-500/10" disabled={busy} onClick={() => decideOrder(o.id, "reject")}>דחייה</Button>
+                      </span>
+                    )}
+                  </div>
+                  {o.status === "signed" && o.broadcastId && (
+                    <p className="text-[10px] font-mono text-emerald-400/80 mt-1.5 break-all" dir="ltr">tx {o.broadcastId}{o.blockNum ? ` · block ${o.blockNum}` : ""}</p>
+                  )}
+                  {o.error && <p className="text-[10px] text-rose-300/70 mt-1.5">{o.error}</p>}
+                  {o.status === "pending" && <p className="text-[9px] text-zinc-600 mt-1">{pv.note ?? "הפקודה אינה חתומה — הכספת תחתום רק באישורך"}</p>}
+                </div>
+              );
+            })}
+            {orders && orders.orders.length === 0 && (
+              <p className="text-xs text-zinc-600 py-4 text-center">אין פקודות — סוכן חמוש ב-steem.order.build מכין פקודת-DEX אמתית, ואתה חותם (או לא)</p>
+            )}
+            {!orders && <p className="text-xs text-zinc-600 py-4 text-center">טוען תור-חתימות…</p>}
           </div>
         </div>
 
@@ -1686,16 +1762,43 @@ function Bridge() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [live, setLive] = useState(false); // SSE connected — push beats polling
   const endRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const r = await apiJson<{ ok: boolean; messages: Msg[] }>("/api/gate/messages");
-    if (r?.ok) setMsgs(r.messages || []);
+    if (r?.ok) setMsgs((r.messages || []).slice(-100));
   }, []);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
   useEffect(() => {
-    const t = setInterval(() => { load(); }, 5000);
-    return () => clearInterval(t);
+    // BRIDGE-ENGINE: one live stream instead of blind 5s polling. On any
+    // failure the old poller takes over — the bridge never goes dark.
+    let es: EventSource | null = null;
+    let poll: ReturnType<typeof setInterval> | null = null;
+    const startPoll = () => {
+      if (!poll) poll = setInterval(() => { load(); }, 5000);
+    };
+    try {
+      es = new EventSource("/api/gate/stream");
+      es.addEventListener("hello", () => { setLive(true); if (poll) { clearInterval(poll); poll = null; } });
+      es.addEventListener("messages", (ev) => {
+        try {
+          const arr = JSON.parse((ev as MessageEvent).data) as Msg[];
+          setMsgs((prev) => {
+            const seen = new Set(prev.map((m) => m.id));
+            const fresh = arr.filter((m) => !seen.has(m.id));
+            return fresh.length ? [...prev, ...fresh].slice(-100) : prev;
+          });
+        } catch { /* malformed frame — the next poller tick repairs */ }
+      });
+      es.onerror = () => { setLive(false); startPoll(); };
+    } catch {
+      startPoll();
+    }
+    return () => {
+      es?.close();
+      if (poll) clearInterval(poll);
+    };
   }, [load]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [msgs]);
 
@@ -1715,6 +1818,12 @@ function Bridge() {
       <SectionHead num="05" title="גשר-הפיקוד" sub="אתה, הסוכנים והמערכת — ערוץ אחד. הכול נרשם." />
       <motion.div {...rise}>
         <GlowCard className="flex flex-col h-[480px] overflow-hidden">
+          <div className="flex items-center justify-between px-5 pt-3">
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-zinc-500" dir="ltr">
+              <Radio className={"h-3 w-3 " + (live ? "text-emerald-400 animate-pulse" : "text-zinc-600")} aria-hidden />
+              {live ? "live stream" : "polling"}
+            </span>
+          </div>
           <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-5 py-4">
             <div className="space-y-3">
               {msgs.map((m) => (

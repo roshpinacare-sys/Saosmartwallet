@@ -29,6 +29,8 @@ import { masterReady } from "@/lib/gate/crypto";
 import { processRun, buildLessons } from "./loop";
 import { parseBrain, pickCheckerBrain } from "./brain";
 import { workerId, claimRun, LEASE_MS } from "./lease";
+import { expireStaleOrders } from "./orders";
+import { steemMarket } from "@/lib/steem-server";
 
 /* ── tuned constants (fleet discipline — the army must never stampede) ── */
 export const HEART_TICK_MS = 20_000; // one bounded pass every 20s
@@ -45,7 +47,7 @@ interface HeartPulse {
   lastTickAt: string;
   beats: number;
   enabled: boolean;
-  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number };
+  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number };
   loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>;
   error?: string;
 }
@@ -235,6 +237,9 @@ function fillTemplate(tpl: string, p: Record<string, unknown>): string {
     .replaceAll("{goal}", String(p.goal ?? ""))
     .replaceAll("{gaps}", String(p.gaps ?? ""))
     .replaceAll("{agent}", String(p.agent ?? ""))
+    .replaceAll("{price}", String(p.price ?? ""))
+    .replaceAll("{prev}", String(p.prev ?? ""))
+    .replaceAll("{pct}", String(p.pct ?? ""))
     .trim();
 }
 
@@ -432,6 +437,84 @@ async function stageDispatch(p: HeartPulse): Promise<void> {
   p.loops.dispatch = { lastAt: new Date().toISOString(), ok: true, fired };
 }
 
+/* ══════════════════ sovereign-hand watchman + market pulse ══════════════════ */
+
+/**
+ * stageOrders — the signing queue's watchman: a pending order nobody decided
+ * on dies honestly after its TTL. The heart NEVER signs — the vault signs
+ * only on an explicit operator decision (SOVEREIGN-HAND contract).
+ */
+async function stageOrders(p: HeartPulse): Promise<void> {
+  const expired = await expireStaleOrders();
+  p.counters.ordersExpired += expired;
+  p.loops.orders = { lastAt: new Date().toISOString(), ok: true, fired: expired };
+}
+
+const PRICE_WATCH_KEY = "pricewatch";
+const PRICE_MOVE_PCT = 0.03; // a ≥3% move against the last NOTIFIED price is worth waking the fleet
+const PRICE_NOTIFY_COOLDOWN_MS = 30 * 60_000; // at most one market alarm per 30min
+const PRICE_WATCH_EVERY_BEATS = 6; // every 6th beat ≈ 2min — one cheap failover read
+
+interface PriceWatchState { last: number; lastAt: string; notifiedAt?: string; notifiedPrice?: number }
+
+/**
+ * stageMarket — the network REACTS to the real market: every 6th beat the
+ * heart reads the live DEX ticker (cheap, failover client) and keeps a
+ * watermark. A ≥3% move (vs the last notified price, cooldown-bounded) emits
+ * a `market.move` event — the existing trigger machinery wakes the agents
+ * armed with market.watch. A probe failure is recorded, never crashes a beat.
+ */
+async function stageMarket(p: HeartPulse): Promise<void> {
+  const loops = () => ({ lastAt: new Date().toISOString(), ok: true, fired: 0 });
+  if (p.beats % PRICE_WATCH_EVERY_BEATS !== 0) {
+    if (!p.loops.market) p.loops.market = loops();
+    return;
+  }
+  let row = await db.gateState.findUnique({ where: { key: PRICE_WATCH_KEY } });
+  let st: PriceWatchState = { last: 0, lastAt: "" };
+  try { if (row) st = { ...st, ...(JSON.parse(row.value) as PriceWatchState) }; } catch { /* fresh */ }
+  try {
+    const t = await steemMarket().ticker();
+    const price = Number(t.latest);
+    if (!Number.isFinite(price) || price <= 0) {
+      p.loops.market = { lastAt: new Date().toISOString(), ok: false, fired: 0 };
+      return;
+    }
+    const prev = st.last;
+    const movedPct = prev > 0 ? Math.abs(price - prev) / prev : 0;
+    const notifiedAgo = st.notifiedAt ? Date.now() - Date.parse(st.notifiedAt) : Infinity;
+    if (prev > 0 && movedPct >= PRICE_MOVE_PCT && notifiedAgo >= PRICE_NOTIFY_COOLDOWN_MS) {
+      const pct = Math.round(movedPct * 1000) / 10;
+      const { emitEvent } = await import("./events");
+      await emitEvent("market.move", { price, prev, pct, direction: price > prev ? "up" : "down" }, "heart");
+      await db.gateMessage.create({
+        data: {
+          channel: "command",
+          fromKind: "system",
+          fromName: "harness",
+          body: `${price > prev ? "📈" : "📉"} תזוזת-שוק ${pct}%: STEEM ${prev.toFixed(4)} → ${price.toFixed(4)} SBD — אירוע market.move נפלט, הצי החמוש ב-market.watch עשוי לקום`,
+          meta: "{}",
+        },
+      }).catch(() => {});
+      st.notifiedAt = new Date().toISOString();
+      st.notifiedPrice = price;
+      p.counters.marketMoves++;
+      p.loops.market = { lastAt: new Date().toISOString(), ok: true, fired: 1 };
+    } else {
+      p.loops.market = loops();
+    }
+    st.last = price;
+    st.lastAt = new Date().toISOString();
+    await db.gateState.upsert({
+      where: { key: PRICE_WATCH_KEY },
+      create: { key: PRICE_WATCH_KEY, value: JSON.stringify(st) },
+      update: { value: JSON.stringify(st) },
+    });
+  } catch {
+    p.loops.market = { lastAt: new Date().toISOString(), ok: false, fired: 0 };
+  }
+}
+
 async function readAutonomyEnabled(): Promise<boolean> {
   const cfg = await db.gateConfig.findUnique({ where: { id: "gate" }, select: { autonomyEnabled: true } });
   return cfg?.autonomyEnabled !== false; // default-on; only an explicit OFF stops the fleet
@@ -461,7 +544,7 @@ export async function tickOnce(): Promise<HeartPulse> {
     lastTickAt: "",
     beats: 0,
     enabled: true,
-    counters: { dispatched: 0, reaped: 0, recovered: 0, schedulesFired: 0, schedulesDeferred: 0, triggersFired: 0, proposalsFired: 0, eventsSeen: 0 },
+    counters: { dispatched: 0, reaped: 0, recovered: 0, schedulesFired: 0, schedulesDeferred: 0, triggersFired: 0, proposalsFired: 0, eventsSeen: 0, ordersExpired: 0, marketMoves: 0 },
     loops: {},
   };
   if (!g) {
@@ -484,6 +567,8 @@ export async function tickOnce(): Promise<HeartPulse> {
         ["scheduler", () => stageSchedules(p)],
         ["triggers", () => stageTriggers(p)],
         ["initiative", () => stageProposals(p)],
+        ["orders", () => stageOrders(p)],
+        ["market", () => stageMarket(p)],
         ["dispatch", () => stageDispatch(p)],
       ];
       for (const [name, fn] of stages) {
@@ -562,6 +647,33 @@ async function ensureTriggerPolicy(): Promise<void> {
         maxPerDay: 2,
       },
     });
+  }
+  // market-reactive autonomy: an agent armed with market.watch hears the
+  // heart's market.move alarm — bounded (cooldown 30min is enforced by the
+  // emitter itself; the trigger adds its own daily cap on top)
+  const marketArmed = armed.filter((a) => {
+    try { return (JSON.parse(a.modules || "[]") as string[]).includes("market.watch"); } catch { return false; }
+  });
+  const marketExisting = await db.gateTrigger.findMany({ where: { on: "market.move" }, select: { agentName: true } });
+  const marketHave = new Set(marketExisting.map((t) => t.agentName));
+  const marketMeans = JSON.stringify([
+    "מחיר-השוק החי נקרא מה-DEX (market.watch) והושווה למחיר שהדליק את האזעקה",
+    "מסקנה מעשית אחת (או ״אין פעולה משתלמת״) נשלחה לגשר בעברית",
+  ]);
+  for (const a of marketArmed) {
+    if (!marketHave.has(a.name)) {
+      await db.gateTrigger.create({
+        data: {
+          on: "market.move",
+          agentName: a.name,
+          goalTemplate: "אזעקת-שוק: המחיר זז ב-{pct}% ({prev} → {price} SBD ל-STEEM). קרא את השוק החי (market.watch) ואת ההזמנות-הפתוחות, והחלט אם יש פעולה משתלמת — דווח מסקנה אחת לגשר.",
+          doneMeans: marketMeans,
+          budget: 4,
+          cooldownMs: 900_000,
+          maxPerDay: 4,
+        },
+      });
+    }
   }
 }
 

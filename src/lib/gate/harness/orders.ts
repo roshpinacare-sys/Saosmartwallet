@@ -22,7 +22,41 @@ import { db } from "@/lib/db";
 import { requireMaster, openSecret, GateError } from "@/lib/gate/crypto";
 import { steemBroadcastAdapter } from "@/lib/steem-server";
 import { buildSteemOrderTx, buildSteemCancelTx } from "@/lib/steem-order";
-import { PrivateKey } from "../../../../packages/crypto/src/index";
+import { PrivateKey, base58Decode } from "../../../../packages/crypto/src/index";
+import { sha256 } from "@noble/hashes/sha2.js";
+
+// secp256k1 group order — @noble/curves (audited); no hand-rolled crypto.
+const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+
+/**
+ * The vault's headcorner WIFs are stored in the 52-char bitcoin-flavored
+ * form ([0x80 ‖ 32B ‖ 0x01 ‖ 4B chk]). steem-js — which REGISTERED the
+ * on-chain authorities — treats that payload's 33-byte body (32B ‖ 0x01)
+ * as the WHOLE scalar (its `fromBuffer` warns "Expecting 32 bytes, instead
+ * got 33" and multiplies on anyway). The live authority is therefore derived
+ * from (body33 mod n), NOT from the canonical 32-byte scalar. Verified live
+ * 2026-09-09 against headcorner's posting authority. Signing must reproduce
+ * steem-js semantics or the chain answers "missing required active authority".
+ * (This quirk is also the real story behind the AUTHORITY-DRIFT finding.)
+ */
+function toSigningKey(wif: string): PrivateKey {
+  const trimmed = wif.trim();
+  const raw = base58Decode(trimmed);
+  if (raw.length === 37 && raw[0] === 0x80) {
+    return PrivateKey.fromWif(trimmed); // canonical steem WIF — package handles it
+  }
+  if (raw.length === 38 && raw[0] === 0x80 && raw[33] === 0x01) {
+    // checksum over [0x80 ‖ 33B body] — fail closed on mismatch
+    const payload = raw.subarray(0, 34);
+    const chk = sha256(sha256(payload)).slice(0, 4);
+    if (!Buffer.from(chk).equals(Buffer.from(raw.subarray(34, 38)))) {
+      throw new GateError("bad-key", "בדיקת-סיכום של המפתח נכשלה — חומר-המפתח בכספת פגום");
+    }
+    const d = BigInt("0x" + Buffer.from(raw.subarray(1, 34)).toString("hex")) % SECP256K1_N;
+    return PrivateKey.fromBytes(Buffer.from(d.toString(16).padStart(64, "0"), "hex"));
+  }
+  return PrivateKey.fromWif(trimmed); // otherwise let the package fail closed
+}
 
 /** The commander account whose ACTIVE key lives in the vault — never taken from agent input. */
 export const COMMANDER_ACCOUNT = "headcorner";
@@ -90,7 +124,9 @@ export async function createOrderFromAgent(input: BuildOrderInput): Promise<Orde
   }
 
   const ttl = Math.min(Math.max(Number(input.ttlSeconds) || ORDER_RAILS.defaultTtlSeconds, 120), 7 * 86400);
-  const orderid = Date.now() & 0xffffffff; // fixed at BUILD time — the operator signs exactly this order
+  // unsigned uint32 — `& 0xffffffff` yields a SIGNED int32 (negative since
+  // 2026-06, when Date.now() mod 2^32 crossed 2^31) and would fail the builder
+  const orderid = Date.now() % 0x100000000; // fixed at BUILD time — the operator signs exactly this order
   const orderExpiration = Math.floor(Date.now() / 1000) + ttl;
 
   let specJson: string;
@@ -180,7 +216,7 @@ async function commanderActiveKey(): Promise<PrivateKey> {
   });
   if (!entry) throw new GateError("vault-missing-key", `אין מפתח-active של ${COMMANDER_ACCOUNT} בכספת — אי אפשר לחתום`);
   const wif = openSecret({ encPriv: entry.encPriv, privIv: entry.privIv, privTag: entry.privTag });
-  return PrivateKey.fromWif(wif);
+  return toSigningKey(wif);
 }
 
 /**

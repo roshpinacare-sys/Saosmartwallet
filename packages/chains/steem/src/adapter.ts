@@ -424,13 +424,27 @@ export class SteemAdapter implements ChainAdapter {
     }
     void digestHex;
     const signedWire = appendSignatures(new Uint8Array(Buffer.from(serializedHex, "hex")), tx.signatures);
+    // Graphene's JSON deserializer parses time_point_sec with boost's
+    // COMPACT ISO parser ("20260909T225349") — dashed ISO and epoch integers
+    // die in from_iso_string with a boost "Day of month" error. Verified live
+    // 2026-09-09 against api.steemit.com + api.justyy.com: compact ISO parses
+    // through to authority checks; every other format fails pre-signature.
+    // (The BINARY path is unaffected — serializedHex/digestHex above stay
+    // integer-exact; only this JSON echo of the fields needs the other form.)
+    const toCompactIso = (t: number) =>
+      new Date(t * 1000).toISOString().replace(/[-:]/g, "").slice(0, 15);
     const txJson = {
       ref_block_num: (tx.metadata as { refBlockNum: number }).refBlockNum,
       ref_block_prefix: (tx.metadata as { refBlockPrefix: number }).refBlockPrefix,
-      expiration: new Date(
-        ((tx.metadata as { expiration: number }).expiration) * 1000,
-      ).toISOString().slice(0, 19),
-      operations: tx.operations.map((o) => [o.type, o.payload] as const),
+      expiration: toCompactIso((tx.metadata as { expiration: number }).expiration),
+      operations: tx.operations.map((o) => {
+        const payload = o.payload as Record<string, unknown>;
+        const body =
+          payload && typeof payload.expiration === "number"
+            ? { ...payload, expiration: toCompactIso(payload.expiration) }
+            : payload;
+        return [o.type, body] as const;
+      }),
       extensions: [],
       signatures: tx.signatures,
     };
