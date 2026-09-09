@@ -1,0 +1,104 @@
+
+==================================================
+QUERY: 1inch Odos aggregator intent-based swap dutch auction mechanism
+==================================================
+
+[1] How Dutch Auctions Deliver Better Swaps
+URL: https://blog.uniswap.org
+SNIPPET: Oct 16, 2025 — Some intent - based protocols bundle many swaps together and execute them in batches. Others process each swap individually through a Dutch ...
+
+[2] Swap API › Intent Swap (Gasless) › Introduction
+URL: https://business.1inch.com
+SNIPPET: An order's exchange rate decreases from the desired rate to the minimal return amount ( Dutch auction ) until it becomes profitable for resolvers to fill the ...
+
+[3] Intent-Based DEX Guide 2026 | Support - Eco
+URL: https://eco.com
+SNIPPET: Jul 8, 2026 — In a Fusion-style Dutch auction , the resolver that fills first takes the spread above the curve. Same-chain intent - based DEXes (UniswapX, 1inch ...
+
+[4] What Is 1inch Network? The DeFi Swap Aggregator
+URL: https://www.ledger.com
+SNIPPET: Dec 7, 2021 — Dutch Auctions systems for Resolvers ... To operate seamless Intents- based swaps for single and cross-chain swaps , 1inch uses offchain resolvers.
+
+[5] An Intent-Centric Mechanism for Dollar Cost Averaging - Brink
+URL: https://www.brink.trade
+SNIPPET: Feb 1, 2024 — Dutch auction-based recurring swaps are one of many composable intent designs that can be built using the Brink API and Brink DSL.
+
+[6] 1inch Leads the Way for Cross-Chain DeFi
+URL: https://thedefiant.io
+SNIPPET: Sep 19, 2025 — Its atomic, intent - based execution is based on an innovative Dutch auction approach for rate sourcing, and an automated recovery for cross-chain ...
+
+==================================================
+QUERY: KyberSwap dynamic fees aggregators oracle how it works
+==================================================
+
+[1] What Is KyberSwap? 2026 Guide | Support - Eco
+URL: https://eco.com
+SNIPPET: Aug 17, 2026 — KyberSwap is a multi-chain DEX aggregator that routes swaps across 420+ liquidity sources on 17 chains to find users the best execution ... Read more
+
+[2] Concepts | KyberSwap Docs
+URL: https://docs.kyberswap.com
+SNIPPET: Feb 10, 2026 — KyberSwap Aggregator improves upon the DeFi swap experience by splitting and rerouting swaps across all integrated DEXs on the same chain. Read more
+
+[3] What Is KyberSwap? Guide to the Multi-Chain DEX
+URL: https://nansen.ai
+SNIPPET: May 10, 2025 — Dynamic trade routing: When you initiate a swap, KyberSwap's algorithm splits your trade across multiple liquidity pools to find the most ... Read more
+
+[4] What is KyberSwap?
+URL: https://liquidityfinder.com
+SNIPPET: May 28, 2024 — KyberSwap will adjust the fees dynamically , depending on where the liquidity is being sourced from and the complexity of the trade. Using ... Read more
+
+[5] KyberSwap Aggregator Fees & Revenue
+URL: https://defillama.com
+SNIPPET: Aggregator fees retained by KyberSwap on routed swaps . Pulled. Transfer events into the fee collector and from native gas-token internal transfers on chains
+
+[6] What Is KyberSwap? DEX Aggregator & Liquidity Protocol
+URL: https://www.gate.com
+SNIPPET: Apr 6, 2026 — KyberSwap Dynamic Trade Routing enables users to exchange at superior rates instantly. The KyberSwap Aggregator is connected to over 100 ... Read more
+
+==================================================
+QUERY: Camelot DEX Nitro spartan pools spiswap rebates mechanism
+==================================================
+
+[1] Pools - Camelot DEX | Arbitrum native Decentralized Exchange
+URL: https://app.camelot.exchange
+SNIPPET: Create positions into pools to earn swap fees and various additional incentives. TOTAL TVL $5.73. Your deposits $ 41.247 TVL $ 13.48
+
+[2] Camelot STIP Program Updates
+URL: https://forum.arbitrum.foundation
+SNIPPET: Dec 1, 2023 — Mechanism for distribution incentives : Merkl and Camelot's Nitro pools . Summary of incentives plan: CAMELOT - STIP - ARB allocations - Google ... Read more
+
+[3] Camelot DEX - Exchanges & Marketplaces - IQ.wiki
+URL: https://iq.wiki
+SNIPPET: Sep 5, 2023 — Camelot's dual liquidity mechanism rewards users who provide liquidity with yield farming. They can also participate in an incentive program ...
+
+[4] Camelot Overview
+URL: https://baltex.io
+SNIPPET: Camelot is an Arbitrum-native DEX and liquidity infrastructure platform . Explore swaps, liquidity pools, incentive mechanics, and ecosystem stats.
+
+==================================================
+QUERY: Trader Joe LZ bonding liquidity book LBP launch mechanism
+==================================================
+
+[1] Trader Joe's Novel Take on Concentrated Liquidity
+URL: https://members.delphidigital.io
+SNIPPET: Mar 23, 2023 — Trader Joe recently launched v2 of its decentralized exchange (DEX), called Liquidity Book ( LB ). The LB design incorporates concentrated ... Read more
+
+[2] 5 Important Logics to Understand About Liquidity Book Pair
+URL: https://dev.to
+SNIPPET: Apr 15, 2026 — At its core, LBPair.sol is the engine that powers Trader Joe V2 , also known as the "Liquidity Book." Unlike typical automated market makers ( ... Read more
+
+[3] Trader Joe Launches 'Liquidity Book' To Improve Capital
+URL: https://thedefiant.io
+SNIPPET: Aug 22, 2022 — The Joe v2 protocol introduces a “ Liquidity Book ” design to improve capital efficiency through concentrated liquidity, and a variable fee that ... Read more
+
+[4] LBX EMS - Financial Trading Software
+URL: https://liquiditybook.com
+SNIPPET: LiquidityBook financial trading software is as robust as it is versatile. Our platform supports every step of the order life cycle.
+
+[5] Trader Joe's Launches Liquidity Book V2.2, Introducing
+URL: https://www.bitget.com
+SNIPPET: Jun 17, 2024 — Centralized incentives specifically refer to the mechanism that LB pools are equipped with local, real-time, and fully on-chain mechanisms to ... Read more
+
+[6] JOE v2.1 Liquidity Book
+URL: https://resources.cryptocompare.com
+SNIPPET: JOE v2: Liquidity Book. 1 Introduction. Trader Joe (v1) was launched in 2021 as an AMM with Uniswap v2 liquidity contracts as its backbone [1]. As DeFi ... Read more 6 pages

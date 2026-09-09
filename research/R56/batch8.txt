@@ -1,0 +1,60 @@
+
+==================================================
+QUERY: am-AMM auction managed AMM Bunni LP bids fee policy epoch how it works
+==================================================
+
+[1] am-AMM: An Auction-Managed Automated Market Maker
+URL: https://ui.adsabs.harvard.edu
+SNIPPET: The `` auction - managed AMM '' works by running a censorship-resistant onchain auction . The pool manager sets the swap fee rate on the pool, and also receives the ...
+
+[2] am-AMM: An Auction-Managed Automated Market Maker⋆
+URL: https://fc25.ifca.ai
+SNIPPET: by A Adams · Cited by 24 — The “ auction - act as “pool manager” for a constant-product AMM . The pool manager sets the swap fee rate on the pool, and also receives the accrued fees from ...
+
+[3] am-AMM: An Auction-Managed Automated Market Maker
+URL: https://arxiv.org
+SNIPPET: The ''auction-managed AMM'' works by running a censorship-resistant onchain auction for the right to temporarily act as ''pool manager'' for a constant-product ...
+
+[4] am-AMM: An Auction-Managed Automated Market Maker
+URL: https://ideas.repec.org
+SNIPPET: by A Adams · 2025 · Cited by 24 — The `` auction - managed AMM '' works by running a censorship-resistant onchain auction . The pool manager sets the swap fee rate on the pool, and also receives the ...
+
+[5] Auction AMM
+URL: https://ethglobal.com
+SNIPPET: The manager pays a guaranteed rent (R) to LPs, which replaces traditional swap fees as the LP revenue stream. The manager collects all swap fees and gains zero ...
+
+[6] am-AMM: An Auction-Managed Automated Market Maker
+URL: https://www.semanticscholar.org
+SNIPPET: We study the fee policy of a liquidity provider ( LP ) in a constant-product automated market maker ( AMM ) whose fee can be adjusted continuously, as enabled ...
+
+[7] Bunniapp/biddog: Open source implementation of am-
+URL: https://github.com
+SNIPPET: Bid : Each bid in the auction specifies its rent (amount of bid tokens paid per block) and deposit (used to pay rent, >= rent * K). The bid with the highest rent ...
+
+==================================================
+QUERY: Balancer LBP weights 96% 4% linear decay price formula start end weight
+==================================================
+
+[1] Liquidity Bootstrapping Pools (LBPs)
+URL: https://docs.balancer.fi
+SNIPPET: The pool owner specifies the starting and ending weights for both tokens. These weights change linearly over time.
+
+[2] Liquidity Bootstrapping FAQ | Balancer V1 - GitBook
+URL: https://balancer.gitbook.io
+SNIPPET: Aug 3, 2021 — For instance, to go from 96 %/ 4 % to 30%/70%, the start weights would be 24/1, and the end weights would be 7.5/17.5 - notice that both total to ... Read more
+
+[3] balancer-v3-monorepo/pkg/interfaces/contracts/pool
+URL: https://github.com
+SNIPPET: Starting weights for the LBP , Ending weights for the LBP , This is the "offset" applied to set the initial price for a seedless LBP ,
+
+[4] Reverse Liquidity Bootstrapping Pool
+URL: https://www.forgd.com
+SNIPPET: Jun 10, 2024 — The blue line shows the spot price for a token when using an LBP , as weights change, price slowly decreases. The above is an example of an LBP . Read more
+
+[5] Balancer Launches LBP Simulator
+URL: https://www.tradingview.com
+SNIPPET: Feb 23, 2026 — The tool allows users to model token supply, allocation for sale, initial collateral, weight ratios, duration, swap fees, and collateral assets ... Read more
+
+[6] Balancer Impermanent Loss: Formula and Impact on LPs
+URL: https://threesigma.xyz
+SNIPPET: Learn about the impermanent loss formula in Balancer . This DeFi LP guide explains how impermanent loss affects liquidity providers in DeFi. Read more

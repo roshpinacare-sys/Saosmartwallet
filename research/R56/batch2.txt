@@ -1,0 +1,140 @@
+
+==================================================
+QUERY: Jupiter DCA program on-chain how it works token sales interval
+==================================================
+
+[1] DCA Orders - Jupiter Documentation
+URL: https://docs.jup.ag
+SNIPPET: Instead of buying a token all at once, you split a total amount into multiple smaller trades (suborders) that execute at regular intervals .
+
+[2] Jupiter DCA Orders on Solana: How to Read Them - StalkChain
+URL: https://stalkchain.com
+SNIPPET: Jul 5, 2026 — A Jupiter DCA order is a scheduled swap program on Solana. Instead of buying a token in one shot, a wallet deposits the full input amount ... Read more
+
+[3] Jupiter DCAs - Nansen API
+URL: https://docs.nansen.ai
+SNIPPET: Jul 20, 2026 — Jupiter DCA (Dollar Cost Averaging) is only available on Solana and allows users to automate token purchases over time. Returns comprehensive ... Read more
+
+[4] Maximize Solana DeFi with Jupiter and Trust Wallet
+URL: https://trustwallet.com
+SNIPPET: Feb 6, 2024 — Jupiter's DCA feature facilitates automated dollar cost averaging for SPL tokens , enabling users to methodically buy or sell tokens at set ... Read more
+
+[5] Jupiter - Exchanges & Marketplaces | IQ.wiki
+URL: https://iq.wiki
+SNIPPET: Jul 9, 2026 — Jupiter DCA provides a dollar-cost averaging solution , allowing users to automate the purchase or sale of SPL tokens at regular intervals over a ... Read more
+
+[6] Jupiter on Solana: Project Review, Programs, Token, Metrics
+URL: https://solanacompass.com
+SNIPPET: DCA and Limit Orders Jupiter's Dollar Cost Averaging tool lets users automate recurring token purchases over a defined schedule, useful for building positions ...
+
+==================================================
+QUERY: GMX v2 order types stop-loss take-profit limit orders keepers mechanism
+==================================================
+
+[1] Positions and order types
+URL: https://docs.gmx.io
+SNIPPET: Take-Profit / Stop-Loss ​. You can set basic TP/SL orders directly in the trade box before opening a position. Toggle the TP/SL section to configure a trigger ... Read more
+
+[2] Create Orders Take Profit And Stop Loss - Trading
+URL: https://updraft.cyfrin.io
+SNIPPET: A detailed guide to Debugging GMX Take Profit and Stop Loss Orders - Learn to dissect `multicall` transactions using tools like Tenderly to understand how GMX ... Read more
+
+[3] Crypto order types: market, limit, stop loss, take profit
+URL: https://metamask.io
+SNIPPET: May 28, 2026 — An order type is an instruction that tells an exchange how to execute a trade—at what price, under what conditions, and how quickly. Read more
+
+[4] Understanding the order types
+URL: https://help.coinbase.com
+SNIPPET: A take profit / stop loss order can be attached to a market or limit order to manage risk by adding predefined exit price levels. A bracket order lets you manage ... Read more
+
+[5] Stop-Loss and Take-Profit Orders
+URL: https://help.crypto.com
+SNIPPET: Jul 20, 2026 — Stop-Loss and Take-Profit are conditional orders that automatically place a mark or limit order when the mark price reaches a trigger price ... Read more
+
+[6] How To Set Stop Loss and Take Profit?
+URL: https://www.evest.com
+SNIPPET: Jun 21, 2026 — A stop loss order is triggered when the market price reaches or exceeds the specified stop price, automatically selling the asset to limit ...
+
+[7] gmx-synthetics/README.md at main
+URL: https://github.com
+SNIPPET: Liquidity providers take on the profits and losses of traders. Market orders , limit orders , stop - loss , take - profit orders Oracle System. Keepers listen for the ...
+
+[8] What Are Take-profit and Stop-loss Orders? How Do They  - IG
+URL: https://www.ig.com
+SNIPPET: A take-profit order is a type of limit order that specifies an exact price set by you . · A stop-loss order is used by traders to limit loss or lock in the ... Read more
+
+==================================================
+QUERY: on-chain grid trading DEX bot strategy automated market making
+==================================================
+
+[1] Top 10 Grid Trading Bots in 2026
+URL: https://www.quicknode.com
+SNIPPET: A grid trading bot is an automated system that places multiple buy and sell orders at preset price intervals to capitalize on price fluctuations.
+
+[2] What Is a DEX Trading Bot? How It Works, Benefits & Risks
+URL: https://wundertrading.com
+SNIPPET: Oct 26, 2025 — Grid trading bots place a series of buy and sell orders at regular price intervals above and below the current market price, forming a grid.
+
+[3] Futures grid trading bots: A beginner's guide
+URL: https://www.kraken.com
+SNIPPET: Futures grid trading bots automate buy and sell orders across preset price levels , benefiting from market fluctuations without manual intervention. Read more
+
+[4] Grid Bot Guide 2025 to Master Automated Crypto Trading
+URL: https://coinrule.com
+SNIPPET: Jan 8, 2025 — A grid bot is an automated trading tool that places buy and sell orders at set intervals within a predefined price range. It takes advantage of ... Read more
+
+[5] What is a grid trading bot and how does it work?
+URL: https://www.coinbase.com
+SNIPPET: Grid trading bots automate the process of buying and selling cryptocurrencies within a predetermined price range. They are designed to yield returns from ...
+
+[6] Grid Bot: Your Ultimate Trading Tool For Sideways Markets!
+URL: https://goodcrypto.app
+SNIPPET: Our grid trading bot automates your trading routine by placing multiple buy and sell orders within a chosen price range, letting you profit from every market ... Read more
+
+[7] Continuous Market Grid bot — Strategy by pointalgo
+URL: https://www.tradingview.com
+SNIPPET: Jun 7, 2026 — The Continuous Market Grid Bot is a high-frequency, range-bound algorithmic market-making strategy . It bypasses conventional directional ...
+
+==================================================
+QUERY: Hyperliquid architecture orderbook HyperCore HyperEVM builder codes
+==================================================
+
+[1] HyperEVM - Hyperliquid Docs - GitBook
+URL: https://hyperliquid.gitbook.io/hyperliquid-docs/hyperevm
+SNIPPET: Aug 17, 2026 · Builders can plug into the onchain order book liquidity of HyperCore via the HyperEVM. See the HyperEVM developer section for more technical ...
+
+[2] What Is Hyperliquid? Hypercore & HyperEVM Explained | Dwellir Blog
+URL: https://www.dwellir.com/blog/what-is-hyperliquid
+SNIPPET: Nov 3, 2025 · Hypercore handles the order book and trading, while HyperEVM lets developers build smart contracts on top of that liquidity.
+
+[3] xulian.hl on X: "Understanding HyperCore and Builder Codes The
+URL: https://x.com/xulian_hl/status/1910188302579458173
+SNIPPET: Apr 9, 2025 · Builder codes unlock monetization for developers building on HyperCore, less way to earn from the traffic they generate.
+
+[4] Hyperliquid Architecture: HyperBFT, HyperCore, HyperEVM - Zealynx
+URL: https://www.zealynx.io/research/protocol-deep-dives/Understanding-Hyperliquid-Architecture-HyperBFT-HyperCore-HyperEVM-Part1
+SNIPPET: Jan 26, 2026 · This Hyperliquid architecture guide is for builders trying to answer one exact question before they ship, HyperEVM gives builders a separate ...
+
+[5] Hyperliquid Architecture Explained: Security & Decentralization
+URL: https://onekey.so/blog/ecosystem/hyperliquid-architecture-explained-security-decentralization-19137c
+SNIPPET: Jan 26, 2026 · HyperEVM uses a dual-block architecture to avoid a single forced trade-off between fast confirmations and large block sizes.
+
+[6] Developer Guide to Hyperliquid & HyperEVM | How to Get Started
+URL: https://www.youtube.com/watch?v=ZESEkAKiJrg
+SNIPPET: Oct 3, 2025 · ——— Get started with Hyperliquid for free: https://www.alchemy.com/hyperevm we'll discuss: ​- How HyperCore & HyperEVM ... ​- Builder Codes & fee- ...
+
+[7] How Hyperliquid Works: Architecture, Order Book, HyperEVM
+URL: https://rocknblock.io/blog/how-does-hyperliquid-work-a-technical-deep-dive
+SNIPPET: Oct 2, 2025 · We'll cover its architecture, the HyperCore order book, HyperEVM, and the mechanisms that manage trading, liquidity, and smart contract ...
+
+[8] Hyperliquid Integration Guide | Chainlink Documentation
+URL: https://docs.chain.link/ccip/tools-resources/network-specific/hyperliquid-integration-guide
+SNIPPET: This guide will provide comprehensive information about Hyperliquid for CCIP users who want to. HyperEVM is largely similar to any other EVM network, allowing ... How Hyperliquid Works · Hyperevm · Integration Steps
+
+[9] What the Hyperliquid Ecosystem Contains: HyperCore Book Apps vs
+URL: https://blofin.com/academy/education/hyperliquid/hyperliquid-ecosystem-and-apps
+SNIPPET: Aug 26, 2026 · HyperCore is the onchain order-book environment. ... Primary sources include the Hyperliquid documentation on HyperEVM, HyperCore, builder codes ...
+
+[10] We Researched Hyperliquid's Architecture — Here's What Actually
+URL: https://dev.to/rocknblock/we-researched-hyperliquids-architecture-heres-what-actually-stands-out-3568
+SNIPPET: Feb 3, 2026 · Hyperliquid Blockchain Architecture. Hyperliquid splits blockchain state between HyperCore and HyperEVM, synchronized under HyperBFT. Hypercore On-Chain Order... · Margin Management And The... · Key Takeaways

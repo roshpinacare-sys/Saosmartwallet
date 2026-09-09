@@ -1,0 +1,128 @@
+
+==================================================
+QUERY: Balancer V3 managed pools hooks 80/20 boosted pools architecture
+==================================================
+
+[1] Pool Creation - Balancer v3 Docs
+URL: https://docs.balancer.fi
+SNIPPET: Weighted and CoW AMM pools use a structure of 50/50, 80/20 , or custom weights that you set per token. Under Pool hooks you can attach a hook to the pool : a ...
+
+[2] Balancer V3 Explained: Programmable Liquidity & DeFi Yields
+URL: https://blog.portals.fi
+SNIPPET: Apr 22, 2026 — Learn how Balancer V3's Vault, hooks, and boosted pools work . Explore BAL tokenomics, veBAL governance, and LP risks in one complete guide.
+
+[3] Modern DEXes, how they're made: Balancer V3
+URL: https://mixbytes.io
+SNIPPET: Balancer V3 introduces several noteworthy advancements in DeFi , such as its modular architecture, support for multi-token pools, and a comprehensive hooks ...
+
+[4] Balancer Guide - Weighted Pools & AMM
+URL: https://coinstancy.com
+SNIPPET: Balancer v3 further simplifies pool creation with a modular "hooks" system , improves capital efficiency, introduces 100% boosted pools
+
+==================================================
+QUERY: Uniswap V4 hooks ecosystem notable examples flash accounting singleton
+==================================================
+
+[1] Uniswap v4 Explained Simply: Features, Hook & Architecture
+URL: https://threesigma.xyz
+SNIPPET: Dec 4, 2024 — Another Uniswap v4 feature is the " flash accounting" system , which allows users to efficiently less gas (100 gas) than traditional storage ...
+
+[2] Building Your First Hook | Uniswap Developers
+URL: https://developers.uniswap.org
+SNIPPET: Uniswap introduced the v4 of their protocol introducing several new concepts such as hooks, flash accounting, singleton architecture and more.
+
+[3] Full Comparision: Uniswap V4 vs V3: Changes and
+URL: https://www.cyfrin.io
+SNIPPET: Nov 6, 2024 — Uniswap V4 introduces a “flash accounting” system that also helps to make routes between liquidity pools significantly more gas efficient.
+
+[4] V4 Hooks Created 2500 Custom Pools and 150 Strategies
+URL: https://blockeden.xyz
+SNIPPET: Feb 6, 2026 — Uniswap claims flash accounting reduces gas costs by up to 99% for multi-hop swaps, and from my testing, a 3-hop route that cost ~350k gas on V ...
+
+[5] johnsonstephan/awesome-uniswap-v4-hooks
+URL: https://github.com
+SNIPPET: Covers an introduction to Uniswap v4, hooks, singleton and flash accounting , native ETH, and other notable features.
+
+[6] Our Vision for Uniswap v4
+URL: https://blog.uniswap.org
+SNIPPET: Jun 12, 2023 — This singleton architecture is complemented by a new " flash accounting " system. Instead of transferring assets in and out of pools at the end ...
+
+[7] Uniswap Protocol V4 Hook-based On-Chain Policy
+URL: https://www.sec.gov
+SNIPPET: Uniswap Protocol v4 marks a pivotal moment in decentralized finance, introducing a highly programmable infrastructure characterized by hooks , a singleton ... Read more 30 pages
+
+[8] Introduction to Uniswap v4
+URL: https://www.ethereum-blockchain-developer.com
+SNIPPET: Aug 19, 2025 — Key Innovations in Uniswap v4 · 1. Singleton Contract Architecture · 2. Hooks · 3. Flash Accounting · 4. Native Liquidity Routing. Read more
+
+==================================================
+QUERY: Osmosis superfluid staking mechanism LP tokens
+==================================================
+
+[1] Superfluid Staking - Osmosis Docs
+URL: https://docs.osmosis.zone/build/chain/superfluid
+SNIPPET: Superfluid staking supports both GAMM LP shares and full-range concentrated-liquidity positions as the underlying staked asset. The OSMO token is minted and ...
+
+[2] Osmosis Lets Liquidity Providers Earn Dual Incomes from Staking
+URL: https://www.prnewswire.com/news-releases/osmosis-lets-liquidity-providers-earn-dual-incomes-from-staking-and-lp-rewards-301492795.html
+SNIPPET: Mar 1, 2022 · Because Osmosis is an AMM, Superfluid Staking also allows for a larger token, like ATOM, to be converted into the staking tokens of several ...
+
+[3] Everything you need to know to participate in Superfluid Staking
+URL: https://www.coinbase.com/developer-platform/discover/insights-analysis/what-is-superfluid-staking
+SNIPPET: Mar 1, 2022 · At launch the Superfluid Staking LP tokens from the initial ATOM/OSMO pool will only be able to contribute to staking on Osmosis validators ...
+
+[4] Osmosis Superfluid Staking tl;dr : r/cosmosnetwork - Reddit
+URL: https://www.reddit.com/r/cosmosnetwork/comments/t2xx6l/osmosis_superfluid_staking_tldr
+SNIPPET: Feb 27, 2022 · LP tokens must be bonded for 14-days to be able to participate in Superfluid staking. Only one validator per pool can be chosen to delegate to. Concerns over Superfluid Staking : r/OsmosisLab - Reddit ELI5: Why provide liquidity when staking has the same APY/APR? More results from www.reddit.com
+
+[5] How To Superfluid Stake On Osmosis (OSMO) - Complete Guide 2022
+URL: https://www.youtube.com/watch?v=CAaXHkBteM8
+SNIPPET: Mar 2, 2022 · Osmosis DEX just launched Superfluid Staking where you can earn up to 90% APR on LP tokens! For now, this applies to the ATOM/OSMO pool but ...
+
+[6] Beginner's Guide to Superfluid Staking on Osmosis - Medium
+URL: https://rishisid.medium.com/beginners-guide-to-superfluid-staking-on-osmosis-9a8a905d0b35
+SNIPPET: Mar 1, 2022 · Superfluid staking is the process where you put your staking tokens in DeFi, and stake the received DeFi assets to obtain additional yield.
+
+[7] How LP Tokens Earn Both Liquidity Mining and Staking Rewards
+URL: https://www.gate.com/blog/103506/osmosis-superfluid-staking-explained-how-lp-tokens-earn-both-liquidity-mining-and-staking-rewards
+SNIPPET: May 21, 2026 · Osmosis Superfluid Staking Explained: How LP Tokens Earn Both Liquidity Mining and Staking Rewards · Proposal Rejection and Market Turbulence.
+
+[8] Superfluid Staking Coming to Osmosis Zone & How  - YouTube
+URL: https://www.youtube.com/watch?v=q_hyGhGkFSc
+SNIPPET: Feb 20, 2022 · The abbreviated version of the video is the following: Superfluid Staking (SFS) is coming to Pool #1 (ATOM/OSMO) on the Osmosis Zone at the ...
+
+[9] Osmosis introduces Superfluid Staking. How is this a game changer
+URL: https://cryptoslate.com/osmosis-introduces-superfluid-staking-how-is-this-a-game-changer-for-the-cosmos-ecosystem
+SNIPPET: Mar 1, 2022 · This is where Superfluid Staking which unlocks two different APRs for LPs comes in–enabling smaller zones to attract investors with high yields, ...
+
+[10] Osmosis Staking & DeFi - Ultimate Crypto Guide
+URL: https://de.fi/blog/the-ultimate-yield-farming-guide-for-osmosis-25d7919ed654
+SNIPPET: Aug 22, 2022 · Superfluid Staking is a solution that solves the liquidity problem by offering liquidity providers to earn staking rewards. This not only boosts ...
+
+==================================================
+QUERY: Pendle PT YT principal yield tokenization mechanism fixed yield
+==================================================
+
+[1] Yield Tokenization Smart Contracts | Pendle Documentation
+URL: https://docs.pendle.finance
+SNIPPET: This guide explains how Pendle tokenizes yield by splitting assets into PT (Principal Token) and YT (Yield Token), and how the YT contract handles minting and ...
+
+[2] Yield Tokenization Protocols, How They're Made: Pendle
+URL: https://mixbytes.io
+SNIPPET: The article explores Pendle , a modular yield tokenization protocol that enables users to separate and tokenize future yield from underlying assets.
+
+[3] Principal Tokens Explained: Fixed Returns in DeFi
+URL: https://1inch.com
+SNIPPET: Dec 12, 2025 — Pendle's strong position in the PT/YT ecosystem , where it tokenizes future yield into tradable Principal Tokens (PTs) and Yield Tokens (YTs), ...
+
+[4] What Is Pendle? PT and YT Tokens Explained 2026 | Support
+URL: https://eco.com
+SNIPPET: Jul 16, 2026 — Pendle splits yield -bearing tokens into PT ( principal ) and YT ( yield ). Lock in fixed APY, trade variable yield , or hedge rates onchain.
+
+[5] Pendle Finance - Projects & Protocols | IQ.wiki
+URL: https://iq.wiki
+SNIPPET: Aug 28, 2026 — Yield tokenization is the process of separating a yield -bearing asset into two components: principal and yield . In Pendle , this begins by ... Read more
+
+[6] What is Pendle Finance? Yield Tokenization Explained &
+URL: https://nansen.ai
+SNIPPET: May 30, 2025 — Principal Tokens (PT): Represent ownership of the underlying asset · Yield Tokens (YT): Represent the future yield that the asset will generate. Read more

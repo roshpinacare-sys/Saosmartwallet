@@ -1,0 +1,148 @@
+
+==================================================
+QUERY: CoW Protocol batch auction uniform clearing price mechanism coincidence of wants
+==================================================
+
+[1] What is price improvement and why is it unique to CoW
+URL: https://cow.fi
+SNIPPET: CoW Swap's batch auction mechanism helps improve pricing by batching orders together and establishing a uniform clearing price.
+
+[2] CoW Swap Explained: MEV-Free DEX Trades | Support - Eco
+URL: https://eco.com
+SNIPPET: Aug 17, 2026 — A coincidence of wants is when two traders in the same batch want opposite sides of the same pair, one selling USDC for ETH, another selling ETH ... Read more
+
+[3] Batch Auctions & Coincidence of Wants - Finance Lessons
+URL: https://lessons.alejandrofernandezcamello.me
+SNIPPET: Jun 20, 2026 — Within a batch , all trades of the same token pair settle at one price — the uniform clearing price — identical for every participant.
+
+[4] A Coincidence of Wants Mechanism for Swap Trade
+URL: https://arxiv.org
+SNIPPET: Jul 14, 2025 — CoWSwap leverages batch auctions [17] and uniform clearing prices to protect users from MEV attacks such as sandwiching.
+
+[5] CoW Swap: Intents, MEV, and Batch Auctions - Shoal Research
+URL: https://www.shoal.gg
+SNIPPET: Nov 27, 2023 — Batch auction serves as the core pricing (price discovery) mechanism for CoW Swap. Orders are grouped together, where solvers (off-chain ... Read more
+
+[6] Fair Combinatorial Batch Auction | CoW Protocol Documentation
+URL: https://docs.cow.fi
+SNIPPET: Coincidence of Wants : When multiple orders trade the same assets within an auction , there may be an opportunity for a peer-to-peer swap that doesn't tap on- ... Read more
+
+==================================================
+QUERY: UniswapX dutch auction order fill mechanism RFQ
+==================================================
+
+[1] Auction Types | Uniswap Developers
+URL: https://developers.uniswap.org
+SNIPPET: UniswapX uses the same RFQ and exclusive Dutch auction model on every supported chain. system uses RFQ to improve pricing before users submit onchain ...
+
+[2] What is UniswapX? 2026 Guide | Support - Eco
+URL: https://eco.com
+SNIPPET: May 26, 2026 — The Dutch Auction Mechanism UniswapX uses a Dutch auction to discover the clearing price . Fillers race to grab the order as soon as their cost ...
+
+[3] UniswapX — A Deep Dive
+URL: https://blog.li.fi
+SNIPPET: Oct 17, 2023 — Once the user signs the order , a Dutch auction is kicked off to decide which Filler gets to fulfil the order . Here, Fillers compete with each ... Read more
+
+[4] UniswapX — A Deep Dive
+URL: https://xangle.io
+SNIPPET: Oct 31, 2023 — Once the user signs the order , a Dutch auction is kicked off to decide which Filler gets to fulfil the order . Here, Fillers compete with each ... Read more
+
+[5] UniswapX: Moving toward intent-centric swaps
+URL: https://www.superscrypt.xyz
+SNIPPET: Nov 28, 2023 — Dutch auction starts at the price quoted by the RFQ auction winner . The price of the swap order then gradually decreases until a Filler accepts ...
+
+[6] An In-depth Overview of the Leading Intent-based DEXs
+URL: https://www.cryptoeq.io
+SNIPPET: Jan 13, 2024 — UniswapX, a novel, open-source, auction-based … employs a Dutch auction mechanism . it functions as a request for quote (RFQ) intent-based ...
+
+[7] Loss-Versus-Fair: Efficiency of Dutch Auctions on
+URL: https://d-nb.info
+SNIPPET: by CC Moallemi · Cited by 6 — Routing trades in request-for-quote ( RFQ ) protocols like UniswapX [2] and 1inch Fusion [1] ... Define the τF to be the fill time of the order , i.e., the first ... Read more
+
+[8] UniswapX Protocol Overview | PDF | Market Liquidity
+URL: https://www.scribd.com
+SNIPPET: UniswapX Protocol is a non-custodial Dutch auction -based trading changes and the architectural changes that help make them possible. protocol implemented for ... Read more
+
+==================================================
+QUERY: on-chain stop loss AMM implementation without keeper trigger price
+==================================================
+
+[1] Cross-Chain DEX Architecture with AI-Driven Stop-Loss Protection
+URL: https://medium.com/@gwrx2005/cross-chain-dex-architecture-with-ai-driven-stop-loss-protection-cd4d13a75f10
+SNIPPET: Nov 20, 2025 · On-chain, each Perpetual Market contract has built-in functions to check collateral ratios and trigger liquidations or stop-loss closures when ...
+
+[2] Onchain Stop Loss & Take Profit: How It Works - Definitive.fi
+URL: https://definitive.fi/blog/onchain-stop-loss-take-profit
+SNIPPET: Onchain stop loss and take profit orders are conditional trade instructions that execute automatically when an asset's price crosses a predefined threshold, ...
+
+[3] What you need to know about crypto stop orders in 2026 - CoW DAO
+URL: https://cow.fi/learn/what-you-need-to-know-about-crypto-stop-orders-in-2026
+SNIPPET: Jan 8, 2026 · A stop order has two main parts. There is a stop price that acts as the trigger, and a follow-up order that is sent once that trigger is hit. On ...
+
+[4] am-AMM: An Auction-Managed Automated Market Maker - arXiv
+URL: https://arxiv.org/html/2403.03367v4
+SNIPPET: This paper presents a single mechanism that targets two important unsolved problems for AMMs: reducing losses to informed orderflow, and maximizing revenue
+
+[5] From AMMs to CLOBs: The $7 Trillion Race to Bring Nasdaq Onchain
+URL: https://x.com/a1research__/status/1972741742903365992
+SNIPPET: Sep 29, 2025 · AMM-based perpetual platforms implemented stop losses and limit orders through auxiliary keeper systems, but these lacked the granularity, ...
+
+[6] Enhancing Concentrated Liquidity AMM Pools with On-Chain Limit
+URL: https://ethresear.ch/t/superimposed-liquidity-enhancing-concentrated-liquidity-amm-pools-with-on-chain-limit-order-book/15489
+SNIPPET: May 4, 2023 · Dfyn V2 introduces limit order ticks, allowing for highly concentrated liquidity on a single price point, resulting in improved price precision.
+
+[7] Understanding the order types - Coinbase Help
+URL: https://help.coinbase.com/coinbase/trading-and-funding/advanced-trade/order-types
+SNIPPET: If BTC drops to $50,000, the stop loss side of the order is triggered. The TP/SL limit price switches to an aggressive limit order with limit price of $47,500.
+
+[8] Jorge-Lopes/stop-loss-amm - GitHub
+URL: https://github.com/Jorge-Lopes/stop-loss-amm
+SNIPPET: The amm pool price goes lower than the initially specified lower boundary, this price update will not trigger the liquidity removal. The amm pool price goes ... Bytepitch & Agoric... · Demonstration Scenarios · Scenario 2
+
+[9] PancakeSwap Limit Orders vs Stop-Loss - Holy Family in Egypt
+URL: https://map.blessedegypt.com/2025/09/18/pancakeswap-limit-orders-vs-stop-loss-why-limit-orders-fail-and-what-to-use-instead
+SNIPPET: Sep 18, 2025 · Do not use limit orders as stop-losses unless you have verified that liquidity exists at the stop price and keeper fees are reasonable. For ...
+
+[10] How to Build Stop-Loss and Take-Profit Smart Contracts
+URL: https://chainscorelabs.com/guides/cryptocurrency-trading-and-investment/automated-portfolio-management/how-to-implement-stop-loss-and-take-profit-orders-via-smart-contracts
+SNIPPET: This guide provides a technical walkthrough for building non-custodial limit order contracts that execute on-chain swaps when price conditions are met, ... Core Technical Concepts · Conditional Order Execution · Composable Dex Integration...
+
+==================================================
+QUERY: liquidity depth proof oracle spot price manipulation detection multiple venues
+==================================================
+
+[1] A Lifecycle-Oriented Detection and Defense Framework for
+URL: https://arxiv.org
+SNIPPET: Aug 16, 2026 — This paper conducts a comprehensive study of AMM spot - oracle price manipulation attacks within the DeFi ecosystem. It first introduces the ... Read more
+
+[2] Market Manipulation vs. Oracle Exploits
+URL: https://chain.link
+SNIPPET: Mar 26, 2024 — An oracle exploit is when an oracle reports inaccurate data about an external event, usually as a result of nefarious influence. Read more
+
+[3] Prevent Price Oracle Manipulation in DeFi | Guardrail
+URL: https://www.guardrail.ai
+SNIPPET: Guardrail protects DeFi protocols from price oracle manipulation with real-time monitoring and multi-source data validation. Stop attacks before they ...
+
+[4] Oracle Risk and Security Standards: Price Composition
+URL: https://chaoslabs.xyz
+SNIPPET: May 1, 2024 — This chapter delves into the intricate world of Price Composition Methodologies, a foundational pillar of Oracle risk and security.
+
+[5] What Is Oracle Manipulation?
+URL: https://www.cube.exchange
+SNIPPET: Learn what oracle manipulation is , how flash-loan-funded price attacks work, and why aggregation, TWAPs, and delayed feeds reduce risk.
+
+[6] The Full Guide to Price Oracle Manipulation Attacks
+URL: https://www.cyfrin.io
+SNIPPET: Feb 1, 2024 — Using a liquidity pool as your oracle guarantees almost 100% that your protocol will get rekt by a flash loan attack, especially when leveraging ... Read more
+
+[7] SC02:2025 - Price Oracle Manipulation
+URL: https://owasp.org
+SNIPPET: If an oracle is compromised, attackers can exploit the manipulated data to drain the contract's liquidity pools or even cause a contract to become insolvent. Read more
+
+[8] Oracle Manipulation Attacks
+URL: https://scsfg.io
+SNIPPET: The classic on-chain price oracle vulnerability is trusting the spot price of a decentralized exchange. A smart contract determines the price of an asset, for ... Read more
+
+[9] Market Manipulation vs. Oracle Exploits - General
+URL: https://governance.aave.com
+SNIPPET: Dec 20, 2022 — Market manipulation changes the price of an asset, while oracle attacks result in incorrect or invalid data being reported that doesn't reflect ... Read more

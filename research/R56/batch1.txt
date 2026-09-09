@@ -1,0 +1,152 @@
+
+==================================================
+QUERY: Uniswap V3 TWAP oracle manipulation resistance how it works accumulator
+==================================================
+
+[1] Uniswap v3 TWAP Oracles in Proof of Stake
+URL: https://blog.uniswap.org
+SNIPPET: Oct 26, 2022 — ... oracle update. This creates oracle manipulation resistance up to a certain length of blocks. For example, if 20,000 ticks were crossed from ... Read more
+
+[2] What is a TWAP Oracle?
+URL: https://www.cube.exchange
+SNIPPET: Uniswap V3 manipulation risk emphasizes that liquidity distribution matters, The oracle's resistance is not only a function of pool design; TWAP stopped ...
+
+[3] TWAP Oracle Attacks: Easier Done than Said?
+URL: https://eprint.iacr.org
+SNIPPET: by T Mackinga · 2022 · Cited by 59 — We analyzed the manipulation resistance of TWAP oracles against different types of attacks and showed that the cost of manipulation for TWAP oracles is lower ... 8 pages
+
+[4] Uniswap v3 TWAP Oracle Tooling and Deep Dive Pt. 1
+URL: https://chaoslabs.xyz
+SNIPPET: Mar 21, 2022 — All Uniswap V3 pair pools can serve as price oracles, offering access to historical price and liquidity data based on trades in the pool. Read more
+
+[5] Price Oracles | Uniswap Developers
+URL: https://developers.uniswap.org
+SNIPPET: The tick accumulator stores the cumulative sum of the active tick at the time of the observation. The tick accumulator value increases monotonically and grows ...
+
+[6] uni-v3-twap-manipulation/cost-of-attack.tex at master
+URL: https://github.com
+SNIPPET: Apr 21, 2026 — To manipulate a geometric mean time-weighted average price ( TWAP ) on Uniswap v3 , an attacker needs to manipulate the spot price for at least 1 ... Read more
+
+[7] TWAP (Time-Weighted Average Price)
+URL: https://www.zealynx.io
+SNIPPET: A price calculation method that averages asset prices over a time period to resist short-term manipulation . Time-Weighted Average Price ( TWAP ) is a pricing ... Read more
+
+==================================================
+QUERY: Osmosis DEX MEV recapture arbitrage module protorev mechanism
+==================================================
+
+[1] ProtoRev - Osmosis Docs
+URL: https://docs.osmosis.zone
+SNIPPET: ProtoRev is Osmosis's in-protocol MEV capture . ProtoRev captures that value for the protocol instead, and returns it to the Osmosis ecosystem.
+
+[2] protorev.md - osmosis
+URL: https://github.com
+SNIPPET: This will store the total number of arbitrage trades that x/ protorev has executed since genesis. This gets incremented every time the module executes a trade. Read more
+
+[3] ProtoRev Revenue Allocation - Osmosis
+URL: https://www.polkachu.com
+SNIPPET: The ProtoRev module will keep asset prices even across pools for every trade by running cyclical arbitrage at the end of each block to rebalance the pools.
+
+[4] Osmosis Protocol Usage Report Q2 2023
+URL: https://messari.io
+SNIPPET: Jul 21, 2023 — Osmosis introduced an automated internal liquidity arbitrage mechanism and held the revenue collected from this module in a monitoring wallet.
+
+[5] Osmosis ProtoRev by Skip Protocol - Blog
+URL: https://forum.osmosis.zone
+SNIPPET: Jan 31, 2023 — This first-of-its-kind module will allow the Osmosis DAO to capture the arbitrage profits that are lost to external agents in other DEXs: bots, ...
+
+[6] The Origins of MEV: Systematic Attribution of Arbitrage
+URL: https://arxiv.org
+SNIPPET: Apr 30, 2026 — MEV extraction refers to the act of capturing profit by strategically reordering, including, or censoring transactions within a block.
+
+[7] Osmosis Boosts $OSMO Value With ProtoRev Burn Project
+URL: https://www.binance.com
+SNIPPET: Jan 3, 2025 — ProtoRev works by accumulating $USDC, $ATOM, and $OSMO via arbitrage opportunities existing within the decentralized exchange (DEX) of Osmosis. Read more
+
+==================================================
+QUERY: Gnosis Liquidity Bootstrapping Pool LBP mechanism price discovery weighting
+==================================================
+
+[1] Liquidity Bootstrapping Pools (LBPs) - Balancer v3 Docs
+URL: https://docs.balancer.fi/concepts/explore-available-balancer-pools/liquidity-bootstrapping-pool/liquidity-bootstrapping-pool.html
+SNIPPET: The standard LBP configuration supports price discovery for new tokens via a continuous Dutch-auction-style mechanism. The pool starts with a high project-token ...
+
+[2] docs/docs/concepts/pools/liquidity-bootstrapping.md at main - GitHub
+URL: https://github.com/balancer/docs/blob/main/docs/concepts/pools/liquidity-bootstrapping.md
+SNIPPET: Liquidity Bootstrapping Pools (LBPs) are pools that can dynamically change token weighting. LBPs use Weighted Math with time-dependent weights.
+
+[3] Liquidity bootstrapping (LBP) - Hydration Docs
+URL: https://docs.hydration.net/daos/lbp
+SNIPPET: An LBP uses a mechanism of time-based weights shifting which exerts a continuous downward pressure on the price. This is being counteracted by any buy orders
+
+[4] Reverse Liquidity Bootstrapping Pool - Forgd
+URL: https://www.forgd.com/post/reverse-liquidity-bootstrapping-pool
+SNIPPET: Jun 10, 2024 · The blue line shows the spot price for a token when using an LBP, as weights change, price slowly decreases. The above is an example of an LBP.
+
+[5] Liquidity Bootstrapping Pools (LBPs)— Explained - Medium
+URL: https://medium.com/coinmonks/liquidity-bootstrapping-pools-lbps-explained-ec3f7041ac85
+SNIPPET: May 8, 2022 · The operating mechanism of LBPs entails adjusting the weight of the two tokens in the pool. ... Also, this mechanism makes the price discovery ...
+
+[6] A Comprehensive Guide to Liquidity Bootstrapping Pools (LBP)
+URL: https://www.linkedin.com/pulse/comprehensive-guide-liquidity-bootstrapping-pools-lbp-cryptolenz-hvbmc
+SNIPPET: Oct 29, 2024 · LBPs utilize a unique mechanism that gradually adjusts the token's price based on supply and demand dynamics, allowing for a smoother price ...
+
+[7] Liquidity Bootstrapping Pool | Balancer V1 - GitBook
+URL: https://balancer.gitbook.io/balancer/guides/smart-pool-templates-gui/liquidity-bootstrapping-pool
+SNIPPET: Aug 3, 2021 · Another untried mechanism is "reverse price discovery." This is a variant of the "delayed" LBP, where you launch the pool but do not start the ...
+
+[8] Liquidity Bootstrapping Pool (LBP) Meaning in Crypto - Tangem Wallet
+URL: https://tangem.com/en/glossary/liquidity-bootstrapping-pool-lbp
+SNIPPET: Feb 4, 2025 · These pools are structured to facilitate the initial distribution and price discovery of new tokens in a controlled environment.
+
+[9] Liquidity Bootstrapping Pools (LBPs) - Fjord Foundry Docs
+URL: https://help.fjordfoundry.com/fjord-foundry-docs/for-sale-participants/token-sale-types/liquidity-bootstrapping-pools-lbps
+SNIPPET: Jul 9, 2024 · Fair Pricing: The price discovery mechanism ensures a fairer distribution of tokens. Flexibility: Participants can choose to buy tokens at any ...
+
+[10] What Is LBP (Liquidity Bootstrapping Pool)? | Fair IDO Explained
+URL: https://www.gate.com/learn/articles/take-5-minutes-to-understand-lbp/2476
+SNIPPET: Apr 7, 2026 · As an IDO strategy, LBP is widely adopted and maintains success in the crypto world with the advantage of fair and efficient price discovery. Lbp Strategy: How To Buy The... · 1. Low Initial Fdv And High... · 2. Moderate Popularity But...
+
+==================================================
+QUERY: pump.fun bonding curve mechanism virtual liquidity Raydium migration
+==================================================
+
+[1] Solana: Listening to pump.fun migrations to PumpSwap - Chainstack
+URL: https://docs.chainstack.com/docs/solana-listening-to-pumpfun-migrations-to-raydium
+SNIPPET: Jun 24, 2026 · pump.fun tokens start on a bonding curve. The bonding-curve mechanics and the migration program are the same; its liquidity migrates to an AMM. ... Main article · Prerequisites · Understanding pump.fun token... · Monitoring tools
+
+[2] Get Pump.fun bonding curve process and Raydium launch
+URL: https://solana.stackexchange.com/questions/16115/get-pump-fun-bonding-curve-process-and-raydium-launch
+SNIPPET: Aug 21, 2024 · This contract manages the migration of tokens from pump.fun to Raydium. The migration completes once the bonding curve is finalized, Why do pump.fun coins move to raydium once the bonding curve is ... How do pool keys for Pump.fun tokens that migrated to Raydium ... More results from solana.stackexchange.com
+
+[3] Predicting the success of new crypto-tokens: the Pump.fun case - arXiv
+URL: https://arxiv.org/html/2602.14860v1
+SNIPPET: Feb 16, 2026 · Pump.fun employs a bonding curve mechanism to bootstrap initial liquidity possibly leading to graduation to the on-chain market, which can be ...
+
+[4] Pump.fun Bonding Curve Mechanics Explained (2026  - Flashift
+URL: https://flashift.app/blog/bonding-curves-pump-fun-meme-coin-launches
+SNIPPET: May 6, 2026 · This technical guide breaks down the underlying algorithmic code, explains the virtual liquidity mechanism, and outlines how to preserve your ...
+
+[5] Final buyer on Pump.fun before the Raydium migration. - Reddit
+URL: https://www.reddit.com/r/solana/comments/1ij56dw/final_buyer_on_pumpfun_before_the_raydium
+SNIPPET: Feb 6, 2025 · If you buy right before a pumpfun migration, only the amount needed to complete the curve will go through, the rest should be refunded. On Pump.fun When market cap reaches $69k and tokens ... Pump.fun bonding curve mechanism questions : r/solana More results from www.reddit.com
+
+[6] The Pump.fun bonding curve
+URL: https://pump.fun/docs/bonding-curve
+SNIPPET: Every coin launched on Pump.fun starts on a bonding curve, a deterministic pricing function that quotes a buy and sell price from on-chain reserves.
+
+[7] The Hidden Liquidity Trap in Pump.fun: Why Late Buyers Are
+URL: https://medium.com/@kurumi0b011/the-hidden-liquidity-trap-in-pump-fun-why-late-buyers-are-mathematically-doomed-after-migration-e923aa7799be
+SNIPPET: Dec 27, 2025 · Its internal bonding curve includes an initial 35 SOL of virtual liquidity, which acts as the base. Pump.fun injects that 85 SOL into Raydium. ...
+
+[8] Bonding Curves in Solana - Block Magnates
+URL: https://blog.blockmagnates.com/bonding-curves-in-solana-58082354b17d
+SNIPPET: Nov 18, 2025 · Graduation is when a token becomes successful enough to move from the bonding curve to a real exchange like Raydium. On Pump.fun, this happens ...
+
+[9] Full Explanation of PUMP.FUN's Mechanism - Binance
+URL: https://www.binance.com/en/square/post/15600492237666
+SNIPPET: Oct 31, 2024 · Provides an explanation that when the bonding curve reaches a certain progress, liquidity will be injected into Raydium and burned. ... bonding ...
+
+[10] Pump.fun Bonding Curve: Formula, Phases, Graduation - J Tools
+URL: https://j.tools/en/blog/pump-fun-bonding-curve-mechanics-explained
+SNIPPET: 5 days ago · A bonding curve is an automated pricing mechanism where the token price is set by a math formula based on circulating supply. There is no order ...

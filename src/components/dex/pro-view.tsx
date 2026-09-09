@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createChart, AreaSeries, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
-import { Loader2, X, Activity, Swords } from 'lucide-react';
+import { Loader2, X, Activity, Swords, Bot, Zap, Timer } from 'lucide-react';
 import { TokenMedallion, fmtMu, fmtPrice, fmtInt, dxPost, type World, type Market, MU } from './common';
 
 type Side = 'buy' | 'sell';
@@ -191,6 +191,9 @@ export function ProView({ world, online, onNeedAuth }: {
           </div>
         </div>
 
+        {/* auto-trading (Task 56): DCA + טריגרים חסרי-קיפרים */}
+        <AutoTradePanel market={market} onNeedAuth={onNeedAuth} />
+
         {/* arena */}
         <ArenaPanel world={world} />
       </div>
@@ -342,6 +345,210 @@ function ArenaPanel({ world }: { world: World | null }) {
       <p className="text-[10px] text-[color:var(--text-3)] mt-2 leading-relaxed">
         ארבעה חיילים עושים שוק אמיתי בספר — {arena.params.spreadBps}bps עם requote {arena.params.requoteBps}bps
       </p>
+    </div>
+  );
+}
+
+// ─── מסחר-אוטומטי חסר-קיפרים (Task 56) — DCA + טריגרים ──────────────────────
+// בונה-הבלוקים הוא ה-keeper: GMX צריך keepers-חוץ בתשלום — אצלנו זו השוואת-
+// שלמים-טהורה בגרעין עצמו. הפרוסות והטריגרים מניבים מסחר-אמת שנכנס לעדות-המחיר.
+
+interface DcaRow { id: string; assetIn: string; assetOut: string; perSliceMu: number; remainingMu: number; everyK: number; done: number; slicesMax: number; nextSliceIn: number; progressPct: number }
+interface TrigRow { id: string; base: string; quote: string; side: string; triggerPx: number; limitPx: number; amountMu: number; expiresH: number; blocksLeft: number | null }
+
+function AutoTradePanel({ market, onNeedAuth }: { market?: Market; onNeedAuth: () => void }) {
+  const [tab, setTab] = useState<'dca' | 'trig'>('dca');
+  const [dcaRows, setDcaRows] = useState<DcaRow[]>([]);
+  const [trigRows, setTrigRows] = useState<TrigRow[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // DCA form
+  const [inAsset, setInAsset] = useState('USDS');
+  const [outAsset, setOutAsset] = useState('SAOS');
+  const [perSlice, setPerSlice] = useState('200');
+  const [slices, setSlices] = useState('10');
+  const [everyK, setEveryK] = useState('10');
+  // Trig form
+  const [tSide, setTSide] = useState<'buy' | 'sell'>('sell');
+  const [triggerPx, setTriggerPx] = useState('');
+  const [tAmount, setTAmount] = useState('');
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/program', { cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) { setDcaRows(j.dca || []); setTrigRows(j.trig || []); }
+    } catch { /* */ }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(refresh, 0);
+    const i = setInterval(refresh, 6000);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [refresh]);
+
+  async function submit(op: string, payload: Record<string, unknown>) {
+    setBusy(true); setNote(null);
+    const j = await dxPost('program', { op, ...payload });
+    if (j.ok) {
+      setNote({ ok: true, text: op.startsWith('dca') ? 'תוכנית-DCA נקלטה — הפריסה מתחילה בבלוק הבא' : 'טריגר הוצב — נסרק כל-בלוק מול המחיר הקנוני' });
+      setTimeout(refresh, 4000);
+    } else {
+      const e = String(j.error || '');
+      setNote({ ok: false, text: e.includes('auth') || e.includes('unauthorized') ? 'נדרשת התחברות-בעלים' : (j.note || j.error || 'נכשל') });
+      if (e.includes('auth') || e.includes('unauthorized')) onNeedAuth();
+    }
+    setBusy(false);
+  }
+
+  const mid = market ? market.fair / MU : 0;
+
+  return (
+    <div className="dx-card p-4" data-testid="auto-trade-panel">
+      <div className="text-[11px] label-caps mb-2 flex items-center gap-1.5">
+        <Bot className="w-3 h-3 text-[color:var(--pink)]" /> מסחר-אוטומטי · חסר-קיפרים
+      </div>
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-full dx-chip mb-3">
+        {(['dca', 'trig'] as const).map(k => (
+          <button key={k} onClick={() => setTab(k)}
+            className={`h-8 rounded-full text-xs transition-colors ${tab === k ? 'bg-white/12 text-[color:var(--text-1)]' : 'text-[color:var(--text-2)]'}`}>
+            {k === 'dca' ? 'DCA פריסה' : 'טריגר stop/take'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'dca' ? (
+        <div className="space-y-2" data-testid="dca-form">
+          <p className="text-[9.5px] text-[color:var(--text-3)] leading-relaxed">
+            הפקדה-מלאה-מראע → פרוסות-אוטומטיות דרך-הראוטר כל-K-בלוקים (Jupiter DCA — בלי-keeper-חוץ).
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="text-[10px] label-caps">מ-</span>
+              <select value={inAsset} onChange={e => setInAsset(e.target.value)} className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none">
+                {['USDS', 'SAOS', 'WSTEEM'].map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] label-caps">אל</span>
+              <select value={outAsset} onChange={e => setOutAsset(e.target.value)} className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none">
+                {['SAOS', 'USDS', 'WSTEEM'].map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] label-caps">פרוסה ({inAsset})</span>
+              <input dir="ltr" inputMode="decimal" value={perSlice} onChange={e => setPerSlice(e.target.value.replace(/[^0-9.]/g, ''))}
+                className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none" />
+            </label>
+            <label className="block">
+              <span className="text-[10px] label-caps">מספר-פרוסות</span>
+              <input dir="ltr" inputMode="numeric" value={slices} onChange={e => setSlices(e.target.value.replace(/[^0-9]/g, ''))}
+                className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none" />
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-[10px] label-caps">פרוסה-כל-K-בלוקים (בלוק = 3ש׳)</span>
+            <input dir="ltr" inputMode="numeric" value={everyK} onChange={e => setEveryK(e.target.value.replace(/[^0-9]/g, ''))}
+              className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none" />
+          </label>
+          <button onClick={() => submit('dca_create', {
+            assetIn: inAsset, assetOut: outAsset,
+            perSlice: Math.floor(parseFloat(perSlice) * MU || 0),
+            slicesMax: parseInt(slices) || 0, everyK: parseInt(everyK) || 0,
+          })} disabled={busy}
+            className="w-full h-10 mt-1 rounded-full text-xs font-semibold bg-[color:var(--pink)] text-white transition-opacity disabled:opacity-50"
+            data-testid="dca-submit">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin-slow inline-block" /> : 'הפעל תוכנית DCA'}
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2" data-testid="trig-form">
+          <p className="text-[9.5px] text-[color:var(--text-3)] leading-relaxed">
+            stop-loss / take-profit על המחיר-הקנוני — GMX צריך keepers-חוץ; אצלנו בונה-הבלוקים הוא ה-keeper (אפס-עלות).
+          </p>
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-full dx-chip">
+            {(['buy', 'sell'] as const).map(s => (
+              <button key={s} onClick={() => setTSide(s)}
+                className={`h-7 rounded-full text-[11px] transition-colors ${tSide === s ? (s === 'buy' ? 'bg-[color:var(--green)] text-black' : 'bg-[color:var(--red)] text-white') : 'text-[color:var(--text-2)]'}`}>
+                {s === 'buy' ? 'קנייה-מעל' : 'מכירה-מתחת'}
+              </button>
+            ))}
+          </div>
+          <div className="text-[9.5px] text-[color:var(--text-3)]">זוג: <span className="dx-num">{market?.key ?? '—'}</span> · mid <span className="dx-num" dir="ltr">{mid.toFixed(3)}</span></div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="text-[10px] label-caps">מחיר-טריגר ({market?.quote ?? ''})</span>
+              <input dir="ltr" inputMode="decimal" placeholder={mid > 0 ? (tSide === 'sell' ? (mid * 0.97).toFixed(3) : (mid * 1.03).toFixed(3)) : '0'} value={triggerPx}
+                onChange={e => setTriggerPx(e.target.value.replace(/[^0-9.]/g, ''))}
+                className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none" />
+            </label>
+            <label className="block">
+              <span className="text-[10px] label-caps">כמות ({market?.base ?? ''})</span>
+              <input dir="ltr" inputMode="decimal" value={tAmount} onChange={e => setTAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                className="dx-num w-full mt-1 h-9 px-2 rounded-lg dx-raised text-left text-xs border border-[color:var(--line)] outline-none" />
+            </label>
+          </div>
+          <button onClick={() => market && submit('trig_create', {
+            base: market.base, quote: market.quote, side: tSide,
+            triggerPx: Math.floor(parseFloat(triggerPx) * MU || 0),
+            amount: Math.floor(parseFloat(tAmount) * MU || 0),
+          })} disabled={busy || !market}
+            className="w-full h-10 mt-1 rounded-full text-xs font-semibold bg-[color:var(--pink)] text-white transition-opacity disabled:opacity-50"
+            data-testid="trig-submit">
+            {busy ? <Loader2 className="w-4 h-4 animate-spin-slow inline-block" /> : 'הצב טריגר'}
+          </button>
+        </div>
+      )}
+
+      {note && <p className={`text-[10.5px] mt-2 ${note.ok ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>{note.text}</p>}
+
+      {/* רשימות-חיות */}
+      <div className="mt-3 pt-3 border-t border-[color:var(--line)] space-y-2" data-testid="auto-trade-lists">
+        {dcaRows.length > 0 && (
+          <div>
+            <div className="text-[10px] label-caps mb-1.5 flex items-center gap-1"><Timer className="w-3 h-3" /> תוכניות-DCA ({dcaRows.length})</div>
+            {dcaRows.map(p => (
+              <div key={p.id} className="dx-raised p-2 mb-1.5 text-[10.5px]">
+                <div className="flex items-center justify-between">
+                  <span className="dx-num font-semibold" dir="ltr">{p.assetIn}→{p.assetOut}</span>
+                  <button onClick={() => submit('dca_cancel', { progId: p.id })} aria-label={`ביטול ${p.id}`}
+                    className="w-6 h-6 rounded-full dx-chip flex items-center justify-center hover:border-[color:var(--red)] hover:text-[color:var(--red)]">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                <div className="dx-num text-[color:var(--text-3)] mt-0.5" dir="ltr">
+                  {fmtMu(p.perSliceMu, 0)}/slice · every {p.everyK}b · {p.done}/{p.slicesMax} · next in {p.nextSliceIn}b
+                </div>
+                <div className="h-0.5 rounded-full bg-white/10 mt-1 overflow-hidden">
+                  <div className="h-full bg-[color:var(--pink)]" style={{ width: `${Math.min(100, p.progressPct)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {trigRows.length > 0 && (
+          <div>
+            <div className="text-[10px] label-caps mb-1.5 flex items-center gap-1"><Zap className="w-3 h-3" /> טריגרים חיים ({trigRows.length})</div>
+            {trigRows.map(t => (
+              <div key={t.id} className="dx-raised p-2 mb-1.5 text-[10.5px] flex items-center justify-between">
+                <div>
+                  <span className={t.side === 'buy' ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}>{t.side === 'buy' ? 'קנייה' : 'מכירה'}</span>
+                  {' '}<span className="dx-num">{fmtMu(t.amountMu, 0)} {t.base}</span>
+                  <div className="dx-num text-[color:var(--text-3)]" dir="ltr">trigger {fmtPrice(t.triggerPx)}{t.expiresH > 0 ? ` · exp ${t.blocksLeft ?? 0}b` : ''}</div>
+                </div>
+                <button onClick={() => submit('trig_cancel', { progId: t.id })} aria-label={`ביטול ${t.id}`}
+                  className="w-6 h-6 rounded-full dx-chip flex items-center justify-center hover:border-[color:var(--red)] hover:text-[color:var(--red)]">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {dcaRows.length === 0 && trigRows.length === 0 && (
+          <p className="text-[10px] text-[color:var(--text-3)] text-center py-1">אין תוכניות פעילות — הפעל DCA או הצב טריגר</p>
+        )}
+      </div>
     </div>
   );
 }

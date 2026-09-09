@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Lock, Flame, Vote, TrendingDown, Percent, Clock, Wallet,
   ShieldCheck, Sparkles, Loader2, Bot, Sprout, Repeat, BarChart3, Landmark,
+  BadgeCheck, Link2, Layers, Globe, Scale,
 } from 'lucide-react';
 import { authHeaders } from '@/components/sv/shared';
 import { fmtInt } from './common';
@@ -57,6 +58,29 @@ interface CompareData {
   maximize: string;
 }
 
+// ── Task 56 · מנוע-הוכחת-המחיר (price-proof) ──
+interface ProofData {
+  ok: boolean;
+  height: number;
+  at: string;
+  internal: { saosUsdsMu: number; wsteemUsdsMu: number; wsteemPerSaosBps: number; backingWsteemMu: number };
+  external: { steemUsd: number | null; hiveUsd: number | null; hbdUsd: number | null; blurtUsd: number | null; feedOk: boolean; feedError?: string };
+  derived: { saosUsdMicro: number | null; saosUsdText: string | null; wsteemDivBps: number | null; verdict: 'CONVERGED' | 'DRIFT' | 'DIVERGENT' | 'NO-FEED' };
+  depth: {
+    saosUsds: { rows: Array<{ pctOfReserve: number; amountInBaseMu: number; effPriceMu: number; impactBps: number }>; midMu: number } | null;
+    wsteemUsds: { rows: Array<{ pctOfReserve: number; amountInBaseMu: number; effPriceMu: number; impactBps: number }>; midMu: number } | null;
+    book1pct: { bidMu: number; askMu: number; orders: number };
+  };
+  treasuryReal: {
+    feedsNote: string;
+    steemHead: { account: string; steem: number; sbd: number; sp: number } | null;
+    hiveFleet: { liquidHive: number; hbd: number; hp: number } | null;
+    blurt: { account: string; liquid: number; vested: number } | null;
+    usd: { steem: number | null; hbd: number | null; hive: number | null; blurt: number | null; total: number | null };
+    honesty: string;
+  };
+}
+
 export function EconomyView({ onNeedAuth, onDone }: {
   onNeedAuth: () => boolean;
   onDone: () => void;
@@ -64,6 +88,7 @@ export function EconomyView({ onNeedAuth, onDone }: {
   const [eco, setEco] = useState<EconomyData | null>(null);
   const [ale, setAle] = useState<AleData | null>(null);
   const [cmp, setCmp] = useState<CompareData | null>(null);
+  const [proof, setProof] = useState<ProofData | null>(null);
   const [lockAmt, setLockAmt] = useState('500');
   const [weeks, setWeeks] = useState(52);
   const [bondAmt, setBondAmt] = useState('1000');
@@ -113,6 +138,22 @@ export function EconomyView({ onNeedAuth, onDone }: {
         const r = await fetch('/saos-dex/api/dex/compare', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
         const j = (await r.json()) as CompareData;
         if (!stop && j.ok) setCmp(j);
+      } catch { /* offline */ }
+      if (!stop) timer = setTimeout(poll, 15000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
+  }, []);
+
+  // ── מנוע-הוכחת-המחיר (Task 56) — שרשרת-הנגזרת + הצלבת-שווקים + אוצר-אמת (כל-15ש')
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const r = await fetch('/saos-dex/api/dex/price-proof', { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+        const j = (await r.json()) as ProofData;
+        if (!stop && j.ok) setProof(j);
       } catch { /* offline */ }
       if (!stop) timer = setTimeout(poll, 15000);
     };
@@ -173,6 +214,9 @@ export function EconomyView({ onNeedAuth, onDone }: {
           </div>
         )}
       </div>
+
+      {/* ── מנוע-הוכחת-המחיר (Task 56) — התשובה-ל"מה-המחיר-הזה-אמיתי" ── */}
+      <PriceProofPanel proof={proof} />
 
       {/* ── ALE · מנוע-הנזילות-האוטונומית (Task 55) ── */}
       <section className="dx-card p-5" data-testid="ale-panel">
@@ -550,5 +594,135 @@ function Step({ n, title, body }: { n: string; title: string; body: string }) {
       </div>
       <p className="text-[color:var(--text-2)]">{body}</p>
     </div>
+  );
+}
+
+// ─── מנוע-הוכחת-המחיר (Task 56) — שרשרת-הוכחה גלויה מקצה-לקצה ───────────────
+const VERDICT_META: Record<string, { label: string; cls: string }> = {
+  CONVERGED: { label: 'מתכנס עם השוק', cls: 'text-[color:var(--green)] border-[color:var(--green)]/40 bg-[color:var(--green)]/10' },
+  DRIFT: { label: 'סטייה-מתונה', cls: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
+  DIVERGENT: { label: 'סטייה-גבוהה', cls: 'text-[color:var(--red)] border-[color:var(--red)]/40 bg-[color:var(--red)]/10' },
+  'NO-FEED': { label: 'אין-פיד-חוץ (כנות)', cls: 'text-[color:var(--text-2)] border-[color:var(--line)] bg-black/20' },
+};
+
+function PriceProofPanel({ proof }: { proof: ProofData | null }) {
+  if (!proof) return null;
+  const v = VERDICT_META[proof.derived.verdict] ?? VERDICT_META['NO-FEED'];
+  const fmtUsdNum = (n: number | null, digits = 2) => n === null ? '—' : `$${n.toFixed(digits)}`;
+  const rows = proof.depth.saosUsds?.rows ?? [];
+  const maxImpact = Math.max(...rows.map(r => r.impactBps), 1);
+  return (
+    <section className="dx-card p-5" data-testid="price-proof-panel">
+      <header className="flex items-start justify-between flex-wrap gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] text-[color:var(--text-3)] mb-1.5">
+            <BadgeCheck className="w-3.5 h-3.5 text-[color:var(--green)]" />
+            מנוע-הוכחת-המחיר · שרשרת-נגזרת-גלויה + הצלבת-שווקים + אוצר-אמת
+          </div>
+          <h2 className="text-[14px] font-bold">מה המחיר האמיתי של SAOS — ואיך זה מוכח</h2>
+          <p className="text-[11px] text-[color:var(--text-2)] mt-1 max-w-2xl leading-relaxed">
+            אין-כאן-מספר-סמכותי-שאי-אפשר-לבדוק: המחיר נגזר מבריכות-חיות → WSTEEM מגובה-1:1
+            ב-STEEM אמת → מחיר-שוק-ציבורי. ואוצר-האמת למטה — כמה יש לנו באמת בשרשראות.
+          </p>
+        </div>
+        <span className={`text-[10.5px] font-bold rounded-full border px-3 py-1.5 ${v.cls}`} data-testid="price-verdict">
+          {v.label}{proof.derived.wsteemDivBps !== null ? ` · ${proof.derived.wsteemDivBps > 0 ? '+' : ''}${proof.derived.wsteemDivBps}bps` : ''}
+        </span>
+      </header>
+
+      {/* שרשרת-הנגזרת */}
+      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4 mb-3" data-testid="price-derivation">
+        <div className="text-[10px] label-caps mb-3 flex items-center gap-1.5"><Link2 className="w-3 h-3" /> שרשרת-הנגזרת — כל-צעד-ניתן-לאימות</div>
+        <div className="flex items-stretch gap-2 flex-wrap text-[11px]">
+          <div className="rounded-lg border border-[color:var(--line)] px-3 py-2 min-w-[150px] flex-1">
+            <div className="text-[9px] text-[color:var(--text-3)]">בריכה-חיה SAOS/USDS</div>
+            <div className="dx-num font-bold" dir="ltr">{(proof.internal.saosUsdsMu / 1000).toFixed(3)} USDS</div>
+          </div>
+          <div className="self-center text-[color:var(--text-3)]">÷</div>
+          <div className="rounded-lg border border-[color:var(--line)] px-3 py-2 min-w-[150px] flex-1">
+            <div className="text-[9px] text-[color:var(--text-3)]">בריכה-חיה WSTEEM/USDS</div>
+            <div className="dx-num font-bold" dir="ltr">{(proof.internal.wsteemUsdsMu / 1000).toFixed(3)} USDS</div>
+          </div>
+          <div className="self-center text-[color:var(--text-3)]">=</div>
+          <div className="rounded-lg border border-[color:var(--line)] px-3 py-2 min-w-[140px] flex-1">
+            <div className="text-[9px] text-[color:var(--text-3)]">SAOS ב-WSTEEM</div>
+            <div className="dx-num font-bold" dir="ltr">{(proof.internal.wsteemPerSaosBps / 10000).toFixed(4)}</div>
+          </div>
+          <div className="self-center text-[color:var(--text-3)]">×</div>
+          <div className="rounded-lg border border-[color:var(--green)]/30 px-3 py-2 min-w-[140px] flex-1">
+            <div className="text-[9px] text-[color:var(--text-3)]">STEEM · שוק-ציבורי חי</div>
+            <div className="dx-num font-bold text-[color:var(--green)]" dir="ltr">{fmtUsdNum(proof.external.steemUsd, 4)}</div>
+          </div>
+          <div className="self-center text-[color:var(--text-3)]">=</div>
+          <div className="rounded-lg border border-[color:var(--pink)]/40 bg-[color:var(--pink)]/10 px-3 py-2 min-w-[150px] flex-1">
+            <div className="text-[9px] text-[color:var(--text-3)]">SAOS ב-$-אמת (מעוגן)</div>
+            <div className="dx-num font-black text-[color:var(--pink)] text-[13px]" dir="ltr">{proof.derived.saosUsdText ?? '—'}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-2.5 text-[9.5px] text-[color:var(--text-3)] flex-wrap">
+          <span className="rounded-full dx-chip px-2 py-0.5">גיבוי-WSTEEM אמת: {fmtInt(proof.internal.backingWsteemMu)}µ (1:1 STEEM נעול)</span>
+          <span className="rounded-full dx-chip px-2 py-0.5">פיד-חוץ: {proof.external.feedOk ? 'חי · CoinGecko' : `נפל-בכנות (${proof.external.feedError ?? 'לא-זמין'})`}</span>
+          <span className="rounded-full dx-chip px-2 py-0.5">גובה-אימות: h{fmtInt(proof.height)}</span>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-3">
+        {/* עומק-אמת */}
+        <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4" data-testid="price-depth">
+          <div className="text-[10px] label-caps mb-3 flex items-center gap-1.5"><Layers className="w-3 h-3" /> עומק-אמת — פגיעה-במחיר לפי-גודל-מסחרה</div>
+          {rows.length === 0 && <p className="text-[11px] text-[color:var(--text-3)]">אין בריכה פעילה</p>}
+          <div className="space-y-1.5">
+            {rows.map(r => (
+              <div key={r.pctOfReserve} className="relative rounded-md overflow-hidden">
+                <div className="absolute inset-y-0 left-0 bg-[color:var(--pink)]/15" style={{ width: `${(r.impactBps / maxImpact) * 100}%` }} />
+                <div className="relative flex items-center justify-between px-2 py-1.5 text-[10.5px]">
+                  <span className="dx-num">{r.pctOfReserve}% מהרזרבה ({(r.amountInBaseMu / 1000).toFixed(0)} SAOS)</span>
+                  <span className="dx-num">מחיר {((r.effPriceMu / 1000)).toFixed(3)} · פגיעה {r.impactBps}bps</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="text-[9.5px] text-[color:var(--text-3)] mt-2">
+            ספר ±1%: bids {fmtInt(proof.depth.book1pct.bidMu)}µ · asks {fmtInt(proof.depth.book1pct.askMu)}µ · {proof.depth.book1pct.orders} פקודות
+          </div>
+        </div>
+
+        {/* אוצר-האמת */}
+        <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4" data-testid="treasury-real">
+          <div className="text-[10px] label-caps mb-3 flex items-center gap-1.5"><Globe className="w-3 h-3" /> אוצר-האמת — יתרות-השרשראות החיות × מחירי-שוק</div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="dx-num text-xl font-black text-[color:var(--green)]" dir="ltr" data-testid="treasury-real-total">
+              {fmtUsdNum(proof.treasuryReal.usd.total, 2)}
+            </span>
+            <span className="text-[9.5px] text-[color:var(--text-3)]">סה״כ-$-אמת בשרשראות</span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 text-[10.5px]">
+            <div className="rounded-lg border border-[color:var(--line)] px-2.5 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">STEEM (headcorner)</div>
+              <div className="dx-num" dir="ltr">{proof.treasuryReal.steemHead ? `${proof.treasuryReal.steemHead.steem.toFixed(3)} + ${proof.treasuryReal.steemHead.sbd.toFixed(3)} SBD` : '—'}</div>
+              <div className="dx-num text-[color:var(--green)]" dir="ltr">{fmtUsdNum(proof.treasuryReal.usd.steem, 2)}</div>
+            </div>
+            <div className="rounded-lg border border-[color:var(--line)] px-2.5 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">HIVE (צי + ראש)</div>
+              <div className="dx-num" dir="ltr">{proof.treasuryReal.hiveFleet ? `${proof.treasuryReal.hiveFleet.liquidHive.toFixed(2)} HIVE + ${proof.treasuryReal.hiveFleet.hbd.toFixed(2)} HBD` : '—'}</div>
+              <div className="dx-num text-[color:var(--green)]" dir="ltr">{fmtUsdNum(proof.treasuryReal.usd.hive, 2)}</div>
+            </div>
+            <div className="rounded-lg border border-[color:var(--line)] px-2.5 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">BLURT (headcorner)</div>
+              <div className="dx-num" dir="ltr">{proof.treasuryReal.blurt ? `${proof.treasuryReal.blurt.liquid.toFixed(2)} BLURT` : '—'}</div>
+              <div className="dx-num text-[color:var(--green)]" dir="ltr">{fmtUsdNum(proof.treasuryReal.usd.blurt, 2)}</div>
+            </div>
+            <div className="rounded-lg border border-[color:var(--line)] px-2.5 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">פידי-שוק חיים</div>
+              <div className="dx-num" dir="ltr">STEEM {fmtUsdNum(proof.external.steemUsd, 3)} · HIVE {fmtUsdNum(proof.external.hiveUsd, 3)}</div>
+              <div className="dx-num" dir="ltr">BLURT {fmtUsdNum(proof.external.blurtUsd, 4)} · HBD {fmtUsdNum(proof.external.hbdUsd, 3)}</div>
+            </div>
+          </div>
+          <p className="text-[9px] text-[color:var(--text-3)] mt-2 leading-relaxed flex items-start gap-1">
+            <Scale className="w-3 h-3 shrink-0 mt-0.5" /> {proof.treasuryReal.honesty}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }

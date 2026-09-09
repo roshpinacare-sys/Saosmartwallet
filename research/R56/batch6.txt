@@ -1,0 +1,116 @@
+
+==================================================
+QUERY: CoinGecko price methodology how exchange prices aggregated trust score
+==================================================
+
+[1] CoinGecko's Crypto Price Aggregation Methodology
+URL: https://www.coingecko.com
+SNIPPET: The Median Absolute Deviation (MAD) algorithm identifies exchange prices that deviate significantly from the majority and removes them before aggregation .
+
+[2] Trust Score Methodology
+URL: https://support.coingecko.com
+SNIPPET: Aug 6, 2026 — An aggregated score is calculated primarily from two factors: Volume consistency . Whether the exchange's reported trading volume. Order book ...
+
+[3] CoinGecko Unveils Exchange 'Trust Score' to Fight Fake
+URL: https://finance.yahoo.com
+SNIPPET: May 13, 2019 — CoinGecko will give each exchange a " trust score ," with three color-coded categories: green (good), yellow (fair) and red (poor).
+
+[4] How CoinMarketCap and CoinGecko Validate the
+URL: https://coinmarketcap.com
+SNIPPET: CoinGecko Trust Score is an exchange-quality framework . Its current methodology uses five components: Liquidity, Cybersecurity, Regulation, Incident and Proof ... Read more
+
+[5] Ranking Cryptocurrency Exchanges by Trustworthiness
+URL: https://www.cs.uoregon.edu
+SNIPPET: by C PERKINS · 2021 — 's ranking methodology is a score based on exchange liquidity. The CoinGecko ranking system is divided into ・ 100 points of the best price across each market - ... 42 pages
+
+[6] CoinGecko Review (2025): Features, API, Trust Score &
+URL: https://coinspot.io
+SNIPPET: Nov 12, 2025 — CoinGecko rolled out its Trust Score system . The methodology has been refined over time, incorporating elements like Proof of Reserves for ...
+
+[7] CoinGecko Review 2026: Top Tool For Crypto Enthusiasts
+URL: https://coinbureau.com
+SNIPPET: Jan 30, 2026 — It aggregates price data across venues using published methodology rather than reflecting a single- exchange price . Exchange rankings use Trust ... Read more
+
+==================================================
+QUERY: dYdX v4 off-chain orderbook on-chain settlement architecture validators
+==================================================
+
+[1] dYdX Chain Architecture, Tokenomics & Governance - DAIC Capital
+URL: https://daic.capital/blog/dydx-exchange-technical-architecture
+SNIPPET: Rating 4.9 (25,172) · Free · Finance May 1, 2024 · dYdX Chain uses in-memory order books maintained by nodes, with block proposers submitting matched trades for consensus and on-chain settlement. The Main Architectural... · Blockchain Protocol · Dydx Tokenomics And...
+
+[2] GMX vs dYdX (2026): Data‑driven comparison - RFP.wiki
+URL: https://www.rfp.wiki/crypto/stablecoins-on-off-ramps/defi-liquidity-platforms/gmx/dydx
+SNIPPET: +Order-book perpetuals historically attract maker/taker flow on major crypto pairs. +DefiLlama still ranks v4 among larger derivatives protocols by TVL despite ...
+
+==================================================
+QUERY: Raydium LaunchLab bonding curve create pool launchpad mechanism
+==================================================
+
+[1] Bonding curves
+URL: https://docs.raydium.io
+SNIPPET: Bonding curves are the standard launch mechanism when the issuing entity does not want to pre-seed an AMM pool with collateral. ​. Generic pricing ... Read more
+
+[2] Raydium Launchpad API
+URL: https://docs.bitquery.io
+SNIPPET: In this section we see how to get data on Launchpad by Raydium . This includes token creation, latest trades by trader, for a token etc. Read more
+
+[3] How do i add bonding curve system to my token that i just
+URL: https://solana.stackexchange.com
+SNIPPET: Nov 29, 2025 — This is when I created my token on the solana devnet. But how do I add a bonding curve system like pump fun or something like that. So I just created a ...
+
+[4] Exploring Raydium LaunchLab: Streamlined Token
+URL: https://www.bitget.com
+SNIPPET: Apr 29, 2025 — Rather than being confined to generic parameters, LaunchLab allows you to define your token's behavior from bonding curves to fundraising caps. Read more
+
+[5] Raydium Launch Lab Clone Script Development
+URL: https://www.blockchainx.tech
+SNIPPET: Bonding Curve Implementation. We use bonding curves ... Admins set up the platform, create launchpad settings, fundraising goals & token specifications. Read more
+
+[6] How to obtain or calculate the bonding curve progress in
+URL: https://github.com
+SNIPPET: Apr 17, 2025 — How to obtain or calculate the bonding curve progress in Launchpad ? #104. New issue. Read more
+
+==================================================
+QUERY: Bunni amAmm LVR aware liquidity dynamic fees Uniswap v4
+==================================================
+
+[1] Dynamic Fees | Uniswap Developers
+URL: https://developers.uniswap.org/docs/protocols/v4/concepts/dynamic-fees
+SNIPPET: Dynamic fees in Uniswap v4 are a specific type of swap fee paid by swappers that directly accrue to liquidity providers. These fees are distinct from protocol ...
+
+[2] LVR Minimization with Uniswap V4 Hook, Dynamic Beta Optimization
+URL: https://medium.com/decipher-media/lvr-minimization-with-uniswap-v4-hook-dynamic-beta-optimization-5ccd2e466235
+SNIPPET: Jul 25, 2025 · The graph above shows the cumulative P&L of Uniswap V2's WETH‑USDC pool from August 2021 — when liquidity provision began — through August 2022.
+
+[3] Uniswap v4 Dynamic Fees - YouTube
+URL: https://www.youtube.com/watch?v=JREXyChdiIU
+SNIPPET: May 16, 2024 · Join saucepoint from Uniswap Foundation for a workshop titled, "Dynamic Fees." Create a hook with dynamic swap fees! Get alpha on dynamic ...
+
+[4] Awesome Uniswap v4 Hooks - GitHub
+URL: https://github.com/fewwwww/awesome-uniswap-hooks
+SNIPPET: Super DCA Gauge Hook: A Uniswap v4 hook for dynamic fee adjustments and fair reward distribution. It enables fee reductions for allowlisted addresses during ...
+
+[5] Uniswap V4: The Hooks To Watch - Arrakis Finance
+URL: https://arrakis.finance/blog/uniswap-v4-is-live-these-are-the-hooks-to-look-out-for
+SNIPPET: Feb 25, 2025 · Bunni adopts an MEV-aware design, using the am-AMM mechanism to recapture MEV in auctions and dynamic swap fees to protect LPs in volatile ...
+
+[6] Uniswap v4 and the Future of Liquidity Provision: A Market Maker's
+URL: https://acherontrading.com/blog/uniswap-v4-and-the-future-of-liquidity-provision
+SNIPPET: Dec 9, 2025 · A technical deep dive into Uniswap v4's hooks, singleton architecture, and flash accounting, and their impact on market-making efficiency.
+
+[7] Bunni: How To Build a Leading Uniswap v4 Hook
+URL: https://research.auditless.com/p/bunni-how-to-build-a-leading-uniswap
+SNIPPET: Apr 1, 2025 · With Bunni, LPs can participate in yield-maximized, dynamic, and automated liquidity pools. The platform's re-hypothecation hook boosts LP ...
+
+[8] Uniswap v4 Explained Simply: Key Features, Hooks & Architecture
+URL: https://threesigma.xyz/blog/defi/uniswap-v4-features-dynamic-fees-hooks-gas-saving
+SNIPPET: Dec 4, 2024 · Dynamic fees are a type of swap fee that directly accrues to liquidity providers. They are also distinct from protocol fees and hook fees. The ...
+
+[9] Uniswap v4: Dynamic Liquidity Provision and Execution Infrastructure
+URL: https://www.linkedin.com/posts/easyfitech_%F0%9D%97%A8%F0%9D%97%BB%F0%9D%97%B6%F0%9D%98%80%F0%9D%98%84%F0%9D%97%AE%F0%9D%97%BD-%F0%9D%98%83%F0%9D%9F%B0-%F0%9D%97%99%F0%9D%97%BF%F0%9D%97%BC%F0%9D%97%BA-%F0%9D%97%A3%F0%9D%97%AE%F0%9D%98%80%F0%9D%98%80%F0%9D%97%B6%F0%9D%98%83%F0%9D%97%B2-activity-7417616822134460416-jE-_
+SNIPPET: Jan 15, 2026 · This turns pools into dynamic instruments capable of: - Implementing custom on-chain oracles - Managing dynamic fees based on volatility - ...
+
+[10] Uniswap V4 Explained: Hooks, Adoption & UNIfication - Datawallet
+URL: https://www.datawallet.com/crypto/uniswap-v4-explained
+SNIPPET: Jun 11, 2026 · Dynamic fee hooks: pools raise fees per block when prices move sharply, taxing arbitrage at exactly the moments it is most profitable, and lower ...

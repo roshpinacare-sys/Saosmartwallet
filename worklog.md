@@ -804,3 +804,25 @@ Stage Summary:
 - הבדלנות-מנוסחת-ומגובה-מספרים: גז-0 · MEV-אפס-מבני · POL-צומח-מהכנסה-לא-מהדפסה · עמלים-דינמיים-מגן-LVR · ציר-Steem/Hive-יחיד-בעולם
 - שורש-באג-התשתית (DATABASE_URL-גלובלי) נסגר-לנצח — המנוע והאפליקציה כל-אחד-על-הDB-שלו
 - פתוח: split-routing-ישן-בכנות-עד-מסדרון-שני (מומלץ: בריכת-WSTEEM/SAOS-בעתיד); את/sol-צי-נותר-כנה-מנוטרל
+
+---
+Task ID: R-56 (research-only, אפס-קוד)
+Agent: DeFi research subagent
+Task: מחקר DEXes — פיצ'רים-משחקים שלא מומשו, מדורגים TOP-8 לפי התאמה לגרעין-הקונצנזוס הדטרמיניסטי (מוקד: אמינות-מחיר / נזילות-אוטונומית / יתרון-שאין-לאחרים).
+
+Work Log:
+- קריאת-הקשר: worklog Tasks 54-55 (כלכלה-חיה: veSAOS/router/bonds/עמלים-דינמיים/SIWE/עיגונים-חיים · ALE+POL+split-routing+compare)
+- 8 באצ'ים חיפוש (~30 שאילתות, z-ai-web-dev-sdk): Uniswap-V3-TWAP · Osmosis-ProtoRev+superfluid · Balancer-LBP+V3 · pump.fun/Raydium-LaunchLab · Jupiter-DCA · GMX-TP/SL · CoW-מכירות-אצווה · UniswapX/1inch-דאטש · CoinGecko-מתודולוגיית-MAD+Trust-Score · dYdX-v4 · Hyperliquid-קודי-בונים · Bunni-am-AMM(arXiv) · Beefy/ICHI/Maverick/Pendle/Kyber/Camelot/Trader-Joe
+- ממצאים-גולמיים: research/R56/batch1..8.txt · סינתזה: research/R56/DEX-GAMECHANGERS.md
+
+Stage Summary (TOP-8 מדורג):
+1. אורקל-TWAP-גרעיני (Uniswap-V3) — מצבר-מחיר-מונוטוני-פר-בריכה; אמינות-מחיר HIGH, יסוד לכל-השאר
+2. ProtoRev-בגרעין (Osmosis) — ארביטראז'-סוף-בלוק-דטרמיניסטי → ראוטר-הכנסות+ALE; פריטת-MEV מבנית HIGH
+3. חותם-אמינות-מחיר MAD (CoinGecko×עיגוני-Steem/Hive) — TWAP מול-API-ציבורי מדי-אפוק, חותם-מרקל VERIFIED/DIVERGENT; HIGH — "המחיר-שלנו-אמת" כהוכחה
+4. מסילת-השקה-עקומה+סיום-לימודים (pump.fun/LaunchLab) — נזילות-חדשה-ללא-משתמשים, הגירה-אוטומטית-לבריכה; HIGH
+5. הזמנות-טריגר-ללא-קיפרים: SL/TP/Bracket (GMX) — הבלוק-בילדר הוא-הקיפר; MED-HIGH
+6. תוכניות-DCA/TWAP-exec (Jupiter) — הזרקות-קבועות-לפי height%K; יציבות-מחיר; MED-HIGH
+7. מכירות-אצווה-פר-בלוק במחיר-שווק-אחיד (CoW) — התאמות-CoW פנים-באצווה, סנדוויץ'-בלתי-אפשרי-מבנית; HIGH-הוגינות, הנדסה-MED
+8. בריכת-LBP-משקלים-דינמיים (Balancer/Gnosis) — מכירה-הולנדית-רציפה w(height), מעבר-אוטומטי-ל-50/50; MED
+- אזכורים: superfluid-veLP · אוטו-קומפאונד+zap · am-AMM-מכירת-חכירה (Bunni) · קודי-בונים (Hyperliquid)
+- סדר-ביצוע-מוצע: A) TWAP→Price-Seal→ProtoRev · B) טריגרים→DCA→Launchpad · C) LBP→אצווה
