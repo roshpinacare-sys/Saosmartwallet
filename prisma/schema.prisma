@@ -85,13 +85,33 @@ model GateRun {
   budget     Int // max maker steps (token-blowout guard)
   status     String // queued | running | done | blocked | failed
   verdict    String? // JSON — independent checker verdict {done, checks[], gaps, notes}
-  steps      String? // JSON array — append-only evidence trace [{i,thought,tool,args,ok,result,at}]
+  steps      String? // JSON array — append-only evidence trace [{i,thought,tool,args,ok,result,ms,at}]
   report     String? // final Hebrew report written to the command bridge
+  lessons    String? // JSON array — lessons distilled from the agent's PAST runs, injected into the maker's first prompt (cross-run external memory)
+  durationMs Int? // total wall-clock of the whole loop — real efficiency, not vibes
+  tokens     String? // JSON {prompt, completion} — real brain usage when the provider reports it (null when unknown — never faked)
   error      String?
   createdAt  DateTime  @default(now())
   finishedAt DateTime?
 
   @@index([createdAt])
+}
+
+// Trusted devices ("זכור אותי בצורה בטוחה") — after a live-key login the operator
+// can arm THIS browser: a random device token lives ONLY in its localStorage;
+// the master key is sealed under scrypt(deviceToken, deviceSalt). The DB alone
+// (hash + ciphertext) can neither log in nor open the vault — possession of the
+// device IS the second factor. Revocable, 90-day expiry, audited on use.
+model GateDevice {
+  id         String   @id @default(cuid())
+  label      String // human-readable ("Chrome · Android")
+  tokenHash  String   @unique // sha256 of the device token — raw token never stored server-side
+  encMaster  String // JSON Seal — master key sealed under scrypt(deviceToken, deviceSalt)
+  deviceSalt String // hex — per-device salt for the token-derived KEK
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  expiresAt  DateTime
+  revoked    Boolean  @default(false)
 }
 
 // The shared chat feed — operator + agents write here

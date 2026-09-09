@@ -79,6 +79,8 @@ export async function POST(req: Request) {
     // ── 4. swap the vault contents atomically ─────────────────────────────
     await db.$transaction(async (tx) => {
       await tx.vaultEntry.deleteMany();
+      // a NEW master invalidates every trusted device's sealed copy — revoke them all
+      await tx.gateDevice.updateMany({ where: { revoked: false }, data: { revoked: true } });
       await tx.gateConfig.update({
         where: { id: "gate" },
         data: {

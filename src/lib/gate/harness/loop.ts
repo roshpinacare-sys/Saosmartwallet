@@ -1,5 +1,5 @@
 /**
- * SOVEREIGN GATE — agent harness · loop (לולאת-המטרה).
+ * SOVEREIGN GATE — agent harness · loop (לולאת-המטרה, גרסה מחודדת).
  *
  * Course mapping (Lectures 13 · "loop engineering" + 8/9/11):
  *  · Goal-based loop    → goal + verification method + stopping condition.
@@ -10,14 +10,20 @@
  *    work; an independent checker brain (different provider/model) rules.
  *  · External state     → the loop's memory lives in GateRun (system of
  *    record), not in the context window; each step is persisted as it happens.
- *  · Observability      → full append-only trace + audit row per tool call.
- *  · Token-blowout guard→ hard budget on maker steps; "never stop" iron rule
- *    applies to the maker's effort, never to the budget.
- *
- * The maker speaks a strict JSON tool-protocol; every tool result is the
- * real output of a real module (zero-mock). The final report is Hebrew,
- * written to the command bridge so the operator wakes up to findings,
- * not to process.
+ *  · Cross-run memory   → lessons distilled from the agent's PAST runs are
+ *    injected into the maker's first prompt and stored on the run row —
+ *    the agent stops repeating yesterday's mistakes.
+ *  · Critic loop        → after a "not proven" verdict, the checker's gaps
+ *    go BACK to the maker for one bounded repair round, then a re-check.
+ *    The pass-gate still rules — the maker never grades itself.
+ *  · Budget hygiene     → a protocol-garbage reply costs the maker ZERO
+ *    budget (one free corrective re-ask, max 2 per run); honest recovery
+ *    is observable in the trace, budget stays the token-blowout guard.
+ *  · Observability      → per-step wall-clock ms, total durationMs and real
+ *    brain token usage recorded on the run — efficiency is measured, and
+ *    unknown usage stays null (never faked).
+ *  · Tool cache         → read-only modules memoize identical calls inside
+ *    one run: no duplicate network hits, "cached" is visible in the trace.
  */
 import { db } from "@/lib/db";
 import { GateError } from "@/lib/gate/crypto";
@@ -33,6 +39,10 @@ export interface TraceStep {
   ok?: boolean;
   result?: unknown;
   error?: string;
+  ms?: number; // wall-clock of this step (brain + tool) — real measurement
+  cached?: boolean; // served from the run's tool cache (no duplicate network)
+  rescued?: boolean; // protocol garbage re-asked for free — budget NOT burned
+  repair?: boolean; // step executed inside the post-verdict repair round
   at: string;
 }
 
@@ -45,6 +55,8 @@ export interface CheckerVerdict {
 
 const MAX_BUDGET = 8;
 const RESULT_CLAMP = 1400;
+const FREE_RESQUE_LIMIT = 2; // protocol-garbage re-asks that cost zero budget
+const REPAIR_STEPS = 2; // bounded critic-loop: gaps → maker → re-check
 
 function clampResult(r: unknown): unknown {
   try {
@@ -72,8 +84,8 @@ function extractJson<T>(raw: string): T {
   throw new GateError("bad-brain-json", "המוח לא החזיר JSON תקין");
 }
 
-function makerSystemPrompt(goal: string, doneMeans: string[], modules: string[]): string {
-  return [
+function makerSystemPrompt(goal: string, doneMeans: string[], modules: string[], lessons: string[] = []): string {
+  const lines = [
     "You are the MAKER inside a goal-loop harness (SAOS SOVEREIGN GATE).",
     "You act ONLY through tools; you NEVER claim a result without a tool observation proving it.",
     "",
@@ -83,12 +95,22 @@ function makerSystemPrompt(goal: string, doneMeans: string[], modules: string[])
     "",
     "YOUR MODULES:",
     modulesForPrompt(modules) || "(none armed — report that honestly)",
+  ];
+  if (lessons.length) {
+    lines.push(
+      "",
+      "LESSONS FROM YOUR PAST RUNS (external memory — do NOT repeat these mistakes):",
+      ...lessons.slice(0, 5).map((l, i) => `${i + 1}. ${l}`),
+    );
+  }
+  lines.push(
     "",
     "PROTOCOL — reply with ONLY compact JSON, no markdown, no prose:",
     '{"thought":"one sentence: what you know, what you still need","tool":"<module-id> | finish","args":{...}}',
     'When you believe the goal is met, use "finish" and put the Hebrew final report inside args.report.',
     "Rules: one tool call per turn · prefer vault.verify/chain.steem for hard evidence · keep failures in mind and adapt · never invent data — if a module errors, read the error and try differently.",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 function checkerSystemPrompt(goal: string, doneMeans: string[]): string {
@@ -117,8 +139,27 @@ function traceToTranscript(steps: TraceStep[]): string {
     .join("\n");
 }
 
+/**
+ * Smart ratchet for long loops: the last RECENT_FULL steps stay verbatim,
+ * older ones are compacted (args dropped, results clamped) — the maker keeps
+ * the thread of the story without mid-JSON truncation or prompt bloat.
+ */
+function ratchetedTranscript(steps: TraceStep[], recentFull = 2): string {
+  if (steps.length <= recentFull) return traceToTranscript(steps);
+  const older = steps.slice(0, steps.length - recentFull);
+  const recent = steps.slice(-recentFull);
+  const compact = older
+    .map((s) => {
+      if (s.side === "checker") return `[checker] done=${(s.result as CheckerVerdict | undefined)?.done}`;
+      const body = s.ok ? JSON.stringify(s.result) : `ERROR: ${s.error}`;
+      return `[step ${s.i}] ${s.tool} ⇐ ${String(body).slice(0, 240)}`;
+    })
+    .join("\n");
+  return compact + "\n" + traceToTranscript(recent);
+}
+
 /** Persist-and-continue helper — external state is written BEFORE the next step runs. */
-async function saveRun(id: string, data: { status?: string; steps?: TraceStep[]; verdict?: CheckerVerdict | null; report?: string | null; error?: string | null; finishedAt?: Date | null }) {
+async function saveRun(id: string, data: { status?: string; steps?: TraceStep[]; verdict?: CheckerVerdict | null; report?: string | null; error?: string | null; finishedAt?: Date | null; durationMs?: number | null; tokens?: string | null }) {
   await db.gateRun.update({
     where: { id },
     data: {
@@ -128,6 +169,8 @@ async function saveRun(id: string, data: { status?: string; steps?: TraceStep[];
       ...(data.report !== undefined ? { report: data.report } : {}),
       ...(data.error !== undefined ? { error: data.error } : {}),
       ...(data.finishedAt !== undefined ? { finishedAt: data.finishedAt } : {}),
+      ...(data.durationMs !== undefined ? { durationMs: data.durationMs } : {}),
+      ...(data.tokens !== undefined ? { tokens: data.tokens } : {}),
     },
   });
 }
@@ -146,12 +189,22 @@ async function audit(agentName: string, action: string, params: unknown, okB: bo
   } catch { /* audit must never break the loop */ }
 }
 
-/** Execute one module call for a run, with audit. */
-export async function execModule(modId: string, args: Record<string, unknown>, ctx: ModuleCtx): Promise<{ ok: boolean; result: unknown }> {
+/** Execute one module call for a run, with audit + per-run cache for read-only modules. */
+export async function execModule(
+  modId: string,
+  args: Record<string, unknown>,
+  ctx: ModuleCtx,
+  cache?: Map<string, unknown>,
+): Promise<{ ok: boolean; result: unknown; cached?: boolean }> {
   const m = getModule(modId);
   if (!m) return { ok: false, result: `unknown module "${modId}"` };
+  const cacheKey = m.cacheable ? `${modId}:${JSON.stringify(args || {})}` : "";
+  if (cache && cacheKey && cache.has(cacheKey)) {
+    return { ok: true, result: cache.get(cacheKey), cached: true };
+  }
   try {
     const result = await m.exec(args || {}, ctx);
+    if (cache && cacheKey) cache.set(cacheKey, result);
     await audit(ctx.agentName, `harness.${modId}`, args, true, result);
     return { ok: true, result };
   } catch (e) {
@@ -175,13 +228,19 @@ async function runChecker(opts: {
   ];
   const reply = await brainChat(parseBrain(opts.checkerSpec), messages, { maxTokens: 900, temperature: 0 });
   const v = extractJson<CheckerVerdict>(reply.content);
+  const checks = Array.isArray(v.checks) ? v.checks.slice(0, 12) : [];
+  // Pass-gate is CONJUNCTIVE — enforced in code, not left to the model's mood:
+  // one failed criterion ⇒ done=false, even if the checker's own "done" says true.
+  const anyFail = checks.some((c) => c && c.pass === false);
   return {
-    done: Boolean(v.done),
-    checks: Array.isArray(v.checks) ? v.checks.slice(0, 12) : [],
+    done: Boolean(v.done) && !anyFail,
+    checks,
     gaps: String(v.gaps || ""),
     notes: String(v.notes || ""),
   };
 }
+
+interface MakerCall { thought?: string; tool?: string; args?: Record<string, unknown> }
 
 /**
  * The goal loop. Fire-and-forget (the API route returns the run id;
@@ -193,65 +252,151 @@ export async function processRun(runId: string): Promise<void> {
 
   const doneMeans = JSON.parse(run.doneMeans) as string[];
   const modules = JSON.parse(run.modules) as string[];
+  let lessons: string[] = [];
+  try { lessons = JSON.parse(run.lessons || "[]"); } catch { lessons = []; }
   const steps: TraceStep[] = [];
+  const toolCache = new Map<string, unknown>();
+  const startedAt = Date.now();
+  let tokPrompt = 0;
+  let tokCompletion = 0;
+  let usageKnown = false;
+  let freeRescues = 0;
+  let repairRan = false;
 
   await saveRun(runId, { status: "running" });
   await db.gateAgent.updateMany({ where: { name: run.agentName }, data: { lastSeenAt: new Date() } });
 
   try {
     const makerSpec = parseBrain(run.brain);
-    let firstUser = true;
 
-    for (let i = 1; i <= run.budget; i++) {
-      /* ── maker turn ── */
-      const userContent = firstUser
-        ? `GOAL RECEIVED. Begin. Progress is empty — you are at step 1 of ${run.budget}.`
-        : `PROGRESS SO FAR (ratchet — do not repeat completed work):\n${traceToTranscript(steps).slice(-5000)}\n\nContinue toward the goal. Step ${i} of ${run.budget}.`;
-      firstUser = false;
-
-      const messages: ChatMsg[] = [
-        { role: "system", content: makerSystemPrompt(run.goal, doneMeans, modules) },
+    /** One maker turn (brain call), with the free protocol-rescue. Returns null after unrecoverable garbage. */
+    async function makerTurn(userContent: string): Promise<{ call: MakerCall | null; rescued: boolean }> {
+      const base: ChatMsg[] = [
+        { role: "system", content: makerSystemPrompt(run.goal, doneMeans, modules, lessons) },
         { role: "user", content: userContent },
       ];
-      const reply = await brainChat(makerSpec, messages, { maxTokens: 800, temperature: 0.2 });
-      const call = extractJson<{ thought?: string; tool?: string; args?: Record<string, unknown> }>(reply.content);
+      const reply = await brainChat(makerSpec, base, { maxTokens: 800, temperature: 0.2 });
+      if (reply.usage && (reply.usage.prompt || reply.usage.completion)) {
+        usageKnown = true;
+        tokPrompt += reply.usage.prompt;
+        tokCompletion += reply.usage.completion;
+      }
+      try {
+        return { call: extractJson<MakerCall>(reply.content), rescued: false };
+      } catch {
+        if (freeRescues >= FREE_RESQUE_LIMIT) return { call: null, rescued: false };
+        freeRescues++;
+        const reply2 = await brainChat(
+          makerSpec,
+          [...base, { role: "user", content: "Your previous reply was NOT valid protocol JSON. Reply AGAIN — ONLY the compact JSON object, nothing else." }],
+          { maxTokens: 800, temperature: 0 },
+        );
+        if (reply2.usage && (reply2.usage.prompt || reply2.usage.completion)) {
+          usageKnown = true;
+          tokPrompt += reply2.usage.prompt;
+          tokCompletion += reply2.usage.completion;
+        }
+        try {
+          return { call: extractJson<MakerCall>(reply2.content), rescued: true };
+        } catch {
+          return { call: null, rescued: true };
+        }
+      }
+    }
+
+    /** Execute one maker step end-to-end (brain → tool → trace) and persist it. */
+    async function makerStep(i: number, userContent: string, opts: { repair?: boolean } = {}): Promise<{ finished: boolean; report: string | null }> {
+      const t0 = Date.now();
+      const { call, rescued } = await makerTurn(userContent);
+      if (!call) {
+        steps.push({ i, side: "maker", ok: false, error: "protocol-garbage after free re-ask", rescued: true, ms: Date.now() - t0, ...(opts.repair ? { repair: true } : {}), at: new Date().toISOString() });
+        await saveRun(runId, { steps });
+        return { finished: false, report: null };
+      }
       const tool = String(call.tool || "").trim();
 
       if (tool === "finish" || tool === "done") {
-        steps.push({ i, side: "maker", thought: call.thought, tool: "finish", args: call.args, ok: true, result: { report: call.args?.report || null }, at: new Date().toISOString() });
+        steps.push({ i, side: "maker", thought: call.thought, tool: "finish", args: call.args, ok: true, result: { report: call.args?.report || null }, ms: Date.now() - t0, ...(rescued ? { rescued: true } : {}), ...(opts.repair ? { repair: true } : {}), at: new Date().toISOString() });
         await saveRun(runId, { steps });
-        break;
+        return { finished: true, report: (call.args?.report as string | undefined) || null };
       }
 
       if (!getModule(tool)) {
-        steps.push({ i, side: "maker", thought: call.thought, tool, args: call.args, ok: false, error: `module not armed: "${tool}" — armed: ${modules.join(", ")}`, at: new Date().toISOString() });
+        steps.push({ i, side: "maker", thought: call.thought, tool, args: call.args, ok: false, error: `module not armed: "${tool}" — armed: ${modules.join(", ")}`, ms: Date.now() - t0, ...(rescued ? { rescued: true } : {}), ...(opts.repair ? { repair: true } : {}), at: new Date().toISOString() });
         await saveRun(runId, { steps });
-        continue; // the observation teaches the maker to correct itself
+        return { finished: false, report: null };
       }
 
-      const out = await execModule(tool, call.args || {}, { agentName: run.agentName, runId });
+      const out = await execModule(tool, call.args || {}, { agentName: run.agentName, runId }, toolCache);
       steps.push({
         i, side: "maker", thought: call.thought, tool, args: call.args,
         ok: out.ok, result: out.ok ? clampResult(out.result) : out.result,
+        ms: Date.now() - t0,
+        ...(out.cached ? { cached: true } : {}),
+        ...(rescued ? { rescued: true } : {}),
+        ...(opts.repair ? { repair: true } : {}),
         at: new Date().toISOString(),
       });
       await saveRun(runId, { steps });
+      return { finished: false, report: null };
     }
 
-    /* ── independent verdict (ALWAYS, even after finish — the maker can't grade itself) ── */
+    /* ── main loop — the budget is the hard token-blowout guard ── */
+    let finished = false;
+    let finalReport: string | null = null;
+    let firstUser = true;
+
+    for (let i = 1; i <= run.budget && !finished; i++) {
+      const userContent = firstUser
+        ? `GOAL RECEIVED. Begin. Progress is empty — you are at step 1 of ${run.budget}.`
+        : `PROGRESS SO FAR (ratchet — do not repeat completed work):\n${ratchetedTranscript(steps.filter((s) => s.side === "maker")).slice(-5000)}\n\nContinue toward the goal. Step ${i} of ${run.budget}.`;
+      firstUser = false;
+      const r = await makerStep(i, userContent);
+      finished = r.finished;
+      if (r.report) finalReport = r.report;
+    }
+
+    /* ── independent verdict (ALWAYS — the maker can't grade itself) ── */
     let verdict: CheckerVerdict | null = null;
     try {
       verdict = await runChecker({ checkerSpec: run.checker, goal: run.goal, doneMeans, steps });
       steps.push({ i: steps.length + 1, side: "checker", ok: verdict.done, result: verdict, at: new Date().toISOString() });
+      await saveRun(runId, { steps, verdict });
     } catch (e) {
       steps.push({ i: steps.length + 1, side: "checker", ok: false, error: e instanceof Error ? e.message : String(e), at: new Date().toISOString() });
+      await saveRun(runId, { steps });
     }
-    await saveRun(runId, { steps, verdict });
 
-    /* ── status: the pass-gate rules, not the maker ── */
-    const status = verdict ? (verdict.done ? "done" : run.status === "running" ? "blocked" : "blocked") : "blocked";
+    /* ── bounded critic-loop: gaps go BACK to the maker, then one re-check ── */
+    if (verdict && !verdict.done) {
+      repairRan = true;
+      // gaps may come empty — synthesize them from the failed criteria (real evidence demands)
+      const failedChecks = verdict.checks.filter((c) => !c.pass).map((c) => `${c.criterion} — ${c.evidence || "no tool evidence recorded"}`).join("; ");
+      const gapsText = (verdict.gaps || failedChecks || "the pass-gate was not proven").slice(0, 1200);
+      const gapMsg = `REPAIR ROUND — the independent checker REJECTED the work. Its verdict: "${verdict.notes}". Gaps that must still be proven: ${gapsText}. You have ${REPAIR_STEPS} steps to close the gaps with real tool evidence (or finish with an honest Hebrew report about what remains).`;
+      for (let j = 1; j <= REPAIR_STEPS && !finished; j++) {
+        const progress = steps.filter((s) => s.side === "maker");
+        const r = await makerStep(run.budget + j, `${gapMsg}\n\nEVIDENCE SO FAR:\n${ratchetedTranscript(progress).slice(-4500)}`, { repair: true });
+        finished = r.finished;
+        if (r.report) finalReport = r.report;
+      }
+      try {
+        const verdict2 = await runChecker({ checkerSpec: run.checker, goal: run.goal, doneMeans, steps });
+        steps.push({ i: steps.length + 1, side: "checker", ok: verdict2.done, result: verdict2, at: new Date().toISOString() });
+        verdict = verdict2;
+        await saveRun(runId, { steps, verdict });
+      } catch (e) {
+        steps.push({ i: steps.length + 1, side: "checker", ok: false, error: e instanceof Error ? e.message : String(e), at: new Date().toISOString() });
+        await saveRun(runId, { steps });
+      }
+    }
+
+    /* ── status: the (final) pass-gate rules, not the maker ── */
+    const status = verdict ? (verdict.done ? "done" : "blocked") : "blocked";
 
     /* ── final Hebrew report → bridge (clean-state handoff) ── */
+    const makerSteps = steps.filter((s) => s.side === "maker").length;
+    const durS = Math.round((Date.now() - startedAt) / 100) / 10;
     const lines: string[] = [
       `🏁 הרצת-מטרה הסתיימה — סוכן ${run.agentName}`,
       `🎯 מטרה: ${run.goal}`,
@@ -261,20 +406,55 @@ export async function processRun(runId: string): Promise<void> {
       lines.push(...verdict.checks.map((c) => `${c.pass ? "✅" : "❌"} ${c.criterion}${c.evidence ? " — " + c.evidence.slice(0, 160) : ""}`));
     }
     if (verdict && !verdict.done && verdict.gaps) lines.push(`⚠️ פערים: ${verdict.gaps.slice(0, 300)}`);
-    lines.push(`🧾 עקבות: ${steps.filter((s) => s.side === "maker").length} צעדי-מייצר · ביקורת מלאה ביומן`);
+    if (repairRan) lines.push(`🔧 סבב-תיקון רץ אחרי הפסיקה הראשונה — הפערים הוחזרו למייצר ונבדקו שוב`);
+    if (freeRescues) lines.push(`🛟 ${freeRescues} חילוצי-פרוטוקול בחינם — התקציב לא נשרף`);
+    lines.push(`🧾 עקבות: ${makerSteps} צעדי-מייצר (תקציב ${run.budget}) · ⏱ ${durS}s${usageKnown ? ` · טוקנים: ${tokPrompt}→${tokCompletion}` : ""} · ביקורת מלאה ביומן`);
 
     const report = lines.join("\n");
     await db.gateMessage.create({
       data: { channel: "command", fromKind: "system", fromName: "harness", body: report.slice(0, 3800), meta: JSON.stringify({ runId }) },
     });
 
-    await saveRun(runId, { status, report, finishedAt: new Date() });
+    await saveRun(runId, {
+      status, report, finishedAt: new Date(),
+      durationMs: Date.now() - startedAt,
+      tokens: usageKnown ? JSON.stringify({ prompt: tokPrompt, completion: tokCompletion }) : null,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     steps.push({ i: steps.length + 1, side: "maker", ok: false, error: msg, at: new Date().toISOString() });
-    await saveRun(runId, { status: "failed", steps, error: msg, finishedAt: new Date() });
+    await saveRun(runId, {
+      status: "failed", steps, error: msg, finishedAt: new Date(),
+      durationMs: Date.now() - startedAt,
+      tokens: usageKnown ? JSON.stringify({ prompt: tokPrompt, completion: tokCompletion }) : null,
+    });
     await db.gateMessage.create({
       data: { channel: "command", fromKind: "system", fromName: "harness", body: `🛑 הרצת-מטרה של ${run.agentName} נפלה: ${msg.slice(0, 400)}`, meta: JSON.stringify({ runId }) },
     }).catch(() => {});
   }
+}
+
+/** Distill cross-run lessons from this agent's past runs — external memory, real data. */
+export async function buildLessons(agentName: string, excludeRunId?: string): Promise<string[]> {
+  const past = await db.gateRun.findMany({
+    where: { agentName, status: { in: ["done", "blocked", "failed"] }, ...(excludeRunId ? { id: { not: excludeRunId } } : {}) },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  const lessons: string[] = [];
+  for (const r of past) {
+    let verdict: CheckerVerdict | null = null;
+    let steps: TraceStep[] = [];
+    try { verdict = JSON.parse(r.verdict || "null"); } catch { verdict = null; }
+    try { steps = JSON.parse(r.steps || "[]"); } catch { steps = []; }
+    const provenTools = [...new Set(steps.filter((s) => s.side === "maker" && s.ok && s.tool && s.tool !== "finish").map((s) => s.tool as string))].slice(0, 3).join(", ");
+    if (r.status === "done") {
+      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} עברה — הכלים שהוכיחו ראיות מהר: ${provenTools || "-"} · שמור על אותו סדר-פעולות יעיל`);
+    } else if (r.status === "blocked") {
+      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} נחסמה${verdict?.gaps ? ` — הפערים שנשארו: ${verdict.gaps.slice(0, 220)}` : ""} · סגור את הפערים האלה עם ראיות-כלים כבר בתחילת העבודה`);
+    } else if (r.status === "failed" && r.error) {
+      lessons.push(`הריצה ב-${r.createdAt.toISOString().slice(0, 10)} נפלה — השגיאה: ${r.error.slice(0, 180)} · הימנע מהקריאה שגרמה לזה`);
+    }
+  }
+  return lessons;
 }

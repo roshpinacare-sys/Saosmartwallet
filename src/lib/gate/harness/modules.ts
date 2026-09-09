@@ -31,6 +31,7 @@ export interface HarnessModule {
   desc: string; // Hebrew — what it really does (shown in armory + given to the maker)
   args: string; // compact JSON-schema-ish hint for the maker's protocol
   needsVault: boolean; // requires the master key in memory (operator session opened the vault)
+  cacheable: boolean; // read-only module → identical calls inside one run are memoized (no duplicate network)
   exec: (args: Record<string, unknown>, ctx: ModuleCtx) => Promise<unknown>;
 }
 
@@ -44,6 +45,7 @@ export const MODULES: HarnessModule[] = [
     desc: "זהויות-ציבור של כל הסודות בכספת (96 מפתחות): סוג, שרשרת, חשבון, תפקיד, מפתח-ציבורי וסטטוס-אימות. חומר-פרטי לעולם לא נחשף.",
     args: `{"chain":"steem|hive|ethereum|tron|solana|github|infra (optional)","account":"string (optional)"}`,
     needsVault: true,
+    cacheable: true,
     async exec(args) {
       if (!masterReady()) throw new GateError("vault-locked", "הכספת נעולה");
       const where: Record<string, string> = {};
@@ -65,6 +67,7 @@ export const MODULES: HarnessModule[] = [
     desc: "מריץ אימות-חי של הכספת מול steem/hive/GitHub ונגזרות-מפתח — מחזיר סיכום כמה מאומתים, כמה נכשלו ומצב-השרשרות. זו ההוכחה, לא ההצהרה.",
     args: "{}",
     needsVault: true,
+    cacheable: true,
     async exec() {
       if (!masterReady()) throw new GateError("vault-locked", "הכספת נעולה");
       const v = await verifyAll();
@@ -85,6 +88,7 @@ export const MODULES: HarnessModule[] = [
     desc: "סטטיסטיקה חיה של השער: כמה סודות, כמה סוכנים פעילים, כמה הרצות-מצטייד ומצב-הכספת.",
     args: "{}",
     needsVault: false,
+    cacheable: true,
     async exec() {
       const cfg = await db.gateConfig.findUnique({ where: { id: "gate" } });
       const [entries, agents, messages, runs] = await Promise.all([
@@ -103,6 +107,7 @@ export const MODULES: HarnessModule[] = [
     desc: "שאילתה חיה מול שרשרת STEEM: יתרות חשבון (STEEM/SBD/VESTS), פרטי חשבון, או בריאות-שרשרת. קריאה-בלבד, מה-adapter האמיתי.",
     args: `{"query":"balances|account|health","account":"headcorner"}`,
     needsVault: false,
+    cacheable: true,
     async exec(args) {
       const adapter = steemAdapter();
       const q = String(args.query || "balances");
@@ -120,6 +125,7 @@ export const MODULES: HarnessModule[] = [
     desc: "חיפוש אינטרנט חי — תוצאות עם כתובות, כותרות ותקצירים. לחקירה שמעבר לכספת.",
     args: `{"query":"string","num":"1-10 (optional)"}`,
     needsVault: false,
+    cacheable: true,
     async exec(args) {
       const query = String(args.query || "").trim();
       if (!query) throw new GateError("bad-input", "דרוש params.query");
@@ -147,6 +153,7 @@ export const MODULES: HarnessModule[] = [
     desc: "קריאת דף אינטרנט אמיתי לפי URL — מחזיר כותרת וטקסט מנוקה (חתוך לגודל-קריאה).",
     args: `{"url":"https://…"}`,
     needsVault: false,
+    cacheable: true,
     async exec(args) {
       const url = String(args.url || "").trim();
       if (!/^https:\/\/[^\s]+$/.test(url)) throw new GateError("bad-input", "דרוש params.url עם https://");
@@ -164,6 +171,7 @@ export const MODULES: HarnessModule[] = [
     desc: "כתיבת הודעה לגשר-הפיקוד בשם הסוכן — כך המפעיל רואה ממצאים בזמן אמת.",
     args: `{"body":"string (≤1000 chars)"}`,
     needsVault: false,
+    cacheable: false, // an actor — every report is a real, unique action
     async exec(args, ctx) {
       const body = String(args.body || "").trim();
       if (!body) throw new GateError("bad-input", "דרוש params.body");

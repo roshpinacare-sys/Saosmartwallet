@@ -135,6 +135,8 @@ async function bootstrapVault(proof: KeyControl): Promise<{ master: Buffer; info
 
   await db.$transaction(async (tx) => {
     await tx.vaultEntry.deleteMany();
+    // a NEW master invalidates every trusted device's sealed copy — revoke them all
+    await tx.gateDevice.updateMany({ where: { revoked: false }, data: { revoked: true } });
     await tx.gateConfig.upsert({
       where: { id: "gate" },
       create: {
