@@ -19,10 +19,15 @@ export async function GET() {
       keySealed: nvSealed || Boolean(process.env.NVIDIA_API_KEY?.trim()),
       source: nvSealed ? "vault" : process.env.NVIDIA_API_KEY ? "env→vault-on-first-use" : "missing",
     };
+    // Module effectiveness — real counters from GateState (survive reboots).
+    const statRow = await db.gateState.findUnique({ where: { key: "modstats" } });
+    let stats: Record<string, { calls: number; cached: number; failed: number; msTotal: number }> = {};
+    try { stats = statRow ? JSON.parse(statRow.value) : {}; } catch { stats = {}; }
     return ok({
       modules: moduleManifest(),
       brains: BRAIN_CATALOG,
       nvidia,
+      stats,
       counts: { modules: MODULES.length },
     });
   } catch (e) {
