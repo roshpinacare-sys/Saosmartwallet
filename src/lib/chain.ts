@@ -5,6 +5,8 @@ import type { Chain, Role } from './keys';
 const NODES: Record<Chain, string[]> = {
   steem: ['https://api.steemit.com', 'https://api.steemitdev.com'],
   hive: ['https://api.hive.blog', 'https://anyx.io', 'https://api.openhive.network'],
+  // blurt.world is DEAD (parked by spam 2026-09) — live community nodes from blurtwallet.com:
+  blurt: ['https://blurt-rpc.saboin.com', 'https://rpc.beblurt.com', 'https://rpc.blurt.blog', 'https://blurtrpc.dagobert.uk', 'https://rpc.drakernoise.com'],
 };
 
 export interface AccountAuths {
@@ -78,11 +80,12 @@ export interface VerifyResult {
 }
 
 // Full live check: WIF → pub → on-chain authorities.
+// Hive keeps the legacy STM prefix; BLURT uses BLT (same key body).
 export async function verifyWif(wif: string, account: string, chain: Chain, pubOverride?: string): Promise<{ pub: string; result: VerifyResult }> {
   const { wifToPublic } = await import('./keys');
   let pub = '';
   try {
-    pub = pubOverride || wifToPublic(wif);
+    pub = pubOverride || wifToPublic(wif, chain === 'blurt' ? 'BLT' : 'STM');
   } catch (e) {
     return { pub: '', result: { ok: false, account, chain, roles: [], error: 'invalid WIF: ' + String(e).slice(0, 80) } };
   }

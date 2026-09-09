@@ -89,11 +89,27 @@ async function call(path: string, opts: RequestInit = {}, auth?: 'owner' | 'agen
   const cBearer = await noCookie('/api/chat', l2body.token);
   console.log('  chat via Bearer only:', cBearer.status, 'messages=', cBearer.body?.messages?.length, '(expect 200)');
   const sBad = await noCookie('/api/vault/status', 'forged-token-123');
-  console.log('  forged Bearer:', sBad.status, '(expect 401)');
+  console.log('  forged Bearer:', sBad.status, '(expect 401 — agent-scope guard; anonymous is 200)');
   // restore owner cookie session for any later sections
   cookie = '';
   const l3 = await call('/api/vault/login', { method: 'POST', body: JSON.stringify({ account: 'headcorner', chain: 'steem', wif }) });
   console.log('  cookie login restored:', l3.status);
+
+  console.log('=== 10) public reads (no session) + BLURT ===');
+  const pub1 = await noCookie('/api/vault/status');
+  console.log('  anonymous status:', pub1.status, 'me=', pub1.body?.me, 'accounts=', pub1.body?.totals?.accounts, '(expect 200 + me=null — no entrance blocker)');
+  const pub2 = await noCookie('/api/chat');
+  console.log('  anonymous chat read:', pub2.status, '(expect 200)');
+  const pub3 = await noCookie('/api/task', undefined, 'POST');
+  console.log('  anonymous task POST:', pub3.status, '(expect 401 — mutations stay protected)');
+  const blurtKey = await db.vaultKey.findUnique({ where: { account_chain_role: { account: 'headcorner', chain: 'blurt', role: 'owner' } } });
+  if (blurtKey) {
+    const bwif = decryptSecret(blurtKey.cipher);
+    const bl = await call('/api/vault/login', { method: 'POST', body: JSON.stringify({ account: 'headcorner', chain: 'blurt', wif: bwif }) });
+    console.log('  BLURT login:', bl.status, bl.body?.ok ? `roles=${bl.body.roles.join(',')}` : bl.body.error, '(expect 200 + owner)');
+  } else {
+    console.log('  BLURT login: SKIPPED (no blurt key in vault)');
+  }
 
   console.log('=== E2E DONE ===');
   await db.$disconnect();

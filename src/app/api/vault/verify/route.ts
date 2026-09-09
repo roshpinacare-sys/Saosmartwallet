@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const owner = await requireOwner(req);
   if (!owner) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
-  const keys = await db.vaultKey.findMany({ where: { chain: { in: ['steem', 'hive'] } } });
+  const keys = await db.vaultKey.findMany({ where: { chain: { in: ['steem', 'hive', 'blurt'] } } });
   const results: Array<{ account: string; chain: string; role: string; ok: boolean; roles: string[]; error?: string }> = [];
 
   for (const k of keys) {

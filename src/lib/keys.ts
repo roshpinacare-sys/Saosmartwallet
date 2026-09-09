@@ -5,8 +5,11 @@
 import steem from 'steem';
 import crypto from 'crypto';
 
-export type Chain = 'steem' | 'hive';
+export type Chain = 'steem' | 'hive' | 'blurt';
 export type Role = 'owner' | 'active' | 'posting' | 'memo';
+
+// Public-key prefix per chain — the Base58 body is IDENTICAL across all three
+// forks (same secp256k1); only the literal prefix differs (STM/BLT/Hive STM).
 
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
@@ -14,9 +17,12 @@ export function wifLooksValid(wif: string): boolean {
   return /^[5KL][1-9A-HJ-NP-Za-km-z]{50,51}$/.test(wif.trim());
 }
 
-export function wifToPublic(wif: string): string {
+export function wifToPublic(wif: string, prefix: 'STM' | 'BLT' = 'STM'): string {
   // steem-js handles both legacy 5J/5H (uncompressed flag) and K/L (compressed) WIFs.
-  return steem.auth.wifToPublic(wif.trim());
+  // The steem lib always emits STM-prefixed pubs; for BLURT we swap the literal
+  // prefix — the checksum covers only the key bytes, so the body is valid as-is.
+  const pub = steem.auth.wifToPublic(wif.trim());
+  return prefix === 'STM' ? pub : prefix + pub.replace(/^STM/, '');
 }
 
 // SAOS-ROT1 derivation — reproduces every rotated key from the master seed.
@@ -33,5 +39,5 @@ export function wifFromRot1Seed(masterHex: string, account: string, chain: strin
 }
 
 export const ROT1_ACCOUNTS = ['headcorner', 'cashmachine', 'haran', 'israelnews', 'lsa', 'macrame', 'siq', 'tov', 'wic', 'wog', 'woq'];
-export const ROT1_CHAINS: Chain[] = ['steem', 'hive'];
+export const ROT1_CHAINS: Chain[] = ['steem', 'hive', 'blurt'];
 export const ROT1_ROLES: Role[] = ['owner', 'active', 'posting', 'memo'];

@@ -5,8 +5,7 @@ import { requireOwner } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
-  const owner = await requireOwner(req);
-  if (!owner) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  // READ is public (personal system); POST stays owner-only.
   const messages = await db.chatMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 80 });
   return NextResponse.json({ ok: true, messages: messages.reverse() });
 }

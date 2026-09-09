@@ -1,8 +1,10 @@
 // Vault status — full control matrix (public keys only, never plaintext)
 // + live on-chain balances for every chain account (cached, stale-while-revalidate).
+// READ is public (personal system — the owner wanted no entrance blocker);
+// every MUTATION stays owner-session protected.
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireOwner } from '@/lib/auth';
+import { sessionFrom } from '@/lib/auth';
 import { getAccount } from '@/lib/chain';
 
 const BAL_TTL_MS = 180_000; // refresh balances at most every 3 minutes
@@ -14,7 +16,7 @@ const g = globalThis as unknown as { __svBal?: { at: number; data: BalMap } };
 
 async function refreshBalances(accounts: string[]): Promise<void> {
   const pairs = await Promise.all(
-    accounts.flatMap(a => (['steem', 'hive'] as const).map(async c => {
+    accounts.flatMap(a => (['steem', 'hive', 'blurt'] as const).map(async c => {
       const acc = await getAccount(c, a);
       return [`${a}@${c}`, acc?.balances ?? {}] as const;
     }))
@@ -23,8 +25,8 @@ async function refreshBalances(accounts: string[]): Promise<void> {
 }
 
 export async function GET(req: NextRequest) {
-  const owner = await requireOwner(req);
-  if (!owner) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  const session = await sessionFrom(req);
+  if (session && session.scope !== 'owner') return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
   const keys = await db.vaultKey.findMany({ orderBy: [{ account: 'asc' }, { chain: 'asc' }, { role: 'asc' }] });
   const guard = await db.guardState.findUnique({ where: { id: 'singleton' } });
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Live balances: serve stale cache immediately; refresh in background when stale.
-  const chainAccounts = [...new Set(keys.filter(k => k.chain === 'steem' || k.chain === 'hive').map(k => k.account))];
+  const chainAccounts = [...new Set(keys.filter(k => ['steem', 'hive', 'blurt'].includes(k.chain)).map(k => k.account))];
   let balances: BalMap = g.__svBal?.data ?? {};
   if (!g.__svBal) {
     await refreshBalances(chainAccounts); // first call in this process — fetch now
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    me: owner.label,
+    me: session ? session.label : null,
     totals: { keys: keys.length, verified: keys.filter(k => k.verified).length, accounts: Object.keys(byAccount).length },
     byAccount,
     balances,

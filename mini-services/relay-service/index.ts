@@ -2,6 +2,7 @@
 // Browser connects via /?XTransformPort=3003 (Caddy) — path must stay '/'.
 // Next.js API routes push events to the INTERNAL admin port 3004 (/emit).
 import { createServer } from 'http';
+try { fs.writeFileSync('/tmp/relay-hot-probe', new Date().toISOString()) } catch {}
 import { Server } from 'socket.io';
 import fs from 'fs';
 import path from 'path';
@@ -33,6 +34,45 @@ io.on('connection', (socket) => {
   socket.emit('hello', { service: 'sovereign-relay', ts: Date.now() });
   socket.on('disconnect', () => console.log('[relay] client disconnected', socket.id));
 });
+
+
+// ─── guardian_boot — keep the main platform (:3000) alive ───────────────────
+// This mini-service is orphan-adopted by init at container boot, so its process
+// tree SURVIVES shell-command reaping. The main dev server does not have that
+// privilege: every shell-spawned instance is reaped when its command exits.
+// Fix: spawn it from HERE (idempotent, port-checked) and re-check every 30s —
+// a real watchdog so "the platform is down" can never happen silently again.
+import { spawn as spawnChild } from 'node:child_process';
+import net from 'node:net';
+
+function portBusy(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = net.createConnection({ port });
+    const done = (v: boolean) => { s.destroy(); resolve(v); };
+    s.once('connect', () => done(true));
+    s.once('error', () => done(false));
+    setTimeout(() => done(false), 900).unref?.();
+  });
+}
+
+async function guardianBoot(): Promise<void> {
+  try {
+    if (await portBusy(3000)) return;
+    const child = spawnChild('bun', ['run', 'dev'], {
+      cwd: '/home/z/my-project',
+      env: { ...process.env },
+      stdio: 'ignore',
+    });
+    child.unref();
+    child.on('error', (e: Error) => console.log('[guardian] spawn error:', e.message));
+    console.log('[guardian] main platform spawning on :3000 (pid', child.pid + ')');
+  } catch (e) {
+    console.log('[guardian] boot skipped:', e instanceof Error ? e.message : e);
+  }
+}
+void guardianBoot();
+setInterval(() => { void guardianBoot(); }, 30_000).unref?.();
+// ────────────────────────────────────────────────────────────────────────────
 
 io.httpServer?.listen(PUBLIC_PORT, () => console.log(`[relay] socket.io on :${PUBLIC_PORT}`));
 

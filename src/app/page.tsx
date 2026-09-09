@@ -57,7 +57,7 @@ function BalLine({ b }: { b?: Record<string, string> }) {
 }
 
 function RoleChip({ k, chain }: { k: RoleKey; chain: string }) {
-  const isChain = chain === 'steem' || chain === 'hive';
+  const isChain = chain === 'steem' || chain === 'hive' || chain === 'blurt';
   const cls = !isChain
     ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
     : k.verified
@@ -95,18 +95,32 @@ export default function SovereignCenter() {
   const [agentCaps, setAgentCaps] = useState('chat,task');
   const [newToken, setNewToken] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Personal system: everything is readable WITHOUT login; mutations need a
+  // session. If a mutation is attempted while logged out → open the login menu.
+  const needAuth = useCallback(() => {
+    if (getToken()) return false;
+    setLoginOpen(true);
+    setLoginMsg({ ok: false, text: 'התחבר דרך התפריט כדי לבצע פעולות — הצפייה פתוחה תמיד.' });
+    return true;
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
       const r = await fetch('/api/vault/status', { cache: 'no-store', headers: authHeaders() });
-      if (r.status === 401) {
-        setAuthed(false); setBooted(true);
-        if (getToken()) setLoginMsg({ ok: false, text: 'תוקף החיבור פג או בוטל — התחבר שוב עם כל מפתח. הכספת נשמרת מוצפנת ושלמה.' });
-        return;
-      }
+      if (!r.ok) { setBooted(true); return; }
       const j = await r.json();
-      if (j.ok) { setStatus(j); setAuthed(true); }
+      if (j.ok) {
+        setStatus(j);
+        const nowAuthed = !!j.me;
+        setAuthed(nowAuthed);
+        if (!nowAuthed && getToken()) {
+          setLoginMsg({ ok: false, text: 'תוקף החיבור פג או בוטל — התחבר שוב עם כל מפתח. הכספת נשמרת מוצפנת ושלמה.' });
+          setLoginOpen(true);
+        }
+      }
     } catch { /* offline */ }
     setBooted(true);
   }, []);
@@ -170,6 +184,7 @@ export default function SovereignCenter() {
         storeToken(j.token || ''); // Bearer carrier — ההתחברות שורדת רענון-עמוד וסגירת-טאב
         setLoginMsg({ ok: true, text: j.message, roles: j.roles });
         setWif('');
+        setLoginOpen(false);
         await refresh(); await refreshChat();
       } else {
         setLoginMsg({ ok: false, text: j.error || 'התחברות נכשלה' });
@@ -181,6 +196,7 @@ export default function SovereignCenter() {
   }
 
   async function verifyAll() {
+    if (needAuth()) return;
     setVerifying(true);
     try { await fetch('/api/vault/verify', { method: 'POST', headers: authHeaders() }); await refresh(); } catch { /* */ }
     setVerifying(false);
@@ -188,11 +204,12 @@ export default function SovereignCenter() {
 
   function doLogout() {
     storeToken('');
-    setAuthed(false); setStatus(null);
+    setAuthed(false); setStatus(s => (s ? { ...s, me: null } : s));
     setLoginMsg(null); setWif('');
   }
 
   async function toggleLock(enable: boolean) {
+    if (needAuth()) return;
     let confirm = '';
     if (!enable) { confirm = 'אני הבעלים ואני מאשר ביטול נעילת-owner'; }
     const r = await fetch('/api/guard', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ enable, confirm }) });
@@ -204,6 +221,7 @@ export default function SovereignCenter() {
   async function sendChat() {
     const content = chatInput.trim();
     if (!content) return;
+    if (needAuth()) return;
     setChatInput('');
     await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ content }) });
     refreshChat();
@@ -212,6 +230,7 @@ export default function SovereignCenter() {
   async function createTask() {
     const title = taskTitle.trim();
     if (!title) return;
+    if (needAuth()) return;
     setTaskTitle('');
     await fetch('/api/task', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title, assignedTo: taskAgent }) });
     refreshTasks();
@@ -220,6 +239,7 @@ export default function SovereignCenter() {
   async function registerAgent() {
     const name = agentName.trim();
     if (!name) return;
+    if (needAuth()) return;
     const r = await fetch('/api/agent/register', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ name, capabilities: agentCaps }) });
     const j = await r.json();
     if (j.ok) { setNewToken(j.token); setAgentName(''); await refresh(); }
@@ -240,67 +260,7 @@ export default function SovereignCenter() {
     );
   }
 
-  // ── login screen ──
-  if (!authed) {
-    return (
-      <div className="flex-1 flex flex-col min-h-screen bg-zinc-950">
-        <main className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md border-zinc-800 bg-zinc-900/60 shadow-2xl">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-2">
-                <ShieldCheck className="w-7 h-7 text-emerald-400" />
-              </div>
-              <CardTitle className="text-xl">מרכז-השליטה הריבוני</CardTitle>
-              <CardDescription>התחבר עם כל מפתח — owner / active / posting / memo · STEEM או HIVE. המפתח מאומת חי מול השרשרת לפני כניסה.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-zinc-400">חשבון</label>
-                  <Input value={account} onChange={e => setAccount(e.target.value)} placeholder="headcorner" className="bg-zinc-950 border-zinc-800 font-mono" dir="ltr" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-zinc-400">שרשרת</label>
-                  <Select value={chain} onValueChange={setChain}>
-                    <SelectTrigger className="bg-zinc-950 border-zinc-800"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="steem">STEEM</SelectItem>
-                      <SelectItem value="hive">HIVE</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs text-zinc-400">מפתח-פרטי (WIF)</label>
-                <div className="relative">
-                  <Input type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="bg-zinc-950 border-zinc-800 font-mono pl-10" dir="ltr" />
-                  <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300" aria-label="הצג/הסתר">
-                    {showWif ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              {loginMsg && (
-                <div className={`text-xs rounded-lg px-3 py-2 border ${loginMsg.ok ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-red-500/10 text-red-300 border-red-500/30'}`}>
-                  {loginMsg.text}
-                </div>
-              )}
-              <Button onClick={doLogin} disabled={busy || !account || !wif} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold" size="lg">
-                <LogIn className="w-4 h-4 ml-2" />{busy ? '...מאמת מול השרשרת' : 'התחבר ואמת'}
-              </Button>
-              <p className="text-[11px] text-zinc-500 text-center leading-relaxed">
-                המפתח נשמר מוצפן (AES-256-GCM) בכספת המקומית בלבד. לעולם לא נשלח החוצה. אימות = גזירת מפתח-ציבורי והשוואה מול ה-authorities על השרשרת.
-              </p>
-            </CardContent>
-          </Card>
-        </main>
-        <footer className="mt-auto border-t border-zinc-800/60 bg-zinc-950 px-4 py-3 text-center text-[11px] text-zinc-600">
-          מרכז-השליטה הריבוני · כספת מוצפנת · owner-lock פעיל · יומן-ביקורת מלא
-        </footer>
-      </div>
-    );
-  }
-
-  // ── dashboard ──
+  // ── dashboard — תמיד גלוי (שימוש אישי); ההתחברות דרך התפריט בראש העמוד ──
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-zinc-950">
       {/* header */}
@@ -317,7 +277,11 @@ export default function SovereignCenter() {
           </div>
           <div className="flex-1" />
           <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
-            <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-mono"><Fingerprint className="w-3 h-3 ml-1" />{status?.me || ''}</Badge>
+            {status?.me ? (
+              <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-mono"><Fingerprint className="w-3 h-3 ml-1" />{status.me}</Badge>
+            ) : (
+              <Badge variant="outline" className="bg-amber-500/10 border-amber-500/30 text-amber-300 font-mono"><Eye className="w-3 h-3 ml-1" />צפייה בלבד — לא מחובר</Badge>
+            )}
             <Badge variant="outline" className="bg-zinc-900 border-zinc-700 text-zinc-300 font-mono"><KeyRound className="w-3 h-3 ml-1" />{status?.totals.verified}/{status?.totals.keys} מאומתים</Badge>
             <Badge variant="outline" className={status?.guard.ownerLock ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}>
               <Lock className="w-3 h-3 ml-1" />owner-lock {status?.guard.ownerLock ? 'פעיל' : 'כבוי!'}
@@ -326,9 +290,15 @@ export default function SovereignCenter() {
             <Badge variant="outline" className={relay ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'}>
               <Radio className="w-3 h-3 ml-1" />relay {relay ? 'חי' : 'polling'}
             </Badge>
-            <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200" onClick={doLogout}>
-              <LogOut className="w-3 h-3 ml-1" />התנתק
-            </Button>
+            {authed ? (
+              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200" onClick={doLogout}>
+                <LogOut className="w-3 h-3 ml-1" />התנתק
+              </Button>
+            ) : (
+              <Button size="sm" className="h-6 px-2.5 text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold" onClick={() => { setLoginMsg(null); setLoginOpen(true); }}>
+                <LogIn className="w-3 h-3 ml-1" />התחברות
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -356,13 +326,14 @@ export default function SovereignCenter() {
                     <Badge variant="outline" className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 text-[10px]">בשליטה מלאה</Badge>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {(['steem', 'hive'] as const).map(c => ROLES.map(r => {
+                    {(['steem', 'hive', 'blurt'] as const).map(c => ROLES.map(r => {
                       const k = chains[`${c}:${r}`];
                       return k ? <RoleChip key={`${c}:${r}`} k={k} chain={c} /> : null;
                     }))}
                   </div>
                   <BalLine b={status?.balances?.[`${acct}@steem`]} />
                   <BalLine b={status?.balances?.[`${acct}@hive`]} />
+                  <BalLine b={status?.balances?.[`${acct}@blurt`]} />
                 </div>
               ))}
             </div>
@@ -581,6 +552,54 @@ curl -X POST <origin>/api/agent/task \\
               <Input readOnly value={newToken || ''} className="bg-zinc-950 border-emerald-500/40 font-mono text-xs" dir="ltr" />
               <Button size="icon" variant="outline" className="border-zinc-700" onClick={() => navigator.clipboard.writeText(newToken || '')}><Copy className="w-4 h-4" /></Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* login dialog — הכניסה בתפריט, בלי חוסם */}
+      <Dialog open={loginOpen} onOpenChange={o => { setLoginOpen(o); if (!o) setLoginMsg(null); }}>
+        <DialogContent className="bg-zinc-900 border-zinc-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-emerald-400" />התחברות חכמה — כל מפתח, כל שרשרת</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-400">חשבון</label>
+                <Input value={account} onChange={e => setAccount(e.target.value)} placeholder="headcorner" className="bg-zinc-950 border-zinc-800 font-mono" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-zinc-400">שרשרת</label>
+                <Select value={chain} onValueChange={setChain}>
+                  <SelectTrigger className="bg-zinc-950 border-zinc-800"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="steem">STEEM</SelectItem>
+                    <SelectItem value="hive">HIVE</SelectItem>
+                    <SelectItem value="blurt">BLURT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-zinc-400">מפתח-פרטי (WIF)</label>
+              <div className="relative">
+                <Input type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="bg-zinc-950 border-zinc-800 font-mono pl-10" dir="ltr" />
+                <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300" aria-label="הצג/הסתר">
+                  {showWif ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {loginMsg && (
+              <div className={`text-xs rounded-lg px-3 py-2 border ${loginMsg.ok ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-red-500/10 text-red-300 border-red-500/30'}`}>
+                {loginMsg.text}
+              </div>
+            )}
+            <Button onClick={doLogin} disabled={busy || !account || !wif} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold" size="lg">
+              <LogIn className="w-4 h-4 ml-2" />{busy ? '...מאמת מול השרשרת' : 'התחבר ואמת'}
+            </Button>
+            <p className="text-[11px] text-zinc-500 text-center leading-relaxed">
+              STEEM · HIVE · BLURT × owner / active / posting / memo. המפתח נשמר מוצפן (AES-256-GCM) בכספת המקומית בלבד, ומאומת חי מול השרשרת. אם השרשרת לא נגישה — אימות-מפל מהכספת (מפתח שנבדק-חי בשבוע האחרון).
+            </p>
           </div>
         </DialogContent>
       </Dialog>

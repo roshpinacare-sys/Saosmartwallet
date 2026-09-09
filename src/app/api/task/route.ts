@@ -5,8 +5,7 @@ import { requireOwner } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
-  const owner = await requireOwner(req);
-  if (!owner) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+  // READ is public (personal system); POST stays owner-only.
   const tasks = await db.taskItem.findMany({ orderBy: { createdAt: 'desc' }, take: 60 });
   return NextResponse.json({ ok: true, tasks });
 }
