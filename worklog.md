@@ -589,3 +589,22 @@ Stage Summary:
 - RECOVERED & REPO-COMMITTED: complete old vault (incl. headcorner prev owner/active/posting/memo — dead on-chain but = 30-day recent-owner authority), 9 Hive-controlled fleet accounts (full 4-role), 12 multichain wallets + sovereign seed + 2 TRON mnemonics + all passes/tokens.
 - STILL MISSING (unrecoverable from any file — chain+repos+sandbox proven): CURRENT headcorner owner/active/posting/memo (both chains), tov current, FACTORY_MASTER (ynet). They live only in the operator's SETTLE-10 chat backup (2026-09-08 ~21:17-21:41 UTC / 00:17-00:41 IL).
 - Next lever: operator scrolls his own chat history for the SETTLE-10 backup message; or re-issues identity from the 9 Hive-controlled accounts + wallets. Rotation of the 9 Hive accounts to a fresh operator-chosen seed offered (awaiting operator go).
+
+---
+Task ID: 1 (KEY-CRISIS)
+Agent: main (z.ai code)
+Task: חירום — מציאת כל המפתחות הראשיים של הבעלים לאחר שהתגלה שרוטציית SETTLE-10 (08/09 21:17) נתפסה כ"אובדן" של ה-owner של headcorner
+
+Work Log:
+- סריקה מלאה: grep headcorner/wif/owner_key בכל הריפו → איתור upload/KEY-RECOVERY-URGENT.md (ניסיון-הצלה קודם שסיכם בטעות "בלתי-ניתן-לשחזור")
+- חקירת /tmp: /tmp/keywork (מליל הרוטציה 21:09–21:37) → new-keys.json עם master seed + כל מפתחות headcorner החדשים
+- גילוי סכמת-הגזירה ב-rotate_fleet.cjs: WIF = base58check(0x80‖HMAC-SHA256(seed,"SAOS-ROT1/<acct>/<chain>/<role>")‖0x01)
+- אימות חי מול שתי השרשראות (api.steemit.com + api.hive.blog): headcorner 8/8 MATCH; גזירה מחדש לכל 12 החשבונות → STEEM 11/12 חי, HIVE headcorner+tov חי + 9 צי חי דרך הכספת
+- יתרות שנבדקו חי: headcorner STEEM 0.67+0.26 SBD+8.64M VESTS (≈4,368 SP), HIVE 9.68
+- תיקון upload/KEY-RECOVERY-URGENT.md (סעיף 0: פתרון מלא+פורנזיקה+חוקי-רשת), ארכוב KEY-ROTATION-NEWKEYS-BACKUP.json + KEY-DERIVED-PUBS.json
+- commit מקומי 2dfbe9e (ריפו ראשי local-only לפי הנחיית-הבעלים)
+
+Stage Summary:
+- המשבר נפתר: המפתחות לא אבדו — הסוכן הקודם בדק שגוי (חיפוש-WIF בהיסטוריה במקום גזירת-pub והשוואה)
+- 11/12 חשבונות בשליטה מלאה; ynet בלבד חסר (יתרות זניחות, operator-delegated)
+- חוקי-רשת חדשים: איסור רוטציית-owner ללא הנחיה מפורשת; כל רוטציה חייבת ארכוב דורש ב-upload/ + אימות-pub חי; /tmp אינו אחסון
