@@ -122,3 +122,15 @@ bun tools/evm-anchor-broadcast.ts --verify=0xf5c48cdefe1c1448728c6d5828f34d8393c
 
 **עדכון CONTINUE-2/3 (2026-09-09, בוקר):** עגינות 4 ו-5 — הסדרה כעת **חמש נקודות-זמן**:
 `68058 → 69207 → 70171 → 71770 → 72958`. עגינה 4: tx `0xb31330ef…f34a532` · בלוק 25,937,227. עגינה 5: tx `0x3b48281f…7f7f97a` · בלוק 25,937,311. שתיהן status 1, gasUsed **32,680 == המודל (6/6 מדויק)**, Tier-3 PROVEN עם crossCheck מלא מול ה-state המפורסם. **בוקר שלם של השרשרת חקוק על mainnet.** גם: `vault-verify` חזר לירוק (root-cause היה ethers חסר ב-lab-root — תוקן, exit=0), system-status regen: 7/7 networks · 1 live rail (EVM, כנה) · 0 critical.
+
+**עדכון CONTINUE-4 (2026-09-09, ~05:00):** עגינה 6 — הסדרה כעת **שש נקודות-זמן**:
+`68058 → 69207 → 70171 → 71770 → 72958 → 74907`. עגינה 6: tx `0x4f27c008…529d1b0e` · בלוק 25,937,568 · status 1 · gasUsed **32,680 == המודל (7/7 מדויק)** · Tier-3 PROVEN · signerIdentity=**headcorner** · crossCheck ידני-מתוכנת **PASS** מול ה-state המפורסם (heightMatches=true, rootMatches=true).
+
+שיקומי תשתית בסבב (כולם נמדדו, לא הוצהרו):
+- **vault-verify ירוק עמיד**: שרשרת root-causes — הקריסה מחקה את `.grid98-lab/node_modules`; `vault.cjs` דורש בנתיב מפורש ethers→bs58→@noble/curves. ה-"deps-reinstalled(bun)" של ה-guardian היה no-op מבני (אין package.json ב-lab-root). תיקון: `.grid98-lab/package.json` + `bun install` (ethers 6 · bs58 · @noble/curves · steem · tronweb) → `node vault.cjs verify --quiet` exit=0, ok:true. מעכשיו גם ה-guardian יכול לשחזר בעצמו.
+- **trondex**: watch-err `tronweb` חסר נעלם מהלוג לאחר ההתקנה; tick#333 · 10/10 chains-ok.
+- **gitkeeper auto-save ל-repo הקנוני (roshpinacare-sys/steem) מת בקריסה** (auto-save אחרון 03:52:15Z) — ה-canonical נתקע על 72,958 בזמן שהשרשרת המקומית המשיכה ל-74,907. פרסום ידני של ה-state החתום דרך contents API. תקלת-ביניים בשקיפות: commit ריק (`bdd17869`) תוקן מיד (`c624070b`) — חלון ~2 דקות, **אפס השפעה on-chain** (העוגנים נושאים את ה-height/root בתוך ה-calldata עצמו).
+- **crossCheck מטמון**: הכלי במצב `--verify` קורא רק את `/tmp/sovereign-state.json` (נכתב ב-preview) — מטמון ישן הציג 72,958. נוקה; ה-crossCheck המכני בוצע ידנית מול fetch טרי → PASS. לעתיד: או שהכלי יביא live ב-verify, או crossCheck ידני-מתוכנת כחלק מהפרוטוקול.
+- dev server הותקף ×3 על-ידי OOM sweep במהלך הסבב — הופעל מחדש בכל פעם; guardian dual-slot שרד ללא התערבות.
+
+עדיין בצד הבעלים (ללא שינוי): מפתחות post-rotation ל-STEEM/HIVE, `npm publish` ל-saos-id-verify, BASE_URL ציבורי.
