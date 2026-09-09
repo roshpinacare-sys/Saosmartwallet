@@ -608,3 +608,26 @@ Stage Summary:
 - המשבר נפתר: המפתחות לא אבדו — הסוכן הקודם בדק שגוי (חיפוש-WIF בהיסטוריה במקום גזירת-pub והשוואה)
 - 11/12 חשבונות בשליטה מלאה; ynet בלבד חסר (יתרות זניחות, operator-delegated)
 - חוקי-רשת חדשים: איסור רוטציית-owner ללא הנחיה מפורשת; כל רוטציה חייבת ארכוב דורש ב-upload/ + אימות-pub חי; /tmp אינו אחסון
+
+---
+Task ID: 2 (SOVEREIGN-CONTROL-CENTER)
+Agent: main (z.ai code)
+Task: מרכז-שליטה ריבוני — התחברות חכמה עם כל מפתח, כספת מוצפנת, חיבור סוכנים דרך API, מחיקת כל המפתחות מהריפו לאחר וידוא
+
+Work Log:
+- Prisma: 7 מודלים חדשים (VaultKey/Session/AgentNode/ChatMessage/TaskItem/AuditLog/GuardState) — נוצרו ב-SQL ישיר (drift קיים ב-SealRecord לא נגענו)
+- lib: vault.ts (AES-256-GCM + scrypt), keys.ts (WIF↔pub + גזירת SAOS-ROT1), chain.ts (אימות-חי steemit/hive עם fallback נודים), auth.ts (סשן cookie 30 יום + Bearer סוכנים), audit.ts (+relayBroadcast)
+- API: vault/login (fail-closed עם אימות-שרשרת), vault/status, vault/verify (watchdog), guard (owner-lock עם אישור-מפורש), agent/register+message+task, chat, task, audit
+- mini-services/relay-service: socket.io :3003 (path '/') + admin-emit :3004 (token)
+- UI: page.tsx הוחלף — מרכז-השליטה הריבוני (login → דשבורד: מטריצת-כספת, guard, סוכנים, צ'אט, משימות, אודיט) RTL מלא, polling-fallback 8s
+- יבוא: scripts/import-vault.ts → 144 פריטים מוצפנים (139 מאומתי-שרשרת + כספת ארכיון + ארנקים + 2 זרעים + 2 מנמוניקות)
+- E2E (scripts/e2e-test.ts): 8/8 ירוק; דפדפן: login אמיתי + צ'אט + מובייל 390px — תקין
+- פורנזיקת-ניקוי: סריקת כל ההיסטוריה (2 ריפואים) → חומר רק ב-upload/KEY-* + tool-results/read_* → filter-branch + gc → 0 פגיעות בכל 32 הקומיטים; saos-dex נקי מלכתחילה (61 קומיטים)
+- Roshcaregt.txt (טוקן GitHub) → .secrets/ (gitignored); /tmp/keywork + /tmp/keyrec נמחו; צ'ק פענוח סופי 144/144
+
+Stage Summary:
+- הכספת: 144 סודות מוצפנים ב-db (AES-256-GCM עם SOVEREIGN_VAULT_SECRET ב-.env בלבד) — אפס טקסט-גלוי בריפו/היסטוריה/דיסק
+- התחברות חכמה: כל WIF (owner/active/posting/memo × steem/hive) מאומת חי fail-closed → סשן 30 יום
+- שלא יקרה שוב: owner-lock (חסימת רוטציות-owner בלי אישור-בעלים מפורש), watchdog אימות כל 5 דקות, יומן-ביקורת מלא
+- סוכנים: register→token-חד-פעמי; message/task/claim/result דרך Bearer; צ'אט חי (relay socket.io + polling)
+- גיבוי-הבעלים: קובץ הדקור.txt (עותקו) הוחזר-קריאה ונמחק מהריפו; העותק האישי של הבעלים = הגיבוי הראשי
