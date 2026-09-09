@@ -15,7 +15,11 @@
 import { db } from "@/lib/db";
 import { masterReady, GateError } from "@/lib/gate/crypto";
 import { verifyAll } from "@/lib/gate/verify";
-import { steemAdapter } from "@/lib/steem-server";
+import { steemAdapter, steemMarket } from "@/lib/steem-server";
+import { fleetStatusCached } from "@/lib/fleet-status";
+import { saosHubCached } from "@/lib/saos-hub";
+import { verifyIdentityAnchor } from "@/lib/anchor-verify";
+import { ecoNetworks } from "@/lib/eco-server";
 
 export type ModuleKind = "skill" | "connector" | "actor";
 
@@ -32,6 +36,13 @@ export interface HarnessModule {
   args: string; // compact JSON-schema-ish hint for the maker's protocol
   needsVault: boolean; // requires the master key in memory (operator session opened the vault)
   cacheable: boolean; // read-only module → identical calls inside one run are memoized (no duplicate network)
+  /**
+   * Canonical cache key for THIS module's args. Without it, `{}` and
+   * `{"username":"headcorner"}` are different strings — the maker would pay
+   * the same expensive network probe twice for the same question. Modules
+   * with defaulted args SHOULD provide one; the default is raw JSON.
+   */
+  cacheKeyOf?: (args: Record<string, unknown>) => string;
   exec: (args: Record<string, unknown>, ctx: ModuleCtx) => Promise<unknown>;
 }
 
@@ -117,6 +128,7 @@ export const MODULES: HarnessModule[] = [
       if (q === "account") return await adapter.getAccount(account);
       return await adapter.getBalances(account);
     },
+    cacheKeyOf: (args) => `${String(args.query || "balances")}:${String(args.account || "headcorner").replace(/^@/, "").toLowerCase()}`,
   },
   {
     id: "web.search",
@@ -227,6 +239,164 @@ export const MODULES: HarnessModule[] = [
         .slice(-15)
         .map((m) => ({ from: m.fromName, kind: m.fromKind, body: m.body.slice(0, 400), at: m.createdAt.toISOString() }));
       return { count: items.length, items };
+    },
+  },
+  {
+    id: "runs.self",
+    name: "זיכרון-עצמי",
+    kind: "skill",
+    desc: "הריצות האחרונות שלך, אתה: יעד, סטטוס, מוצא (סיור/טריגר/ידני), משך, tokens, פסק-הבודק והלקחים. אל תגלה מחדש מה שכבר ידוע לך — קרא את העבר לפני שאתה פועל.",
+    args: "{}",
+    needsVault: false,
+    cacheable: false, // the past changes between runs — never memoize
+    async exec(_args, ctx) {
+      const rows = await db.gateRun.findMany({
+        where: { agentName: ctx.agentName },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: {
+          id: true, goal: true, status: true, origin: true, attempt: true, budget: true,
+          durationMs: true, tokens: true, verdict: true, lessons: true, error: true, createdAt: true,
+        },
+      });
+      const runs = rows.map((r) => {
+        let verdict: { done?: boolean; gaps?: string[] } | null = null;
+        try { const v = r.verdict ? JSON.parse(r.verdict) : null; if (v && typeof v === "object") verdict = { done: Boolean(v.done), gaps: Array.isArray(v.gaps) ? v.gaps.slice(0, 3).map((g: string) => String(g).slice(0, 140)) : [] }; } catch {}
+        let lessons: string[] = [];
+        try { const l = r.lessons ? JSON.parse(r.lessons) : null; if (Array.isArray(l)) lessons = l.slice(0, 4).map((x: string) => String(x).slice(0, 140)); } catch {}
+        let tokens: unknown = null;
+        try { tokens = r.tokens ? JSON.parse(r.tokens) : null; } catch {}
+        return {
+          id: r.id, at: r.createdAt.toISOString(), goal: r.goal.slice(0, 160), status: r.status,
+          origin: r.origin, attempt: r.attempt, budget: r.budget, durationMs: r.durationMs, tokens,
+          verdict, lessons, error: r.error ? r.error.slice(0, 160) : null,
+        };
+      });
+      const done = runs.filter((r) => r.status === "done").length;
+      return { count: runs.length, done, runs };
+    },
+  },
+  {
+    id: "fleet.status",
+    name: "צי-החיילים",
+    kind: "skill",
+    desc: "מצב חי של צבא-ה-STEEM שלנו (13 חשבונות: המפקד headcorner + חיילי-מסחר + powerspan): SP, כוח-הצבעה, RC, פעילות-אחרונה אמיתית מהשרשרת ומי 'מחובר' (RC מעל הרצפה). העיניים שלך על הצי.",
+    args: "{}",
+    needsVault: false,
+    cacheable: true, // fleetStatusCached() → shared cache: N agents = 1 RPC read
+    async exec() {
+      const f = await fleetStatusCached();
+      if (!f.ok) return { ok: false, error: f.error || "fleet probe failed", measuredAt: f.measuredAt };
+      return {
+        ok: true, measuredAt: f.measuredAt, total: f.total, online: f.online, liveAccounts: f.liveAccounts,
+        statusLine: f.statusLine,
+        soldiers: f.soldiers.slice(0, 15).map((s) => ({
+          name: s.name, role: s.role, sp: s.sp, vpPct: s.vpPct, rcPct: s.rcPct, online: s.isOnline,
+          last: s.lastActivity ? `${s.lastActivity.type} · ${s.lastActivity.ageMinutes}min` : null,
+        })),
+      };
+    },
+  },
+  {
+    id: "saos.hub",
+    name: "לב-הכלכלה הריבונית",
+    kind: "skill",
+    desc: "תמונת-מצב אחת של כלכלת SAOS הריבונית: גובה-השרשרת ועיגונים, מנוע-המסחר (PnL-אוצר, טרנזקציות, מדרגות-רצפה), כלוב-נכסים 1:1, בריכות-AMM, אורקל, גשר-TRON ומפקד-הלולאות. הכל נמדד, כלום לא מומצא.",
+    args: "{}",
+    needsVault: false,
+    cacheable: true, // saosHubCached() → 30s shared cache
+    async exec() {
+      const h = await saosHubCached();
+      if (!h.ok) return { ok: false, error: h.stateError || "saos-hub unavailable", fetchedAt: h.fetchedAt };
+      return {
+        ok: true, fetchedAt: h.fetchedAt,
+        core: h.core ? { height: h.core.height, checkpoints: h.core.checkpointCount, verified: h.core.verifiedCount, cadenceSec: h.core.checkpointCadenceSeconds, updatedAt: h.core.updatedAt } : null,
+        engine: h.engine ? { tradesToday: h.engine.tradesToday, txsToday: h.engine.txsToday, tradesTotal: h.engine.tradesTotal, treasuryPnlSAOS: h.engine.treasuryPnlSAOS, treasuryPnlTodaySAOS: h.engine.treasuryPnlTodaySAOS, floor: h.engine.floor, bench: h.engine.bench } : null,
+        gates: h.gates, floorSteps: h.floorSteps.slice(-3),
+        steemAccountsLive: h.steemAccountsLive,
+        loops: { agent: h.loops.agent.length, node: h.loops.node.length },
+        wrapped: Array.isArray(h.wrapped) ? h.wrapped.length : null,
+        pools: Array.isArray(h.pools) ? h.pools.length : null,
+        oracleQuotes: Array.isArray(h.oracle) ? h.oracle.length : null,
+        tronBridge: h.tronBridge ? { anchors: h.tronBridge.anchors, last: h.tronBridge.lastAnchor, usdtTotal: h.tronBridge.usdtTotal } : null,
+        anchors: h.anchors.slice(-2).map((a) => ({ chain: a.chain, cpHeight: a.cpHeight, txid: a.txid })),
+        facts: h.facts.slice(-3).map((f) => ({ at: f.at, kind: f.kind, text: f.text.slice(0, 160) })),
+      };
+    },
+  },
+  {
+    id: "identity.anchor",
+    name: "הוכחת-ריבונות",
+    kind: "skill",
+    desc: "אימות מתמטי שסקלר secp256k1 אחד קושר Steem + Hive + כתובת EVM: קורא את עיגון saos.id.v1 האחרון מהשרשרת, מריץ ecrecover על EIP-191 ומשווה מול ה-authority החי. חשוב: ok=false עם drift=true זה ממצא אמיתי (סטיית-authority — המפתח הוסב מאז העיגון), לא כשל-קריאה. אל תחזור על הקריאה — דווח על הממצא.",
+    args: `{"username":"headcorner (optional)"}`,
+    needsVault: false,
+    cacheable: true,
+    cacheKeyOf: (args) => `verify:${String(args.username || "headcorner").replace(/^@/, "").toLowerCase()}`,
+    async exec(args) {
+      const username = String(args.username || "headcorner").replace(/^@/, "");
+      if (!/^[a-z0-9.\-]{3,16}$/.test(username)) throw new GateError("bad-input", "שם-חשבון לא תקין");
+      const v = await verifyIdentityAnchor(username);
+      const drift = Boolean(v.verify?.claimedMatchesRecovered) && !v.verify?.activeKeyEqualsRecovered;
+      return {
+        ok: v.ok, username: v.username, error: v.error,
+        drift, // AUTHORITY DRIFT — the anchor is internally valid but the live active key moved. A finding, not a call failure.
+        finding: drift ? "סטיית-authority: העיגון חתום נכון על הכתובת הנטענת, אבל המפתח-הפעיל החי כיום נגזר לכתובת EVM אחרת — המפתח הוסב מאז. זו תשובה סופית של הבדיקה; אין טעם לחזור עליה." : undefined,
+        anchor: v.anchor ? { trxId: v.anchor.trxId, block: v.anchor.block, at: v.anchor.timestamp, claimedEvm: v.anchor.claimedEvm } : null,
+        verify: v.verify ? { recoveredEvm: v.verify.recoveredEvm, claimedMatchesRecovered: v.verify.claimedMatchesRecovered, activeKeyEqualsRecovered: v.verify.activeKeyEqualsRecovered, sameScalarProof: v.verify.sameScalarProof, scanned: v.verify.scanned } : null,
+        chains: (v.chains || []).map((c) => ({ chain: c.chain, sameKeyAsSteem: c.sameKeyAsSteem, note: c.note ? c.note.slice(0, 120) : undefined })),
+        summary: v.summary ? v.summary.slice(0, 300) : undefined,
+      };
+    },
+  },
+  {
+    id: "market.watch",
+    name: "צופה-שוק",
+    kind: "connector",
+    desc: "שוק STEEM/SBD החי: טיקר (מחיר אחרון, גבוה/נמוך, נפח), ספר-הזמנות (asks/bids) ומצב-השרשרת — ישירות מה-DEX האמיתי. הבסיס לכל החלטת-מסחר או הערכת-שווי.",
+    args: `{"depth":"orderbook rows, 1-25 (optional, default 10)"}`,
+    needsVault: false,
+    cacheable: true,
+    async exec(args) {
+      const depth = Math.min(Math.max(Number(args.depth) || 10, 1), 25);
+      const m = steemMarket();
+      const [ticker, book, chain] = await Promise.all([m.ticker(), m.orderBook(depth), m.chainStatus()]);
+      return {
+        ticker: ticker ?? null, chainStatus: chain ?? null,
+        asks: (book?.asks ?? []).slice(0, depth).map((a) => ({ price: a.price, amount: a.amount })),
+        bids: (book?.bids ?? []).slice(0, depth).map((b) => ({ price: b.price, amount: b.amount })),
+      };
+    },
+    cacheKeyOf: (args) => `depth:${Math.min(Math.max(Number(args.depth) || 10, 1), 25)}`,
+  },
+  {
+    id: "net.health",
+    name: "בריאות-הרשת כולה",
+    kind: "skill",
+    desc: "סקר-חי אחד: הרשתות שלנו (steem/hive/SAOS-NET/TRON ועוד) עם גובה-ראש ושהות, מצב-הכספת (נעולה/פתוחה, כמה סודות), הסוכנים, ודופק לב-האוטונומיה (פעימות, מונים). לפני כל פעולה גדולה — דע על איזו רשת אתה עומד.",
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const [eco, entries, agents] = await Promise.all([
+        ecoNetworks(),
+        db.vaultEntry.count(),
+        db.gateAgent.count({ where: { active: true } }),
+      ]);
+      const pulseRow = await db.gateState.findUnique({ where: { key: "heart" } });
+      let heart: unknown = null;
+      try {
+        if (pulseRow) {
+          const p = JSON.parse(pulseRow.value) as { enabled?: boolean; beats?: number; lastTickAt?: string; counters?: Record<string, number> };
+          heart = { enabled: p.enabled ?? null, beats: p.beats ?? null, lastTickAt: p.lastTickAt ?? null, counters: p.counters ?? null };
+        }
+      } catch {}
+      return {
+        measuredAt: new Date().toISOString(),
+        chains: (eco.chains || []).map((c) => ({ id: c.id, status: c.status, head: c.headHeight, lagSec: c.lagSeconds, note: c.note ? c.note.slice(0, 100) : null })),
+        vault: { entries, unlocked: masterReady() },
+        agents, heart,
+      };
     },
   },
 ];

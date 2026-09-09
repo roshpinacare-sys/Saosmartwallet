@@ -106,6 +106,7 @@ model GateRun {
 
   @@index([createdAt])
   @@index([status])
+  @@index([agentName, createdAt]) // runs.self — an agent reading its own past must not scan the table
 }
 
 // The Gate Heart — schedules: goals the agents run ON THEIR OWN, on cadence.

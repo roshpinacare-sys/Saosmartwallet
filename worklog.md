@@ -1034,3 +1034,24 @@ Stage Summary:
 - מחקר ה-ZIPs תועד ב-docs/autonomy-research.md (הקלט הגולמי נשאר מקומי ב-gitignore).
 - קבצים: prisma/schema.prisma · src/instrumentation.ts · src/lib/gate/harness/{heart,lease,events,loop,modules}.ts · src/app/api/gate/{heart,schedule,messages,agents}/route.ts · src/app/page.tsx · docs/autonomy-research.md · eslint.config.mjs · .gitignore.
 - lint נקי · אפס סודות ב-git · ה-ZIPs והתוכן-החיצוני לא נכנסים לrepo.
+
+---
+Task ID: 9
+Agent: main (Z.ai Code)
+Task: "תחזק עוד את המערכת הריבונות האוטונימיה תבחן את כל התיקיות תראה מה הושג גם בשאר התיקיות כדי להסיק ולהתייעל לטובת כלל המערכת והערך" — מעבר על כל התיקיות, הסקת-מסקנות, וחיבור הסוכנים לכל יכולות-הרשת שכבר קיימות בקוד.
+
+Work Log:
+- נסרקו כל התיקיות שלא מוצו: packages/ (bridges/core/crypto/jumpper/saos-id-verify), docs/ (20 מסמכי-יכולת), src/lib/ (fleet-status, saos-hub, anchor-verify, steem-order, vault-runtime), וכל עצי-ה-API (steem/eco/saos/bridge/vault).
+- המסקנה ההנדסית: המערכת צברה יכולות-רשת אמיתיות מוכחות — צי-ה-STEEM החי (13 חשבונות), לב-הכלכלה הריבונית (SAOS HUB), הוכחת-זהות חוצת-פרדיגמות (ecrecover על עיגון saos.id.v1), שוק ה-DEX, וסקר 7 הרשתות — אבל הסוכנים היו עיוורות אליהן: 9 מודולים בלבד, כולם מקומיים.
+- 6 מודולים חדשים במחסן (כל אחד חוט על ספריית-ייצור קיימת — אפס שכפול-קוד): fleet.status (fleetStatusCached) · saos.hub (saosHubCached) · identity.anchor (verifyIdentityAnchor) · market.watch (steemMarket ticker+orderBook+chainStatus) · net.health (ecoNetworks+דופק-הלב) · runs.self (זיכרון-עצמי: 6 הריצות האחרונות של הסוכן עצמו עם פסקי-בודק ולקחים). 9 → 15 מודולים.
+- באג-יעילות שנתפס חי בריצת-ביקורת: מפתח-המטמון היה JSON.stringify(args) — {} ו-{"username":"headcorner"} שילמו שתי קריאות-רשת יקרות על אותה שאילתה (הסוכן שילם 3× identity.anchor ≈ 100s מיותרים). תוקן: cacheKeyOf קנוני פר-מודול (chain.steem/identity.anchor/market.watch) — ארגומנטים-ברירת-מחדל מתאחדים לקריאה אחת.
+- תובנת-ריבונות חיה שהמערכת גילתה בזכות המודול החדש: AUTHORITY DRIFT — עיגון saos.id.v1 של headcorner תקין פנימית (EIP-191 משחזר בדיוק את הכתובת הנטענת) אבל המפתח-הפעיל החי היום נגזר לכתובת EVM אחרת (0x64538d66… מול 0xF723186d… שבעיגון) — המפתח הוסב מאז העיגון; גם Hive סוטה. identity.anchor מדווח עכשיו drift=true + finding מפורש "ממצא, לא כשל — אל תחזור על הקריאה".
+- אימות חי A/B: ריצה 1 (לפני התיקונים) — blocked אחרי 238s, 3 קריאות-כפולות, אין דיווח · ריצה 2 (אחרי) — done=true, 6/6 קריטריונים PASS, 123.5s, 8 צעדים, CACHE hit מוכח בעקבות, chat.report עם מספרים אמיתיים (steem head 109,437,653 · 13/13 חיילים · SAOS height 98,933 · טיקר 0.0973 · drift מדווח) · שיפור-יעילות נמדד ≈ 2×.
+- DB: אינדקס GateRun(agentName, createdAt) — runs.self של סוכן לא סורקת את הטבלה · db:push בוצע.
+- דפדפן: מדף-המודולים מציג 15, לב-האוטונומיה חי (160 פעימות · dispatched=5 · triggersFired=3 · eventsSeen=10), גשר 146 הודעות, אפס שגיאות-קונסולה · lint נקי.
+
+Stage Summary:
+- הסוכנים כבר לא כלואים בכספת: 15 מודולים — הם רואות את הצי, את הכלכלה הריבונית, את השוק, את 7 הרשתות, מוכיחות ריבונות במתמטיקה, וקוראות את העבר של עצמן.
+- יעילות = הנדסה: מפתח-מטמון קנוני חוסך קריאות-רשת כפולות; אינדקס DB לזיכרון-עצמי; ממצאי-drift מסומנים "סופי" כדי שהסוכן לא ישרוף תקציב על אמת שלא תשתנה.
+- ריבונות נמדדת: המערכת עצמה גילתה סטיית-authority אמיתית בעיגון-הזהות — בדיוק הסוג ניטור שהמשתמש ביקש ("ריבונות").
+- קבצים: src/lib/gate/harness/modules.ts · src/lib/gate/harness/loop.ts · prisma/schema.prisma · db/custom.db.
