@@ -1,0 +1,12 @@
+{
+  "name": "sovereign-relay-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Realtime relay — pushes vault/chat/task/agent events to the operator UI",
+  "scripts": {
+    "dev": "bun --hot index.ts"
+  },
+  "dependencies": {
+    "socket.io": "4.8.1"
+  }
+}

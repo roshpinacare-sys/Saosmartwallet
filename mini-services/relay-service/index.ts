@@ -1,0 +1,66 @@
+// Sovereign Relay — realtime event bus (socket.io) for the operator UI.
+// Browser connects via /?XTransformPort=3003 (Caddy) — path must stay '/'.
+// Next.js API routes push events to the INTERNAL admin port 3004 (/emit).
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
+
+// Load project root .env (mini-service has its own cwd)
+if (!process.env.SOVEREIGN_RELAY_TOKEN) {
+  try {
+    for (const line of fs.readFileSync(path.join(import.meta.dir, '../../.env'), 'utf8').split('\n')) {
+      const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+    }
+  } catch { /* .env optional */ }
+}
+
+const PUBLIC_PORT = 3003; // socket.io for browser (via Caddy XTransformPort)
+const ADMIN_PORT = 3004; // internal emit endpoint (server-to-server only)
+const RELAY_TOKEN = process.env.SOVEREIGN_RELAY_TOKEN || '';
+
+const io = new Server(createServer(), {
+  // DO NOT change the path, it is used by Caddy to forward the request to the correct port
+  path: '/',
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
+
+io.on('connection', (socket) => {
+  console.log('[relay] client connected', socket.id);
+  socket.emit('hello', { service: 'sovereign-relay', ts: Date.now() });
+  socket.on('disconnect', () => console.log('[relay] client disconnected', socket.id));
+});
+
+io.httpServer?.listen(PUBLIC_PORT, () => console.log(`[relay] socket.io on :${PUBLIC_PORT}`));
+
+// internal admin server — broadcast endpoint
+const admin = createServer((req, res) => {
+  if (req.method === 'POST' && req.url === '/emit') {
+    if (!RELAY_TOKEN || req.headers['x-relay-token'] !== RELAY_TOKEN) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: false, error: 'forbidden' }));
+      return;
+    }
+    let body = '';
+    req.on('data', (c: Buffer) => { body += c.toString(); if (body.length > 1e6) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { event, payload } = JSON.parse(body);
+        if (typeof event !== 'string' || !event) throw new Error('bad event');
+        io.emit(event, payload ?? {});
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e).slice(0, 100) }));
+      }
+    });
+    return;
+  }
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ ok: false, error: 'not found' }));
+});
+admin.listen(ADMIN_PORT, '127.0.0.1', () => console.log(`[relay] admin emit on 127.0.0.1:${ADMIN_PORT}`));

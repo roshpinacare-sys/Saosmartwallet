@@ -125,3 +125,98 @@ model OpLog {
 
   @@index([op])
 }
+
+// ─── Sovereign Key Vault (כספת-המפתחות — חומר רק מוצפן) ─────────────────────
+
+model VaultKey {
+  id             String    @id @default(cuid())
+  account        String // headcorner / cashmachine / wallet:headcorner-evm ...
+  chain          String // steem | hive | evm | tron | sol | btc | seed | mnemonic
+  role           String // owner | active | posting | memo | wallet | seed | mnemonic
+  pubKey         String? // STM... for steem/hive
+  address        String? // wallet address
+  cipher         String // AES-256-GCM "iv:tag:ct" hex — plaintext NEVER stored
+  fingerprint    String // sha256(plaintext)[:16] — id without exposure
+  verified       Boolean   @default(false)
+  lastVerifiedAt DateTime?
+  lastError      String?
+  source         String    @default("import")
+  note           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([account, chain, role])
+  @@index([account])
+}
+
+// ─── Sessions (התחברות — נשאר מחובר) ─────────────────────────────────────────
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique // sha256 of the cookie token
+  label     String   @default("operator")
+  scope     String   @default("owner") // owner | agent
+  keyRef    String? // which vault key opened it
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+}
+
+// ─── Agent mesh (סוכנים חיצוניים דרך API) ────────────────────────────────────
+
+model AgentNode {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  tokenHash    String    @unique
+  capabilities String    @default("") // csv: chat,task,execute-post
+  status       String    @default("active") // active | suspended | revoked
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
+}
+
+// ─── Shared chat (צ'אט משותף בעלים⇄סוכנים) ───────────────────────────────────
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  author    String // "owner" | agent name | "system"
+  role      String // owner | agent | system
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ─── Tasks (משימות לסוכנים) ──────────────────────────────────────────────────
+
+model TaskItem {
+  id         String   @id @default(cuid())
+  title      String
+  detail     String   @default("")
+  createdBy  String // owner | agent name
+  assignedTo String   @default("") // agent name or "" = open
+  status     String   @default("open") // open | claimed | done | failed
+  result     String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+}
+
+// ─── Audit + Guard (שלא יקרה שוב) ────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([action])
+  @@index([createdAt])
+}
+
+model GuardState {
+  id        String   @id @default("singleton")
+  ownerLock Boolean  @default(true) // ON = no owner-authority mutations ever without explicit operator unlock
+  note      String   @default("")
+  updatedAt DateTime @updatedAt
+}
