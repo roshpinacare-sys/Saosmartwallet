@@ -289,8 +289,8 @@ export function SwapView({ world, online, onNeedAuth }: {
         {/* CTA — state machine */}
         <button
           onClick={() => (ctaEnabled ? setReviewOpen(true) : undefined)}
-          disabled={!ctaEnabled || cta === 'submitting' || cta === 'queued'}
-          className={`dx-cta w-full h-[52px] mt-4 text-[16px] ${cta === 'queued' ? '!bg-[color:var(--green)]' : ''} ${cta === 'error' ? '!bg-[color:var(--red)]' : ''}`}
+          disabled={!ctaEnabled || (cta as CtaState) === 'submitting' || (cta as CtaState) === 'queued'}
+          className={`dx-cta w-full h-[52px] mt-4 text-[16px] ${(cta as CtaState) === 'queued' ? '!bg-[color:var(--green)]' : ''} ${(cta as CtaState) === 'error' ? '!bg-[color:var(--red)]' : ''}`}
           data-testid="swap-cta"
         >
           {cta === 'submitting' && <Loader2 className="w-4 h-4 animate-spin-slow inline-block ml-2" />}

@@ -10,12 +10,13 @@ import { wifLooksValid, wifToPublic } from '@/lib/keys';
 import { encryptSecret, fingerprint } from '@/lib/vault';
 import { createSession, SESSION_COOKIE, cookieOptions } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
+import { consumeChallenge, peekChallenge } from '@/app/api/vault/challenge/route';
 
 const CHAINS = ['steem', 'hive', 'blurt'] as const;
 type Ch = (typeof CHAINS)[number];
 
 export async function POST(req: NextRequest) {
-  let body: { account?: string; chain?: string; wif?: string; saveUnverified?: boolean };
+  let body: { account?: string; chain?: string; wif?: string; saveUnverified?: boolean; nonce?: string };
   try {
     body = await req.json();
   } catch {
@@ -28,6 +29,17 @@ export async function POST(req: NextRequest) {
   if (!account || !wif) return NextResponse.json({ ok: false, error: 'חסר חשבון או מפתח' }, { status: 400 });
   if (!CHAINS.includes(chain)) return NextResponse.json({ ok: false, error: 'chain חייב להיות steem, hive או blurt' }, { status: 400 });
   if (!wifLooksValid(wif)) return NextResponse.json({ ok: false, error: 'פורמט מפתח לא תקין (WIF)' }, { status: 400 });
+
+  // Task 54 · אימות-סטייל-איתריום: כל-התחברות חייבת-נונס-אתגר-חי שהונפק עכשיו
+  // (SIWE-שלנו). האימות-המוקדם = peek (לא-שורף); הצריכה-החד-פעמית רק אחרי
+  // אימות-המפתח-החי — כישלון-אימות/שרת לא מכריח reconnect.
+  const nonce = (body.nonce || '').trim();
+  if (!nonce) {
+    return NextResponse.json({ ok: false, error: 'נדרש אתגר-חתימה — לחץ "חבר ארנק" שוב (אימות SIWE חובה)' }, { status: 400 });
+  }
+  if (!peekChallenge(nonce, account, chain)) {
+    return NextResponse.json({ ok: false, error: 'האתגר פג תוקף — בצע חיבור מחדש' }, { status: 401 });
+  }
 
   const { pub, result } = await verifyWif(wif, account, chain);
 
@@ -53,6 +65,11 @@ export async function POST(req: NextRequest) {
   if (!result.ok) {
     await audit('login-rejected', `${account}/${chain}: ${result.error || 'no-error-details'}`);
     return NextResponse.json({ ok: false, error: `המפתח לא שולט ב-${account} על ${chain}: ${result.error || 'אין פירוט'}` }, { status: 401 });
+  }
+
+  // האתגר נצרך-רק-עכשיו — אחרי-אימות-חי-מוצלח (anti-replay בלי-ענישת-משתמש)
+  if (!consumeChallenge(nonce, account, chain)) {
+    return NextResponse.json({ ok: false, error: 'האתגר נוצל במקביל — בצע חיבור מחדש' }, { status: 401 });
   }
 
   // Save the key encrypted (idempotent upsert) so the network stays connected.

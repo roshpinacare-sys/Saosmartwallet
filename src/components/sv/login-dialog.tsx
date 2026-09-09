@@ -1,79 +1,148 @@
 'use client';
 
-// ─── smart login — any key, any chain, vault-fallback when chain unreachable ──
+// ─── Connect Wallet — אימות-סטייל-איתריום (SIWE) על הרשת הריבונית ────────────
+// שלב 1: חיבור (חשבון+רשת → אתגר-חתימה חי מהשרת, כמו eth_personalSign)
+// שלב 2: אישור (הצגת-האתגר + מפתח → סשן-30-יום דו-נשא — נשארים מחוברים)
 
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogIn, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { LogIn, Eye, EyeOff, ShieldCheck, Wallet, PenLine, ArrowRight } from 'lucide-react';
+
+export interface ChallengeT { nonce: string; message: string; digest: string }
 
 export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   msg: { ok: boolean; text: string; roles?: string[] } | null;
   busy: boolean;
-  onLogin: (account: string, chain: string, wif: string) => void;
+  onLogin: (account: string, chain: string, wif: string, nonce: string) => void;
 }) {
   const [account, setAccount] = useState('headcorner');
   const [chain, setChain] = useState('steem');
   const [wif, setWif] = useState('');
   const [showWif, setShowWif] = useState(false);
+  const [step, setStep] = useState<'connect' | 'sign'>('connect');
+  const [challenge, setChallenge] = useState<ChallengeT | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [connErr, setConnErr] = useState<string | null>(null);
+  // local mirror of msg for step-1 errors (page-level msg shows after login attempt)
+  const [loginMsgLocal, setLoginMsgLocal] = useState<string | null>(null);
+
+  async function connect() {
+    setConnecting(true); setConnErr(null); setLoginMsgLocal(null);
+    try {
+      const r = await fetch('/api/vault/challenge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account, chain }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setChallenge({ nonce: j.nonce, message: j.message, digest: j.digest });
+        setStep('sign');
+      } else {
+        setConnErr(j.error || 'הנפקת-אתגר נכשלה');
+      }
+    } catch {
+      setConnErr('שגיאת רשת בהנפקת-האתגר');
+    }
+    setConnecting(false);
+  }
+
+  function back() {
+    setStep('connect'); setChallenge(null); setWif('');
+  }
 
   return (
-    <Dialog open={open} onOpenChange={o => onOpenChange(o)}>
-      <DialogContent className="bg-white border-[#e8e8e3] max-w-md rounded-2xl shadow-[0_24px_70px_-20px_rgba(24,24,27,0.35)]">
+    <Dialog open={open} onOpenChange={o => { onOpenChange(o); if (!o) back(); }}>
+      <DialogContent className="dx-card border-[color:var(--line)] max-w-md rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base text-zinc-900">
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 flex items-center justify-center shadow-[0_2px_8px_-2px_rgba(5,150,105,0.5)]">
-              <ShieldCheck className="w-4.5 h-4.5 text-emerald-50" />
+          <DialogTitle className="flex items-center gap-2 text-base text-[color:var(--text-1)]">
+            <span className="w-9 h-9 rounded-xl bg-[color:var(--pink)] flex items-center justify-center shadow-[0_0_24px_-6px_rgba(255,55,199,0.8)]">
+              <Wallet className="w-4.5 h-4.5 text-white" />
             </span>
-            התחברות חכמה — כל מפתח, כל שרשרת
+            {step === 'connect' ? 'חבר ארנק — הרשת הריבונית' : 'אשר את החתימה'}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="label-caps" htmlFor="login-account">חשבון</label>
-              <Input id="login-account" value={account} onChange={e => setAccount(e.target.value)} placeholder="headcorner" className="bg-white border-[#e0e0da] font-data h-10" dir="ltr" />
+
+        {step === 'connect' ? (
+          <div className="space-y-4" data-testid="connect-step">
+            <p className="text-[12px] text-[color:var(--text-2)] leading-relaxed">
+              התחברות חכמה אל הטוקן שלנו — כמו Connect באיתריום: השרת מנפיק אתגר-חתימה
+              חד-פעמי, אתה מאשר אותו עם המפתח, והסשן <span className="text-[color:var(--text-1)] font-semibold">נשאר מחובר 30 יום</span> (דו-נשא: cookie מאובטח + Bearer).
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="label-caps" htmlFor="login-account">חשבון</label>
+                <Input id="login-account" value={account} onChange={e => setAccount(e.target.value)} placeholder="headcorner" className="dx-input font-data h-10" dir="ltr" data-testid="connect-account" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="label-caps">רשת</label>
+                <Select value={chain} onValueChange={setChain}>
+                  <SelectTrigger className="dx-input h-10"><SelectValue /></SelectTrigger>
+                  <SelectContent className="dx-card border-[color:var(--line)]">
+                    <SelectItem value="steem">STEEM</SelectItem>
+                    <SelectItem value="hive">HIVE</SelectItem>
+                    <SelectItem value="blurt">BLURT</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="label-caps">שרשרת</label>
-              <Select value={chain} onValueChange={setChain}>
-                <SelectTrigger className="bg-white border-[#e0e0da] h-10"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-white border-[#e8e8e3]">
-                  <SelectItem value="steem">STEEM</SelectItem>
-                  <SelectItem value="hive">HIVE</SelectItem>
-                  <SelectItem value="blurt">BLURT</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {(connErr || loginMsgLocal) && (
+              <div className="text-xs rounded-lg px-3 py-2 border leading-relaxed bg-rose-950/40 text-rose-300 border-rose-900/60" role="status">{connErr || loginMsgLocal}</div>
+            )}
+            <button
+              onClick={connect}
+              disabled={connecting || !account}
+              className="dx-cta w-full h-11 text-[13px] flex items-center justify-center gap-2"
+              data-testid="connect-btn"
+            >
+              <Wallet className="w-4 h-4" />{connecting ? 'מנפיק אתגר...' : 'חבר ארנק'}
+            </button>
+            <p className="text-[11px] text-[color:var(--text-3)] text-center leading-relaxed">
+              STEEM · HIVE · BLURT × owner / active / posting / memo. אימות חי מול השרשרת.
+              אם השרשרת לא נגישה — אימות-מפל מהכספת (מפתח שנבדק-חי בשבוע האחרון).
+            </p>
           </div>
-          <div className="space-y-1.5">
-            <label className="label-caps" htmlFor="login-wif">מפתח-פרטי (WIF)</label>
-            <div className="relative">
-              <Input id="login-wif" type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="bg-white border-[#e0e0da] font-data h-10 pl-10" dir="ltr" />
-              <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700" aria-label={showWif ? 'הסתר מפתח' : 'הצג מפתח'}>
-                {showWif ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        ) : (
+          <div className="space-y-4" data-testid="sign-step">
+            <div className="rounded-xl border border-[color:var(--line)] bg-black/30 p-3 max-h-40 overflow-y-auto" data-testid="challenge-box">
+              <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--text-3)] mb-2">
+                <PenLine className="w-3 h-3" /> אתגר-חתימה · SHA-256
+                <span className="dx-num text-[color:var(--text-3)]" dir="ltr">{challenge?.digest.slice(0, 16)}…</span>
+              </div>
+              <pre className="text-[10.5px] leading-relaxed text-[color:var(--text-2)] whitespace-pre-wrap font-data" dir="rtl">{challenge?.message}</pre>
+            </div>
+            <div className="space-y-1.5">
+              <label className="label-caps" htmlFor="login-wif">מפתח-פרטי (WIF) — כדי לאשר את האתגר</label>
+              <div className="relative">
+                <Input id="login-wif" type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="dx-input font-data h-10 pl-10" dir="ltr" data-testid="connect-wif" />
+                <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-3)] hover:text-[color:var(--text-1)]" aria-label={showWif ? 'הסתר מפתח' : 'הצג מפתח'}>
+                  {showWif ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            {msg && (
+              <div className={`text-xs rounded-lg px-3 py-2 border leading-relaxed ${msg.ok ? 'bg-[color:var(--green-soft)] text-[color:var(--green)] border-[color:var(--green)]/30' : 'bg-rose-950/40 text-rose-300 border-rose-900/60'}`} role="status" data-testid="login-msg">
+                {msg.text}
+              </div>
+            )}
+            <div className="grid grid-cols-[auto_1fr] gap-2">
+              <button onClick={back} className="dx-chip h-11 px-3 text-[12px] flex items-center gap-1" aria-label="חזרה לחיבור">
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => challenge && onLogin(account, chain, wif, challenge.nonce)}
+                disabled={busy || !account || !wif || !challenge}
+                className="dx-cta w-full h-11 text-[13px] flex items-center justify-center gap-2"
+                data-testid="approve-btn"
+              >
+                <ShieldCheck className="w-4 h-4" />{busy ? 'מאמת מול השרשרת...' : 'אשר והתחבר'}
               </button>
             </div>
           </div>
-          {msg && (
-            <div className={`text-xs rounded-lg px-3 py-2 border leading-relaxed ${msg.ok ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`} role="status">
-              {msg.text}
-            </div>
-          )}
-          <button
-            onClick={() => onLogin(account, chain, wif)}
-            disabled={busy || !account || !wif}
-            className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-[13px] font-bold shadow-[0_4px_16px_-4px_rgba(5,150,105,0.5)] transition-colors inline-flex items-center justify-center gap-2"
-          >
-            <LogIn className="w-4 h-4" />{busy ? 'מאמת מול השרשרת...' : 'התחבר ואמת'}
-          </button>
-          <p className="text-[11px] text-zinc-400 text-center leading-relaxed">
-            STEEM · HIVE · BLURT × owner / active / posting / memo. המפתח נשמר מוצפן (AES-256-GCM) בכספת המקומית בלבד ומאומת חי מול השרשרת. אם השרשרת לא נגישה — אימות-מפל מהכספת (מפתח שנבדק-חי בשבוע האחרון).
-          </p>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

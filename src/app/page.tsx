@@ -23,6 +23,7 @@ import { useDexWorld, fmtInt } from '@/components/dex/common';
 import { SwapView } from '@/components/dex/swap-view';
 import { ProView } from '@/components/dex/pro-view';
 import { PoolsView } from '@/components/dex/pools-view';
+import { EconomyView } from '@/components/dex/economy-view';
 import { PortfolioView } from '@/components/dex/portfolio-view';
 import { AnchorsView } from '@/components/dex/anchors-view';
 
@@ -127,12 +128,12 @@ export default function SovereignDex() {
   }, [authed, refresh, refreshChat, refreshTasks]);
 
   // ── actions ──
-  async function doLogin(account: string, chain: string, wif: string) {
+  async function doLogin(account: string, chain: string, wif: string, nonce: string) {
     setBusy(true); setLoginMsg(null);
     try {
       const r = await fetch('/api/vault/login', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account, chain, wif }),
+        body: JSON.stringify({ account, chain, wif, nonce }), // SIWE — אתגר-חתימה חד-פעמי
       });
       const j = await r.json();
       if (j.ok) {
@@ -217,6 +218,9 @@ export default function SovereignDex() {
         )}
         {view === 'pools' && (
           <PoolsView world={world} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} onDone={refetchNow} />
+        )}
+        {view === 'economy' && (
+          <EconomyView onNeedAuth={() => { if (getToken()) return true; setLoginMsg({ ok: false, text: 'התחבר דרך "חבר ארנק" כדי לנעול, להצביע ולקנות בונדים.' }); setLoginOpen(true); return false; }} onDone={refetchNow} />
         )}
         {view === 'portfolio' && (
           <PortfolioView world={world} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} onDone={refetchNow} />

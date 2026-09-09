@@ -25,6 +25,7 @@ const ALLOWED = new Set([
   'wrap',     // POST — עטיפה/פריקה 1:1
   'convert',  // POST — המרה דרך הסולם
   'transfer', // POST — העברה בין ארנקים
+  'economy',  // POST — Task 54: ve_lock/ve_unlock/ve_vote/bond_buy (כלכלה-מטורפת)
 ]);
 
 export async function POST(req: NextRequest) {

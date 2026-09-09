@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import {
-  ArrowLeftRight, CandlestickChart, Droplets, Wallet, Anchor,
+  ArrowLeftRight, CandlestickChart, Droplets, Wallet, Anchor, Coins,
   Fingerprint, Landmark, Zap, ScrollText, Settings2, LogIn, LogOut,
   Menu, ChevronDown, Activity,
 } from 'lucide-react';
@@ -19,13 +19,14 @@ import type { StatusData } from '@/components/sv/shared';
 import type { World } from './common';
 import { fmtInt } from './common';
 
-export type ViewId = 'swap' | 'pro' | 'pools' | 'portfolio' | 'anchors'
+export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'portfolio' | 'anchors'
   | 'vault' | 'towers' | 'ops' | 'audit' | 'settings';
 
 export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'swap', label: 'בורסה', icon: ArrowLeftRight },
   { id: 'pro', label: 'מסחר', icon: CandlestickChart },
   { id: 'pools', label: 'בריכות', icon: Droplets },
+  { id: 'economy', label: 'כלכלה', icon: Coins },
   { id: 'portfolio', label: 'תיק', icon: Wallet },
   { id: 'anchors', label: 'עיגונים', icon: Anchor },
 ];
@@ -80,7 +81,7 @@ export function TopNav({ view, onNavigate, status, world, online, relay, authed,
             <Menu className="w-[15px] h-[15px]" /> פלטפורמה
             <ChevronDown className="w-3.5 h-3.5 opacity-60" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="dx-card border-[color:var(--line)] rounded-2xl" dir="rtl">
+          <DropdownMenuContent align="start" className="dx-card border-[color:var(--line)] rounded-2xl">
             <DropdownMenuLabel className="text-[11px] text-[color:var(--text-3)]">מרכז-השליטה הריבוני</DropdownMenuLabel>
             {PLATFORM_NAV.map(v => {
               const Icon = v.icon;
@@ -129,7 +130,7 @@ export function TopNav({ view, onNavigate, status, world, online, relay, authed,
               <span className="dx-num text-[11px] max-w-[90px] truncate" dir="ltr">{status?.me || 'owner'}</span>
               <ChevronDown className="w-3 h-3 opacity-50" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="dx-card border-[color:var(--line)] rounded-2xl" dir="rtl">
+            <DropdownMenuContent align="end" className="dx-card border-[color:var(--line)] rounded-2xl">
               <DropdownMenuLabel className="text-[11px] text-[color:var(--text-3)]">
                 <span className="dx-num" dir="ltr">{status?.totals.verified ?? '—'}/{status?.totals.keys ?? '—'} keys verified</span>
               </DropdownMenuLabel>
@@ -200,15 +201,15 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
           {/* more sheet */}
           <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger className="flex flex-col items-center gap-0.5 py-1.5">
-              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
-              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
+              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
+              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
             </SheetTrigger>
             <SheetContent side="bottom" className="dx-card border-[color:var(--line)] rounded-t-3xl px-4 pt-3 pb-8" dir="rtl">
               <SheetHeader className="p-0 mb-2">
                 <SheetTitle className="text-sm text-[color:var(--text-1)]">כל התצוגות</SheetTitle>
               </SheetHeader>
               <div className="grid grid-cols-3 gap-2">
-                {[{ id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, ...PLATFORM_NAV].map(v => {
+                {[{ id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, ...PLATFORM_NAV].map(v => {
                   const Icon = v.icon;
                   return (
                     <button key={v.id} onClick={() => { onNavigate(v.id); setMoreOpen(false); }}

@@ -755,3 +755,28 @@ Stage Summary:
 - המוטציות מאובטחות-שכבה-כפולה: סשן-בעלים בדפדפן + טוקן-מפעיל בשרת בלבד
 - כנות: relay-העיגון מוצג כנה (steem/hive disabled fail-closed בגלל authority-mismatch מהרוטציה — דורש ייבוא-מפתח-נכון ל-.env של הדמון; לא נגעתי — זו החלטת-מפעיל)
 - פתוח: המחיר-בכרטיס הוא ציטוט-ראוטר חי; ה-PRO chart משתמש בסרט-השווקים החופשי; quote-integrity banner ("המחיר עודכן") קיים ב-hook אך עדיין לא מוצג-כפס — מועמד לאיטרציה הבאה
+
+---
+Task ID: 54 (RESURRECT + ECONOMY-TOP + SIWE + REAL-DATA + LIVE-ANCHORS)
+Agent: main (Z.ai Code)
+Task: "צריך לוודא שהכל רץ באמת ועובד לייב על הרשת שלנו... לבחון דקס אלטרנטיביים עם פונקציות כלכליות חדשניות מטורפות... להוסיף את כל הנתונים האמיתיים... לחזק עוד את העיצוב... חייב שיהיה אימות לטוקן כמו באיתריום... ולהישאר מחובר... בנוסף השרת נפל"
+
+Work Log:
+- RESURRECT: השרת אותחל (HTTP 200), saos-dex/ הוחזר מהריפו, .env-אב שוחזר (SOVEREIGN_VAULT_SECRET מהמאסטר-סיד המוכר + DEX_OPERATOR_TOKEN חדש-רנדומלי), saos-dex/.env נכתב מחדש עם מפתחות-headcorner האמתיים (ACTIVE/ACTIVE × steem/hive), prisma generate + db:push (עקיפת DATABASE_URL גלובלי — env -u), socket.io-client+lightweight-charts הותקנו מחדש, relay-service:3003 הוקם
+- באג-ירושה נתפס-ותוקן: page.tsx:43 `const essages` — [messages אבדו (push-פגום של 1c40097) → תוקף
+- מחקר (סוכן R, 14 חיפושים): TOP-7 פונקציות כלכליות 2024-25 — Aerodrome ve(3,3) ($322M fees, 100%-fees-to-voters), Hyperliquid buybacks ($1.16B, 92-97%→burn), Uniswap-V4/Bunni dynamic-fees+am-AMM, Olympus bonds (POL), Ethena sUSDe, LBP, Ondo-RWA. מיושמים כאן: 1+2+3+4
+- ECONOMY ENGINE (saos-dex): economy.ts חדש — economyTick קנוני ב-buildBlock (height-trigger טהור, אפס-שעון): (a) veSAOS: ve_lock/ve_unlock/ve_vote ops (1..208שב', דעיכה-לינארית, כספת ve-vault + קרן ve-pot + אפוק-פליפ 1200 בלוקים מחלק פרופורציונלי-לכוח-הצבעה); (b) Revenue-Router: כל-600 בלוקים 40%-קנייה-מהבריכה-ושריפה (ΣSAOS יורד — דפלציה-אמת) + 40%-קרן-ve + 20%-אוצר, מרוסן-לרווח-מדוד ורצפת-אוצר; (c) Bonds-2.0: bond_buy בהנחת-3% מעל מחיר-בריכה-חי, SAOS-נכנס-ve-נעול-12שב', תקרות+cooldown; (d) עמלים-דינמיים ב-amm.ts: EWMA-תנודתיות-פר-בריכה → fee 4..1500bps (quote=execution), נמדד-חי 30→44bps אחרי-סוואפ-גדול; /api/dex/economy GET+POST (operatorAuth+consoleGuard); גשר-פלטפורמה: 'economy' ב-whitelist
+- SIWE-CONNECT (אימות-סטייל-איתריום): /api/vault/challenge (nonce רנדומלי 16B, TTL 5דק', הודעת-חתימה קנונית, peek/consume — הצריכה רק-אחרי-אימות-חי); login מחייב-נונס; LoginDialog חדש-2-שלבים: "חבר ארנק" → אתגר-מוצג → אשר-והתחבר; סשן-30-יום דו-נשא (cookie httpOnly + Bearer) — reload-מלא שמר owner:headcorner (מבחן "נשאר מחובר" עבר)
+- REAL-DATA: onramp.ts מרחיב — readSteemHead (headcorner מול api.steemit.com: 0.670 STEEM / 0.260 SBD / 8 SP חי); PortfolioView: כרטיס "יתרות-חוץ חיות" (STEEM-ראש + HIVE-ראש + צי-9-חיילים + אבק-HE + קיבולת-עיגון-RC ~23/יום), fail-כנה כש-RPC לא עונה; תוויות ve-vault/ve-pot בספרי-המערכת
+- UI: EconomyView חדשה (hero + veSAOS עם סליידר-שבועות + router עם split-bar 40/40/20 + bonds + עמלים-דינמיים + how-it-works), nav "כלכלה" (Coins) ב-EXCHANGE_NAV + מובייל-sheet; תיקוני-טיפוס ישנים (nav dir, requoteBps, cta-narrowing, pack.tree guards)
+- RELAY-באג-כפול נתפס-ותוקן-שורשית: (1) authority-mismatch כוזב — wifToPublic של ספריית-steem מחזיר פאב-שגוי מ-WIF-מנורמל-5K (אותו-סקלר! נמדד-בינארית) → FIX: פאב-אימות נגזר-מה-WIF-הגולמי בטעינה (keys.steemPub/hivePub); (2) "Missing Active Authority" בשידור — החתימה-על-המנורמל פגומה-גם-היא בגרסת-הספרייה-הנוכחית → FIX: חתימה-על-WIF-גולמי-דחוס (K) ישירות. אחרי-התיקון: עיגון-חי מיידי
+- LIVE ANCHORS מאומת: Steem txid 774e20657a7599ff (עגון h876) + Hive txid 42c18fa353a1e595 — אומת-עצמית (verified 1→3, mismatches 0) + אומת-בדפדפן בעיגונים: STEEM עגונו-4/אומתו-1 · HIVE עגונו-3/אומתו-3 · חותמות נוספות זורמות; הופעה-בהיסטוריית-החשבון-החיה על Hive (blocks 109769492+504, custom_json saos-dex.anchor.v1)
+- E2E דפדפן: connect→sign→מחובר (owner:headcorner), ve_lock 500 SAOS×52w נחת (כספת-ve 500,000µ), ve_vote נחת (weight 228,625), bond_buy 1000 USDS נחת (414,526µ SAOS בהנחה, עמדה-ממוזגת 914,526µ), סוואפ-100-SAOS דרך-סקירה+אישור, עמלה-דינמית 30→32→44bps בצ'יפ-השוק, reload=מחובר, תיק=יתרות-חוץ-אמת, צילומי desktop+mobile
+- lint: 0 errors. tsc: נקי-מהשלי (נשארו 3 שגיאות-ישנות ב-api/agent + guardian/status — ירושה, לא נוגעות-בריצה)
+
+Stage Summary:
+- הכל רץ-חי על הרשת: מנוע-3010 (height עולה, dbOk, halted-false), relay-3003, עיגון-Steem/Hive-חי עם מפתחות-אמת (באג-ספרייה נתגלה-מדוד ותוקן-שורשית)
+- הכלכלה-המטורפת חיה על-השרשרת: veSAOS+גייגים+אפוקים, ראוטר-שריפה-דפלציוני, בונדים-3%, עמלים-דינמיים — הכל-deterministic מגובה-מרקל
+- אימות-סטייל-איתריום חי: אתגר-חתימה חד-פעמי + נשאר-מחובר-30-יום (מבוטל-רק-בהתנתקות-ידנית)
+- נתונים-אמת בלי-זיוף: יתרות-חוץ-חיות משתי-השרשראות + בריכות-מצב-אמת + fail-כנה-כשאין-נתון
+- פתוח: eth/sol/fleet disabled כנה (אין-מפתחות/כספת-צי-בסנדבוקס), router ידליק-עם-צבירת-עמלות-מעל-הרצפה, TRON מותנה-מימון

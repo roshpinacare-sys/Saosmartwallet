@@ -23,7 +23,7 @@ export type Pool = {
 export type Wallet = { name: string; credits: number; balances: Record<string, number>; locked: Record<string, number> };
 export type Soldier = { name: string; saos: number; usds: number; equity: number; pnl: number; liveQuotes: number; locked: Record<string, number> };
 export type ArenaData = {
-  params: { enabled: boolean; spreadBps: number; stepBps: number; levels: number; sizeMu: number; maxInventoryMu: number; minEdgeBps: number; noise: boolean };
+  params: { enabled: boolean; spreadBps: number; stepBps: number; levels: number; sizeMu: number; maxInventoryMu: number; minEdgeBps: number; noise: boolean; requoteBps?: number };
   soldiers: Soldier[];
 };
 export type TapeRow = { kind: string; base: string; quote: string; price: number; amountMu: number; taker: string; maker: string; at: number; h: number };

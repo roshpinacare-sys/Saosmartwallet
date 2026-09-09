@@ -352,7 +352,7 @@ function ProofsTower({ saos }: { saos: SaosStatus | null }) {
         <div className="mt-4 space-y-3">
           {pack.allVerified ? (
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-[12px] font-semibold text-emerald-800 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />כל {pack.tree.leaves} העלים אומתו מול השורש — rootMatches: {String(pack.rootMatches)}
+              <CheckCircle2 className="w-4 h-4 shrink-0" />כל {pack.tree?.leaves ?? 0} העלים אומתו מול השורש — rootMatches: {String(pack.rootMatches)}
             </div>
           ) : (
             <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-[12px] font-semibold text-rose-700 flex items-center gap-2">
@@ -362,7 +362,7 @@ function ProofsTower({ saos }: { saos: SaosStatus | null }) {
           <div className="grid gap-2 sm:grid-cols-3">
             <div className="sv-well px-3 py-2.5">
               <div className="label-caps mb-1">מרקל-רוט</div>
-              <div className="font-data text-[10px] text-zinc-800 break-all leading-relaxed" dir="ltr">{pack.tree.root}</div>
+              <div className="font-data text-[10px] text-zinc-800 break-all leading-relaxed" dir="ltr">{pack.tree?.root ?? "—"}</div>
             </div>
             <div className="sv-well px-3 py-2.5">
               <div className="label-caps mb-1">stateRoot</div>
@@ -370,7 +370,7 @@ function ProofsTower({ saos }: { saos: SaosStatus | null }) {
             </div>
             <div className="sv-well px-3 py-2.5">
               <div className="label-caps mb-1">מבנה</div>
-              <div className="font-data text-[12px] font-semibold text-zinc-800" dir="ltr">{pack.tree.leaves} leaves · {pack.tree.levels} levels</div>
+              <div className="font-data text-[12px] font-semibold text-zinc-800" dir="ltr">{pack.tree?.leaves ?? 0} leaves · {pack.tree?.levels ?? 0} levels</div>
               <div className="font-data text-[9.5px] text-zinc-400" dir="ltr">{pack.seal?.createdAt ? new Date(pack.seal.createdAt).toLocaleString('he-IL') : ''}</div>
             </div>
           </div>
