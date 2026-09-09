@@ -45,7 +45,7 @@ interface HeartPulse {
   lastTickAt: string;
   beats: number;
   enabled: boolean;
-  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; eventsSeen: number };
+  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number };
   loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>;
   error?: string;
 }
@@ -67,7 +67,7 @@ async function enqueueRun(opts: {
   modules: string[] | null;
   brain: string | null;
   budget: number;
-  origin: "schedule" | "trigger";
+  origin: "schedule" | "trigger" | "proposal";
   meta: Record<string, unknown>;
 }): Promise<string> {
   const agent = await db.gateAgent.findFirst({ where: { name: opts.agentName, active: true } });
@@ -105,14 +105,15 @@ async function enqueueRun(opts: {
     await db.gateRun.update({ where: { id: run.id }, data: { lessons: JSON.stringify(lessons) } });
   }
   void run;
-  const originIcon = opts.origin === "schedule" ? "⏰" : "⚡";
+  const originIcon = opts.origin === "schedule" ? "⏰" : opts.origin === "proposal" ? "💡" : "⚡";
+  const originText = opts.origin === "schedule" ? "סיור מתוכנן" : opts.origin === "proposal" ? "יוזמת-יעד" : "טריגר אירוע";
   const note = typeof meta.brainNote === "string" ? ` · ${meta.brainNote}` : "";
   await db.gateMessage.create({
     data: {
       channel: "command",
       fromKind: "system",
       fromName: "harness",
-      body: `${originIcon} יעד אוטונומי (${opts.origin === "schedule" ? "סיור מתוכנן" : "טריגר אירוע"}) → ${agent.name}: "${opts.goal.slice(0, 180)}" · מוח: ${brain} · תקציב: ${run.budget}${note}`,
+      body: `${originIcon} יעד אוטונומי (${originText}) → ${agent.name}: "${opts.goal.slice(0, 180)}" · מוח: ${brain} · תקציב: ${run.budget}${note}`,
       meta: JSON.stringify({ runId: run.id }),
     },
   }).catch(() => {});
@@ -291,6 +292,120 @@ async function stageTriggers(p: HeartPulse): Promise<void> {
   p.loops.triggers = { lastAt: now.toISOString(), ok: true, fired };
 }
 
+/* ══════════════════ goal-initiative policy (the boundary decides) ══════════════════ */
+
+const PROPOSAL_POLICY_KEY = "proposal-policy";
+
+export interface ProposalPolicy {
+  autoApprove: boolean; // may the heart launch proposals on its own?
+  maxAutoPerDay: number; // fleet-wide policy-approved proposals per day
+  maxBudget: number; // a proposal asking for more steps waits for the operator
+}
+
+/** Bounded initiative is ON by default — small, capped, fully visible. */
+export async function readProposalPolicy(): Promise<ProposalPolicy> {
+  const row = await db.gateState.findUnique({ where: { key: PROPOSAL_POLICY_KEY } });
+  const dflt: ProposalPolicy = { autoApprove: true, maxAutoPerDay: 2, maxBudget: 4 };
+  try { if (row) return { ...dflt, ...(JSON.parse(row.value) as Partial<ProposalPolicy>) }; } catch { /* fresh */ }
+  return dflt;
+}
+
+export async function writeProposalPolicy(p: ProposalPolicy): Promise<void> {
+  await db.gateState.upsert({
+    where: { key: PROPOSAL_POLICY_KEY },
+    create: { key: PROPOSAL_POLICY_KEY, value: JSON.stringify(p) },
+    update: { value: JSON.stringify(p) },
+  });
+}
+
+/**
+ * stageProposals — goal initiative, made real but BOUNDED: an armed agent
+ * proposed a goal (goal.propose module); the heart launches it only when the
+ * policy allows: daily fleet cap, budget cap, armed+autonomous+idle agent.
+ * One proposal per beat max — initiative must never stampede the fleet.
+ */
+async function stageProposals(p: HeartPulse): Promise<void> {
+  const policy = await readProposalPolicy();
+  const loops = () => ({ lastAt: new Date().toISOString(), ok: true, fired: 0 });
+  if (!policy.autoApprove) {
+    p.loops.initiative = loops();
+    return;
+  }
+  const dayStart = new Date(`${dayKeyNow()}T00:00:00.000Z`);
+  const todayCount = await db.gateProposal.count({
+    where: { status: "launched", decidedBy: "policy", decidedAt: { gte: dayStart } },
+  });
+  const pend = todayCount >= policy.maxAutoPerDay
+    ? []
+    : await db.gateProposal.findMany({ where: { status: "pending" }, orderBy: { createdAt: "asc" }, take: 3 });
+  const cand = pend.find((x) => x.budget <= policy.maxBudget);
+  if (!cand) {
+    p.loops.initiative = loops();
+    return;
+  }
+  try {
+    const agent = await db.gateAgent.findFirst({ where: { name: cand.agentName, active: true, autonomy: true } });
+    if (!agent) {
+      await db.gateProposal.update({ where: { id: cand.id }, data: { status: "expired", decidedBy: "policy", decidedAt: new Date() } });
+      p.loops.initiative = loops();
+      return;
+    }
+    const busy = await db.gateRun.count({ where: { agentName: cand.agentName, status: { in: ["queued", "running"] } } });
+    if (busy > 0) {
+      p.loops.initiative = loops(); // idle-only — never stack a proposal on a working agent
+      return;
+    }
+    const runId = await enqueueRun({
+      agentName: cand.agentName,
+      goal: cand.goal,
+      doneMeans: JSON.parse(cand.doneMeans || "[]"),
+      modules: null, // the agent's armed set rules
+      brain: null,
+      budget: Math.min(cand.budget, policy.maxBudget),
+      origin: "proposal",
+      meta: { proposalId: cand.id, note: `יוזמת-יעד אושרה במדיניות (${todayCount + 1}/${policy.maxAutoPerDay} היום)` },
+    });
+    await db.gateProposal.update({
+      where: { id: cand.id },
+      data: { status: "launched", decidedBy: "policy", decidedAt: new Date(), runId },
+    });
+    p.counters.proposalsFired++;
+    p.loops.initiative = { lastAt: new Date().toISOString(), ok: true, fired: 1 };
+  } catch {
+    // a broken proposal is rejected honestly, not retried forever
+    await db.gateProposal.update({ where: { id: cand.id }, data: { status: "rejected", decidedBy: "policy", decidedAt: new Date() } }).catch(() => {});
+    p.loops.initiative = loops();
+  }
+}
+
+/**
+ * Operator/policy approval — launch a proposal as a REAL run (origin=proposal).
+ * Used by the proposals API (operator decision) and by the policy path.
+ * The run is QUEUED here; the heart's dispatch stage claims it within one beat.
+ */
+export async function launchProposal(proposalId: string, decidedBy: "operator" | "policy"): Promise<string> {
+  const p = await db.gateProposal.findUnique({ where: { id: proposalId } });
+  if (!p) throw new Error("אין הצעה כזו");
+  if (p.status !== "pending") throw new Error(`ההצעה כבר הוכרעה (${p.status})`);
+  const agent = await db.gateAgent.findFirst({ where: { name: p.agentName, active: true } });
+  if (!agent) throw new Error("הסוכן אינו פעיל — לא ניתן להזניק");
+  const runId = await enqueueRun({
+    agentName: p.agentName,
+    goal: p.goal,
+    doneMeans: JSON.parse(p.doneMeans || "[]"),
+    modules: null, // the agent's armed set rules
+    brain: null,
+    budget: p.budget,
+    origin: "proposal",
+    meta: { proposalId: p.id, note: decidedBy === "operator" ? "אושרה ידנית על-ידי המפעיל" : "אושרה במדיניות המרוסנת" },
+  });
+  await db.gateProposal.update({
+    where: { id: proposalId },
+    data: { status: "launched", decidedBy, decidedAt: new Date(), runId },
+  });
+  return runId;
+}
+
 async function stageDispatch(p: HeartPulse): Promise<void> {
   const running = await db.gateRun.count({ where: { status: "running" } });
   let slots = Math.max(0, MAX_CONCURRENT_RUNS - running);
@@ -346,7 +461,7 @@ export async function tickOnce(): Promise<HeartPulse> {
     lastTickAt: "",
     beats: 0,
     enabled: true,
-    counters: { dispatched: 0, reaped: 0, recovered: 0, schedulesFired: 0, schedulesDeferred: 0, triggersFired: 0, eventsSeen: 0 },
+    counters: { dispatched: 0, reaped: 0, recovered: 0, schedulesFired: 0, schedulesDeferred: 0, triggersFired: 0, proposalsFired: 0, eventsSeen: 0 },
     loops: {},
   };
   if (!g) {
@@ -368,6 +483,7 @@ export async function tickOnce(): Promise<HeartPulse> {
         ["reaper", () => stageReap(p)],
         ["scheduler", () => stageSchedules(p)],
         ["triggers", () => stageTriggers(p)],
+        ["initiative", () => stageProposals(p)],
         ["dispatch", () => stageDispatch(p)],
       ];
       for (const [name, fn] of stages) {

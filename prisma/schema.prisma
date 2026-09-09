@@ -200,6 +200,47 @@ model GateMessage {
   @@index([createdAt])
 }
 
+// Fleet memory (ביקורת #8 — נפתר) — the shared knowledge bank: FINAL findings
+// recorded ONCE under a canonical key; every agent reads BEFORE re-researching,
+// so one expensive probe (e.g. an authority-drift verification) teaches the
+// whole fleet instead of being paid again run after run.
+// Pollution defenses, enforced in code: canonical-key upsert (a fact UPDATES
+// itself instead of duplicating), body clamp, total-cap with evict-oldest,
+// provenance (source + runId) and a refCount that says which knowledge is used.
+model GateMemory {
+  id        String   @id @default(cuid())
+  key       String   @unique // canonical fact key, e.g. "drift:headcorner"
+  kind      String // drift | finding | fact
+  body      String // the distilled knowledge itself (Hebrew, clamped)
+  source    String // who wrote it — agent name or "harness"
+  runId     String? // originating run (provenance, audit trail)
+  refCount  Int      @default(0) // how many times agents actually read it
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
+// Goal initiative (ביקורת #7 — נפתר) — an armed agent PROPOSES a goal with
+// doneMeans; the boundary decides: explicit operator approval in the UI, or
+// the bounded auto-approve policy (fleet daily cap + budget cap + armed
+// agent + idle agent). "הסוכן מציע — הגבול מחליט."
+model GateProposal {
+  id        String    @id @default(cuid())
+  agentName String
+  goal      String
+  rationale String? // WHY the agent believes this is worth doing
+  doneMeans String // JSON array — the pass-gate the proposer binds itself to
+  budget    Int       @default(4)
+  status    String    @default("pending") // pending | launched | rejected | expired
+  decidedBy String? // operator | policy
+  runId     String? // the run created on approval (lineage)
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
 // Audit of every executed action
 model GateAction {
   id        String   @id @default(cuid())

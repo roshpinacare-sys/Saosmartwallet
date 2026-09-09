@@ -1073,3 +1073,25 @@ Stage Summary:
 - "רץ הכי טוב שיש" הפך מהצהרה לתצוגה: כל מודול נושא את מוני-היעילות שלו, כל סוכן נושא את לקחי-המהירות שלו, וכל פער-חוזר מתויג כתבנית-תכנון.
 - מה עוד חוסם — כתוב בכנות בdocs/autonomy-audit.md: יוזמת-יעד לסוכנים (דורש הכרעת-מפעיל) וזיכרון-צי משותף (דורש עיצוב נגד זיהום-הקשר) — הם הצעדים הבאים בסדר-ערך.
 - קבצים: src/lib/gate/harness/loop.ts · src/app/api/gate/modules/route.ts · src/app/page.tsx · docs/autonomy-audit.md.
+
+---
+Task ID: 11
+Agent: main (Z.ai Code)
+Task: "תמשיך הרבה יותר חזק תראה מה השגת האם זה נכון האם יש יותר מה מגביל אותנו שדורש פתרון מה נשאר פתוח שיש ליישם ליישם שיפור כללי מקיף תיקונים יעול בחינת עומק נוספת ודחוף לריפה" — יישום שני הפערים-הפתוחים מהביקורת (יוזמת-יעד #7 + זיכרון-צי #8) + טלמטריית-בודקים, אימות-עומק חי, push.
+
+Work Log:
+- נבדק מה הושג (worklog Tasks 1-10 + docs/autonomy-audit.md): 4 מגבלות תוקנו בגל-הראשון, 3 מרוסנות במכוון, ו-2 נותרו פתוחות — הן יושמו עכשיו במלואן.
+- schema: GateMemory (בנק-ידע משותף — key קנוני ייחודי = upsert במקום שכפול; cap 150 עם פינוי-הישן; provenance source+runId; refCount אמיתי) + GateProposal (תור-יוזמות עם lineage runId + decidedBy operator|policy); db:push תקין.
+- המחסן 15 → 18 מודולים: memory.read (קריאת-הבנק + מוני-שימוש), memory.write (רק ממצאים סופיים — חוזה מפורש נגד נתונים-חולפים), goal.propose (הצעה אחת-פתוחה לסוכן — יוזמה, לא ספאם; חובת doneMeans).
+- לב-האוטונומיה + שלב-חמישי: stageProposals — הסוכן מציע, הגבול מחליט: מדיניות מרוסנת (autoApprove ברירת-מחדל ON · מקס 2/יום לכל הצי · תקציב ≤4 · סוכן חמוש+autonomy+פנוי בלבד · הצעה אחת/פעימה); launchProposal לאישור-מפעיל; מקור-ריצה חדש "proposal" עם אייקון 💡.
+- לולאה: הזרקת 3 עובדות-העבר הטריות של זיכרון-הצי לפרומפט-הפתיחה של כל ריצה ("מה שהצי כבר הוכיח לא שווה חקירה-חוזרת") · קציר-אוטומטי: ריצה שמגלה drift מרשימה אותו לבנק בעצמה (harvestFleetMemory) · checkerstats (verdicts/firstPass/repairPass/blocked/errors) — דיוק-שער-המעבר הופך נתון · תיקון-תצוגה: דוח-ריצה מציג "💡 יוזמת-יעד" למקור proposal (היה מתויג בטעות "טריגר").
+- API חדשים: GET/PATCH/PUT /api/gate/proposals (תור + הכרעת-מפעיל + מדיניות) · GET /api/gate/memory (ראיית-הבנק למפעיל) · heart GET חושף proposals+policy+checkerStats.
+- UI: פאנל יוזמות-יעד (הצעות עם נימוק, אישור/דחייה, מתג-מדיניות "אוטומטי מרוסן · 2/יום · תקציב ≤4") + פאנל זיכרון-הצי (ממצאים, מחבר, מוני-קריאה) + שורת checker gate + תג 💡 יוזמה ביומן-הריצות + 5 endpoints חדשים במסוף-API.
+- אימות-עומק חי (אפס לחיצות-מפעיל על הזרימות האוטונומיות): ריצת-העשרה — memory.read ✓ · identity.anchor → drift=true כממצא ✓ · memory.write(drift:headcorner) ✓ · goal.propose הוגש ✓ · הבודק חסם בכנות על דוח-חסר (chat.report לא נקרא) — והקצב-היומי של מרדף-התיקון עצר את הרדיפה (2/2) — הגבול עובד. הלב אישר את ההצעה לבד (by=policy, 1/2 היום) והזניק ריצת-יוזמה אמיתית (origin=proposal) שהוכיחה יתרות STEEM חיות ונחסמה בכנות על doneMeans דל (חסר Hive) — הצעה דלה נתפסת. אישור-מפעיל (PATCH approve) → ריצה done: chain.steem → net.health → chat.report, פסיקת-בודק done=True 3/3. מנגנון-הכרעה-כפולה נדחה (already-decided).
+- דפדפן (דסקטופ + מובייל 390px): פאנלים חיים (יוזמות/זיכרון/מתג-מדיניות), מתג הופעל וכובה אמיתית (PUT), תג 💡 ביומן, מחסן 18 עם טלמטריה ("נמדד: 2 calls · ~878ms"), ביקורת מציגה harness.goal.propose/memory.*, אין גלילה-אופקית, פוטר דביק, אפס שגיאות-קונסולה.
+- מצב-סופי נמדד: heart counters dispatched=10 · initiatives=1 · checkerStats 4 פסיקות (2 first-pass · 2 blocked) · בנק-הזיכרון 2 ממצאים (drift+fact) עם 6 קריאות אמיתיות · policy autoApprove=2/יום·≤4 · lint נקי · docs/autonomy-audit.md עודכן (#7/#8 ✅ + סעיף 3b).
+
+Stage Summary:
+- שתי המגבלות-הפתוחות האחרונות נפתרו בקוד חי ומאומת: הצי עכשיו יוזם (הסוכן מציע — הגבול מחליט) ולומד-יחד (ממצא סופי נרשם פעם-אחת ומלמד כל ריצה עתידית).
+- "מה עוד מגביל אותנו" — התשובה הכנה היחידה שנותרה במסמך-הביקורת: חתימה ריבונית מבוקרת (steem-order לא-חתום + אישור-מפעיל) — הצעד-הפתוח הבא בסדר-ערך.
+- קבצים: prisma/schema.prisma · src/lib/gate/harness/{modules,loop,heart}.ts · src/app/api/gate/{proposals,memory,heart}/route.ts · src/app/page.tsx · docs/autonomy-audit.md · db/custom.db.

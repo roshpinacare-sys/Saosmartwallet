@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { requireOperator } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { GateError } from "@/lib/gate/crypto";
-import { readPulse, HEART_CONSTANTS, tickOnce } from "@/lib/gate/harness/heart";
+import { readPulse, HEART_CONSTANTS, tickOnce, readProposalPolicy } from "@/lib/gate/harness/heart";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await requireOperator();
-    const [pulse, queued, running, schedules, triggers, events, cfg, agents] = await Promise.all([
+    const [pulse, queued, running, schedules, triggers, events, cfg, agents, proposals, policy, checkerRow] = await Promise.all([
       readPulse(),
       db.gateRun.count({ where: { status: "queued" } }),
       db.gateRun.count({ where: { status: "running" } }),
@@ -25,7 +25,12 @@ export async function GET() {
       db.gateEvent.findMany({ orderBy: { createdAt: "desc" }, take: 12 }),
       db.gateConfig.findUnique({ where: { id: "gate" }, select: { autonomyEnabled: true } }),
       db.gateAgent.findMany({ where: { active: true }, select: { name: true, autonomy: true, lastSeenAt: true, brain: true }, orderBy: { createdAt: "asc" } }),
+      db.gateProposal.findMany({ orderBy: { createdAt: "desc" }, take: 15 }),
+      readProposalPolicy(),
+      db.gateState.findUnique({ where: { key: "checkerstats" } }),
     ]);
+    let checkerStats: unknown = null;
+    try { checkerStats = checkerRow ? JSON.parse(checkerRow.value) : null; } catch { checkerStats = null; }
     return ok({
       pulse,
       constants: HEART_CONSTANTS,
@@ -35,6 +40,9 @@ export async function GET() {
       triggers: triggers.map((t) => ({ ...t, doneMeans: JSON.parse(t.doneMeans || "[]") })),
       events: events.map((e) => ({ ...e, payload: e.payload ? JSON.parse(e.payload) : null })),
       agents,
+      proposals,
+      proposalPolicy: policy,
+      checkerStats,
     });
   } catch (e) {
     return fail(e);

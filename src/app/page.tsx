@@ -25,7 +25,7 @@ import {
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
-  Smartphone, Unplug, HeartPulse, Clock, Zap,
+  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain,
 } from "lucide-react";
 
 /* ══════════════════════════ auth plumbing ══════════════════════════ */
@@ -111,8 +111,12 @@ interface ActionRow { id: string; agentName: string; action: string; params: str
 interface ScheduleRow { id: string; label: string; agentName: string; goal: string; kind: string; everyMs: number | null; hourUtc: number | null; budget: number; maxPerDay: number; dayCount: number; dayKey: string | null; enabled: boolean; lastRunAt: string | null; nextRunAt: string }
 interface EventRow { id: string; type: string; payload: { agent?: string; body?: string; goal?: string; gaps?: string; by?: string } | null; source: string; consumed: boolean; createdAt: string }
 interface TriggerRow { id: string; on: string; agentName: string; goalTemplate: string; budget: number; cooldownMs: number; maxPerDay: number; dayCount: number; enabled: boolean }
-interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; eventsSeen: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
-interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[] }
+interface ProposalRow { id: string; agentName: string; goal: string; rationale: string | null; doneMeans: string; budget: number; status: string; decidedBy: string | null; runId: string | null; createdAt: string; decidedAt: string | null }
+interface ProposalPolicyRow { autoApprove: boolean; maxAutoPerDay: number; maxBudget: number }
+interface CheckerStatsRow { verdicts: number; firstPass: number; repairPass: number; blocked: number; errors: number }
+interface MemoryRow { id: string; key: string; kind: string; body: string; source: string; refCount: number; updatedAt: string }
+interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
+interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[]; proposals?: ProposalRow[]; proposalPolicy?: ProposalPolicyRow; checkerStats?: CheckerStatsRow | null }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -130,8 +134,12 @@ const ENDPOINTS: Ep[] = [
   { method: "GET", path: "/api/gate/modules", desc: "מחסן-המודולים לחימוש סוכנים", auth: "operator" },
   { method: "POST", path: "/api/gate/run", desc: "הרצת מטרה עם לולאת-חוכמה (מייצר + בודק עצמאי + לקחים)", auth: "operator", body: '{ "agentName": "…", "goal": "…", "doneMeans": ["…"] }' },
   { method: "GET", path: "/api/gate/run", desc: "יומן הרצות + יעילות-צי אמיתית", auth: "operator" },
-  { method: "GET", path: "/api/gate/heart", desc: "דופק לב-האוטונומיה: סיורים, טריגרים, אירועים ותור", auth: "operator" },
+  { method: "GET", path: "/api/gate/heart", desc: "דופק לב-האוטונומיה: סיורים, טריגרים, יוזמות, אירועים ותור", auth: "operator" },
   { method: "POST", path: "/api/gate/heart", desc: "מתג-הפסק לאוטונומיה (kill-switch)", auth: "operator", body: '{ "autonomyEnabled": false }' },
+  { method: "GET", path: "/api/gate/proposals", desc: "תור יוזמות-היעד שהסוכנים הציעו + המדיניות המרוסנת", auth: "operator" },
+  { method: "PATCH", path: "/api/gate/proposals", desc: "הכרעת הצעת-יעד: אישור מזניק ריצה אמיתית (origin=proposal)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
+  { method: "PUT", path: "/api/gate/proposals", desc: "מדיניות-יוזמות: אישור-אוטומטי מרוסן (מקס-יומי + תקציב)", auth: "operator", body: '{ "autoApprove": true, "maxAutoPerDay": 2, "maxBudget": 4 }' },
+  { method: "GET", path: "/api/gate/memory", desc: "זיכרון-הצי: בנק-הממצאים הסופיים המשותף", auth: "operator" },
   { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
   { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
   { method: "POST", path: "/api/gate/device", desc: "חימוש מכשיר-מהימן (זכור אותי בצורה בטוחה)", auth: "operator", body: '{ "label": "Chrome · Windows" }' },
@@ -1029,6 +1037,7 @@ const HEART_TICK_MS_CLIENT = 20000;
 function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   const [h, setH] = useState<HeartData | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mem, setMem] = useState<MemoryRow[]>([]);
 
   /* patrol form */
   const [label, setLabel] = useState("");
@@ -1042,11 +1051,15 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     const r = await apiJson<HeartData>("/api/gate/heart");
     if (r?.ok) setH(r);
   }, []);
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  const loadMem = useCallback(async () => {
+    const r = await apiJson<{ ok: boolean; facts?: MemoryRow[] }>("/api/gate/memory");
+    if (r?.ok) setMem(r.facts || []);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); }, [load, loadMem]);
   useEffect(() => {
-    const t = setInterval(() => { load(); }, 8000);
+    const t = setInterval(() => { load(); loadMem(); }, 8000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, loadMem]);
 
   async function toggleAutonomy(v: boolean) {
     setBusy(true);
@@ -1090,6 +1103,26 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     } finally { setBusy(false); }
   }
 
+  async function decideProposal(id: string, decision: "approve" | "reject") {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; runId?: string; error?: string }>("/api/gate/proposals", { method: "PATCH", body: JSON.stringify({ id, decision }) });
+      if (r?.ok) {
+        toast.success(decision === "approve" ? "ההצעה אושרה — ריצת-יעד אמיתית מזנקת" : "ההצעה נדחתה — הסוכן רואה זאת בגשר");
+        await load();
+      } else toast.error(r?.error || "ההכרעה נכשלה");
+    } finally { setBusy(false); }
+  }
+
+  async function togglePolicy(v: boolean) {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>("/api/gate/proposals", { method: "PUT", body: JSON.stringify({ autoApprove: v }) });
+      if (r?.ok) { toast.success(v ? "יוזמות אוטומטיות מרוסנות הופעלו" : "יוזמות ממתינות לאישור שלך בלבד"); await load(); }
+      else toast.error(r?.error || "עדכון המדיניות נכשל");
+    } finally { setBusy(false); }
+  }
+
   const beatAgeS = h?.pulse?.lastTickAt ? Math.max(0, Math.round((Date.now() - new Date(h.pulse.lastTickAt).getTime()) / 1000)) : null;
   const beatState = !h?.pulse ? "dark" : beatAgeS !== null && beatAgeS <= HEART_TICK_MS_CLIENT / 1000 * 3 ? "ok" : beatAgeS !== null && beatAgeS <= 120 ? "warn" : "stall";
   const c = h?.pulse?.counters;
@@ -1110,6 +1143,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
         </div>
         <p className="text-[11px] text-zinc-500 leading-relaxed mb-4">
           הסוכנים קמים לבד: סיורים מתוכננים (קצב אמיתי שנשמר ב-DB) · טריגרים שמגיבים לאירועים בגשר ולריצות שנחסמו ·
+          יוזמות-יעד מרוסנות — הסוכן מציע, הגבול מחליט · זיכרון-צי משותף — ממצא סופי נרשם פעם-אחת ומלמד את כל הצי ·
           חוזי-חכירה שמשיבים ריצות קרוסות מהעקבות שנשמרו · והכול מרוסן — תקציב-צעדים, מקסימום-יומי, קירור בין-הפעלות, ומוח-בודק שונה.
         </p>
 
@@ -1127,6 +1161,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               <span className="text-emerald-400/80" title="ריצות שהתאוששו מקריסה">recovered {c.recovered}</span>
               <span title="סיורים שהוזנקו מתוכננים">patrols {c.schedulesFired}</span>
               <span title="ריצות שהוזנקו מטריגרי-אירוע">triggers {c.triggersFired}</span>
+              <span title="יוזמות-יעד שהוזנקו מהצעות סוכנים">initiatives {c.proposalsFired}</span>
               <span title="ריצות קרוסות שהשומר החזיר לתור">reaped {c.reaped}</span>
             </span>
           )}
@@ -1191,6 +1226,77 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* goal initiative (proposals) + fleet memory */}
+        <div className="grid gap-4 lg:grid-cols-2 mt-4">
+          <div>
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <p className="text-xs text-zinc-400 flex items-center gap-1.5">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-300" />
+                יוזמות-יעד מהסוכנים ({h?.proposals?.filter((p) => p.status === "pending").length ?? 0} ממתינות)
+              </p>
+              <label className="flex items-center gap-1.5 text-[10px] text-zinc-400 cursor-pointer">
+                <Switch checked={h?.proposalPolicy?.autoApprove ?? false} disabled={busy || !h} onCheckedChange={togglePolicy} aria-label="מתג אישור-אוטומטי ליוזמות" />
+                {h?.proposalPolicy
+                  ? h.proposalPolicy.autoApprove
+                    ? `אוטומטי מרוסן · ${h.proposalPolicy.maxAutoPerDay}/יום · תקציב ≤${h.proposalPolicy.maxBudget}`
+                    : "רק באישור שלך"
+                  : "…"}
+              </label>
+            </div>
+            <div className="max-h-56 overflow-y-auto scroll-thin space-y-2 pl-1">
+              {h && h.proposals && h.proposals.map((p) => (
+                <div key={p.id} className={"rounded-xl border px-3 py-2.5 " + (p.status === "pending" ? "border-amber-500/30 bg-amber-500/5" : "border-zinc-800 bg-black/40")}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (p.status === "pending" ? "text-amber-300 border-amber-500/40" : p.status === "launched" ? "text-emerald-300 border-emerald-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{p.status}</Badge>
+                    <span className="text-[11px] font-mono text-zinc-400 shrink-0">{p.agentName}</span>
+                    <span className="text-[10px] text-zinc-600 font-mono shrink-0" dir="ltr">budget {p.budget}</span>
+                    {p.decidedBy && <span className="text-[9px] text-zinc-600 shrink-0">הוכרע ע&quot;י {p.decidedBy === "operator" ? "המפעיל" : "המדיניות"}</span>}
+                    {p.status === "pending" && (
+                      <span className="mr-auto flex gap-1.5">
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-emerald-300 hover:bg-emerald-500/10" disabled={busy} onClick={() => decideProposal(p.id, "approve")}>אישור</Button>
+                        <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2 text-rose-300 hover:bg-rose-500/10" disabled={busy} onClick={() => decideProposal(p.id, "reject")}>דחייה</Button>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-300 mt-1.5 leading-snug">&quot;{p.goal}&quot;</p>
+                  {p.rationale && <p className="text-[10px] text-zinc-500 mt-1">נימוק: {p.rationale}</p>}
+                  {p.runId && <p className="text-[9px] font-mono text-zinc-600 mt-1" dir="ltr">run {p.runId.slice(0, 12)}…</p>}
+                </div>
+              ))}
+              {h && (!h.proposals || h.proposals.length === 0) && (
+                <p className="text-xs text-zinc-600 py-4 text-center">אין הצעות — סוכן חמוש ב-goal.propose יכול להציע מטרה מיוזמתו, והגבול מחליט</p>
+              )}
+              {!h && <p className="text-xs text-zinc-600 py-4 text-center">טוען יוזמות…</p>}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-zinc-400 flex items-center gap-1.5 mb-2">
+              <Brain className="h-3.5 w-3.5 text-purple-300" />
+              זיכרון-הצי ({mem.length} ממצאים סופיים)
+            </p>
+            <div className="max-h-56 overflow-y-auto scroll-thin space-y-1.5 pl-1">
+              {mem.map((f) => (
+                <div key={f.id} className="rounded-lg border border-zinc-800/80 bg-black/40 px-2.5 py-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (f.kind === "drift" ? "text-amber-300 border-amber-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{f.key}</Badge>
+                    <span className="text-[9px] text-zinc-600">by {f.source}</span>
+                    {f.refCount > 0 && <span className="text-[9px] text-emerald-400/70">{f.refCount} קריאות</span>}
+                    <span className="text-[9px] text-zinc-600 font-mono mr-auto shrink-0">{new Date(f.updatedAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 mt-1 leading-snug">{f.body}</p>
+                </div>
+              ))}
+              {mem.length === 0 && <p className="text-xs text-zinc-600 py-4 text-center">הבנק ריק — ממצא סופי ראשון יירשם כשסוכן יגלה אותו, ואז כל הצי ייהנה ממנו</p>}
+            </div>
+            {h?.checkerStats && h.checkerStats.verdicts > 0 && (
+              <p className="text-[10px] text-zinc-500 mt-2 font-mono" dir="ltr">
+                checker gate: {h.checkerStats.verdicts} verdicts · {Math.round(((h.checkerStats.firstPass + h.checkerStats.repairPass) / h.checkerStats.verdicts) * 100)}% pass ({h.checkerStats.firstPass} first-try · {h.checkerStats.repairPass} repaired) · {h.checkerStats.blocked} blocked{h.checkerStats.errors ? ` · ${h.checkerStats.errors} errors` : ""}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1553,7 +1659,7 @@ function Agents() {
                   <span className={"h-2 w-2 rounded-full shrink-0 " + (r.status === "done" ? "bg-emerald-400" : r.status === "blocked" ? "bg-amber-400" : r.status === "failed" ? "bg-rose-400" : "bg-zinc-500 animate-pulse")} aria-hidden />
                   <span className="font-mono text-xs text-zinc-300" dir="ltr">{r.agentName}</span>
                   {r.origin && r.origin !== "manual" && (
-                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (r.origin === "schedule" ? "text-sky-300 border-sky-500/40" : "text-amber-300 border-amber-500/40")} dir="ltr">{r.origin === "schedule" ? "⏰ סיור" : "⚡ טריגר"}</Badge>
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (r.origin === "schedule" ? "text-sky-300 border-sky-500/40" : r.origin === "proposal" ? "text-purple-300 border-purple-500/40" : "text-amber-300 border-amber-500/40")} dir="ltr">{r.origin === "schedule" ? "⏰ סיור" : r.origin === "proposal" ? "💡 יוזמה" : "⚡ טריגר"}</Badge>
                   )}
                   {(r.attempt ?? 0) > 1 && <Badge variant="outline" className="text-[9px] font-mono text-emerald-300 border-emerald-500/40 shrink-0" dir="ltr">🫀 התאושש</Badge>}
                   <span className="text-xs text-zinc-500 truncate max-w-[40%]">{r.goal}</span>

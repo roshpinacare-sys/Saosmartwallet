@@ -93,7 +93,7 @@ function extractJson<T>(raw: string): T {
   throw new GateError("bad-brain-json", "המוח לא החזיר JSON תקין");
 }
 
-function makerSystemPrompt(goal: string, doneMeans: string[], modules: string[], lessons: string[] = []): string {
+function makerSystemPrompt(goal: string, doneMeans: string[], modules: string[], lessons: string[] = [], fleetFacts: string[] = []): string {
   const lines = [
     "You are the MAKER inside a goal-loop harness (SAOS SOVEREIGN GATE).",
     "You act ONLY through tools; you NEVER claim a result without a tool observation proving it.",
@@ -105,6 +105,13 @@ function makerSystemPrompt(goal: string, doneMeans: string[], modules: string[],
     "YOUR MODULES:",
     modulesForPrompt(modules) || "(none armed — report that honestly)",
   ];
+  if (fleetFacts.length) {
+    lines.push(
+      "",
+      "FLEET MEMORY — what the fleet ALREADY proved (final findings; do NOT re-research these, use memory.read for the full bank):",
+      ...fleetFacts.slice(0, 3).map((f, i) => `${i + 1}. ${f}`),
+    );
+  }
   if (lessons.length) {
     lines.push(
       "",
@@ -327,6 +334,16 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
   if (recovering) {
     try { steps = JSON.parse(run.steps || "[]"); } catch { steps = []; }
   }
+  // fleet memory — the shared bank, injected into the maker's FIRST prompt:
+  // what the fleet already proved is not worth another paid probe.
+  let fleetFacts: string[] = [];
+  try {
+    const mem = await db.gateMemory.findMany({ orderBy: { updatedAt: "desc" }, take: 3 });
+    fleetFacts = mem.map((r) => `${r.key} — ${r.body.slice(0, 220)}`);
+    if (mem.length) {
+      void db.gateMemory.updateMany({ where: { id: { in: mem.map((r) => r.id) } }, data: { refCount: { increment: 1 } } }).catch(() => {});
+    }
+  } catch { /* empty bank is fine */ }
   const toolCache = new Map<string, unknown>();
   const startedAt = Date.now();
   let tokPrompt = 0;
@@ -345,7 +362,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     /** One maker turn (brain call), with the free protocol-rescue. Returns null after unrecoverable garbage. */
     async function makerTurn(userContent: string): Promise<{ call: MakerCall | null; rescued: boolean }> {
       const base: ChatMsg[] = [
-        { role: "system", content: makerSystemPrompt(run.goal, doneMeans, modules, lessons) },
+        { role: "system", content: makerSystemPrompt(run.goal, doneMeans, modules, lessons, fleetFacts) },
         { role: "user", content: userContent },
       ];
       const reply = await brainChat(makerSpec, base, { maxTokens: 800, temperature: 0.2 });
@@ -442,6 +459,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     } catch (e) {
       steps.push({ i: steps.length + 1, side: "checker", ok: false, error: e instanceof Error ? e.message : String(e), at: new Date().toISOString() });
       await saveRun(runId, { steps });
+      void bumpCheckerStats("error");
     }
 
     /* ── bounded critic-loop: gaps go BACK to the maker, then one re-check ── */
@@ -465,10 +483,14 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
         steps.push({ i: steps.length + 1, side: "checker", ok: verdict2.done, result: verdict2, at: new Date().toISOString() });
         verdict = verdict2;
         await saveRun(runId, { steps, verdict });
+        void bumpCheckerStats(verdict2.done ? "repair-pass" : "blocked");
       } catch (e) {
         steps.push({ i: steps.length + 1, side: "checker", ok: false, error: e instanceof Error ? e.message : String(e), at: new Date().toISOString() });
         await saveRun(runId, { steps });
+        void bumpCheckerStats("error");
       }
+    } else if (verdict) {
+      void bumpCheckerStats(verdict.done ? "first-pass" : "blocked");
     }
 
     /* ── status: the (final) pass-gate rules, not the maker ── */
@@ -482,7 +504,8 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
       `🎯 מטרה: ${run.goal}`,
     ];
     if (run.origin !== "manual") {
-      lines.push(`🧬 מקור: ${run.origin === "schedule" ? "⏰ סיור מתוכנן (לב-האוטונומיה)" : "⚡ טריגר אירוע"}${recovering ? " · התאוששות מקריסה" : ""}`);
+      const originText = run.origin === "schedule" ? "⏰ סיור מתוכנן (לב-האוטונומיה)" : run.origin === "proposal" ? "💡 יוזמת-יעד (הסוכן הציע — הגבול אישר)" : "⚡ טריגר אירוע";
+      lines.push(`🧬 מקור: ${originText}${recovering ? " · התאוששות מקריסה" : ""}`);
     } else if (recovering) {
       lines.push("🫀 התאוששות-מקריסה — העקבות חודשו מה-DB");
     }
@@ -506,6 +529,9 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
       tokens: usageKnown ? { prompt: tokPrompt, completion: tokCompletion } : null,
     });
 
+    /* ── fleet memory: a final finding recorded here teaches every future run ── */
+    await harvestFleetMemory(run.agentName, runId, steps);
+
     /* ── emit the terminal event — the nervous system may react (bounded) ── */
     await emitEvent(
       status === "done" ? "run.done" : "run.blocked",
@@ -525,6 +551,54 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
       data: { channel: "command", fromKind: "system", fromName: "harness", body: `🛑 הרצת-מטרה של ${run.agentName} נפלה: ${msg.slice(0, 400)}`, meta: JSON.stringify({ runId }) },
     }).catch(() => {});
   }
+}
+
+/**
+ * Fleet-memory auto-harvest: when a run produces a FINAL finding the whole
+ * fleet must know (today: identity.anchor drift), the harness records it ONCE
+ * under a canonical key — no agent pays for that probe again. Fire-safe:
+ * memory must never break the loop.
+ */
+async function harvestFleetMemory(agentName: string, runId: string, steps: TraceStep[]): Promise<void> {
+  try {
+    for (const s of steps) {
+      if (s.side !== "maker" || !s.ok || s.tool !== "identity.anchor") continue;
+      const r = s.result as { drift?: boolean; username?: string; finding?: string } | undefined;
+      if (!r?.drift) continue;
+      const user = String(r.username || "headcorner").toLowerCase();
+      const body = String(r.finding || "סטיית-authority מאומתת — המפתח-הפעיל החי נגזר לכתובת אחרת מהעיגון").slice(0, 500);
+      await db.gateMemory.upsert({
+        where: { key: `drift:${user}` },
+        create: { key: `drift:${user}`, kind: "drift", body, source: agentName, runId },
+        update: { body, source: agentName, runId },
+      });
+    }
+  } catch { /* memory must never break the loop */ }
+}
+
+/**
+ * Checker telemetry — the verdicts are a cost center too (audit #3 in the
+ * roadmap): how often the independent checker passes runs first-try, how
+ * often a repair round saves them, how often runs end blocked, how often the
+ * checker itself errors. "Is the gate precise or over-strict" becomes data.
+ */
+export interface CheckerStats { verdicts: number; firstPass: number; repairPass: number; blocked: number; errors: number }
+export async function bumpCheckerStats(kind: "first-pass" | "repair-pass" | "blocked" | "error"): Promise<void> {
+  try {
+    const row = await db.gateState.findUnique({ where: { key: "checkerstats" } });
+    let s: CheckerStats = { verdicts: 0, firstPass: 0, repairPass: 0, blocked: 0, errors: 0 };
+    try { if (row) s = { ...s, ...(JSON.parse(row.value) as Partial<CheckerStats>) }; } catch { /* fresh */ }
+    s.verdicts++;
+    if (kind === "first-pass") s.firstPass++;
+    else if (kind === "repair-pass") s.repairPass++;
+    else if (kind === "blocked") s.blocked++;
+    else s.errors++;
+    await db.gateState.upsert({
+      where: { key: "checkerstats" },
+      create: { key: "checkerstats", value: JSON.stringify(s) },
+      update: { value: JSON.stringify(s) },
+    });
+  } catch { /* telemetry must never break the loop */ }
 }
 
 /** Distill cross-run lessons from this agent's past runs — external memory, real data. */
