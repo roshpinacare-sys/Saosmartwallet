@@ -8,7 +8,7 @@
  * keys even right after a server restart. No passphrase involved.
  */
 import crypto from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
 import { sha256hex, randomToken, GateError, Seal, sealWith, openWith, deriveKek } from "./crypto";
 
@@ -46,9 +46,35 @@ export async function createSession(kind: string, name: string, scopes: string[]
   return token;
 }
 
+/**
+ * The session token travels in the `gate_session` cookie AND (equally valid)
+ * in the `x-gate-token` request header. The header path exists because the
+ * sandbox preview runs the app inside a cross-origin iframe where browsers
+ * drop SameSite cookies — which made login "succeed" while every following
+ * call arrived cookie-less (the "התחברתי זה לא עשה כלום" bug).
+ * Header first, cookie as fallback. Raw token never touches the DB (hash only).
+ */
+async function currentToken(): Promise<string | null> {
+  try {
+    const h = await headers();
+    const bearer = h.get("authorization");
+    if (bearer?.startsWith("Bearer ")) {
+      const t = bearer.slice(7).trim();
+      if (t) return t;
+    }
+    const xt = h.get("x-gate-token");
+    if (xt?.trim()) return xt.trim();
+  } catch { /* headers() unavailable outside request scope */ }
+  try {
+    const jar = await cookies();
+    return jar.get(GATE_COOKIE)?.value || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getSession(): Promise<SessionInfo | null> {
-  const jar = await cookies();
-  const token = jar.get(GATE_COOKIE)?.value;
+  const token = await currentToken();
   if (!token) return null;
   const row = await db.gateSession.findUnique({ where: { tokenHash: sha256hex(token) } });
   if (!row || row.revoked || row.expiresAt.getTime() < Date.now()) return null;
@@ -63,8 +89,7 @@ export async function getSession(): Promise<SessionInfo | null> {
  * no key re-entry — "פשוט להתחבר ולעבוד"). Returns null when impossible.
  */
 export async function openSessionMaster(): Promise<Buffer | null> {
-  const jar = await cookies();
-  const token = jar.get(GATE_COOKIE)?.value;
+  const token = await currentToken();
   if (!token) return null;
   const row = await db.gateSession.findUnique({ where: { tokenHash: sha256hex(token) } });
   if (!row || row.revoked || row.expiresAt.getTime() < Date.now() || !row.encMaster || !row.sealSalt) return null;
@@ -91,12 +116,14 @@ export async function requireOperator(): Promise<SessionInfo> {
 }
 
 export async function revokeSession() {
-  const jar = await cookies();
-  const token = jar.get(GATE_COOKIE)?.value;
+  const token = await currentToken();
   if (token) {
     await db.gateSession.updateMany({ where: { tokenHash: sha256hex(token) }, data: { revoked: true } });
   }
-  jar.delete(GATE_COOKIE);
+  try {
+    const jar = await cookies();
+    jar.delete(GATE_COOKIE);
+  } catch { /* no request scope — header token already revoked */ }
 }
 
 /** Bearer-token auth for attached agents. Returns agent row or throws. */

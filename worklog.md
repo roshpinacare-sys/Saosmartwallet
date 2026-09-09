@@ -929,3 +929,24 @@ Stage Summary:
 - עמודות סשן חדשות בשימוש: encMaster/sealSalt — העותק החתום של מפתח-האב חי בסשן בלבד, הטוקן רק ב-cookie (httpOnly), ה-DB לבדו חסר-תועלת.
 - קבצים: prisma/schema.prisma · src/lib/gate/{crypto,session,key-id}.ts · src/app/api/gate/{login,reveal}/route.ts (חדשים) · status/inventory (wake) · page.tsx (מחדש).
 - אימות: lint נקי; כל הזרימות נבדקו מקצה-לקצה ב-API ובדפדפן אמיתי; אפס מפתחות-גלוי בגיט.
+
+---
+Task ID: 4
+Agent: main (Z.ai Code)
+Task: דיווח משתמש "זה לא עובד / התחברתי ולא קרה כלום" — אבחון שורש, תיקון אימות, UI חדש לחלוטין שחושף הכל, push דחוף.
+
+Work Log:
+- אבחון שורש ב-dev.log: POST /api/gate/login חזר 200 אך מיד אחריו GET inventory/agents/messages חזרו 400 operator-only. הסיבה: ב-preview (iframe חוצה-מקור) הדפדפן זורק קוקי SameSite=Lax — ההתחברות "הצליחה" אך כל קריאה הבאה הגיעה ללא קוקי.
+- תיקון אימות דו-ערוצי ב-session.ts: currentToken() קורא x-gate-token / Authorization: Bearer קודם, קוקי כגיבוי; getSession/openSessionMaster/revokeSession עודכנו.
+- login/unlock-key/unlock/setup/reset מחזירים עכשיו את טוקן-הסשן בתשובה; ה-UI שומר ב-localStorage ושולח בכל קריאה.
+- page.tsx נכתב מחדש לגמרי — קונסולת-פיקוד כהה (zinc-950), RTL, סרגל-צד: סקירה (טיילים חיים+שרשרות+פעילות), מפתחות (96 רשומות, אימות-חי, הצג/הסתר/העתק, זיהוי+שמירת מפתח חדש), סוכנים (יצירה/טוקן-חד-פעמי/שלילה/מדריך-API אמיתי), צ'אט-פיקוד (poll 5s), ביקורת (actions), מסוף-API חי עם 20 endpoints אמיתיים מהקוד והרצה בלחיצה; פוטר דביק; מובייל-פירסט.
+- lint: תוקן react-hooks/set-state-in-effect ב-Overview/Audit (microtask); נקי.
+- Agent Browser end-to-end: מסך-נעילה → כניסה עם STEEM posting WIF חי → קונסולה; סקירה (פתוחה/96/8 חותמות/שרשרות ירוקות); מפתחות 96 רשומות; הצג מפתח → פענוח חי + הסתר; סוכן ui-verify נוצר, טוקן הוצג פעם-אחת, כתב לצ'אט והריץ report.status דרך curl עם הטוקן; צ'אט מפעיל נשלח ומוצג; ביקורת מציגה report.status; מסוף-API הריץ status חי; נעילה → חזרה למסך-נעילה + טוקן נמחק מ-localStorage; מובייל 390px — כניסה, 96 מפתחות, פוטר דביק. אפס שגיאות-קונסולה.
+- ui-verify שולל אחרי הבדיקה (ביקורת נשמרת). WARN "Expecting 32 bytes, instead got 33" זוהה כהודעה שגרתית של ספריית steem על WIF דחוס — לא מזיק.
+- סריקת diff לפני push: אפס מפתחות-גלויים; upload/ ו-backups/ gitignored.
+
+Stage Summary:
+- הבאג "התחברתי ולא קרה כלום" נפתר מהשורש: אימות בכותרת (x-gate-token) עמיד ל-iframe/קוקים-חסומים; הקוקי נשאר גיבוי.
+- UI חדש לחלוטין: קונסולת-פיקוד כהה שחושפת כל יכולת אמיתית בקוד — כניסה, כספת, צפייה במפתחות, סוכנים+API, צ'אט, ביקורת, מסוף-API.
+- קבצים: src/lib/gate/session.ts · src/app/api/gate/{login,unlock-key,unlock,setup,reset}/route.ts · src/app/page.tsx · db/custom.db.
+- כל הזרימות אומתו בדפדפן אמיתי בדסקטופ ומובייל; lint נקי; אפס חומר-סודי בדיף.
