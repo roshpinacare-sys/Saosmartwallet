@@ -65,9 +65,33 @@ model GateAgent {
   name       String    @unique
   tokenHash  String    @unique // sha256 of bearer token (token shown once at creation)
   memo       String?
+  modules    String? // JSON array of harness-module ids the agent is armed with (skills/connectors)
+  brain      String? // brain spec "provider:model" — nvidia:openai/gpt-oss-20b | zai:default
   active     Boolean   @default(true)
   createdAt  DateTime  @default(now())
   lastSeenAt DateTime  @default(now())
+}
+
+// Harness runs — external state: the loop's memory lives HERE (system of record),
+// never only inside a model's context window. Goal + done-means + full evidence trace.
+model GateRun {
+  id         String    @id @default(cuid())
+  agentName  String
+  goal       String
+  doneMeans  String // JSON array — done-criteria contract (what "done" concretely means)
+  modules    String // JSON array of module ids armed for this run
+  brain      String // maker brain spec "provider:model"
+  checker    String   // checker brain spec — ALWAYS a different brain than maker (generator/evaluator separation)
+  budget     Int // max maker steps (token-blowout guard)
+  status     String // queued | running | done | blocked | failed
+  verdict    String? // JSON — independent checker verdict {done, checks[], gaps, notes}
+  steps      String? // JSON array — append-only evidence trace [{i,thought,tool,args,ok,result,at}]
+  report     String? // final Hebrew report written to the command bridge
+  error      String?
+  createdAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([createdAt])
 }
 
 // The shared chat feed — operator + agents write here

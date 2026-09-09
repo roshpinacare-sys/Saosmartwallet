@@ -967,3 +967,24 @@ Stage Summary:
 - התוצר: SOVEREIGN VAULT — חוויית-כספת קינמטית אחת שמבצעת את כל מה שנבנה בתיקיה: חיבור-ואימות-חי, פענוח מפתחות בלחיצה, הזרקת מפתח, סוכנים, פיקוד, ביקורת, API, חירום.
 - קובץ: src/app/page.tsx (מחדש). אפס שינויי-API/DB — רק השכבה החזותית.
 - lint נקי; כל הזרימות אומתו בדפדפן אמיתי; אפס חומר-סודי בקוד.
+
+---
+Task ID: 6
+Agent: main (Z.ai Code)
+Task: "בחן איך לחמש את הסוכנים במודולים הכי נכונים ואיך ליישם את זה נכון מאוד כדי לפעול חכם מאוד" — לימוד walkinglabs/learn-harness-engineering, בניית HARNESS אמיתי לסוכני השער (מוח NVIDIA NIM מהמפתח שהעלה המפעיל ב-nvid.evm.txt), UI מחסן-חימוש, ו-push.
+
+Work Log:
+- נלמד הקורס (8 הרצאות EN + צ'קליסטים מקוד-המקור שלו): לולאת-מטרה = מטרה+שיטת-אימות+תנאי-עצירה · הפרדת מייצר/בודק ("מישהו בצוות חייב לא להאמין לך") · state-חוץ ב-repo ולא בהקשר · feature-list כשער-מעבר עם ראיות · תצפיתנות בתוך ה-harness · תקציב-צעדים נגד token-blowout.
+- מוח אמיתי כפול: NVIDIA NIM (integrate.api.nvidia.com — אומת חי; 80 מודלים; gpt-oss-20b מחזיר JSON-כלים נקי) עם מפתח שנאטם בכספת בשימוש-ראשון (VaultEntry chain=nvidia — פריט 97! אפס טקסט-גלוי בrepo) · z-ai-web-dev-sdk כפרוביידר שני.
+- schema: GateAgent += modules/brain · טבלת GateRun חדשה (מטרה, doneMeans, מודולים, brain+checker, budget, status, verdict, steps=עקבות-ראיות, report) — הזיכרון-חוץ של הלולאה.
+- src/lib/gate/harness/: brain.ts (פרוטוקול-כלים JSON, retry, pickCheckerBrain שאוכף מוח-שונה) · modules.ts (7 מודולים אמיתיים: vault.map/vault.verify/vault.stats/chain.steem(אדפטר האמיתי)/web.search/web.read/chat.report) · loop.ts (לולאת-מטרה: מייצר→כלי→התבוננות→עקבות-נשמרות-כל-צעד→בודק עצמאי פוסק לפי קריטריונים-עם-ראיות→דוח עברית לגשר; audit לכל קריאת-כלי).
+- API: GET /api/gate/modules (מדף+קטלוג-מוחות+מצב-מפתח) · POST+GET /api/gate/run (הזנקה עם wake-כספת מהסשן, ריצה ברקע, polling) · agents POST/PATCH מחמשים בעת-צירוף ובעת-דרישה.
+- UI: מקטע 04 הפך למחסן-החימוש — מדף-מודולים (צ'יפים לחיצים=חימוש/פריקה מיידית לכל סוכן), בחירת-מוח עם חיווי מפתח-nvidia, מפעילת-מטרות (סוכן חמוש, מטרה, קריטריוני-סיום דינמיים, תקציב 3/5/8), עקבות-חיות ב-polling 2.5s (💭 מחשבות, קריאות-כלים עם ראיות מקופלות, פסיקת-בודק, דוח-סופי), יומן-הרצות; ApiConsole += modules/run.
+- תיקונים-תוך-כדי: modules היה JSON-string ב-DB (parse חד-פעמי) · restart-שרת השאיר כספת-נעולה ולכן אטימת-מפתח-nvidia נכשלה בריצה-ראשונה → wake-כספת מהעותק-החתום בסשן בעת הזנקה · client-prisma ישן אחרי db:push → restart-dev.
+- אימות-קצה-לקצה אמיתי: 3 ריצות-מטרה חיות — vault.verify (steemOk=true, 97/48/44), chain.steem (יתרות אמיתיות: 0.670 STEEM · 8,644,132.6 VESTS · 0.260 SBD), chat.report (הודעות-עברית בגשר), התאוששות-עצמית מקריאת-כלי ריקה (step4 "?"→step5 finish), בודק-עצמאי zai אישר done=true מול מייצר NIM · אודיט harness.* נרשם · בדפדפן: כניסה→מחסן→בחירת-סוכן→מטרה מה-UI→עקבות-חיות→פסיקה→דוח; מובייל 390px ללא גלילה-אופקית, פוטר בדיוק בתחתית; אפס שגיאות-קונסולה.
+
+Stage Summary:
+- הסוכנים של השער חמושים עכשיו באמת: מוח NIM חי + 7 מודולים אמיתיים + לולאת-מטרה עם בודק עצמאי וראיות-כלים — חכמים מאוד ולא רק טוקנים.
+- ההיגיון מוקפד לפי הקורס: אין ניצחון-עצמי (הבודק במוח אחר, באכיפה), הזיכרון ב-DB ולא בהקשר, תקציב-צעדים, אודיט מלא, ודוח עברית לגשר.
+- אפס סודות ב-git: מפתח-nvidia חי כצופן-GCM בלבד (פריט 97 בכספת, נראה ב-UI עם פילטר nvidia(1)); .env gitignored.
+- קבצים: prisma/schema.prisma · src/lib/gate/harness/{brain,modules,loop}.ts · src/app/api/gate/{modules,run}/route.ts · src/app/api/gate/agents/route.ts · src/app/page.tsx · db/custom.db.
