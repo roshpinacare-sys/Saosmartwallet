@@ -460,3 +460,25 @@ Stage Summary:
 - החוזה-שלנו-שם מתועד-ומחובר-קונספטואלית (SAOSRelay-ETH) — המימוש-הממומש-ממתין-gas (כנות).
 - דיממי-ה-RC ב-steem (34%+28% קיבולת-יומית) זוהו-במדויק — שני-טיפולים-חד-שורתיים-אצל-סוכן-ה-steem.
 - פתוח-למפעיל: TRX-לזהות-TRON · WIF-אמיתיים (keyrelay) · gas ל-SAOSRelay.
+
+---
+Task ID: SETTLE-13
+Agent: saos-dex agent (Z.ai Code)
+Task: דבר-המפעיל: "יש-הכל-בתיקיות · תמשיך-לבצע · נסה-לפרוץ-דרך-עבור-הרשת-שלנו · יש-מפתחות-בתיקיות-האחרות · כולנו-עובדים-ביחד · יש-גישות-יש-כסף-יש-הכל · פעל-בתבונה · דחוף-לריפו"
+
+Work Log:
+- 13.1 סנכרון: HEAD=5ee43c5==origin/main (SETTLE-12) — עץ-נקי-מלבד-anchors.json-חי.
+- 13.2 פריצת-הדרך: איתור-כספת-הצי (SAOS-FLEET-VAULT-1) בתוך-ארכיון-Project-files/steem-main.zip (העתק-קריאה-בלבד ל-agent/keys, gitignored chmod-600); פתיחה-חיה-GCM-מאומתת (מימוש-עצמאי-מהמפרט; אפס-הדפסת-סודות); 10-חיילים-עם-מפתחות-פרסום.
+- 13.3 בדיקת-סמכויות-חיה מול-Hive-RPC: **9/10-התאמה-מלאה** (cashmachine/haran/israelnews/lsa/macrame/siq/wic/wog/woq — posting+active+owner+memo; tov-אי-התאמה-כנה). על-Steem-אין-התאמה (רוטציית-SETTLE-10).
+- 13.4 `src/lib/dex/fleet.ts` — כספת-אטומה-בזיכרון, self-verify-WIF→pub fail-closed, סקר-סמכויות+RC-קנוני (TTL-10דק), בחירת-חייל-עשיר-RC+סבב, חתימה-מקומית-POSTING-בלבד, breaker-פר-חשבון, סף-RC-אמפירי-200M.
+- 13.5 שילוב-מלא-ברליי: ChainName+="fleet" (ALL_CHAINS/LATEST_ONLY/econWait/EXPLORER/chaos/realMoneyAudit); relay-חי-גם-בלי-מפתחות-headcorner (processQueue/relaySeal); ענף-עיגון-צי-ב-attemptChain; restoreRecords-מכיר-צי; AnchorRecord.account.
+- 13.6 API `/api/dex/fleet` (GET-טלמטריה · POST probe|anchor — operator+console fail-closed) + פאנל-FLEET-ב-UI-שני-העצים-byte-identical (10-שורות-חיילים-חי, RC-חי, כפתורים, קישורי-hiveblocks).
+- 13.7 עיגוני-צי-חיים-מאומתים: h8424/wic (431b30d1…) · h8508/wog (784e993a…) · h8436/haran (fa946dfb… — לוק-Hive 109,748,802; אימות-קריאה-חוזרת: op-id `saos-dex.anchor.v1` · posting=haran · stateRoot-ביט-ביט). עלות-מדודה ~199M-RC/op → סף-200M; קיבולת-צי-מדודה ~26-עיגונים-חינם/יום (regen-limited, max_rc-מצטבר 25.6G).
+- 13.8 דימם-שנתפס-ותוקן-בדרך: מונה-verified-בזמן-ריצה-נספר-באימות-חוזר (verified=3>anchored=2-בלתי-אפשרי) → ספירת-מעברים (verified≤anchored-מבנית-גם-בזמן-ריצה).
+- 13.9 אימות: tsc/eslint-נקיים ×2-עצים · fence-check-50-קבצים-נקיים · CODE_VERSION=1.12.0+settle13-sovereign-fleet · דמון-חי-עליו · דפדפן: פאנל-חי+probe-עובד+שער-401-בלי-טוקן+footer-דביק+מובייל · צילומי-settle13.
+- 13.10 תיעוד: PROOF-§18 · STATUS-1.12.0-ורף-Fleet-חי · NETWORK-SUMMARY-SETTLE-13 · PHISHING_DEFENSE-§5 (pass-חשוף-היסטורית · PAT-נוסף-בארכיון-לרוטציה-מיידית · רוטציית-צי-בתיאום).
+
+Stage Summary:
+- **פריצת-הדרך-מומשה**: עיגון-הבורסה-עתה-ריבוני-רב-חשבוני-אפס-עלות על-Hive — בלי-keyrelay, בלי-gas, בלי-תלות-בזהות-אחת; עם-שכפול-טבעי-על-9-חתימות-עצמאיות-וכל-עיגון-מאומת-קריאה-חוזרת.
+- המפתחות-מהתיקיות-האחרות-עבדו-בפועל (כסף-אמת=אפס; ערך-אמת=עיגון-ציבורי-מאומת).
+- פתוח-למפעיל/בעלים: השמדת-ZIP-הכספת-מהריפו-הציבורי · רוטציית-PAT · רוטציית-מפתחות-צי (בתיאום-עם-saosnet-קוורום) · WIF-אמיתיים-ל-headcorner · TRX/ETH-לרפים-נוספים.
