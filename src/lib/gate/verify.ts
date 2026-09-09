@@ -4,7 +4,7 @@
  */
 import { db } from "@/lib/db";
 import { openSecret } from "./crypto";
-import { chainPub, evmAddress, tronAddress, fetchChainAuthorityMap, FLEET_ACCOUNTS } from "./key-id";
+import { chainPub, evmAddress, tronAddress, solAddress, fetchChainAuthorityMap, FLEET_ACCOUNTS } from "./key-id";
 
 export interface EntryVerify {
   id: string;
@@ -52,6 +52,13 @@ async function verifyEntry(e: {
       const match = e.pub ? derived === e.pub : true;
       base.liveOk = match;
       base.detail = match ? `כתובת נגזרה תואמת לרישום: ${derived}` : `אי-התאמה: נגזר ${derived} אך הרישום ${e.pub}`;
+      return base;
+    }
+    if (e.kind === "sol-key") {
+      const derived = solAddress(priv.replace(/^0x/, ""));
+      const match = e.pub ? derived === e.pub : true;
+      base.liveOk = match;
+      base.detail = match ? `כתובת SOL נגזרה תואמת לרישום: ${derived}` : `אי-התאמה: נגזר ${derived} אך הרישום ${e.pub}`;
       return base;
     }
     if (e.kind === "mnemonic") {

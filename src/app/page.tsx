@@ -287,8 +287,8 @@ export default function SovereignGate() {
   const operatorIn = Boolean(status?.session);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-stone-950 text-stone-100">
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <div dir="rtl" className="flex min-h-screen flex-col bg-stone-950 text-stone-100">
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6">
         {/* header */}
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -373,7 +373,7 @@ export default function SovereignGate() {
         )}
 
         {/* unlock-by-key — the passphrase is never a single point of failure */}
-        {!operatorIn && status?.initialized && !unlocked && (
+        {!operatorIn && status?.initialized && (
           <Card className="mb-6 border-emerald-900/60 bg-emerald-950/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg text-emerald-200">
@@ -711,7 +711,7 @@ curl -X POST '<origin>/api/gate/actions' \\
           </CardContent>
         </Card>
 
-        <footer className="mt-8 pb-6 text-center text-xs text-stone-600">
+        <footer className="mt-auto border-t border-stone-900 pb-6 pt-6 text-center text-xs text-stone-600" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
           SOVEREIGN GATE · born from the headcorner incident (2026-09-08) · אפס-מפתחות-בטקסט-גלוי, מעכשיו והלאה
         </footer>
       </main>
