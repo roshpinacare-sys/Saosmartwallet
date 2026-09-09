@@ -781,3 +781,20 @@ Stage Summary:
 - Anchor series now FOUR live Ethereum mainnet commitments in one day (68058/69207/70171/71770), each under five chain clocks, gas model 5/5 exact — the sovereign chain has a repeated, verifiable on-chain heartbeat.
 - Resilience doctrine re-proven by the environment itself: two crashes, zero data loss, git always green, guardian loops always alive.
 - Next steps unchanged and prioritized: owner STEEM key re-sync (unlocks STEEM/HIVE rails), npm publish (owner-only), public BASE_URL, vault-verify investigation, periodic anchors.
+
+---
+Task ID: CONTINUE-3
+Agent: Z.ai Code (main) — System Owner Mode
+Task: "תמשיך ודחוף לגיטהאב" — continue the declared next steps (vault-verify, periodic anchors, deferred status regen) and push.
+
+Work Log:
+- VAULT-VERIFY FIXED: guardian had logged VAULT-VERIFY-FAILED; vault-verify-last.json pinned the exact cause — vault.cjs requires ethers from .grid98-lab/node_modules which never existed (we had only installed it under mini-services/key-broker). Fix: bun add ethers@6 at lab root → `node vault.cjs verify --quiet` exit 0. The next guardian pass should now report vault-verified instead of FAILED.
+- ANCHOR #5: canonical height advanced 71770 → 72958 (+1,188). Broadcast live: tx 0x3b48281f723ad186190bb27199d074aa6fad0afae4a729415d7e302d5ff7f97a, block 25,937,311, status 1, gasUsed 32,680 == model (6/6 exact). Tier-3 PROVEN, signerIdentity=headcorner, crossCheck {heightMatches:true, rootMatches:true} vs published 72958.
+- ANOTHER OOM SWEEP mid-round killed dev server (3rd today); revived via the documented setsid pattern; guardian slots never died.
+- system-status regen (previously deferred twice): 7/7 networks up · 1 live rail (EVM — honest: STEEM rail still key-blocked) · 0 critical issues. docs/system-status.json+.md rewritten.
+- Evidence updated: docs/evm-anchor-round.md now carries the full 5-point series table.
+
+Stage Summary:
+- Five independently timestamped Ethereum mainnet commitments in one day (68058/69207/70171/71770/72958), gas model 6/6 exact — the sovereign chain's on-chain heartbeat is now a measured, repeatable operational routine, zero code changes needed.
+- Every declared next step from the day-summary either DONE (vault-verify, status regen, anchors #4+#5) or explicitly owner-side (STEEM keys, npm publish, BASE_URL).
+- Shared awareness: lab dependencies are multi-rooted — ethers must exist at .grid98-lab root (for sovereign/node tools) AND under mini-services/key-broker (for the broker). A missing dep in ANY spawn target manifests as a guardian FAILED line with the path in vault-verify-last.json — read the artifact, don't guess.

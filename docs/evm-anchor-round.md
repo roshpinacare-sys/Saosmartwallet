@@ -119,3 +119,6 @@ bun tools/evm-anchor-broadcast.ts --verify=0xf5c48cdefe1c1448728c6d5828f34d8393c
   DOOR-RELAYER/HARVEST-SPAWNED · wallets/deposits/sibling-alive.
 - עגינות-STEEM עדיין נכשלות כנים (missing posting authority) — אותו גבול מתועד:
   מפתחות post-rotation אצל הבעלים בלבד.
+
+**עדכון CONTINUE-2/3 (2026-09-09, בוקר):** עגינות 4 ו-5 — הסדרה כעת **חמש נקודות-זמן**:
+`68058 → 69207 → 70171 → 71770 → 72958`. עגינה 4: tx `0xb31330ef…f34a532` · בלוק 25,937,227. עגינה 5: tx `0x3b48281f…7f7f97a` · בלוק 25,937,311. שתיהן status 1, gasUsed **32,680 == המודל (6/6 מדויק)**, Tier-3 PROVEN עם crossCheck מלא מול ה-state המפורסם. **בוקר שלם של השרשרת חקוק על mainnet.** גם: `vault-verify` חזר לירוק (root-cause היה ethers חסר ב-lab-root — תוקן, exit=0), system-status regen: 7/7 networks · 1 live rail (EVM, כנה) · 0 critical.
