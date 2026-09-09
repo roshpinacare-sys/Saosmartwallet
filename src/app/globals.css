@@ -1,32 +1,32 @@
 @import "tailwindcss";
 
-/* ─── SAOS Sovereign Design Tokens — institutional dark ─────────────────────
-   Canvas/surfaces layered by hairlines (Vercel discipline), never by color.
-   Gold = sovereignty, ONCE per view (focal metric / primary CTA).
-   Emerald = verified / live / healthy. Everything else grayscale.
-   Numbers, addresses, keys → JetBrains Mono with tabular-nums, LTR islands. */
+/* ─── SAOS Sovereign Ledger — light design system ───────────────────────────
+   A calm paper canvas, white ledger cards, hairline discipline.
+   Emerald = sovereignty + verified/live. Amber = gated/warn. Rose = dead.
+   One saturated moment per view: the deep-emerald hero band.
+   Numbers, addresses, roots → JetBrains Mono, tabular-nums, LTR islands. */
 :root {
-  --canvas: #09090b;
-  --surface-1: #0f0f12;
-  --raised: #17171c;
-  --well: #0c0c0e;
-  --hairline: #26262c;
-  --hairline-strong: #34343c;
-  --gold: #d4a94e;
-  --gold-bright: #ecd28b;
-  --gold-deep: #8f6c1f;
-  --emerald: #10b981;
-  --emerald-bright: #34d399;
-  --warn: #f59e0b;
-  --danger: #ef4444;
-  --txt-hi: #f4f4f5;
-  --txt-mid: #a1a1aa;
-  --txt-low: #71717a;
-  --glow-gold: 0 0 24px rgba(212, 169, 78, 0.15);
+  --canvas: #f6f6f3;
+  --card: #ffffff;
+  --well: #f2f2ee;
+  --hairline: #e8e8e3;
+  --hairline-strong: #d8d8d1;
+  --ink: #1b1b1f;
+  --ink-mid: #5c5c64;
+  --ink-low: #94949c;
+  --brand: #059669;
+  --brand-deep: #047857;
+  --brand-ink: #064e3b;
+  --brand-soft: #ecfdf5;
+  --amber: #b45309;
+  --amber-soft: #fffbeb;
+  --rose: #e11d48;
+  --rose-soft: #fff1f2;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -34,9 +34,10 @@ body {
     "Heebo", "Rubik", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew",
     system-ui, -apple-system, sans-serif;
   background: var(--canvas);
-  color: var(--txt-hi);
+  color: var(--ink);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* data face — every number/address/key lives here */
@@ -47,100 +48,91 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* institutional card — surface separated by hairline + layered shadow */
+/* ledger card — white surface, hairline, two-layer soft shadow */
 .sv-card {
-  background: var(--surface-1);
+  background: var(--card);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 14px;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    0 4px 12px rgba(0, 0, 0, 0.35);
+    0 1px 2px rgba(24, 24, 27, 0.04),
+    0 6px 20px -6px rgba(24, 24, 27, 0.06);
 }
 
 .sv-well {
   background: var(--well);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
-/* the single expressive moment — ambient gold glow behind the hero */
+/* the single expressive moment — deep emerald brand band */
 .sv-hero {
   position: relative;
   overflow: hidden;
+  border-radius: 18px;
   background:
-    linear-gradient(135deg, #13110c 0%, var(--surface-1) 42%, var(--surface-1) 100%);
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
+    radial-gradient(900px 380px at 88% -30%, rgba(52, 211, 153, 0.28) 0%, transparent 60%),
+    linear-gradient(140deg, #053f2f 0%, #065f46 55%, #047857 100%);
+  color: #f0fdf7;
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    0 8px 28px rgba(0, 0, 0, 0.45);
+    0 1px 2px rgba(6, 78, 59, 0.25),
+    0 18px 44px -18px rgba(6, 78, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
-.sv-hero::before {
+.sv-hero::after {
   content: "";
   position: absolute;
-  top: -45%;
-  inset-inline-end: -12%;
-  width: 540px;
-  height: 540px;
-  background: radial-gradient(circle, rgba(212, 169, 78, 0.13) 0%, transparent 62%);
+  inset: 0;
   pointer-events: none;
-  animation: breathe 8s ease-in-out infinite;
-}
-@keyframes breathe {
-  0%, 100% { opacity: 0.7; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.07); }
+  background:
+    radial-gradient(500px 220px at 8% 120%, rgba(255, 255, 255, 0.07) 0%, transparent 60%);
 }
 
 /* live-pulse status ring — honest heartbeat */
 @keyframes ring-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.35); }
-  70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35); }
+  70% { box-shadow: 0 0 0 9px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
-.pulse-ring {
-  animation: ring-pulse 2.4s ease-out infinite;
-}
+.pulse-ring { animation: ring-pulse 2.4s ease-out infinite; }
 @keyframes ring-pulse-amber {
-  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
-  70% { box-shadow: 0 0 0 9px rgba(245, 158, 11, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.3); }
+  70% { box-shadow: 0 0 0 9px rgba(217, 119, 6, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
 }
-.pulse-ring-amber {
-  animation: ring-pulse-amber 2.4s ease-out infinite;
-}
+.pulse-ring-amber { animation: ring-pulse-amber 2.4s ease-out infinite; }
 
 .label-caps {
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--txt-low);
+  color: var(--ink-low);
   font-weight: 600;
 }
 
-/* custom scrollbar — institutional zinc */
-.scroll-slim::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.scroll-slim::-webkit-scrollbar-track {
-  background: rgba(39, 39, 42, 0.4);
-  border-radius: 8px;
-}
-.scroll-slim::-webkit-scrollbar-thumb {
-  background: rgba(113, 113, 122, 0.45);
-  border-radius: 8px;
-}
-.scroll-slim::-webkit-scrollbar-thumb:hover {
-  background: rgba(161, 161, 170, 0.6);
+.label-caps-onbrand {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(240, 253, 244, 0.66);
+  font-weight: 600;
 }
 
-/* range slider styling (sovereign gold) */
+/* custom scrollbar — slim neutral */
+.scroll-slim::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-slim::-webkit-scrollbar-track { background: transparent; }
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: rgba(24, 24, 27, 0.16);
+  border-radius: 8px;
+}
+.scroll-slim::-webkit-scrollbar-thumb:hover { background: rgba(24, 24, 27, 0.28); }
+
+/* range slider styling (sovereign emerald) */
 input[type="range"].sovereign-range {
   -webkit-appearance: none;
   appearance: none;
   height: 6px;
   border-radius: 9999px;
-  background: linear-gradient(to left, #f5b84133, #3f3f46);
+  background: linear-gradient(to left, rgba(5, 150, 105, 0.35), #e4e4e7);
   outline: none;
 }
 input[type="range"].sovereign-range::-webkit-slider-thumb {
@@ -149,39 +141,35 @@ input[type="range"].sovereign-range::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: #f5b841;
-  border: 2px solid #18181b;
+  background: #059669;
+  border: 3px solid #ffffff;
   cursor: pointer;
-  box-shadow: 0 0 0 3px rgba(245, 184, 65, 0.25);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.22), 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 input[type="range"].sovereign-range::-moz-range-thumb {
   width: 18px;
   height: 18px;
   border-radius: 9999px;
-  background: #f5b841;
-  border: 2px solid #18181b;
+  background: #059669;
+  border: 3px solid #ffffff;
   cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.22);
 }
 
-@keyframes pulse-gold {
+@keyframes pulse-brand {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
-.animate-pulse-gold {
-  animation: pulse-gold 2.2s ease-in-out infinite;
-}
+.animate-pulse-brand { animation: pulse-brand 2.2s ease-in-out infinite; }
 
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-rise {
-  animation: rise 0.4s ease-out both;
-}
+.animate-rise { animation: rise 0.35s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise, .pulse-ring, .pulse-ring-amber, .sv-hero::before,
-  .animate-pulse-gold {
+  .animate-rise, .pulse-ring, .pulse-ring-amber, .animate-pulse-brand {
     animation: none !important;
   }
 }

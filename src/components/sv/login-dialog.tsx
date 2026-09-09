@@ -22,11 +22,11 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
 
   return (
     <Dialog open={open} onOpenChange={o => onOpenChange(o)}>
-      <DialogContent className="bg-[#0f0f12] border-[#34343c] max-w-md rounded-2xl">
+      <DialogContent className="bg-white border-[#e8e8e3] max-w-md rounded-2xl shadow-[0_24px_70px_-20px_rgba(24,24,27,0.35)]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <span className="w-8 h-8 rounded-lg bg-[#0c0c0e] border border-[#34343c] flex items-center justify-center">
-              <ShieldCheck className="w-4.5 h-4.5 text-[#d4a94e]" />
+          <DialogTitle className="flex items-center gap-2 text-base text-zinc-900">
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-700 flex items-center justify-center shadow-[0_2px_8px_-2px_rgba(5,150,105,0.5)]">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-50" />
             </span>
             התחברות חכמה — כל מפתח, כל שרשרת
           </DialogTitle>
@@ -35,13 +35,13 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="label-caps" htmlFor="login-account">חשבון</label>
-              <Input id="login-account" value={account} onChange={e => setAccount(e.target.value)} placeholder="headcorner" className="bg-[#0c0c0e] border-[#26262c] font-data h-10" dir="ltr" />
+              <Input id="login-account" value={account} onChange={e => setAccount(e.target.value)} placeholder="headcorner" className="bg-white border-[#e0e0da] font-data h-10" dir="ltr" />
             </div>
             <div className="space-y-1.5">
               <label className="label-caps">שרשרת</label>
               <Select value={chain} onValueChange={setChain}>
-                <SelectTrigger className="bg-[#0c0c0e] border-[#26262c] h-10"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-[#17171c] border-[#34343c]">
+                <SelectTrigger className="bg-white border-[#e0e0da] h-10"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-white border-[#e8e8e3]">
                   <SelectItem value="steem">STEEM</SelectItem>
                   <SelectItem value="hive">HIVE</SelectItem>
                   <SelectItem value="blurt">BLURT</SelectItem>
@@ -52,25 +52,25 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
           <div className="space-y-1.5">
             <label className="label-caps" htmlFor="login-wif">מפתח-פרטי (WIF)</label>
             <div className="relative">
-              <Input id="login-wif" type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="bg-[#0c0c0e] border-[#26262c] font-data h-10 pl-10" dir="ltr" />
-              <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300" aria-label={showWif ? 'הסתר מפתח' : 'הצג מפתח'}>
+              <Input id="login-wif" type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="bg-white border-[#e0e0da] font-data h-10 pl-10" dir="ltr" />
+              <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700" aria-label={showWif ? 'הסתר מפתח' : 'הצג מפתח'}>
                 {showWif ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
           </div>
           {msg && (
-            <div className={`text-xs rounded-lg px-3 py-2 border leading-relaxed ${msg.ok ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-red-500/10 text-red-300 border-red-500/25'}`} role="status">
+            <div className={`text-xs rounded-lg px-3 py-2 border leading-relaxed ${msg.ok ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`} role="status">
               {msg.text}
             </div>
           )}
           <button
             onClick={() => onLogin(account, chain, wif)}
             disabled={busy || !account || !wif}
-            className="w-full h-11 rounded-xl bg-gradient-to-b from-[#ecd28b] to-[#d4a94e] hover:from-[#f5e0a0] hover:to-[#dfb45a] disabled:opacity-40 disabled:hover:from-[#ecd28b] text-[#09090b] text-[13px] font-bold shadow-[0_0_24px_rgba(212,169,78,0.15)] transition-all inline-flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-[13px] font-bold shadow-[0_4px_16px_-4px_rgba(5,150,105,0.5)] transition-colors inline-flex items-center justify-center gap-2"
           >
             <LogIn className="w-4 h-4" />{busy ? 'מאמת מול השרשרת...' : 'התחבר ואמת'}
           </button>
-          <p className="text-[11px] text-zinc-600 text-center leading-relaxed">
+          <p className="text-[11px] text-zinc-400 text-center leading-relaxed">
             STEEM · HIVE · BLURT × owner / active / posting / memo. המפתח נשמר מוצפן (AES-256-GCM) בכספת המקומית בלבד ומאומת חי מול השרשרת. אם השרשרת לא נגישה — אימות-מפל מהכספת (מפתח שנבדק-חי בשבוע האחרון).
           </p>
         </div>

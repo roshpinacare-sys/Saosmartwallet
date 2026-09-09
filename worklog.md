@@ -715,3 +715,21 @@ Stage Summary:
 - The platform is now a 5-view institutional console (ראשי/כספת/מבצעים/ביקורת/הגדרות) replacing the flat card stack — design language: grayscale surfaces separated by hairlines, gold reserved for the hero liquid totals + primary CTA, emerald = verified/live, all numbers LTR mono islands in Hebrew RTL shell
 - Zero backend changes (per owner instruction) — all APIs, auth carriers and data contracts untouched; E2E regression 10/10 proves it
 - Screenshots: tool-results/redesign-{desktop-overview,authed,vault,settings,mobile,final-desktop}.png
+
+---
+Task ID: 51
+Agent: main (Z.ai Code)
+Task: עיצוב חדש לפי התיקיה — תשובה על "מה יש בתיקיה / איזו תיקיה" + Sovereign Ledger redesign
+
+Work Log:
+- אותרה תקלת DB אמיתית: schema drift (SealLeaf חסר, gasUsed/height required בלי default, toHeight מתה) — תוקן עם @default(0) + --accept-data-loss רק לעמודה מתה; 9 API של SAOS חזרו לחיים
+- אימות 5 מרכזי-שליטה ב-GitHub (roshpinacare-sys): saos-control-center = התיקיה הנוכחית
+- redesign מלא: globals.css חדש (Sovereign Ledger light — נייר חם + כרטיסי לדגר לבנים + emerald), כל קומפוננטות sv/ נכתבו מחדש
+- towers-view.tsx חדש: חמשת מגדלי SAOS חיים (פיקוח+matrix, אנרגיה TRON/HIVE, כלכלה, הוכחות merkle, פורץ דרך) — היה בתיקיה ולא היה גלוי ב-UI בכלל
+- תיקוני bugs בזמן אימות: energyFunded [object Object], VerifyPack shape, ChevronDown import, lint set-state-in-effect ×3
+- אימות דפדפן מלא: 6 תצוגות, seal אמיתי (root 9605ea3c…, 9 leaves, allVerified), login אמיתי עם posting key → ownerheadcorner, mobile iPhone 14, אפס שגיאות קונסולה
+
+Stage Summary:
+- העיצוב החדש חי: light Sovereign Ledger, hero emerald אחד לכל תצוגה, RTL מלא
+- התיקיה כולה חשופה ב-UI לראשונה: כספת (148 מפתחות/144 חיים/28 ישויות) + 5 מגדלים + סוכנים + ביקורת
+- lint: 0 errors

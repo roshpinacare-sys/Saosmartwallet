@@ -15,11 +15,11 @@ datasource db {
 
 model SealRecord {
   id          String       @id @default(cuid())
-  height      Int          @unique // chain height at seal time
+  height      Int          @unique @default(0) // chain height at seal time
   root        String       @unique // merkle root of the batch (hex)
   leavesCount Int
   stateRoot   String // sha256 of canonical kernel state
-  gasUsed     Int
+  gasUsed     Int          @default(0)
   note        String?
   createdAt   DateTime     @default(now())
   anchors     AnchorTx[]

@@ -1,10 +1,10 @@
 'use client';
 
-// ─── מרכז-השליטה הריבוני — redesign v2 ─────────────────────────────────────
-// Institutional dark shell: right sidebar (RTL) · 5 views · gold-once
-// discipline · mono data face. All logic preserved 1:1:
-// smart login (any key × 3 chains) · AES-256-GCM vault · live on-chain
-// verification · owner-lock · agent API · realtime chat/tasks · audit log.
+// ─── מרכז-השליטה הריבוני — Sovereign Ledger redesign ───────────────────────
+// Light paper canvas · deep-emerald hero · white ledger cards.
+// All logic preserved 1:1: smart login (any key × 3 chains) · AES-256-GCM
+// vault · live on-chain verification · owner-lock · agent API · realtime
+// chat/tasks · audit log · the five SAOS towers (anchor foundry).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,17 +17,19 @@ import { Sidebar, MobileNav, MobileTopbar } from '@/components/sv/sidebar';
 import { LoginDialog } from '@/components/sv/login-dialog';
 import { OverviewView } from '@/components/sv/overview';
 import { VaultView } from '@/components/sv/vault-view';
+import { TowersView } from '@/components/sv/towers-view';
 import { OpsView } from '@/components/sv/ops-view';
 import { AuditView } from '@/components/sv/audit-view';
 import { SettingsView } from '@/components/sv/settings-view';
 import { getToken, storeToken, authHeaders, fmtAgo } from '@/components/sv/shared';
-import type { StatusData, ChatMsg, TaskT, AuditRow } from '@/components/sv/shared';
+import type { StatusData, ChatMsg, TaskT, AuditRow, SaosStatus } from '@/components/sv/shared';
 import type { ViewId } from '@/components/sv/sidebar';
 
 export default function SovereignCenter() {
   const [booted, setBooted] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [status, setStatus] = useState<StatusData | null>(null);
+  const [saos, setSaos] = useState<SaosStatus | null>(null);
   const [relay, setRelay] = useState(false);
   const [view, setView] = useState<ViewId>('overview');
   const [lastSync, setLastSync] = useState<number | null>(null);
@@ -41,6 +43,14 @@ export default function SovereignCenter() {
   const [tasks, setTasks] = useState<TaskT[]>([]);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [newToken, setNewToken] = useState<string | null>(null);
+
+  const refreshSaos = useCallback(async () => {
+    try {
+      const r = await fetch('/api/saos/status', { cache: 'no-store' });
+      const j = await r.json();
+      if (j.ok) setSaos(j);
+    } catch { /* offline */ }
+  }, []);
 
   // Personal system: everything is readable WITHOUT login; mutations need a
   // session. If a mutation is attempted while logged out → open the login menu.
@@ -93,7 +103,7 @@ export default function SovereignCenter() {
 
   // boot + socket + intervals
   useEffect(() => {
-    const boot = setTimeout(() => { refresh(); refreshChat(); refreshTasks(); refreshAudit(); }, 0);
+    const boot = setTimeout(() => { refresh(); refreshChat(); refreshTasks(); refreshAudit(); refreshSaos(); }, 0);
     const sock = io('/?XTransformPort=3003', { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 8, timeout: 8000 });
     sock.on('connect', () => setRelay(true));
     sock.on('disconnect', () => setRelay(false));
@@ -103,7 +113,7 @@ export default function SovereignCenter() {
     sock.on('agent', () => refresh());
     sock.on('guard', () => refresh());
     return () => { clearTimeout(boot); sock.close(); };
-  }, [refresh, refreshTasks]);
+  }, [refresh, refreshTasks, refreshSaos]);
 
   useEffect(() => {
     if (!authed) return;
@@ -185,7 +195,7 @@ export default function SovereignCenter() {
       <div className="flex-1 flex flex-col items-center justify-center min-h-screen gap-4">
         <Sigil size="lg" live />
         <div className="text-zinc-500 text-[13px]">מאתחל את מרכז-השליטה...</div>
-        <div className="font-data text-[10px] text-zinc-700" dir="ltr">AES-256-GCM VAULT · LIVE CHAIN VERIFY</div>
+        <div className="font-data text-[10px] text-zinc-400" dir="ltr">AES-256-GCM VAULT · LIVE CHAIN VERIFY</div>
       </div>
     );
   }
@@ -200,10 +210,13 @@ export default function SovereignCenter() {
 
         <main key={view} className="flex-1 w-full max-w-[1440px] mx-auto px-4 md:px-7 py-5 md:py-7 space-y-4 pb-28 md:pb-10 animate-rise">
           {view === 'overview' && (
-            <OverviewView status={status} relay={relay} lastSync={lastSync} auditRows={auditRows} tasks={tasks} onNavigate={setView} verifying={verifying} onVerifyAll={verifyAll} />
+            <OverviewView status={status} saos={saos} relay={relay} lastSync={lastSync} auditRows={auditRows} tasks={tasks} onNavigate={setView} verifying={verifying} onVerifyAll={verifyAll} />
           )}
           {view === 'vault' && (
             <VaultView status={status} verifying={verifying} onVerifyAll={verifyAll} />
+          )}
+          {view === 'towers' && (
+            <TowersView saos={saos} onSaosRefresh={refreshSaos} />
           )}
           {view === 'ops' && (
             <OpsView status={status} authed={authed} messages={messages} onSend={sendChat} tasks={tasks} onCreateTask={createTask} onRegisterAgent={registerAgent} />
@@ -216,9 +229,9 @@ export default function SovereignCenter() {
           )}
         </main>
 
-        <footer className="hidden md:block mt-auto border-t border-[#1d1d22] bg-[#0b0b0e] px-7 py-3.5">
-          <div className="max-w-[1440px] mx-auto flex items-center justify-between flex-wrap gap-2 text-[11px] text-zinc-600">
-            <span>מרכז-השליטה הריבוני · כספת AES-256-GCM · אימות-חי מול השרשרת · relay בזמן-אמת</span>
+        <footer className="hidden md:block mt-auto border-t border-[#e8e8e3] bg-white px-7 py-3.5">
+          <div className="max-w-[1440px] mx-auto flex items-center justify-between flex-wrap gap-2 text-[11px] text-zinc-400">
+            <span>מרכז-השליטה הריבוני · כספת AES-256-GCM · אימות-חי מול השרשרת · חמשת מגדלי SAOS · relay בזמן-אמת</span>
             <span className="font-data" dir="ltr">
               {status?.totals.verified}/{status?.totals.keys} VERIFIED{lastSync ? ` · SYNC ${fmtAgo(new Date(lastSync).toISOString())}` : ''}
             </span>
@@ -230,18 +243,18 @@ export default function SovereignCenter() {
 
       {/* new agent token dialog */}
       <Dialog open={!!newToken} onOpenChange={o => !o && setNewToken(null)}>
-        <DialogContent className="bg-[#0f0f12] border-[#34343c] max-w-md rounded-2xl">
+        <DialogContent className="bg-white border-[#e8e8e3] max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base"><KeyRound className="w-4 h-4 text-[#d4a94e]" />טוקן הסוכן — מוצג פעם אחת!</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-base text-zinc-900"><KeyRound className="w-4 h-4 text-emerald-600" />טוקן הסוכן — מוצג פעם אחת!</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-zinc-400 leading-relaxed">העבר את הטוקן לסוכן. לא ניתן לצפות בו שוב (נשמר רק hash).</p>
+            <p className="text-xs text-zinc-500 leading-relaxed">העבר את הטוקן לסוכן. לא ניתן לצפות בו שוב (נשמר רק hash).</p>
             <div className="flex gap-2">
-              <Input readOnly value={newToken || ''} className="bg-[#0c0c0e] border-emerald-500/30 font-data text-xs" dir="ltr" />
+              <Input readOnly value={newToken || ''} className="bg-zinc-50 border-emerald-200 font-data text-xs" dir="ltr" />
               <button
                 onClick={() => navigator.clipboard.writeText(newToken || '')}
                 aria-label="העתק טוקן"
-                className="w-10 h-10 shrink-0 rounded-lg border border-[#34343c] bg-[#17171c] hover:bg-[#1d1d22] flex items-center justify-center text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="w-10 h-10 shrink-0 rounded-lg border border-[#e0e0da] bg-white hover:bg-zinc-50 flex items-center justify-center text-zinc-500 hover:text-zinc-800 transition-colors"
               >
                 <Copy className="w-4 h-4" />
               </button>

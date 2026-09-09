@@ -23,11 +23,26 @@ export const ROLES = ['owner', 'active', 'posting', 'memo'] as const;
 export const CHAIN_KEYS = ['steem', 'hive', 'blurt'] as const;
 export type ChainId = (typeof CHAIN_KEYS)[number];
 
-export const CHAIN_META: Record<ChainId, { label: string; dot: string; text: string }> = {
-  steem: { label: 'STEEM', dot: 'bg-emerald-400', text: 'text-emerald-300' },
-  hive: { label: 'HIVE', dot: 'bg-amber-400', text: 'text-amber-300' },
-  blurt: { label: 'BLURT', dot: 'bg-rose-400', text: 'text-rose-300' },
+export const CHAIN_META: Record<ChainId, { label: string; dot: string; text: string; soft: string }> = {
+  steem: { label: 'STEEM', dot: 'bg-emerald-500', text: 'text-emerald-700', soft: 'bg-emerald-50' },
+  hive: { label: 'HIVE', dot: 'bg-amber-500', text: 'text-amber-700', soft: 'bg-amber-50' },
+  blurt: { label: 'BLURT', dot: 'bg-rose-500', text: 'text-rose-700', soft: 'bg-rose-50' },
 };
+
+// ── SAOS tower types (from /api/saos/*) ──
+export type SaosMatrixRow = { network: string; status: string; gate: string | null; detail: string; recovery: string | null };
+export type SaosSeal = { id: string; height: number; root: string; stateRoot: string; leaves: number; gasUsed: number; createdAt: string; anchors: Array<{ network?: string; txRef?: string; state?: string } | string> };
+export type SaosReceipt = { kind: string; digest: string; prevDigest: string; at: string };
+export type SaosStatus = {
+  ok: boolean;
+  motto: string;
+  matrix: SaosMatrixRow[];
+  historic: Array<{ network: string; txRef: string; state: string; note: string }>;
+  seals: SaosSeal[];
+  receipts: SaosReceipt[];
+  opsLogged: number;
+};
+export type SaosKernelCheck = { name: string; pass: boolean; detail: string };
 
 // ── session persistence (dual-carrier) ─────────────────────────────────────
 // The token lives BOTH in an httpOnly cookie (server-set) AND in localStorage
@@ -78,12 +93,12 @@ export function BalLine({ b, chain }: { b?: Record<string, string>; chain?: stri
   const isDebtZero = b.debt === '0.000 SBD' || b.debt === '0.000 HBD';
   const savingsZero = b.savings === '0.000 STEEM' || b.savings === '0.000 HIVE' || b.savings === '0.000 BLURT';
   return (
-    <div className="mt-2 pt-1.5 border-t border-[#1d1d22] flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-data" dir="ltr">
-      {chain && <span className="inline-flex items-center gap-1 text-zinc-600"><span className={`w-1 h-1 rounded-full ${CHAIN_META[chain as ChainId]?.dot || 'bg-zinc-500'}`} />{chain.toUpperCase()}</span>}
-      <span className="text-emerald-300/90">{b.liquid}</span>
-      {b.debt && !isDebtZero && <span className="text-amber-400/80">{b.debt}</span>}
-      {b.vests && <span className="text-zinc-500">{Number(b.vests.replace(' VESTS', '')).toLocaleString('en-US', { maximumFractionDigits: 0 })} VESTS</span>}
-      {b.savings && !savingsZero && <span className="text-zinc-500">savings {b.savings}</span>}
+    <div className="mt-2 pt-2 border-t border-[#eeeeea] flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-data" dir="ltr">
+      {chain && <span className="inline-flex items-center gap-1 text-zinc-400"><span className={`w-1 h-1 rounded-full ${CHAIN_META[chain as ChainId]?.dot || 'bg-zinc-400'}`} />{chain.toUpperCase()}</span>}
+      <span className="text-emerald-700 font-medium">{b.liquid}</span>
+      {b.debt && !isDebtZero && <span className="text-amber-700">{b.debt}</span>}
+      {b.vests && <span className="text-zinc-400">{Number(b.vests.replace(' VESTS', '')).toLocaleString('en-US', { maximumFractionDigits: 0 })} VESTS</span>}
+      {b.savings && !savingsZero && <span className="text-zinc-400">savings {b.savings}</span>}
     </div>
   );
 }
@@ -92,13 +107,13 @@ export function BalLine({ b, chain }: { b?: Record<string, string>; chain?: stri
 export function RoleChip({ k, chain }: { k: RoleKey; chain: string }) {
   const isChain = chain === 'steem' || chain === 'hive' || chain === 'blurt';
   const cls = !isChain
-    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+    ? 'bg-zinc-100 text-zinc-600 border-zinc-200'
     : k.verified
-      ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
-      : 'bg-red-500/10 text-red-300 border-red-500/25';
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : 'bg-rose-50 text-rose-700 border-rose-200';
   return (
     <Badge variant="outline" className={`${cls} inline-flex items-center gap-1.5 px-1.5 py-0`} title={`${k.fingerprint} · ${k.lastError || (isChain ? (k.verified ? 'חי מול השרשרת' : 'לא חי') : 'חומר מוצפן')}`}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CHAIN_META[chain as ChainId]?.dot || 'bg-zinc-500'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${CHAIN_META[chain as ChainId]?.dot || 'bg-zinc-400'}`} />
       <span className="font-data text-[10px]" dir="ltr">{chain}:{k.role}{isChain ? (k.verified ? ' ✓' : ' ✗') : ''}</span>
     </Badge>
   );
