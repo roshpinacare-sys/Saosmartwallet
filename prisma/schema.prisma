@@ -253,3 +253,30 @@ model GateAction {
 
   @@index([createdAt])
 }
+
+// SOVEREIGN-HAND (ביקורת #4 — הצעד-הפתוח האחרון) — the controlled signing
+// queue: an armed agent BUILDS a real DEX order (unsigned — building needs no
+// keys); the vault signs ONLY on an explicit operator decision, rebuilding the
+// EXACT order (fixed orderid + orderExpiration — the steem-order determinism
+// contract), broadcasting it with the ACTIVE key and recording the real chain
+// evidence. "הסוכן מכין — הכספת חותמת, רק באישור המפעיל."
+model GateOrder {
+  id            String    @id @default(cuid())
+  agentName     String
+  runId         String? // lineage — which run built this
+  op            String    @default("limit_order_create") // limit_order_create | limit_order_cancel
+  account       String // the sovereign commander account — resolved from the vault, never from the agent
+  spec          String // JSON — the EXACT SteemOrderSpec (fixed orderid/orderExpiration ⇒ deterministic rebuild)
+  preview       String // JSON — human-readable preview shown to operator + agent {side, amount, price, total, expiresAt}
+  notionalSteem Float // the STEEM leg size — for the fleet amount rail
+  status        String    @default("pending") // pending | signed | rejected | expired | failed
+  decidedBy     String? // operator
+  previewTxId   String? // txId of the preview build (ref-block differs at signing — the ORDER is what's identical)
+  broadcastId   String? // the REAL chain tx id after broadcast
+  blockNum      Int?
+  error         String?
+  createdAt     DateTime  @default(now())
+  decidedAt     DateTime?
+
+  @@index([status, createdAt])
+}
