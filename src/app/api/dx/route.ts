@@ -27,6 +27,7 @@ const ALLOWED = new Set([
   'transfer', // POST — העברה בין ארנקים
   'economy',  // POST — Task 54: ve_lock/ve_unlock/ve_vote/bond_buy (כלכלה-מטורפת)
   'program',  // POST — Task 56: מסחר-אוטומטי חסר-קיפרים (DCA + טריגרים stop/take)
+  'launchpad', // POST — Task 57: מסילת-ההשקות (עקומה/LBP + קנייה/מכירה)
 ]);
 
 export async function POST(req: NextRequest) {

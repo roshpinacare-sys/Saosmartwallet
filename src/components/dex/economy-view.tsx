@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Lock, Flame, Vote, TrendingDown, Percent, Clock, Wallet,
   ShieldCheck, Sparkles, Loader2, Bot, Sprout, Repeat, BarChart3, Landmark,
-  BadgeCheck, Link2, Layers, Globe, Scale,
+  BadgeCheck, Link2, Layers, Globe, Scale, Rocket, Crosshair,
 } from 'lucide-react';
 import { authHeaders } from '@/components/sv/shared';
 import { fmtInt } from './common';
@@ -64,8 +64,8 @@ interface ProofData {
   height: number;
   at: string;
   internal: { saosUsdsMu: number; wsteemUsdsMu: number; wsteemPerSaosBps: number; backingWsteemMu: number };
-  external: { steemUsd: number | null; hiveUsd: number | null; hbdUsd: number | null; blurtUsd: number | null; feedOk: boolean; feedError?: string };
-  derived: { saosUsdMicro: number | null; saosUsdText: string | null; wsteemDivBps: number | null; verdict: 'CONVERGED' | 'DRIFT' | 'DIVERGENT' | 'NO-FEED' };
+  external: { steemUsd: number | null; hiveUsd: number | null; hbdUsd: number | null; blurtUsd: number | null; feedOk: boolean; feedStale?: boolean; feedSources?: Partial<Record<string, string>>; feedError?: string };
+  derived: { saosUsdMicro: number | null; saosUsdText: string | null; wsteemDivBps: number | null; verdict: 'CONVERGED' | 'DRIFT' | 'DIVERGENT' | 'STALE' | 'NO-FEED' };
   depth: {
     saosUsds: { rows: Array<{ pctOfReserve: number; amountInBaseMu: number; effPriceMu: number; impactBps: number }>; midMu: number } | null;
     wsteemUsds: { rows: Array<{ pctOfReserve: number; amountInBaseMu: number; effPriceMu: number; impactBps: number }>; midMu: number } | null;
@@ -81,6 +81,33 @@ interface ProofData {
   };
 }
 
+// ── Task 57 · מסילת-ההשקות (launchpad) + ProtoRev ──
+interface LpadData {
+  ok: boolean;
+  height: number;
+  policy: { feeBps: number; creatorPct: number; gradMinUsdsMu: number; maxRaiseMu: number; lbpBlocks: number; minSupplyMu: number; maxSupplyMu: number; vqDiv: number };
+  launches: Array<{
+    id: string; owner: string; ticker: string; name: string; code: string; mode: 'curve' | 'lbp';
+    priceMu: number; supplyMu: number; circulatingMu: number; raisedMu: number; gradPctBps: number;
+    gradTargetMu: number; feesCreatorMu: number; feesPlatformMu: number;
+    atH: number; endH: number; blocksLeft: number; graduated: boolean; gradH: number; poolKey: string; status: string;
+  }>;
+  revAux: { protorevMu: number; launchpadMu: number };
+  honesty: string;
+}
+
+interface PrvData {
+  ok: boolean;
+  height: number;
+  state: { runs: number; profitMu: number; cycles: number; rejections: number; lastH: number };
+  revAux: { protorevMu: number; launchpadMu: number };
+  desk: { account: string; credits: number; usdsMu: number; deskFloorMu: number; inventory: Array<{ asset: string; mu: number }> };
+  policy: { maxRunsPerBlock: number; minProfitMu: number; maxBaseMu: number; impactPct: number; edgeBps: number };
+  spreads: Array<{ key: string; base: string; quote: string; midMu: number; bidMu: number | null; askMu: number | null; edgeBidBps: number | null; edgeAskBps: number | null; actionable: boolean }>;
+  recent: Array<{ h: number; action: string; note?: string; profitMu?: number }>;
+  honesty: string;
+}
+
 export function EconomyView({ onNeedAuth, onDone }: {
   onNeedAuth: () => boolean;
   onDone: () => void;
@@ -89,11 +116,16 @@ export function EconomyView({ onNeedAuth, onDone }: {
   const [ale, setAle] = useState<AleData | null>(null);
   const [cmp, setCmp] = useState<CompareData | null>(null);
   const [proof, setProof] = useState<ProofData | null>(null);
+  const [lpad, setLpad] = useState<LpadData | null>(null);
+  const [prv, setPrv] = useState<PrvData | null>(null);
   const [lockAmt, setLockAmt] = useState('500');
   const [weeks, setWeeks] = useState(52);
   const [bondAmt, setBondAmt] = useState('1000');
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [newTicker, setNewTicker] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newMode, setNewMode] = useState<'curve' | 'lbp'>('curve');
   const aliveRef = useRef(true);
 
   useEffect(() => {
@@ -161,6 +193,38 @@ export function EconomyView({ onNeedAuth, onDone }: {
     return () => { stop = true; clearTimeout(timer); };
   }, []);
 
+  // ── מסילת-ההשקות (Task 57) — השקות-חיות על-העקומה (כל-3ש')
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const r = await fetch('/saos-dex/api/dex/launchpad', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        const j = (await r.json()) as LpadData;
+        if (!stop && j.ok) setLpad(j);
+      } catch { /* offline */ }
+      if (!stop) timer = setTimeout(poll, 3000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
+  }, []);
+
+  // ── ProtoRev — הארביטראז'-הפנימי (כל-3ש')
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const r = await fetch('/saos-dex/api/dex/protorev', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        const j = (await r.json()) as PrvData;
+        if (!stop && j.ok) setPrv(j);
+      } catch { /* offline */ }
+      if (!stop) timer = setTimeout(poll, 3000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
+  }, []);
+
   const mutate = useCallback(async (payload: Record<string, unknown>, tag: string) => {
     if (!onNeedAuth()) return;
     setBusy(tag); setMsg(null);
@@ -168,6 +232,25 @@ export function EconomyView({ onNeedAuth, onDone }: {
       const r = await fetch('/api/dx', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ action: 'economy', payload }),
+      });
+      const j = await r.json();
+      setMsg(j.ok
+        ? { ok: true, text: 'נשלח לממפול — ייכלל בבלוק הבא (≤3 שניות)' }
+        : { ok: false, text: j.error || j.note || 'הפעולה נדחתה' });
+      if (j.ok) onDone();
+    } catch {
+      setMsg({ ok: false, text: 'שגיאת רשת — נסה שוב' });
+    }
+    setBusy(null);
+  }, [onNeedAuth, onDone]);
+
+  const mutateLaunch = useCallback(async (payload: Record<string, unknown>, tag: string) => {
+    if (!onNeedAuth()) return;
+    setBusy(tag); setMsg(null);
+    try {
+      const r = await fetch('/api/dx', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ action: 'launchpad', payload }),
       });
       const j = await r.json();
       setMsg(j.ok
@@ -293,6 +376,9 @@ export function EconomyView({ onNeedAuth, onDone }: {
           )}
         </div>
       </section>
+
+      {/* ── מסילת-ההשקות + ProtoRev (Task 57) ── */}
+      <LaunchpadPanel lpad={lpad} prv={prv} newTicker={newTicker} setNewTicker={setNewTicker} newName={newName} setNewName={setNewName} newMode={newMode} setNewMode={setNewMode} mutateLaunch={mutateLaunch} busy={busy} />
 
       <div className="grid lg:grid-cols-2 gap-5">
         {/* ── veSAOS ── */}
@@ -602,6 +688,7 @@ const VERDICT_META: Record<string, { label: string; cls: string }> = {
   CONVERGED: { label: 'מתכנס עם השוק', cls: 'text-[color:var(--green)] border-[color:var(--green)]/40 bg-[color:var(--green)]/10' },
   DRIFT: { label: 'סטייה-מתונה', cls: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
   DIVERGENT: { label: 'סטייה-גבוהה', cls: 'text-[color:var(--red)] border-[color:var(--red)]/40 bg-[color:var(--red)]/10' },
+  STALE: { label: 'פיד-עמום (נתון-אחרון-טוב, מסומן)', cls: 'text-amber-400 border-amber-500/40 bg-amber-500/10' },
   'NO-FEED': { label: 'אין-פיד-חוץ (כנות)', cls: 'text-[color:var(--text-2)] border-[color:var(--line)] bg-black/20' },
 };
 
@@ -661,7 +748,7 @@ function PriceProofPanel({ proof }: { proof: ProofData | null }) {
         </div>
         <div className="flex items-center gap-2 mt-2.5 text-[9.5px] text-[color:var(--text-3)] flex-wrap">
           <span className="rounded-full dx-chip px-2 py-0.5">גיבוי-WSTEEM אמת: {fmtInt(proof.internal.backingWsteemMu)}µ (1:1 STEEM נעול)</span>
-          <span className="rounded-full dx-chip px-2 py-0.5">פיד-חוץ: {proof.external.feedOk ? 'חי · CoinGecko' : `נפל-בכנות (${proof.external.feedError ?? 'לא-זמין'})`}</span>
+          <span className="rounded-full dx-chip px-2 py-0.5">פיד-חוץ: {proof.external.feedOk ? (proof.external.feedStale ? 'עמום-מסומן' : `חי · ${Object.values(proof.external.feedSources ?? {})[0] ?? 'מקורות-מרובים'}`) : `נפל-בכנות (${proof.external.feedError ?? 'לא-זמין'})`}</span>
           <span className="rounded-full dx-chip px-2 py-0.5">גובה-אימות: h{fmtInt(proof.height)}</span>
         </div>
       </div>
@@ -722,6 +809,175 @@ function PriceProofPanel({ proof }: { proof: ProofData | null }) {
             <Scale className="w-3 h-3 shrink-0 mt-0.5" /> {proof.treasuryReal.honesty}
           </p>
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Task 57 · מסילת-ההשקות + ProtoRev — פאנל-כפול-חי ───────────────────────────
+
+function LaunchpadPanel({ lpad, prv, newTicker, setNewTicker, newName, setNewName, newMode, setNewMode, mutateLaunch, busy }: {
+  lpad: LpadData | null;
+  prv: PrvData | null;
+  newTicker: string; setNewTicker: (s: string) => void;
+  newName: string; setNewName: (s: string) => void;
+  newMode: 'curve' | 'lbp'; setNewMode: (m: 'curve' | 'lbp') => void;
+  mutateLaunch: (payload: Record<string, unknown>, tag: string) => void;
+  busy: string | null;
+}) {
+  const launches = lpad?.launches ?? [];
+  const liveLaunches = launches.filter(l => !l.graduated);
+  const gradLaunches = launches.filter(l => l.graduated);
+  return (
+    <section className="dx-card p-5" data-testid="launchpad-panel">
+      <header className="flex items-start justify-between flex-wrap gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2 text-[11px] text-[color:var(--text-3)] mb-1.5">
+            <Rocket className="w-3.5 h-3.5 text-[color:var(--pink)]" />
+            מסילת-ההשקות · עקומת-pump.fun + LBP-דצ'י-אוקציה · הגירה-לבריכה-אמת
+          </div>
+          <h2 className="text-[14px] font-bold">השקות-חיות — טוקן-חדש מהעקומה עד לבריכה</h2>
+          <p className="text-[11px] text-[color:var(--text-2)] mt-1 max-w-2xl leading-relaxed">
+            טוקן-חדש נסחר על עקומת-מחיר דטרמיניסטית מהבלוק-הראשון; בגיוס {fmtInt(lpad?.policy.gradMinUsdsMu ?? 0)}µ-USDS
+            הוא מוגר-אוטומטית לבריכת-AMM אמת עם LP-לאוצר (POL). LBP = מכירה-הולנדית: הזמן מוריד, הקניות מרימות.
+          </p>
+        </div>
+        <span className="text-[10px] rounded-full border border-[color:var(--pink)]/40 bg-[color:var(--pink)]/10 text-[color:var(--pink)] px-2.5 py-1 font-semibold">
+          {liveLaunches.length > 0 ? `${liveLaunches.length} חיות` : 'אין-השקות-חיות'} · עמלה {lpad?.policy.feeBps ?? 150}bps
+        </span>
+      </header>
+
+      {/* טופס-השקה-חדשה */}
+      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4 mb-4" data-testid="launch-create">
+        <div className="text-[10px] label-caps mb-3">השקה-חדשה — טיקר (2–8 אותיות) + מצב</div>
+        <div className="flex gap-2 flex-wrap">
+          <input value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+            className="dx-input font-data h-10 w-32" dir="ltr" placeholder="TICKER" aria-label="טיקר ההשקה" data-testid="launch-ticker" />
+          <input value={newName} onChange={e => setNewName(e.target.value.slice(0, 24))}
+            className="dx-input h-10 w-44" placeholder="שם (רשות)" aria-label="שם ההשקה" data-testid="launch-name" />
+          <div className="flex rounded-xl border border-[color:var(--line)] overflow-hidden" role="group" aria-label="מצב השקה">
+            <button onClick={() => setNewMode('curve')} className={`h-10 px-3 text-[11px] font-semibold transition-colors ${newMode === 'curve' ? 'bg-[color:var(--pink)]/20 text-[color:var(--pink)]' : 'text-[color:var(--text-3)] hover:text-[color:var(--text-1)]'}`} data-testid="mode-curve">עקומה</button>
+            <button onClick={() => setNewMode('lbp')} className={`h-10 px-3 text-[11px] font-semibold transition-colors border-s border-[color:var(--line)] ${newMode === 'lbp' ? 'bg-[color:var(--pink)]/20 text-[color:var(--pink)]' : 'text-[color:var(--text-3)] hover:text-[color:var(--text-1)]'}`} data-testid="mode-lbp">LBP</button>
+          </div>
+          <button
+            onClick={() => mutateLaunch({ action: 'create', ticker: newTicker, name: newName || newTicker, mode: newMode, supply: 200_000_000 }, 'lcreate')}
+            disabled={busy !== null || newTicker.length < 2}
+            className="dx-cta h-10 px-4 text-[12px] flex items-center gap-1.5"
+            data-testid="launch-create-btn"
+          >
+            {busy === 'lcreate' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Rocket className="w-3.5 h-3.5" />} שגר
+          </button>
+        </div>
+        <div className="text-[9.5px] text-[color:var(--text-3)] mt-2">
+          היצע-200K טוקן · מחיר-פתיחה-שטוח · {newMode === 'lbp' ? `דצ'י-אוקציה ${lpad?.policy.lbpBlocks ?? 1200} בלוקים` : 'עקומה-עולה-עד-הסף'} · היוצר מקבל {lpad?.policy.creatorPct ?? 40}% מהעמלה-חי
+        </div>
+      </div>
+
+      {/* רשימת-השקות */}
+      <div className="space-y-2.5 mb-4 max-h-96 overflow-y-auto" data-testid="launch-list">
+        {liveLaunches.length === 0 && (
+          <div className="text-[11px] text-[color:var(--text-3)] rounded-lg bg-black/20 border border-[color:var(--line)] px-3 py-3">
+            אין-השקות-חיות — שגר-טוקן-ראשון מהטופס-למעלה. כל-ההשקות גלויות-ודטרמיניסטיות: אפס-חברתנות, אפס-rug (הגיוס-נעול-בחשבון-ההשקה).
+          </div>
+        )}
+        {liveLaunches.map(l => (
+          <div key={l.id} className="rounded-xl border border-[color:var(--line)] bg-black/20 p-3.5" data-testid={`launch-${l.ticker}`}>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+              <div className="flex items-center gap-2">
+                <span className="dx-num font-black text-[13px] text-[color:var(--pink)]" dir="ltr">${l.ticker}</span>
+                <span className="text-[10.5px] text-[color:var(--text-3)]">{l.name}</span>
+                <span className={`text-[9px] rounded-full px-1.5 py-0.5 border ${l.mode === 'lbp' ? 'border-amber-500/40 text-amber-400' : 'border-[color:var(--line)] text-[color:var(--text-3)]'}`} dir="ltr">{l.mode.toUpperCase()}</span>
+              </div>
+              <div className="flex items-center gap-3 text-[10.5px]">
+                <span className="dx-num text-[color:var(--text-1)]" dir="ltr">{(l.priceMu / 1000).toFixed(4)} USDS</span>
+                <span className="dx-num text-[color:var(--text-3)]" dir="ltr">{fmtInt(l.raisedMu)}µ גויסו</span>
+                {l.mode === 'lbp' && l.blocksLeft > 0 && <span className="dx-num text-amber-400" dir="ltr">{l.blocksLeft} בלוקים</span>}
+              </div>
+            </div>
+            {/* התקדמות-לסף-ההגירה */}
+            <div className="h-2 rounded-full bg-zinc-800 overflow-hidden mb-1" dir="ltr" aria-label="התקדמות להגירה">
+              <div className="h-full bg-gradient-to-r from-[color:var(--pink)] to-[color:var(--green)]" style={{ width: `${Math.max(1.5, l.gradPctBps / 100)}%` }} />
+            </div>
+            <div className="flex justify-between text-[9.5px] text-[color:var(--text-3)] mb-2.5">
+              <span dir="ltr">{(l.gradPctBps / 100).toFixed(1)}% לסף-ההגירה ({fmtInt(l.gradTargetMu)}µ)</span>
+              <span dir="ltr">מחזור: {fmtInt(l.circulatingMu * (l.priceMu / 1000))}µ</span>
+            </div>
+            {/* קנייה/מכירה-מהירה */}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => mutateLaunch({ action: 'buy', ticker: l.ticker, amount: 10_000 }, `lbuy-${l.ticker}`)}
+                disabled={busy !== null}
+                className="h-8 px-3 rounded-lg border border-[color:var(--green)]/40 bg-[color:var(--green-soft)] text-[color:var(--green)] text-[11px] font-bold hover:brightness-110 transition-all"
+                data-testid={`launch-buy-${l.ticker}`}
+              >
+                {busy === `lbuy-${l.ticker}` ? <Loader2 className="w-3 h-3 animate-spin" /> : 'קנה 10 USDS'}
+              </button>
+              <button
+                onClick={() => mutateLaunch({ action: 'sell', ticker: l.ticker, amount: 10_000 }, `lsell-${l.ticker}`)}
+                disabled={busy !== null}
+                className="h-8 px-3 rounded-lg border border-[color:var(--line)] text-[color:var(--text-2)] text-[11px] font-bold hover:border-[color:var(--line-strong)] transition-all"
+                data-testid={`launch-sell-${l.ticker}`}
+              >
+                {busy === `lsell-${l.ticker}` ? <Loader2 className="w-3 h-3 animate-spin" /> : 'מכור 10 טוקן'}
+              </button>
+              {l.feesCreatorMu > 0 && <span className="dx-num text-[9.5px] text-[color:var(--text-3)] self-center" dir="ltr">יוצר: {fmtInt(l.feesCreatorMu)}µ · פלטפורמה: {fmtInt(l.feesPlatformMu)}µ</span>}
+            </div>
+          </div>
+        ))}
+        {gradLaunches.length > 0 && (
+          <div className="text-[10px] text-[color:var(--text-3)] flex flex-wrap gap-1.5" data-testid="graduated-list">
+            {gradLaunches.map(l => (
+              <span key={l.id} className="rounded-full border border-[color:var(--green)]/40 bg-[color:var(--green-soft)] text-[color:var(--green)] px-2 py-0.5 font-semibold">
+                <BadgeCheck className="w-3 h-3 inline" /> ${l.ticker} הוגר-ל-{l.poolKey} @h{fmtInt(l.gradH)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ProtoRev — הארביטראז'-הפנימי */}
+      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4" data-testid="protorev-panel">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className="w-7 h-7 rounded-lg bg-[color:var(--green-soft)] border border-[color:var(--green)]/30 flex items-center justify-center">
+            <Crosshair className="w-3.5 h-3.5 text-[color:var(--green)]" />
+          </span>
+          <div className="flex-1 min-w-[180px]">
+            <div className="text-[12px] font-bold">ProtoRev — ארביטראז'-פנימי-דטרמיניסטי</div>
+            <div className="text-[9.5px] text-[color:var(--text-3)]">Osmosis-ProtoRev על הגרעין: הפרוטוקול צד-סטיות-ספר↔בריכה ומזרים-את-הרווח-לשריפה-ולקרן-ve — בלי-keepers-חוץ</div>
+          </div>
+          <span className="text-[10px] rounded-full border border-[color:var(--green)]/40 bg-[color:var(--green-soft)] text-[color:var(--green)] px-2.5 py-1 font-bold" dir="ltr">
+            {prv?.state.runs ?? 0} הרצות · {fmtInt(prv?.state.profitMu ?? 0)}µ רווח
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          <MiniStat label="רווח-מצטבר" value={`${fmtInt(prv?.state.profitMu ?? 0)}µ`} sub="→ 40% שריפה · 40% ve · 20% אוצר" tone="green" />
+          <MiniStat label="מחזורי-בריכות" value={fmtInt(prv?.state.cycles ?? 0)} sub="USDS→a→b→USDS" />
+          <MiniStat label="סרבנויות-כנות" value={fmtInt(prv?.state.rejections ?? 0)} sub="מגן-minOut/הון" />
+          <MiniStat label="USDS-אוצר (שולחן-הארב)" value={`${fmtInt(prv?.desk.usdsMu ?? 0)}µ`} sub={`רצפת-שולחן ${fmtInt(prv?.desk.deskFloorMu ?? 0)}µ`} />
+        </div>
+        <div className="space-y-1 max-h-40 overflow-y-auto" data-testid="protorev-spreads">
+          {(prv?.spreads ?? []).map(s => (
+            <div key={s.key} className="flex items-center justify-between text-[10px] rounded-lg bg-black/30 border border-[color:var(--line)] px-2.5 py-1.5">
+              <span className="dx-num font-semibold" dir="ltr">{s.key}</span>
+              <span className="flex items-center gap-3 dx-num" dir="ltr">
+                <span className="text-[color:var(--text-3)]">mid {(s.midMu / 1000).toFixed(4)}</span>
+                <span>bid {s.bidMu !== null ? `${s.edgeBidBps !== null && s.edgeBidBps > 0 ? '+' : ''}${s.edgeBidBps}bps` : '—'}</span>
+                <span>ask {s.askMu !== null ? `${s.edgeAskBps !== null && s.edgeAskBps < 0 ? '' : '+'}${s.edgeAskBps}bps` : '—'}</span>
+                {s.actionable && <span className="text-[color:var(--green)] font-bold">● ציד-חי</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+        {(prv?.recent ?? []).length > 0 && (
+          <div className="mt-2 space-y-1" data-testid="protorev-log">
+            {prv!.recent.slice(0, 3).map((j, i) => (
+              <div key={`${j.h}-${i}`} className="text-[9.5px] text-[color:var(--text-3)] flex gap-2 dx-num" dir="ltr">
+                <span>#{fmtInt(j.h)}</span><span className="text-[color:var(--text-2)] flex-1 truncate">{j.note}</span>
+                {j.action === 'prv_run' && <span className="text-[color:var(--green)] font-bold">+{fmtInt(j.profitMu ?? 0)}µ</span>}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

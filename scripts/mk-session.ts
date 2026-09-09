@@ -18,10 +18,18 @@ const chain = (process.argv[3] || 'steem') as 'steem' | 'hive';
   });
   if (!key) throw new Error(`no verified vault key for ${account}/${chain}`);
   const wif = decryptSecret(key.cipher);
+  // Task 54 SIWE: קבלת-אתגר-חתימה חד-פעמי → התחברות עם הנונס (החזקת-ה-WIF היא החתימה)
+  const ch = await fetch('http://127.0.0.1:3000/api/vault/challenge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account, chain }),
+  });
+  const cj = await ch.json();
+  if (!cj.ok || !cj.nonce) throw new Error('challenge failed: ' + (cj.error || 'unknown'));
   const r = await fetch('http://127.0.0.1:3000/api/vault/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ account, chain, wif }),
+    body: JSON.stringify({ account, chain, wif, nonce: cj.nonce }),
   });
   const j = await r.json();
   if (!j.ok || !j.token) throw new Error('login failed: ' + (j.error || 'unknown'));
