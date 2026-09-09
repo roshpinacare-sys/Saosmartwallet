@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Lock, Flame, Vote, TrendingDown, Percent, Clock, Wallet,
-  ShieldCheck, Sparkles, Loader2,
+  ShieldCheck, Sparkles, Loader2, Bot, Sprout, Repeat, BarChart3, Landmark,
 } from 'lucide-react';
 import { authHeaders } from '@/components/sv/shared';
 import { fmtInt } from './common';
@@ -35,11 +35,35 @@ interface EconomyData {
   dynamicFees: Array<{ key: string; a: string; b: string; feeBps: number; volBpsEwma: number; swaps: number }>;
 }
 
+interface AleData {
+  ok: boolean;
+  height: number;
+  policy: { every: number; seedPct: number; maxPerCycleMu: number; minSeedMu: number; floorUsdsMu: number };
+  treasury: { usdsFreeMu: number; usdsFreeAboveFloorMu: number; lpValueUsdsMu: number; profitMu: number };
+  ale: { lastH: number; cycles: number; seededMu: number; seeds: number; polBaseUsdsMu: number } | null;
+  pol: { growthBps: number; weightedPolBps: number };
+  flywheel: { feeMeterMu: number; burnedSaosMu: number; revCycles: number; vePaidMu: number; aleSeededMu: number; aleSeeds: number; aleCycles: number };
+  autonomy: { arenaFills: number; swapsTotal: number; liveOrders: number; note: string };
+  pools: Array<{ key: string; assetA: string; assetB: string; reserveAMu: number; reserveBMu: number; lpTotalMu: number; lpTreasuryMu: number; polShareBps: number; dynFeeBps: number | null; swaps: number }>;
+  recentSeeds: Array<{ h: number; soldier: string; action: string; profitMu?: number; note?: string }>;
+  vaultFeed: { backingWsteemMu: number; honesty: string };
+}
+
+interface CompareData {
+  ok: boolean;
+  height: number;
+  rows: Array<{ metric: string; us: string; usLive: boolean; usValue: string; uniswap: string; curve: string; olympus: string; verdict: string }>;
+  methodology: string;
+  maximize: string;
+}
+
 export function EconomyView({ onNeedAuth, onDone }: {
   onNeedAuth: () => boolean;
   onDone: () => void;
 }) {
   const [eco, setEco] = useState<EconomyData | null>(null);
+  const [ale, setAle] = useState<AleData | null>(null);
+  const [cmp, setCmp] = useState<CompareData | null>(null);
   const [lockAmt, setLockAmt] = useState('500');
   const [weeks, setWeeks] = useState(52);
   const [bondAmt, setBondAmt] = useState('1000');
@@ -61,6 +85,39 @@ export function EconomyView({ onNeedAuth, onDone }: {
     };
     poll();
     return () => { aliveRef.current = false; stop = true; clearTimeout(timer); };
+  }, []);
+
+  // ── ALE · מנוע-הנזילות-האוטונומית (Task 55) — דוח-חי כל-3ש'
+  useEffect(() => {
+    aliveRef.current = true;
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const r = await fetch('/saos-dex/api/dex/ale', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        const j = (await r.json()) as AleData;
+        if (aliveRef.current && j.ok) setAle(j);
+      } catch { /* offline */ }
+      if (aliveRef.current && !stop) timer = setTimeout(poll, 3000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
+  }, []);
+
+  // ── השוואה-חיה מול-העולם — העמודה-שלנו-חיה, המתחרים-עובדות-מתועדות (כל-15ש')
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const r = await fetch('/saos-dex/api/dex/compare', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        const j = (await r.json()) as CompareData;
+        if (!stop && j.ok) setCmp(j);
+      } catch { /* offline */ }
+      if (!stop) timer = setTimeout(poll, 15000);
+    };
+    poll();
+    return () => { stop = true; clearTimeout(timer); };
   }, []);
 
   const mutate = useCallback(async (payload: Record<string, unknown>, tag: string) => {
@@ -116,6 +173,82 @@ export function EconomyView({ onNeedAuth, onDone }: {
           </div>
         )}
       </div>
+
+      {/* ── ALE · מנוע-הנזילות-האוטונומית (Task 55) ── */}
+      <section className="dx-card p-5" data-testid="ale-panel">
+        <header className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="w-8 h-8 rounded-xl bg-[color:var(--green-soft)] border border-[color:var(--green)]/30 flex items-center justify-center">
+            <Bot className="w-4 h-4 text-[color:var(--green)]" />
+          </span>
+          <div className="flex-1 min-w-[200px]">
+            <h2 className="text-[15px] font-bold">ALE — מנוע-הנזילות-האוטונומית</h2>
+            <p className="text-[11px] text-[color:var(--text-3)]">
+              נזילות שצומחת מעצמה: האוצר זורע חלק-מהעמלות חזרה-לבריכות כל {ale?.policy.every ?? 100} בלוקים — בלי-משתמשים, בלי-הדפסה
+            </p>
+          </div>
+          <span className="text-[10px] rounded-full border border-[color:var(--green)]/40 bg-[color:var(--green-soft)] text-[color:var(--green)] px-2.5 py-1 font-semibold">
+            {ale?.ale ? `פעיל · מחזור #${ale.ale.cycles}` : 'ממתין-למחזור-הראשון'}
+          </span>
+        </header>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4" data-testid="ale-stats">
+          <MiniStat label="POL-משוקלל" value={`${(ale?.pol.weightedPolBps ?? 0) / 100}%`} sub="מה-LP הכולל שלנו" tone="green" />
+          <MiniStat label="שווי-עמדות-LP-אוצר" value={`${fmtInt(ale?.treasury.lpValueUsdsMu ?? 0)}µ`} sub="נמדד-מהבריכות-החיות" />
+          <MiniStat label="הוזרע-מהעמלים" value={`${fmtInt(ale?.flywheel.aleSeededMu ?? 0)}µ`} sub={`${ale?.flywheel.aleSeeds ?? 0} הזרעות חיות`} tone="pink" />
+          <MiniStat label="פילים-אוטונומיים" value={fmtInt(ale?.autonomy.arenaFills ?? 0)} sub="סוחרי-הארנה — אפס-משתמשים" />
+        </div>
+
+        {/* הפלאיהול */}
+        <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3 text-[11px] font-semibold">
+            <Repeat className="w-3.5 h-3.5 text-[color:var(--green)]" /> הפלאיהול-הסגור — המערכת מפרה את עצמה
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap text-[10px]" dir="ltr">
+            {['עמלות-אמת', '40% שריפה', '40% קרן-ve', '20% אוצר', 'ALE זורע POL', 'בריכות-עמוקות', 'פגיעה-קטנה → מחזור-גבוה'].map((s, i, arr) => (
+              <span key={s} className="flex items-center gap-1.5">
+                <span className={`rounded-lg px-2 py-1 border ${i === 4 ? 'border-[color:var(--pink)]/50 bg-[color:var(--pink)]/10 text-[color:var(--pink)] font-bold' : 'border-[color:var(--line)] bg-black/30 text-[color:var(--text-2)]'}`}>{s}</span>
+                {i < arr.length - 1 && <span className="text-[color:var(--text-3)]">→</span>}
+              </span>
+            ))}
+          </div>
+          <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+            <div className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">מד-עמלות-חי</div>
+              <div className="dx-num text-[11.5px] font-bold" dir="ltr">{fmtInt(ale?.flywheel.feeMeterMu ?? 0)}µ</div>
+            </div>
+            <div className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">USDS-חופשי-מעל-הרצפה</div>
+              <div className="dx-num text-[11.5px] font-bold" dir="ltr">{fmtInt(ale?.treasury.usdsFreeAboveFloorMu ?? 0)}µ</div>
+            </div>
+            <div className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">צמיחת-שווי-LP-מאז-בסיס</div>
+              <div className={`dx-num text-[11.5px] font-bold ${(ale?.pol.growthBps ?? 0) >= 0 ? 'text-[color:var(--green)]' : 'text-rose-400'}`} dir="ltr">{((ale?.pol.growthBps ?? 0) / 100).toFixed(2)}%</div>
+            </div>
+            <div className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1.5">
+              <div className="text-[9px] text-[color:var(--text-3)]">גיבוי-כספת-חי (WSTEEM 1:1)</div>
+              <div className="dx-num text-[11.5px] font-bold" dir="ltr">{fmtInt(ale?.vaultFeed.backingWsteemMu ?? 0)}µ</div>
+            </div>
+          </div>
+        </div>
+
+        {/* יומן-הזרעות */}
+        <div className="space-y-1" data-testid="ale-seeds-log">
+          <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--text-3)] mb-1">
+            <Sprout className="w-3 h-3 text-[color:var(--green)]" /> יומן-הזרעות-חי (מהיומן-הקנוני-החתום-מרקל)
+          </div>
+          {(ale?.recentSeeds ?? []).length > 0 ? ale!.recentSeeds.slice(0, 4).map((j, i) => (
+            <div key={`${j.h}-${i}`} className="flex items-center justify-between text-[10.5px] rounded-lg bg-black/20 border border-[color:var(--line)] px-2.5 py-1.5">
+              <span className="dx-num text-[color:var(--text-3)]" dir="ltr">#{fmtInt(j.h)}</span>
+              <span className="dx-num text-[color:var(--text-1)] flex-1 mx-3 truncate" dir="ltr">{j.note}</span>
+              <span className="dx-num text-[color:var(--green)]" dir="ltr">{j.action === 'pol_seed' ? 'seed' : 'acquire'}</span>
+            </div>
+          )) : (
+            <div className="text-[10.5px] text-[color:var(--text-3)] rounded-lg bg-black/20 border border-[color:var(--line)] px-2.5 py-2">
+              המחזור-הראשון מתוזמן לגובה-בלוק מרובה-{ale?.policy.every ?? 100} — דטרמיניסטי, כמו-הכל-כאן. הפוליסה: {ale?.policy.seedPct ?? 25}% מהחופשי-מעל-הרצפה, תקרה {fmtInt(ale?.policy.maxPerCycleMu ?? 0)}µ למחזור.
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="grid lg:grid-cols-2 gap-5">
         {/* ── veSAOS ── */}
@@ -324,14 +457,64 @@ export function EconomyView({ onNeedAuth, onDone }: {
         </section>
       </div>
 
+      {/* ── השוואה-חיה מול-העולם (Task 55) ── */}
+      <section className="dx-card p-5" data-testid="compare-panel">
+        <header className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="w-8 h-8 rounded-xl bg-[color:var(--pink)]/15 border border-[color:var(--pink)]/30 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-[color:var(--pink)]" />
+          </span>
+          <div className="flex-1 min-w-[200px]">
+            <h2 className="text-[15px] font-bold">השוואה-חיה — הרשת שלנו מול הדקסים-המובילים</h2>
+            <p className="text-[11px] text-[color:var(--text-3)]">{cmp?.methodology ?? 'העמודה-שלנו=חי-נמדד-מהגרעין · המתחרים=עובדות-ציבוריות-מתועדות'}</p>
+          </div>
+        </header>
+        {cmp?.maximize && (
+          <div className="text-[10.5px] text-[color:var(--green)] rounded-lg border border-[color:var(--green)]/30 bg-[color:var(--green-soft)] px-3 py-1.5 mb-3 leading-relaxed">
+            {cmp.maximize}
+          </div>
+        )}
+        <div className="space-y-2 max-h-96 overflow-y-auto" data-testid="compare-table">
+          {(cmp?.rows ?? []).map(r => (
+            <div key={r.metric} className="rounded-xl border border-[color:var(--line)] bg-black/20 p-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+                <span className="text-[12px] font-bold">{r.metric}</span>
+                <span className="dx-num text-[10px] rounded-full border border-[color:var(--green)]/40 bg-[color:var(--green-soft)] text-[color:var(--green)] px-2 py-0.5 font-bold" dir="ltr">{r.usValue}</span>
+              </div>
+              <div className="grid md:grid-cols-4 gap-2 text-[10.5px]">
+                <div className="rounded-lg border border-[color:var(--green)]/40 bg-[color:var(--green-soft)]/60 p-2">
+                  <div className="text-[9px] font-bold text-[color:var(--green)] mb-0.5">אנחנו · חי מהגרעין</div>
+                  <div className="text-[color:var(--text-1)] leading-snug">{r.us}</div>
+                </div>
+                <div className="rounded-lg border border-[color:var(--line)] bg-black/30 p-2">
+                  <div className="text-[9px] font-bold text-[color:var(--text-3)] mb-0.5" dir="ltr">Uniswap v3</div>
+                  <div className="text-[color:var(--text-2)] leading-snug">{r.uniswap}</div>
+                </div>
+                <div className="rounded-lg border border-[color:var(--line)] bg-black/30 p-2">
+                  <div className="text-[9px] font-bold text-[color:var(--text-3)] mb-0.5" dir="ltr">Curve</div>
+                  <div className="text-[color:var(--text-2)] leading-snug">{r.curve}</div>
+                </div>
+                <div className="rounded-lg border border-[color:var(--line)] bg-black/30 p-2">
+                  <div className="text-[9px] font-bold text-[color:var(--text-3)] mb-0.5" dir="ltr">OlympusDAO</div>
+                  <div className="text-[color:var(--text-2)] leading-snug">{r.olympus}</div>
+                </div>
+              </div>
+              <div className="text-[10px] text-[color:var(--text-3)] mt-1.5 flex items-start gap-1">
+                <Landmark className="w-3 h-3 shrink-0 mt-0.5 text-[color:var(--pink)]" /> {r.verdict}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* how it works */}
       <section className="dx-card p-5">
         <h2 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-[color:var(--text-2)]" />איך זה מסתדר יחד</h2>
-        <div className="grid md:grid-cols-4 gap-3 text-[11.5px] leading-relaxed">
+        <div className="grid md:grid-cols-5 gap-3 text-[11.5px] leading-relaxed">
           <Step n="1" title="עמלים זורמים" body="כל סוואפ/מילוי בספר מייצר עמלה-אמת: 70% ל-LP, 30% לאוצר — מדידה חתומה." />
           <Step n="2" title="אוצר מפריש" body={`כל ${eco?.revenue.every ?? 600} בלוקים: 40% קנייה-ושריפה · 40% לקרן-ve · 20% נשאר.`} />
           <Step n="3" title="מצביעים מרוויחים" body={`בכל אפוק (${eco?.epoch.every ?? 1200} בלוקים) הקרן מתחלקת לפי כוח-ve — נשלם ישירות לארנק.`} />
           <Step n="4" title="ההיצע מתכווץ" body="שריפה מורידה ΣSAOS מהמצב-עצמו; בונדים מוסיפים נזילות-אוצר. המעגל מחזק את עצמו." />
+          <Step n="5" title="ALE זורע נזילות" body={`כל ${ale?.policy.every ?? 100} בלוקים האוצר רוכש צד-שני וזורע POL מהעמלות — נזילות שצומחת בלי משתמשים.`} />
         </div>
       </section>
     </div>
