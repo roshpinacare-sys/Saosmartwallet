@@ -25,11 +25,14 @@ import {
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
+  Smartphone, Unplug,
 } from "lucide-react";
 
 /* ══════════════════════════ auth plumbing ══════════════════════════ */
 
 const TOKEN_KEY = "saos-gate-token";
+const DEVICE_KEY = "saos-gate-device"; // the trusted-device token — lives ONLY in this browser
+const DEVICE_ID_KEY = "saos-gate-device-id";
 
 function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
@@ -39,6 +42,23 @@ function setToken(t: string | null) {
     if (t) localStorage.setItem(TOKEN_KEY, t);
     else localStorage.removeItem(TOKEN_KEY);
   } catch { /* cookie fallback applies */ }
+}
+function getDeviceToken(): string | null {
+  try { return localStorage.getItem(DEVICE_KEY); } catch { return null; }
+}
+function setDeviceToken(token: string | null, id?: string) {
+  try {
+    if (token) {
+      localStorage.setItem(DEVICE_KEY, token);
+      if (id) localStorage.setItem(DEVICE_ID_KEY, id);
+    } else {
+      localStorage.removeItem(DEVICE_KEY);
+      localStorage.removeItem(DEVICE_ID_KEY);
+    }
+  } catch { /* private mode — device memory unavailable, key login still works */ }
+}
+function getDeviceId(): string | null {
+  try { return localStorage.getItem(DEVICE_ID_KEY); } catch { return null; }
 }
 
 async function api(path: string, init?: RequestInit): Promise<Response> {
@@ -76,13 +96,16 @@ interface AgentRow {
   modules?: string[] | null; brain?: string | null;
 }
 interface ModuleDef { id: string; name: string; kind: "skill" | "connector" | "actor"; desc: string; args: string; needsVault: boolean }
-interface TraceStep { i: number; side: "maker" | "checker"; thought?: string; tool?: string; args?: Record<string, unknown>; ok?: boolean; result?: unknown; error?: string; at: string }
+interface TraceStep { i: number; side: "maker" | "checker"; thought?: string; tool?: string; args?: Record<string, unknown>; ok?: boolean; result?: unknown; error?: string; ms?: number; cached?: boolean; rescued?: boolean; repair?: boolean; at: string }
 interface CheckerVerdict { done: boolean; checks: { criterion: string; pass: boolean; evidence: string }[]; gaps: string; notes: string }
-interface RunRow { id: string; agentName: string; goal: string; brain: string; checker: string; budget: number; status: string; createdAt: string; finishedAt: string | null; report?: string | null }
+interface RunRow { id: string; agentName: string; goal: string; brain: string; checker: string; budget: number; status: string; createdAt: string; finishedAt: string | null; report?: string | null; makerSteps?: number; durationMs?: number | null; tokens?: string | null }
 interface RunDetail extends RunRow {
   doneMeans: string[]; modules: string[];
   steps: TraceStep[]; verdict: CheckerVerdict | null; error?: string | null;
+  lessons?: string[]; durationMs?: number | null; tokens?: { prompt: number; completion: number } | null;
 }
+interface AgentStat { agent: string; runs: number; done: number; blocked: number; failed: number; avgSteps: number; avgMs: number | null }
+interface DeviceRow { id: string; label: string; createdAt: string; lastUsedAt: string; expiresAt: string; revoked: boolean }
 interface Msg { id: string; channel: string; fromKind: string; fromName: string; body: string; createdAt: string }
 interface ActionRow { id: string; agentName: string; action: string; params: string; ok: boolean; result: string; createdAt: string }
 interface KeyReport {
@@ -100,8 +123,11 @@ const ENDPOINTS: Ep[] = [
   { method: "GET", path: "/api/gate/agents", desc: "הסוכנים המחוברים", auth: "operator" },
   { method: "POST", path: "/api/gate/agents", desc: "צירוף סוכן (טוקן פעם-אחת)", auth: "operator", body: '{ "name": "my-agent" }' },
   { method: "GET", path: "/api/gate/modules", desc: "מחסן-המודולים לחימוש סוכנים", auth: "operator" },
-  { method: "POST", path: "/api/gate/run", desc: "הרצת מטרה עם לולאת-חוכמה (מייצר + בודק עצמאי)", auth: "operator", body: '{ "agentName": "…", "goal": "…", "doneMeans": ["…"] }' },
-  { method: "GET", path: "/api/gate/run", desc: "יומן הרצות + עקבות ראיות", auth: "operator" },
+  { method: "POST", path: "/api/gate/run", desc: "הרצת מטרה עם לולאת-חוכמה (מייצר + בודק עצמאי + לקחים)", auth: "operator", body: '{ "agentName": "…", "goal": "…", "doneMeans": ["…"] }' },
+  { method: "GET", path: "/api/gate/run", desc: "יומן הרצות + יעילות-צי אמיתית", auth: "operator" },
+  { method: "POST", path: "/api/gate/device", desc: "חימוש מכשיר-מהימן (זכור אותי בצורה בטוחה)", auth: "operator", body: '{ "label": "Chrome · Windows" }' },
+  { method: "POST", path: "/api/gate/device/login", desc: "כניסה חוזרת ממכשיר מוכר — בלי מפתח", auth: "public", body: '{ "deviceToken": "…" }' },
+  { method: "GET", path: "/api/gate/device", desc: "רשימת המכשירים-המהימנים", auth: "operator" },
   { method: "POST", path: "/api/gate/messages", desc: "פרסום בגשר-הפיקוד", auth: "operator", body: '{ "body": "…" }' },
   { method: "GET", path: "/api/gate/actions", desc: "יומן-הביקורת", auth: "operator" },
   { method: "POST", path: "/api/gate/lock", desc: "נעילה וניקוי-זיכרון", auth: "public" },
@@ -246,6 +272,7 @@ export default function Page() {
   const [booting, setBooting] = useState(true);
   const [status, setStatus] = useState<GateStatus | null>(null);
   const [sealState, setSealState] = useState<"locked" | "verifying" | "open">("locked");
+  const [deviceRemembered, setDeviceRemembered] = useState(false);
 
   const refreshStatus = useCallback(async (): Promise<boolean> => {
     const s = await apiJson<GateStatus>("/api/gate/status");
@@ -258,7 +285,31 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    (async () => { await refreshStatus(); setBooting(false); })();
+    (async () => {
+      let okIn = await refreshStatus();
+      // secure "remember me": no live session but this browser holds a trusted
+      // device token → re-open the vault without ever pasting a key again
+      if (!okIn && getDeviceToken()) {
+        setDeviceRemembered(true);
+        try {
+          const r = await fetch("/api/gate/device/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ deviceToken: getDeviceToken() }),
+          }).then((x) => x.json());
+          if (r?.ok && r.token) {
+            setToken(r.token as string);
+            okIn = await refreshStatus();
+            if (okIn) toast.success("חזרת בביטחון ממכשיר מוכר — בלי להדביק מפתח");
+          } else {
+            // the device was revoked/expired — clear the inert token, honest state
+            setDeviceToken(null);
+            setDeviceRemembered(false);
+          }
+        } catch { /* network hiccup — the lock screen stays honest */ }
+      }
+      setBooting(false);
+    })();
   }, [refreshStatus]);
 
   async function logout() {
@@ -288,6 +339,7 @@ export default function Page() {
         <LockScene
           status={status}
           state={sealState}
+          deviceRemembered={deviceRemembered}
           onVerifying={() => setSealState("verifying")}
           onFail={() => setSealState("locked")}
           onIn={async (token) => {
@@ -295,6 +347,7 @@ export default function Page() {
             const okIn = await refreshStatus();
             if (okIn) toast.success("הכספת נפתחה — כל המפתחות בפנים");
             else { setSealState("locked"); toast.error("האימות השתבש — נסה שוב"); }
+            return okIn;
           }}
         />
       </div>
@@ -313,13 +366,17 @@ export default function Page() {
         <Bridge />
         <Audit />
         <ApiConsole />
+        <TrustedDevices />
         <EmergencyZone onAfter={refreshStatus} />
         <div className="h-10" />
       </main>
       <footer className="relative z-10 mt-auto border-t border-zinc-900 bg-black/60 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
           <span className="font-mono tracking-widest">SAOS SOVEREIGN VAULT · AES-256-GCM · scrypt(2¹⁵)</span>
-          <span>מחובר כ-<b className="text-zinc-400">{status.session.name}</b> · {status.keySeals} חותמות-מפתח · סשן 30 יום</span>
+          <span>
+            מחובר כ-<b className="text-zinc-400">{status.session.name}</b> · {status.keySeals} חותמות-מפתח · סשן 30 יום
+            {deviceRemembered && <span className="text-emerald-500/80"> · מכשיר זכור ✓</span>}
+          </span>
         </div>
       </footer>
     </div>
@@ -343,16 +400,18 @@ function Backdrop() {
 /* ══════════════════════════ lock scene ══════════════════════════ */
 
 function LockScene({
-  status, state, onVerifying, onFail, onIn,
+  status, state, deviceRemembered, onVerifying, onFail, onIn,
 }: {
   status: GateStatus | null;
   state: "locked" | "verifying" | "open";
+  deviceRemembered: boolean;
   onVerifying: () => void;
   onFail: () => void;
-  onIn: (token: string) => void;
+  onIn: (token: string) => Promise<boolean>;
 }) {
   const [keyInput, setKeyInput] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [remember, setRemember] = useState(true);
 
   async function login() {
     if (!keyInput.trim() || state === "verifying") return;
@@ -366,7 +425,23 @@ function LockScene({
       }).then((x) => x.json());
       if (r?.ok && r.token) {
         setKeyInput("");
-        onIn(r.token as string);
+        const okIn = await onIn(r.token as string);
+        if (okIn && remember) {
+          // arm THIS browser as a trusted device — the raw token lives only here;
+          // the server keeps the hash + the master sealed under it (DB alone is inert)
+          try {
+            const d = await apiJson<{ ok: boolean; device?: { id: string }; deviceToken?: string; error?: string }>("/api/gate/device", {
+              method: "POST",
+              body: JSON.stringify({}),
+            });
+            if (d?.ok && d.deviceToken) {
+              setDeviceToken(d.deviceToken, d.device?.id);
+              toast.success("המכשיר הזה זכור — הכניסה הבאה בלי מפתח (90 יום)");
+            } else {
+              toast.error(d?.error || "חימוש-המכשיר נכשל — הכניסה במפתח תמיד עובדת");
+            }
+          } catch { /* device arm is best-effort — session already live */ }
+        }
       } else {
         setErr(r?.error || "הכניסה נכשלה");
         onFail();
@@ -426,6 +501,21 @@ function LockScene({
 
           {err && (
             <p role="alert" className="mt-4 text-sm text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-2.5">{err}</p>
+          )}
+
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <Switch
+              checked={remember}
+              onCheckedChange={setRemember}
+              aria-label="זכור אותי על המכשיר הזה"
+              className="data-[state=checked]:bg-emerald-600"
+            />
+            <span className="text-xs text-zinc-400">
+              זכור אותי בצורה בטוחה על המכשיר הזה — <span className="text-zinc-500">כניסה חוזרת בלי מפתח, 90 יום, שלילה בלחיצה</span>
+            </span>
+          </div>
+          {deviceRemembered && (
+            <p className="mt-2 text-[11px] font-mono text-amber-300/80">⚠ היה כאן טוקן-מכשיר שנפסל — היכנס במפתח וחמש מכשיר מחדש</p>
           )}
 
           {status && (
@@ -867,7 +957,7 @@ function TraceStepView({ s }: { s: TraceStep }) {
     const v = s.result as CheckerVerdict | undefined;
     return (
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5">
-        <p className="font-bold text-sm text-amber-300 flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> פסיקת הבודק העצמאי</p>
+        <p className="font-bold text-sm text-amber-300 flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> פסיקת הבודק העצמאי{s.ms ? <span className="font-mono text-[10px] text-zinc-500">· {(s.ms / 1000).toFixed(1)}s</span> : null}</p>
         {v && (
           <div className="mt-2 space-y-1.5">
             <p className="text-xs text-zinc-300">{v.notes}</p>
@@ -892,6 +982,10 @@ function TraceStepView({ s }: { s: TraceStep }) {
         {s.args && Object.keys(s.args).length > 0 && (
           <span className="text-zinc-500 truncate max-w-full">{JSON.stringify(s.args).slice(0, 120)}</span>
         )}
+        {typeof s.ms === "number" && <span className="text-zinc-600">· {(s.ms / 1000).toFixed(1)}s</span>}
+        {s.cached && <span className="text-[9px] px-1.5 py-0 rounded bg-sky-500/15 text-sky-300 font-black">CACHE</span>}
+        {s.rescued && <span className="text-[9px] px-1.5 py-0 rounded bg-emerald-500/15 text-emerald-300 font-black">RESCUED</span>}
+        {s.repair && <span className="text-[9px] px-1.5 py-0 rounded bg-amber-500/15 text-amber-300 font-black">REPAIR</span>}
       </p>
       {s.ok === false && s.error && <p className="text-[11px] text-rose-300 mt-1.5 font-mono break-all" dir="ltr">{s.error}</p>}
       {s.ok !== false && s.result !== undefined && s.tool !== "finish" && (
@@ -931,6 +1025,7 @@ function Agents() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [activeRun, setActiveRun] = useState<RunDetail | null>(null);
   const [runs, setRuns] = useState<RunRow[]>([]);
+  const [stats, setStats] = useState<AgentStat[]>([]);
 
   const armedAgents = agents.filter((a) => a.active && (a.modules?.length || 0) > 0);
 
@@ -941,8 +1036,8 @@ function Agents() {
     ]);
     if (ar?.ok) setAgents(ar.agents || []);
     if (mo?.ok) { setMods(mo.modules || []); setBrains(mo.brains || { maker: [], checker: [] }); setNv(mo.nvidia || null); }
-    const rs = await apiJson<{ ok: boolean; runs: RunRow[] }>("/api/gate/run");
-    if (rs?.ok) setRuns(rs.runs || []);
+    const rs = await apiJson<{ ok: boolean; runs: RunRow[]; stats?: AgentStat[] }>("/api/gate/run");
+    if (rs?.ok) { setRuns(rs.runs || []); setStats(rs.stats || []); }
     setLoading(false);
   }, []);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -1084,6 +1179,7 @@ function Agents() {
             {loading && <div className="flex items-center gap-2 text-sm text-zinc-500 py-4 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> טוען…</div>}
             {!loading && agents.map((a) => {
               const armed = a.modules || [];
+              const st = stats.find((s) => s.agent === a.name);
               return (
                 <div key={a.id} className="rounded-xl border border-zinc-800/80 bg-black/40 p-3.5">
                   <div className="flex items-center gap-2.5 flex-wrap">
@@ -1093,6 +1189,11 @@ function Agents() {
                       ? <Badge variant="outline" className="text-emerald-400 border-emerald-500/40 text-[10px]">פעיל</Badge>
                       : <Badge variant="outline" className="text-zinc-600 border-zinc-800 text-[10px]">נשלל</Badge>}
                     {a.brain && <Badge variant="outline" className="text-sky-300 border-sky-500/40 text-[10px] font-mono" dir="ltr"><Cpu className="h-3 w-3 ml-1 inline" />{a.brain}</Badge>}
+                    {st && st.runs > 0 && (
+                      <span className="font-mono text-[10px] text-zinc-500" dir="ltr" title="יעילות אמיתית מהריצות">
+                        {st.runs} ריצות · {Math.round((st.done / st.runs) * 100)}% עברו · ממוצע {st.avgSteps} צעדים{st.avgMs ? ` · ${Math.round(st.avgMs / 100) / 10}s` : ""}
+                      </span>
+                    )}
                     <span className="text-[10px] text-zinc-600 mr-auto">{new Date(a.lastSeenAt).toLocaleString("he-IL")}</span>
                     {a.active && armed.length > 0 && (
                       <Button variant="outline" size="sm" className="h-7 text-[11px] gap-1 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10"
@@ -1126,7 +1227,7 @@ function Agents() {
         <GlowCard className="p-6">
           <h3 className="font-bold flex items-center gap-2 mb-1"><Crosshair className="h-4 w-4 text-emerald-400" /> מפעילת-המטרות (לולאה סגורה)</h3>
           <p className="text-[11px] text-zinc-500 mb-4">
-            מייצר פועל דרך מודולים אמיתיים · בודק עצמאי עם מוח <b className="text-zinc-400">אחר</b> פוסק לפי קריטריונים עם ראיות מהעקבות · אין ניצחון-עצמי — רק הוכחה.
+            מייצר פועל דרך מודולים אמיתיים · בודק עצמאי עם מוח <b className="text-zinc-400">אחר</b> פוסק לפי קריטריונים עם ראיות מהעקבות · פערים חוזרים למייצר לסבב-תיקון אחד · לקחים מריצות-עבר מוזרקים אוטומטית · תקציב לא נשרף על זבל-פרוטוקול.
           </p>
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="space-y-2.5">
@@ -1189,6 +1290,15 @@ function Agents() {
                 {runRunning && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400 mr-auto" />}
               </div>
               <p className="text-sm text-zinc-300 mb-2">🎯 {activeRun.goal}</p>
+              {(activeRun.durationMs || activeRun.tokens || (activeRun.lessons && activeRun.lessons.length > 0)) && (
+                <div className="flex items-center gap-2 flex-wrap mb-2 text-[10px] font-mono">
+                  {activeRun.durationMs ? <span className="text-zinc-500">⏱ {(activeRun.durationMs / 1000).toFixed(1)}s</span> : null}
+                  {activeRun.tokens ? <span className="text-zinc-500" dir="ltr">tokens: {activeRun.tokens.prompt}→{activeRun.tokens.completion}</span> : null}
+                  {activeRun.lessons && activeRun.lessons.length > 0 && (
+                    <span className="text-emerald-300/80" title={activeRun.lessons.join("\n")}>🧠 {activeRun.lessons.length} לקחים מריצות-עבר</span>
+                  )}
+                </div>
+              )}
               <div className="space-y-2 max-h-96 overflow-y-auto scroll-thin">
                 {activeRun.steps.map((s, i) => <TraceStepView key={i} s={s} />)}
                 {activeRun.steps.length === 0 && <p className="text-xs text-zinc-500 py-3 text-center">ממתין לצעד הראשון…</p>}
@@ -1209,7 +1319,12 @@ function Agents() {
                   className="w-full text-right rounded-xl border border-zinc-800/80 bg-black/40 px-3 py-2 flex items-center gap-2 flex-wrap hover:border-zinc-600 transition-colors">
                   <span className={"h-2 w-2 rounded-full shrink-0 " + (r.status === "done" ? "bg-emerald-400" : r.status === "blocked" ? "bg-amber-400" : r.status === "failed" ? "bg-rose-400" : "bg-zinc-500 animate-pulse")} aria-hidden />
                   <span className="font-mono text-xs text-zinc-300" dir="ltr">{r.agentName}</span>
-                  <span className="text-xs text-zinc-500 truncate max-w-[46%]">{r.goal}</span>
+                  <span className="text-xs text-zinc-500 truncate max-w-[40%]">{r.goal}</span>
+                  {typeof r.makerSteps === "number" && (
+                    <span className="font-mono text-[10px] text-zinc-600" dir="ltr">
+                      {r.makerSteps}/{r.budget} צעדים{r.durationMs ? ` · ${(r.durationMs / 1000).toFixed(1)}s` : ""}
+                    </span>
+                  )}
                   <Badge variant="outline" className="text-[9px] font-mono text-zinc-500 border-zinc-700 mr-auto" dir="ltr">{r.status}</Badge>
                 </button>
               ))}
@@ -1432,7 +1547,122 @@ function ApiConsole() {
   );
 }
 
-/* ══════════════════════════ 08 · emergency zone ══════════════════════════ */
+/* ══════════════════════════ 08 · trusted devices ══════════════════════════ */
+
+function TrustedDevices() {
+  const [devices, setDevices] = useState<DeviceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const r = await apiJson<{ ok: boolean; devices: DeviceRow[] }>("/api/gate/device");
+    if (r?.ok) setDevices(r.devices || []);
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    setCurrentId(getDeviceId());
+    void Promise.resolve().then(load);
+  }, [load]);
+
+  async function revoke(id: string) {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>(`/api/gate/device?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (r?.ok) {
+        if (currentId === id) { setDeviceToken(null); setCurrentId(null); }
+        toast.success("המכשיר נשלל — הצופן שלו אינרטי מעתה");
+        await load();
+      } else toast.error(r?.error || "השלילה נכשלה");
+    } finally { setBusy(false); }
+  }
+
+  async function forgetThis() {
+    setBusy(true);
+    try {
+      const dt = getDeviceToken();
+      if (dt) {
+        await fetch("/api/gate/device/forget", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deviceToken: dt }) });
+      }
+      setDeviceToken(null);
+      setCurrentId(null);
+      toast("המכשיר הזה נשכח — הכניסה הבאה במפתח-חי");
+      await load();
+    } finally { setBusy(false); }
+  }
+
+  async function revokeAll() {
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; error?: string }>("/api/gate/device?all=1", { method: "DELETE" });
+      if (r?.ok) {
+        setDeviceToken(null);
+        setCurrentId(null);
+        toast.success("כל המכשירים נשללו — כניסה חוזרת רק במפתח-חי");
+        await load();
+      } else toast.error(r?.error || "השלילה נכשלה");
+    } finally { setBusy(false); }
+  }
+
+  const active = devices.filter((d) => !d.revoked);
+
+  return (
+    <section className="py-14">
+      <SectionHead num="08" title="מכשירים-מהימנים" sub="זכירה-בטוחה של המפעיל: הטוקן חי בדפדפן בלבד, השרת מחזיק hash + מפתח-אב חתום תחתו. ה-DB לבדו אינו מסוגל להיכנס." />
+      <motion.div {...rise}>
+        <GlowCard className="p-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+            <h3 className="font-bold flex items-center gap-2"><Smartphone className="h-4 w-4 text-emerald-400" /> {active.length} מכשירים פעילים</h3>
+            <div className="flex gap-2">
+              {currentId && (
+                <Button variant="outline" size="sm" disabled={busy} onClick={forgetThis} className="h-8 text-[11px] gap-1 border-zinc-800 text-zinc-300 hover:bg-zinc-800/60">
+                  <Unplug className="h-3 w-3" /> שכח מכשיר זה
+                </Button>
+              )}
+              {active.length > 0 && (
+                <Button variant="outline" size="sm" disabled={busy} onClick={revokeAll} className="h-8 text-[11px] gap-1 border-rose-500/40 text-rose-300 hover:bg-rose-500/10">
+                  <Trash2 className="h-3 w-3" /> שלול הכול
+                </Button>
+              )}
+            </div>
+          </div>
+          <div className="space-y-2 max-h-72 overflow-y-auto scroll-thin">
+            {loading && <div className="flex items-center gap-2 text-sm text-zinc-500 py-4 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> טוען…</div>}
+            {!loading && devices.map((d) => (
+              <div key={d.id} className={"rounded-xl border px-3.5 py-3 flex items-center gap-3 flex-wrap " + (d.revoked ? "border-zinc-800/60 bg-black/20 opacity-60" : "border-zinc-800/80 bg-black/40")}>
+                <Smartphone className={"h-4 w-4 shrink-0 " + (d.revoked ? "text-zinc-600" : "text-emerald-400")} />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-zinc-200 flex items-center gap-2">
+                    {d.label}
+                    {d.id === currentId && <Badge variant="outline" className="text-[9px] text-emerald-300 border-emerald-500/40">המכשיר הזה</Badge>}
+                    {d.revoked && <Badge variant="outline" className="text-[9px] text-zinc-500 border-zinc-700">נשלל</Badge>}
+                  </p>
+                  <p className="text-[10px] text-zinc-600 font-mono">
+                    נוצר {new Date(d.createdAt).toLocaleDateString("he-IL")} · שימוש אחרון {new Date(d.lastUsedAt).toLocaleString("he-IL")} · פג-תוקף {new Date(d.expiresAt).toLocaleDateString("he-IL")}
+                  </p>
+                </div>
+                {!d.revoked && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400/80 shrink-0 mr-auto" title="שלילת מכשיר" disabled={busy} onClick={() => revoke(d.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {!loading && devices.length === 0 && (
+              <p className="text-sm text-zinc-500 py-6 text-center">אין מכשירים-מהימנים — היכנס במפתח עם &quot;זכור אותי&quot; והמכשיר ייחרש כאן</p>
+            )}
+          </div>
+          <p className="mt-4 text-[11px] text-zinc-600 leading-relaxed">
+            איך זה בטוח: טוקן-המכשיר (256 סיביות) נולד בהתחברות וחי רק בדפדפן הזה · השרת מחזיק את ה-hash שלו בלבד, ואת מפתח-האב חתום תחת scrypt(טוקן) —
+            כלומר גם גניבת-DB מלאה לא מאפשרת כניסה ולא פותחת את הכספת · שלילה הופכת את הצופן לאינרטי מיד · תוקף 90 יום.
+          </p>
+        </GlowCard>
+      </motion.div>
+    </section>
+  );
+}
+
+/* ══════════════════════════ 09 · emergency zone ══════════════════════════ */
 
 function EmergencyZone({ onAfter }: { onAfter: () => Promise<boolean> }) {
   const [open, setOpen] = useState(false);
@@ -1459,7 +1689,7 @@ function EmergencyZone({ onAfter }: { onAfter: () => Promise<boolean> }) {
 
   return (
     <section className="py-14">
-      <SectionHead num="08" title="אזור-חירום" sub="רק אם איבדת הכול: הוכחת-בעלות חיה משחזרת את הכספת מהמקורות ששרדו." />
+      <SectionHead num="09" title="אזור-חירום" sub="רק אם איבדת הכול: הוכחת-בעלות חיה משחזרת את הכספת מהמקורות ששרדו. כל המכשירים-המהימנים נשללים אוטומטית — מפתח-אב חדש." />
       <motion.div {...rise}>
         <GlowCard className="border-rose-500/20">
           <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 px-6 py-4 text-right" aria-expanded={open}>
