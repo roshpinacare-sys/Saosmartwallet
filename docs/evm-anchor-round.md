@@ -89,3 +89,33 @@ bun tools/evm-anchor-broadcast.ts --verify=0xf5c48cdefe1c1448728c6d5828f34d8393c
   (הכלי מוכן).
 - המפתחות הפרטיים חיים רק ב-`.grid98-lab/` המנוטרל מ-git (מנוגרס ע"י
   ה-security gate) — ב-git יש רק כלים וראיות ציבוריות.
+
+---
+
+## עדכון סבב CONTINUE-1 (2026-09-09): עגינות 2 ו-3 — הנתיב החוזר מוכח
+
+הבעלים אישר "תמשיך" — ושתי עגינות המשך בוצעו חי, באותו כלי, אותם גבולות-בטיחות,
+בלי שום שינוי-קוד. זו כבר **סדרה** ולא proof-of-perform בודד:
+
+| # | txid | בלוק | height שנעגן | root | gasUsed | עדות 5-שרשרות (S/H/T/E/Sol) |
+|---|---|---|---|---|---|---|
+| 1 | `0xf5c48cde…6d584a` | 25,936,661 | 68058 | `94efe479…` | 32,680 | — (סבב החתימה) |
+| 2 | `0xd00ca0a2…4cdd5ad` | 25,936,827 | **69207** | `93f134b6…` | **32,680** | 109,416,825 / 109,751,350 / 86,082,968 / 25,936,823 / 445,497,073 |
+| 3 | `0x040a04f2…d5c2b2` | 25,936,958 | **70171** | `077cbc32…` | **32,680** | 109,417,353 / 109,751,880 / 86,083,498 / 25,936,956 / 445,502,080 |
+
+- **מודל ה-gas: 4/4 התאמות מדויקות** (32,680 == gasUsed בכל אחת) — זה כבר
+  חוזה, לא צירוף.
+- Tier-3 עצמאי על עגינה 3:
+  `bun tools/evm-anchor-broadcast.ts --verify=0x040a04f2…d5c2b2` →
+  `TIER-3-VERIFY: PROVEN · signerIdentity=headcorner · heightMatches/rootMatches: true (publishedHeight 70171)`.
+- בין עגינה 1 ל-3 עברו ~50 דקות והשרשרת צעדה 68058 → 70171 (+2,113 בלוקים) —
+  שלוש נקודות-זמן עצמאיות של אותה stateRoot-התקדמות עכשיו חקוקות על mainnet.
+- במקביל בסבב: **תשתית הדאימונים שוקמה מקריסת-סנדבוקס מלאה** (lab מוחזר,
+  guardian boot + dual-slot loops חיים, saosnet BEAT חי, key-broker שוקם),
+  ונמצא-ותוקן root-cause שהפיל את guardian.cjs: spawn ל-`mini-services/key-broker`
+  שלא היה קיים ב-lab → ENOENT → unhandled `'error'` → קריסה. אחרי ההשלמה
+  (קוד-ה-service האמיתי מה-org + ethers): **GUARD DONE מלא** —
+  key-broker-alive · daemon-respawned · chain-fresh(0min) · engine-fresh ·
+  DOOR-RELAYER/HARVEST-SPAWNED · wallets/deposits/sibling-alive.
+- עגינות-STEEM עדיין נכשלות כנים (missing posting authority) — אותו גבול מתועד:
+  מפתחות post-rotation אצל הבעלים בלבד.
