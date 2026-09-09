@@ -631,3 +631,24 @@ Stage Summary:
 - שלא יקרה שוב: owner-lock (חסימת רוטציות-owner בלי אישור-בעלים מפורש), watchdog אימות כל 5 דקות, יומן-ביקורת מלא
 - סוכנים: register→token-חד-פעמי; message/task/claim/result דרך Bearer; צ'אט חי (relay socket.io + polling)
 - גיבוי-הבעלים: קובץ הדקור.txt (עותקו) הוחזר-קריאה ונמחק מהריפו; העותק האישי של הבעלים = הגיבוי הראשי
+
+---
+Task ID: 3 (SESSION-PERSISTENCE + PLATFORM-PUSH)
+Agent: main (z.ai code)
+Task: "הכל נעלם, נשאר רק דף-כניסה" — אבחון, תיקון, שיפור, ניקוי-דליפה בריפו-אחר, ו-push מלא
+
+Work Log:
+- אבחון מ-dev.log: login 200 → Session INSERT, אך כל GET אחריו 401. שורש: cookie בלבד (SameSite=Lax) נחסם ב-preview iframe חוצה-מקור
+- תיקון dual-carrier ב-auth.ts: sessionFrom קורא Bearer קודם, cookie כגיבוי; login מחזיר token בגוף התשובה; ה-UI שומר ב-localStorage (sv_session_token) ושולח Bearer בכל בקשה
+- שיפורים: יתרות-חי לכל חשבון-שרשרת ב-matrix (getAccount, cache stale-while-revalidate 3 דק', 24 זוגות), badge זהות-הפעלה (me), כפתור התנתקות, הודעת "תוקף החיבור פג" במקום בעיטה שקטה
+- תיקון באג "undefined": verifyWif מחזיר הודעה ברורה כשמפתח-תקין לא שולט בחשבון
+- E2E סעיף 9 (regression): login בלי cookie-jar → token בגוף → status/chat דרך Bearer בלבד 200 → forged token 401; 9/9 ירוק
+- דפדפן: הזרקת טוקן → reload → דשבורד ישיר (owner:headcorner, 140/144, יתרות חיות) — פעמיים + מובייל iPhone 14
+- גילוי וסגירת דליפה: roshpinacare-sys/saos-sovereign-platform (סוכן-אחר) החזיק KEYS-EXPORT-2026-09-09.md עם 44 WIFs + 39 seeds בגלוי על GitHub; החומר שוכפל-מלא בכספת המוצפנת שלנו (144/144) → filter-branch להסרה מכל ההיסטוריה + force-push; raw 404 מאומת; הסריקה המלאה של הריפו (48 קומיטים) נקייה (README/worklog/bun.lock = false-positive של חתימות-Solana)
+- ניקוי-עצמי: .env היה מנוטר בריפו הראשי מה-commit הראשון (מכיל SOVEREIGN_VAULT_SECRET!) → untrack + filter-branch + gc; סריקת ערך-הסוד על כל ההיסטוריה = 0 פגיעות
+- push: נוצר ריפו פרטי חדש roshpinacare-sys/saos-control-center; push מלא (36 קומיטים, עץ ללא .env/KEY-/.secrets — מאומת מרחוק); remote-URL נוקה מ-token; ה-clone הזמני נשופף (shred)
+
+Stage Summary:
+- ההתחברות עמידה: Bearer+localStorage עוקף חסימת-cookies ב-preview — "שלא ייעלם שוב" מובטח מבחינה מבנית; סשן 30 יום
+- GitHub נקי מחומר-מפתח בשני הריפואים (saos-control-center + saos-sovereign-platform); הכספת נשארת AES-256-GCM עם SOVEREIGN_VAULT_SECRET מקומי בלבד
+- הערה לבעלים: קובץ ה-ייצוא שהוסר מ-GitHub — אם לא הספקת להוריד, אין אובדן: כל החומר בכספת ואפשר לייצא שוב בצורה מאובטחת בכל רגע
