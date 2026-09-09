@@ -61,3 +61,13 @@ server.log
 
 # agent tool output dumps (never commit)
 tool-results/
+
+# ── SOVEREIGN GATE (2026-09-09 incident hardening) ──
+# אפס חומר-מפתח בריפו — לנצח. נלמד מרוטציית-owner על headcorner.
+MASTER-KEYS-RECOVERY*
+*.enc
+*.enc.meta
+fleet_keys.meta.json
+upload/
+.grid98-lab/
+!/.grid98-lab/package.json

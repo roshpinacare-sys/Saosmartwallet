@@ -1,231 +1,579 @@
 "use client";
 
 /**
- * SAOS — Sovereign Identity Network · Command Surface
- * ====================================================
- * Unambiguous hierarchy: OUR network first, external rails second.
- *
- *   SAOS       — the landing: what SAOS is + live sovereign vitals
- *                (height, checkpoints, bench, treasury, wrapped, pools)
- *                + real checkpoint anchors with verifiable txids
- *                + the anchored-rails grid (SAOS-NET sorted first)
- *   SAOS HUB   — the sovereign stack center-stage: chain core, grid98 engine
- *                (bench + floor ladder + honesty gates), soldier fleet with
- *                live Steem measurements, loop census, pools, wrapped economy,
- *                signed oracle, anchor rails with public txids, honest dex-facts
- *   PROOFS     — three live demos: identity anchor (ecrecover), real grid98
- *                benchmark, live soldier fleet
- *   SAOS-NET   — deep view: engine output, sovereign book depth, oracle, pools
- *   MARKETS    — trading surfaces: STEEM/SBD internal market (depth · ladder ·
- *                terminal · tape) + full pairs matrix (demoted here on purpose:
- *                an external pair is a market, not the brand)
- *   BRIDGES    — M3 explorer (route finder, live-quoted fees) + anchor rails
- *                with real txids + TRON pulse
- *   WALLET     — balances, Steem Power, RC manabar, open orders + M3 ETH/SOL
- *                lookups, vault status
- *   VAULT      — Sovereign Key Vault: wizard, policy engine, backup, audit
- *   DEVELOPER  — Model 1 metered Identity API: keys, try-it, usage ledger,
- *                official SDK + repo registry & honest gaps
- *
- * Every market number is chain-sourced — zero mock data. Keyboard: 1–9
- * switches every section. Signing flows through the M2 keystore + policy engine.
+ * SOVEREIGN GATE — מרחב-ההתחברות הריבוני.
+ * שנולד מהתאונה: 2026-09-08, רוטציית-owner על headcorner דרך קובץ-מפתחות
+ * גלוי ש"לכולם היתה גישה" אליו. מעכשיו: אפס מפתחות בטקסט-גלוי, כספת
+ * מוצפנת (AES-256-GCM תחת סיסמת-מפעיל), סשן מתמשך, ושער-API לסוכנים.
  */
 
-import { useEffect, useState } from "react";
-
-import { motion } from "framer-motion";
-import { Boxes, FlaskConical, GitBranch, Landmark, Server, ShieldCheck, Table2, Wallet2, Waypoints } from "lucide-react";
-
-import { BridgeExplorer } from "@/components/terminal/bridge-explorer";
-import { BridgeMonitor } from "@/components/terminal/bridge-monitor";
-import { DeveloperConsole } from "@/components/developer/developer-console";
-import { TerminalHeader } from "@/components/terminal/eco-header";
-import { NetworkGrid } from "@/components/terminal/network-grid";
-import { PairsMatrix } from "@/components/terminal/pairs-matrix";
-import { ProofLab } from "@/components/terminal/proof-lab";
-import { SaosHub } from "@/components/terminal/saos-hub";
-import { SaosHero } from "@/components/terminal/saos-hero";
-import { SaosNetPanel } from "@/components/terminal/saosnet-panel";
-import { StatusFooter } from "@/components/terminal/status-footer";
-import { WalletPanel } from "@/components/terminal/wallet-panel";
-import { MultiChainWallet } from "@/components/terminal/multichain-wallet";
-import { MarketStrip } from "@/components/terminal/market-strip";
-import { VaultConsole } from "@/components/vault/vault-console";
-import { VaultStatusWidget } from "@/components/vault/vault-status-widget";
-import { DexView } from "@/components/trading/dex-view";
-import { Providers } from "@/components/providers";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import {
+  ShieldCheck, ShieldAlert, Lock, Unlock, KeyRound, Bot, Send,
+  RefreshCw, Copy, CheckCircle2, XCircle, Loader2, Eye, EyeOff, Plus,
+} from "lucide-react";
 
-type SectionId =
-  | "saos"
-  | "saoshub"
-  | "proofs"
-  | "saosnet"
-  | "markets"
-  | "bridges"
-  | "wallet"
-  | "vault"
-  | "developer";
+interface GateStatus {
+  initialized: boolean;
+  unlocked: boolean;
+  hint: string | null;
+  session: { kind: string; name: string; scopes: string[] } | null;
+  counts: { vaultEntries: number; activeAgents: number; messages: number };
+}
 
-const SECTIONS: Array<{ id: SectionId; label: string; icon: React.ReactNode }> = [
-  { id: "saos", label: "SAOS", icon: <Landmark className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "saoshub", label: "SAOS HUB", icon: <Boxes className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "proofs", label: "PROOFS", icon: <FlaskConical className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "saosnet", label: "SAOS-NET", icon: <Server className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "markets", label: "MARKETS", icon: <Table2 className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "bridges", label: "BRIDGES", icon: <GitBranch className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "wallet", label: "WALLET", icon: <Wallet2 className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "vault", label: "VAULT", icon: <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> },
-  { id: "developer", label: "DEVELOPER", icon: <Waypoints className="h-3.5 w-3.5" aria-hidden /> },
-];
+interface KeyReport {
+  kind: string;
+  label: string;
+  pubs: string[];
+  controls: { chain: string; account: string; role: string; pub: string }[];
+  liveChecked: boolean;
+  notes: string[];
+}
 
-export default function Home() {
-  const [section, setSection] = useState<SectionId>("saos");
+interface InventoryEntry {
+  id: string;
+  kind: string;
+  chain: string | null;
+  account: string | null;
+  role: string | null;
+  pub: string | null;
+  status: string;
+  liveOk: boolean | null;
+  detail: string;
+}
 
-  // power-user keyboard shortcuts: 1..9 (all sections reachable)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const idx = Number.parseInt(e.key, 10);
-      if (idx >= 1 && idx <= SECTIONS.length) setSection(SECTIONS[idx - 1].id);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+interface AgentRow {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+interface Msg {
+  id: string;
+  fromKind: string;
+  fromName: string;
+  body: string;
+  createdAt: string;
+}
+
+export default function SovereignGate() {
+  const [status, setStatus] = useState<GateStatus | null>(null);
+  const [pass, setPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [newPass, setNewPass] = useState("");
+
+  const [keyInput, setKeyInput] = useState("");
+  const [report, setReport] = useState<KeyReport | null>(null);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+
+  const [inventory, setInventory] = useState<InventoryEntry[]>([]);
+  const [summary, setSummary] = useState<string>("");
+  const [chains, setChains] = useState<{ steemOk?: boolean; hiveOk?: boolean; githubOk?: boolean | null }>({});
+
+  const [agents, setAgents] = useState<AgentRow[]>([]);
+  const [agentName, setAgentName] = useState("");
+  const [freshToken, setFreshToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [draft, setDraft] = useState("");
+  const feedRef = useRef<HTMLDivElement>(null);
+
+  const loadStatus = useCallback(async () => {
+    const r = await fetch("/api/gate/status", { cache: "no-store" });
+    const j = await r.json();
+    if (j.ok) setStatus(j as GateStatus & { ok: boolean });
   }, []);
 
-  return (
-    <Providers>
-      <div className="flex min-h-screen flex-col">
-        <TerminalHeader />
-        <main
-          className="relative mx-auto w-full max-w-[1600px] flex-1 px-3 py-5 sm:px-6"
-          aria-label="SAOS sovereign network dashboard"
-        >
-          {/* blueprint grid backdrop */}
-          <div aria-hidden className="bg-grid pointer-events-none absolute inset-0 -z-10" />
+  const loadMessages = useCallback(async () => {
+    try {
+      const r = await fetch("/api/gate/messages", { cache: "no-store" });
+      const j = await r.json();
+      if (j.ok) setMessages(j.messages || []);
+    } catch { /* feed poll failure — silent */ }
+  }, []);
 
-          <Tabs value={section} onValueChange={(v) => setSection(v as SectionId)} className="gap-5">
-            <TabsList
-              aria-label="Dashboard sections"
-              className="glass h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg p-1"
-            >
-              {SECTIONS.map((s, i) => (
-                <TabsTrigger
-                  key={s.id}
-                  value={s.id}
-                  aria-label={`${s.label} section (keyboard ${i + 1})`}
-                  className="num gap-1.5 rounded-md px-3 py-1.5 text-[10px] font-bold tracking-[0.18em] data-[state=active]:bg-[var(--saos)]/15 data-[state=active]:text-[var(--saos)]"
+  const loadInventory = useCallback(async () => {
+    const r = await fetch("/api/gate/inventory", { cache: "no-store" });
+    const j = await r.json();
+    if (j.ok && !j.locked) {
+      setInventory(j.entries || []);
+      setChains(j.chains || {});
+      setSummary(`סה"כ ${j.summary.total} · מאומת-live ${j.summary.verified} · נכשל ${j.summary.failed} · ללא-בדיקת-רשת ${j.summary.noLive}`);
+    } else if (j.ok) {
+      setInventory([]);
+      setSummary("הכספת נעולה — פתח כדי לאמת live");
+    }
+  }, []);
+
+  const loadAgents = useCallback(async () => {
+    const r = await fetch("/api/gate/agents", { cache: "no-store" });
+    const j = await r.json();
+    if (j.ok) setAgents(j.agents || []);
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+    loadMessages();
+  }, [loadStatus, loadMessages]);
+
+  useEffect(() => {
+    if (status?.unlocked) {
+      loadInventory();
+      loadAgents();
+    }
+  }, [status?.unlocked, loadInventory, loadAgents]);
+
+  useEffect(() => {
+    const t = setInterval(() => { loadMessages(); }, 5000);
+    return () => clearInterval(t);
+  }, [loadMessages]);
+
+  async function setupOrUnlock() {
+    setBusy("unlock"); setErr(null);
+    try {
+      const first = status && !status.initialized;
+      const r = await fetch("/api/gate/" + (first ? "setup" : "unlock"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passphrase: pass }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "כשל");
+      setPass(""); setNewPass("");
+      if (first) {
+        // first operator after setup — auto-import the whole system once
+        await fetch("/api/gate/import-lab", { method: "POST" });
+      }
+      await loadStatus();
+      await loadInventory();
+      await loadAgents();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally { setBusy(null); }
+  }
+
+  async function lockVault() {
+    setBusy("lock");
+    await fetch("/api/gate/lock", { method: "POST" });
+    setInventory([]); setAgents([]); setReport(null);
+    await loadStatus();
+    setBusy(null);
+  }
+
+  async function identifyKey(save: boolean) {
+    setBusy(save ? "save" : "identify"); setErr(null); setSavedNote(null);
+    try {
+      const r = await fetch("/api/gate/key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: keyInput, save }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "כשל");
+      setReport(j.report);
+      if (save && j.saved?.length) setSavedNote(`נשמר מוצפן: ${j.saved.length} רשומות`);
+      if (save) { await loadInventory(); await loadStatus(); }
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally { setBusy(null); }
+  }
+
+  async function verifyNow() {
+    setBusy("verify");
+    await loadInventory();
+    await loadStatus();
+    setBusy(null);
+  }
+
+  async function attachAgent() {
+    setBusy("agent"); setErr(null);
+    try {
+      const r = await fetch("/api/gate/agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: agentName }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "כשל");
+      setFreshToken(j.token);
+      setAgentName("");
+      await loadAgents();
+      await loadMessages();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally { setBusy(null); }
+  }
+
+  async function sendMessage() {
+    if (!draft.trim()) return;
+    setBusy("send");
+    try {
+      await fetch("/api/gate/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: draft }),
+      });
+      setDraft("");
+      await loadMessages();
+    } finally { setBusy(null); }
+  }
+
+  const unlocked = Boolean(status?.unlocked);
+
+  return (
+    <div dir="rtl" className="min-h-screen bg-stone-950 text-stone-100">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        {/* header */}
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/40">
+              <KeyRound className="h-6 w-6 text-emerald-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">שער-ריבון · SOVEREIGN GATE</h1>
+              <p className="text-sm text-stone-400">התחברות חכמה עם כל מפתח · כספת מוצפנת · שער-סוכנים</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {status?.initialized ? (
+              unlocked ? (
+                <Badge className="gap-1 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">
+                  <Unlock className="h-3.5 w-3.5" /> כספת פתוחה · מחובר
+                </Badge>
+              ) : (
+                <Badge className="gap-1 bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/40">
+                  <Lock className="h-3.5 w-3.5" /> כספת נעולה
+                </Badge>
+              )
+            ) : (
+              <Badge className="gap-1 bg-stone-500/15 text-stone-300 ring-1 ring-stone-500/40">
+                <ShieldAlert className="h-3.5 w-3.5" /> טרם-אותחל
+              </Badge>
+            )}
+            {status?.session && (
+              <Badge variant="outline" className="border-stone-700 text-stone-300">
+                סשן: {status.session.kind === "operator" ? "מפעיל" : status.session.name}
+              </Badge>
+            )}
+          </div>
+        </header>
+
+        {err && (
+          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {err}
+          </div>
+        )}
+
+        {/* unlock card */}
+        {!unlocked && (
+          <Card className="mb-6 border-stone-800 bg-stone-900/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Lock className="h-5 w-5 text-amber-400" />
+                {status?.initialized ? "פתיחת-הכספת" : "אתחול-ראשון של הכספת"}
+              </CardTitle>
+              <CardDescription>
+                {status?.initialized
+                  ? "הזן סיסמת-מפעיל כדי לפתוח את מפתח-האב (נשאר בזיכרון-התהליך בלבד). הסשן שלך נשמר 30 יום."
+                  : "קבע סיסמת-מפעיל. מפתח-אב אקראי ייווצר וייאטם תחתה — וכל המפתחות של המערכת ייכנסו מוצפנים."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Input
+                  type={showPass ? "text" : "password"}
+                  value={pass}
+                  onChange={(e) => setPass(e.target.value)}
+                  placeholder="סיסמת-מפעיל (8+ תווים)"
+                  className="border-stone-700 bg-stone-950 pl-10 text-stone-100"
+                  onKeyDown={(e) => e.key === "Enter" && setupOrUnlock()}
+                />
+                <button
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
+                  aria-label="הצג/הסתר סיסמה"
                 >
-                  {s.icon}
-                  <span className="hidden sm:inline">{s.label}</span>
-                  <span className="hidden text-[8px] text-[var(--text-tertiary)] lg:inline">{i + 1}</span>
-                </TabsTrigger>
-              ))}
+                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <Button onClick={setupOrUnlock} disabled={busy !== null || pass.length < 8} className="bg-emerald-600 hover:bg-emerald-500">
+                {busy === "unlock" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlock className="h-4 w-4" />}
+                {status?.initialized ? "פתח והתחבר" : "אתחל והתחבר"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {unlocked && (
+          <Tabs defaultValue="keys" className="gap-6">
+            <TabsList className="bg-stone-900 text-stone-300">
+              <TabsTrigger value="keys" className="gap-1 data-[state=active]:text-emerald-300"><KeyRound className="h-4 w-4" /> התחברות-מפתח</TabsTrigger>
+              <TabsTrigger value="inventory" className="gap-1 data-[state=active]:text-emerald-300"><ShieldCheck className="h-4 w-4" /> מחובר-להכל</TabsTrigger>
+              <TabsTrigger value="agents" className="gap-1 data-[state=active]:text-emerald-300"><Bot className="h-4 w-4" /> סוכנים</TabsTrigger>
+              <TabsTrigger value="chat" className="gap-1 data-[state=active]:text-emerald-300"><Send className="h-4 w-4" /> צ'אט-פיקוד</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="saos" className="mt-0 flex flex-col gap-5 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex flex-col gap-5"
-              >
-                <SaosHero onJump={(t) => setSection(t)} />
-                <NetworkGrid />
-              </motion.div>
+            {/* ── key connect tab ── */}
+            <TabsContent value="keys" className="space-y-4">
+              <Card className="border-stone-800 bg-stone-900/60">
+                <CardHeader>
+                  <CardTitle className="text-lg">התחבר עם כל מפתח</CardTitle>
+                  <CardDescription>
+                    הדבק כל מפתח — WIF של STEEM/HIVE (5… / K… / L…), מפתח EVM (0x…), מפתח TRON, מנמוניק, PAT של GitHub.
+                    המערכת מזהה מה הוא ומה הוא שולט-בו <b>live מהשרשרות</b>, ואז (אם תבקש) שומר אותו מוצפן.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Textarea
+                    value={keyInput}
+                    onChange={(e) => setKeyInput(e.target.value)}
+                    placeholder="הדבק כאן מפתח אחד…"
+                    className="min-h-[72px] border-stone-700 bg-stone-950 font-mono text-sm text-stone-100"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => identifyKey(false)} disabled={busy !== null || !keyInput.trim()} variant="outline" className="border-stone-700">
+                      {busy === "identify" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                      זהה live
+                    </Button>
+                    <Button onClick={() => identifyKey(true)} disabled={busy !== null || !keyInput.trim()} className="bg-emerald-600 hover:bg-emerald-500">
+                      {busy === "save" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                      זהה ושמור מוצפן
+                    </Button>
+                    <Button onClick={lockVault} disabled={busy !== null} variant="outline" className="border-stone-700 text-stone-400 hover:text-stone-200">
+                      <Lock className="h-4 w-4" /> נעל כספת
+                    </Button>
+                  </div>
+                  {savedNote && <p className="text-sm text-emerald-400">{savedNote}</p>}
+                  {report && (
+                    <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-sm">
+                      <div className="mb-2 flex items-center gap-2">
+                        <Badge className="bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">{report.kind}</Badge>
+                        <span className="text-stone-300">{report.label}</span>
+                        {report.liveChecked && <Badge variant="outline" className="border-emerald-700 text-emerald-400">אומת live</Badge>}
+                      </div>
+                      {report.pubs.length > 0 && (
+                        <div className="mb-2 space-y-1">
+                          <p className="text-stone-500">זהויות-ציבוריות שנגזרו:</p>
+                          {report.pubs.map((p) => (
+                            <p key={p} className="break-all font-mono text-xs text-stone-400">{p}</p>
+                          ))}
+                        </div>
+                      )}
+                      {report.controls.length > 0 ? (
+                        <div>
+                          <p className="mb-1 text-stone-500">המפתח שולט ב:</p>
+                          <ul className="space-y-1">
+                            {report.controls.map((c, i) => (
+                              <li key={i} className="flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                                <span>{c.chain} · {c.account} · {c.role}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        report.liveChecked && <p className="flex items-center gap-2 text-stone-400"><XCircle className="h-4 w-4 text-amber-400" /> לא נמצא authority תואם בשרשרות</p>
+                      )}
+                      {report.notes.map((n, i) => <p key={i} className="mt-2 text-xs text-stone-500">{n}</p>)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
-            <TabsContent value="saoshub" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <SaosHub />
-              </motion.div>
+            {/* ── inventory tab ── */}
+            <TabsContent value="inventory" className="space-y-4">
+              <Card className="border-stone-800 bg-stone-900/60">
+                <CardHeader className="flex-row items-start justify-between space-y-0">
+                  <div>
+                    <CardTitle className="text-lg">מלאי-החיבור · מחובר להכל</CardTitle>
+                    <CardDescription>{summary || "…"}</CardDescription>
+                  </div>
+                  <Button onClick={verifyNow} disabled={busy !== null} size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+                    {busy === "verify" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    אמת הכל עכשיו
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <Badge variant="outline" className={chains.steemOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>steem: {chains.steemOk ? "live" : "לא נענה"}</Badge>
+                    <Badge variant="outline" className={chains.hiveOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>hive: {chains.hiveOk ? "live" : "לא נענה"}</Badge>
+                    {chains.githubOk !== null && chains.githubOk !== undefined && (
+                      <Badge variant="outline" className={chains.githubOk ? "border-emerald-700 text-emerald-400" : "border-red-700 text-red-400"}>github: {chains.githubOk ? "live" : "נכשל"}</Badge>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-96 rounded-lg border border-stone-800">
+                    <div className="divide-y divide-stone-800">
+                      {inventory.length === 0 && <p className="p-4 text-sm text-stone-500">אין רשומות — הדבק מפתח בלשונית התחברות-מפתח.</p>}
+                      {inventory.map((e) => (
+                        <div key={e.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                          <div className="min-w-0">
+                            <p className="truncate">
+                              <span className="font-semibold">{e.chain || e.kind}</span>
+                              {e.account && <span> · {e.account}</span>}
+                              {e.role && <span> · {e.role}</span>}
+                            </p>
+                            <p className="truncate font-mono text-xs text-stone-500">{e.pub || e.detail}</p>
+                          </div>
+                          {e.liveOk === true && <Badge className="shrink-0 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40">live ✓</Badge>}
+                          {e.liveOk === false && <Badge className="shrink-0 bg-red-500/15 text-red-300 ring-1 ring-red-500/40">לא-תואם</Badge>}
+                          {e.liveOk === null && <Badge variant="outline" className="shrink-0 border-stone-700 text-stone-400">מוצפן</Badge>}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
             </TabsContent>
 
-            <TabsContent value="proofs" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <ProofLab />
-              </motion.div>
+            {/* ── agents tab ── */}
+            <TabsContent value="agents" className="space-y-4">
+              <Card className="border-stone-800 bg-stone-900/60">
+                <CardHeader>
+                  <CardTitle className="text-lg">צרף סוכן (כמוני) דרך API</CardTitle>
+                  <CardDescription>
+                    כל סוכן מקבל טוקן ויכול לכתוב לנו בצ'אט-הפיקוד ולבצע פעולות-מותרות. הטוקן מאוחסן כ-hash — ומוצג <b>פעם-אחת</b>.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Input
+                      value={agentName}
+                      onChange={(e) => setAgentName(e.target.value)}
+                      placeholder="שם-הסוכן (למשל: anchor-agent)"
+                      className="flex-1 border-stone-700 bg-stone-950 text-stone-100"
+                    />
+                    <Button onClick={attachAgent} disabled={busy !== null || !/^[a-zA-Z0-9_-]{2,32}$/.test(agentName)} className="bg-emerald-600 hover:bg-emerald-500">
+                      <Plus className="h-4 w-4" /> צרף סוכן
+                    </Button>
+                  </div>
+                  {freshToken && (
+                    <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4">
+                      <p className="mb-2 text-sm text-emerald-300">טוקן-הסוכן (מוצג פעם-אחת — העתק עכשיו):</p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 break-all rounded bg-stone-950 p-2 font-mono text-xs text-emerald-200">{freshToken}</code>
+                        <Button
+                          size="sm" variant="outline" className="border-emerald-700"
+                          onClick={() => { navigator.clipboard.writeText(freshToken); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                        >
+                          {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <Separator className="bg-stone-800" />
+                  <div>
+                    <p className="mb-2 text-sm font-semibold text-stone-300">סוכנים מחוברים ({agents.filter((a) => a.active).length} פעילים)</p>
+                    <div className="space-y-2">
+                      {agents.length === 0 && <p className="text-sm text-stone-500">אין עדיין סוכנים.</p>}
+                      {agents.map((a) => (
+                        <div key={a.id} className="flex items-center justify-between rounded-lg border border-stone-800 bg-stone-950 px-3 py-2 text-sm">
+                          <div>
+                            <p className="font-semibold">{a.name}</p>
+                            <p className="text-xs text-stone-500">נראה-לאחרונה: {new Date(a.lastSeenAt).toLocaleString("he-IL")}</p>
+                          </div>
+                          <Badge variant={a.active ? "default" : "outline"} className={a.active ? "bg-emerald-500/15 text-emerald-300" : "border-stone-700 text-stone-500"}>
+                            {a.active ? "פעיל" : "מבוטל"}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Separator className="bg-stone-800" />
+                  <div className="rounded-lg border border-stone-800 bg-stone-950 p-4 text-xs text-stone-400">
+                    <p className="mb-2 font-semibold text-stone-300">מדריך-API לסוכנים (curl):</p>
+                    <pre className="overflow-x-auto whitespace-pre-wrap font-mono leading-6">{`# כתיבה לצ'אט-הפיקוד:
+curl -X POST '<origin>/api/gate/messages' \\
+  -H 'Authorization: Bearer <TOKEN>' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"body":"שלום, אני הסוכן שלך"}'
+
+# ביצוע פעולה מותרת:
+curl -X POST '<origin>/api/gate/actions' \\
+  -H 'Authorization: Bearer <TOKEN>' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"action":"report.status","params":{}}'
+
+# פעולות: message.post · report.status · vault.list-pubs · verify.run`}</pre>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
-            <TabsContent value="saosnet" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <SaosNetPanel />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="markets" className="mt-0 flex flex-col gap-5 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex flex-col gap-5"
-              >
-                <MarketStrip />
-                <PairsMatrix onJump={(t) => setSection(t)} />
-                <DexView />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="bridges" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex flex-col gap-4 md:gap-6"
-              >
-                <BridgeExplorer />
-                <BridgeMonitor />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="wallet" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex flex-col gap-5"
-              >
-                <VaultStatusWidget compact />
-                <WalletPanel />
-                <MultiChainWallet />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="vault" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <VaultConsole />
-              </motion.div>
-            </TabsContent>
-
-            <TabsContent value="developer" className="mt-0 outline-none">
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <DeveloperConsole />
-              </motion.div>
+            {/* ── chat tab ── */}
+            <TabsContent value="chat">
+              <Card className="border-stone-800 bg-stone-900/60">
+                <CardHeader>
+                  <CardTitle className="text-lg">צ'אט-פיקוד · מפעיל + סוכנים</CardTitle>
+                  <CardDescription>כל הסוכנים שצירפת כותבים כאן ומבצעים לפי הצורך. עדכון-חי כל 5 שניות.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div ref={feedRef} className="max-h-96 overflow-y-auto rounded-lg border border-stone-800 bg-stone-950 p-3">
+                    <div className="space-y-2">
+                      {messages.length === 0 && <p className="text-sm text-stone-500">אין הודעות — התחל שיחה.</p>}
+                      {messages.map((m) => (
+                        <div key={m.id} className="rounded-md px-3 py-2 text-sm" style={{
+                          background: m.fromKind === "operator" ? "rgba(16,185,129,0.08)" : m.fromKind === "agent" ? "rgba(245,158,11,0.08)" : "rgba(120,113,108,0.08)",
+                        }}>
+                          <p className="mb-0.5 text-xs text-stone-500">
+                            {m.fromKind === "operator" ? "👤 מפעיל" : m.fromKind === "agent" ? `🤖 סוכן ${m.fromName}` : "⚙️ מערכת"}
+                            {" · "}{new Date(m.createdAt).toLocaleTimeString("he-IL")}
+                          </p>
+                          <p className="whitespace-pre-wrap text-stone-200">{m.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                      placeholder="כתוב לצ'אט-הפיקוד…"
+                      className="flex-1 border-stone-700 bg-stone-950 text-stone-100"
+                    />
+                    <Button onClick={sendMessage} disabled={busy !== null || !draft.trim()} className="bg-emerald-600 hover:bg-emerald-500">
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
-        </main>
-        <StatusFooter />
-      </div>
-    </Providers>
+        )}
+
+        {/* security posture */}
+        <Card className="mt-6 border-stone-800 bg-stone-900/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base text-stone-300">
+              <ShieldCheck className="h-5 w-5 text-emerald-400" /> מדוע זה לא יקרה שוב
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 text-sm text-stone-400 sm:grid-cols-2">
+            <p>🔒 <b className="text-stone-200">אפס-טקסט-גלוי</b> — כל מפתח נשמר AES-256-GCM בתוך מסד-הנתונים; אין קובץ-מפתחות לקרוא.</p>
+            <p>🧠 <b className="text-stone-200">מפתח-אב בזיכרון בלבד</b> — נאטם תחת סיסמת-המפעיל (scrypt); הפעלה-מחדש של השרת נועלת אוטומטית.</p>
+            <p>🚫 <b className="text-stone-200">סוכנים רואים pubs בלבד</b> — אין API שחושף חומר-פרטי; כל פעולת-סוכן נרשמת באודיט.</p>
+            <p>🍪 <b className="text-stone-200">סשן מתמשך 30 יום</b> — httpOnly cookie; טוקן מאוחסן כ-hash בלבד.</p>
+          </CardContent>
+        </Card>
+
+        <footer className="mt-8 pb-6 text-center text-xs text-stone-600">
+          SOVEREIGN GATE · born from the headcorner incident (2026-09-08) · אפס-מפתחות-בטקסט-גלוי, מעכשיו והלאה
+        </footer>
+      </main>
+    </div>
   );
 }
