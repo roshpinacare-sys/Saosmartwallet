@@ -798,3 +798,28 @@ Stage Summary:
 - Five independently timestamped Ethereum mainnet commitments in one day (68058/69207/70171/71770/72958), gas model 6/6 exact — the sovereign chain's on-chain heartbeat is now a measured, repeatable operational routine, zero code changes needed.
 - Every declared next step from the day-summary either DONE (vault-verify, status regen, anchors #4+#5) or explicitly owner-side (STEEM keys, npm publish, BASE_URL).
 - Shared awareness: lab dependencies are multi-rooted — ethers must exist at .grid98-lab root (for sovereign/node tools) AND under mini-services/key-broker (for the broker). A missing dep in ANY spawn target manifests as a guardian FAILED line with the path in vault-verify-last.json — read the artifact, don't guess.
+
+---
+Task ID: CONTINUE-4
+Agent: Z.ai Code (main)
+Task: "תמשיך ודחוף" — continue actionable work (vault-verify investigation declared last round), anchor rhythm check, and push to GitHub.
+
+Work Log:
+- Audit first: git fetch → main ahead-1 (unpushed UUID commit 8a75f67 = ethers pin ^6.17.0→6, benign automated commit); dev server hung (pid alive, HTTP 000) → killed/restarted ×3 across the round (OOM sweep kept killing it; guardian dual-slot survived all).
+- vault-verify FAILED investigation (was declared last round): vault-verify-last.json @04:39 ok=false — "Cannot find module .grid98-lab/node_modules/ethers". vault.cjs:65 requires deps via EXPLICIT path.join(ROOT,'node_modules',…): ethers, bs58, @noble/curves/ed25519.js. CONTINUE-3's fix (bun add at lab root) was wiped by the infra crash before 04:39.
+- Structural finding: guardian logs "deps-reinstalled(bun)" every cycle but lab root had NO package.json → it is a structural no-op. Also found trondex watch-err (tronweb missing) in guardian.log.
+- Durable fix: created .grid98-lab/package.json (ethers 6, bs58 ^4.0.1, @noble/curves ^2.4.0, steem ^0.7.10, tronweb ^6.0.0) + bun install (115 pkgs, steem@0.7.11, tronweb@6.5.0) → node vault.cjs verify --quiet exit=0, ok:true, errors:[] — verified artifact, not a claim. trondex watch-err gone from log; tick#333 · 10/10 chains-ok.
+- Anchor rhythm: lab local height 74,907 (beat daemon alive, saosnet.cjs --beat --live pid 12069) vs published canonical 72,958 → delta +1,949 ≥ 1,000 → anchor #6 DUE per protocol.
+- Root-cause of stale canonical: gitkeeper auto-save (the pusher of state.json to roshpinacare-sys/steem, cadence ~20-30min, last auto-save 03:52:15Z "· 28 files · loop 21") died in the infra crash and is not present on this box (only ONE git repo exists: my-project=Saosmartwallet.git; no steem clone; no API-push code in lab files). Manual publish performed via contents API (PAT, message "gitkeeper-recovery: manual publish of daemon-sealed state @ height 74907").
+- Honest incident: first PUT carried EMPTY content (b64 extraction bug, commit bdd17869, remote size 0 for ~2min) → detected by size check, fixed immediately (commit c624070b, size 171420). Zero on-chain impact (anchors carry height/root in calldata). Both commits transparent in history.
+- ANCHOR #6 LIVE: bun tools/evm-anchor-broadcast.ts --wallet=headcorner --broadcast → tx 0x4f27c008371241efac45812c20f7bf6e3d30fe065951df89c0f8b63a529d1b0e, block 25,937,568, status 1, gasUsed 32,680 == model (7/7 exact), height 74,907, root 7584955…129dea, leafCount 64, 5-chain witness (steem 109419800 / hive 109754327 / tron 86085952 / ethereum 25937567 / solana 445525351).
+- Tier-3 independent verify: PROVEN, signerIdentity=headcorner. crossCheck in-tool showed stale 72,958 → root cause: tool's verify mode reads only /tmp/sovereign-state.json cache (written during preview; cache was from 04:05). Cache removed; MANUAL programmatic cross-check vs fresh fetch: heightMatches=true, rootMatches=true → PASS. Future protocol: manual programmatic crossCheck (or upgrade tool to live-fetch in verify mode).
+- Re-verified CONTINUE-3 claims mechanically: anchor #5 tx 0x3b48281f…7f7f97a → TIER-3-VERIFY: PROVEN, crossCheck {heightMatches:true, rootMatches:true, publishedHeight:72958} — the claim was TRUE.
+- Security gate: bun tools/security-audit.ts → ALL CHECKS PASSED (incl. live headers + 0 vulnerabilities).
+- Docs: docs/evm-anchor-round.md appended CONTINUE-4 section (6-point series + recovery story).
+
+Stage Summary:
+- Anchor #6 (74,907) live on Ethereum mainnet — six-point series 68058→74908 span, gas model 7/7 exact; the heartbeat routine survived a full infra crash + manual recovery with zero code changes to the anchor pipeline.
+- vault-verify is now durably green: real package.json at lab root makes guardian's "deps-reinstalled" real for future crash-recovery.
+- gitkeeper (canonical-state pusher) is dead and ABSENT from this box — manual publish-before-anchor is now part of the anchor protocol until restored (deliberate simplification: publish exactly when anchoring).
+- Known honest limits unchanged (owner-side): STEEM/HIVE posting authority (post-rotation keys), npm publish saos-id-verify, public BASE_URL.
