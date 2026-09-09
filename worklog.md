@@ -674,3 +674,44 @@ Stage Summary:
 - BLURT ניצל: הגישה חזרה דרך המפתחות-הישנים שנשמרו בארכיון-הכספת; הבעיה הייתה האתר, לא המפתחות
 - הכניסה לא חוסמת עוד: צפייה חופשית, התחברות יפה בתפריט, מוטציות מוגנות
 - כלל-הפעלה: לעולם לא להרוג את עץ-ה-boot; החייאה רק ב-double-fork או מעץ-חי
+
+---
+Task ID: 2-a
+Agent: design-research (general-purpose)
+Task: Competitor design research for SAOS Control Center redesign
+
+Work Log:
+- Read worklog head+tail; context: Hebrew-RTL Sovereign Control Center (zinc-950 + emerald, flat card stack) for Steem/Hive/Blurt key-vault + agent ops; goal = best-in-class redesign brief.
+- Ran 15 web searches (z-ai web_search): Zerion, Kubera, Rainbow, DeBank, MetaMask Portfolio/MMI, CoinStats/CoinTracker, Linear, Vercel/Geist, bento-grid trends, RTL dashboards, Delta, Argent/Monarch, institutional fintech, Bloomberg terminal, layout patterns.
+- Full-page reads (page_reader/curl): Setproduct "Dashboard design principles: 8 rules" (Stripe/Linear/Vercel patterns), WANDR "Fintech Dashboard Design: Patterns and Examples", LinkedIn "Why Rainbow's UX Succeeded Where Most Web3 UX Fails", mycapitally Kubera Review 2026, SimpleLocalize RTL design guide for developers, Duply Vercel/Geist DESIGN.md token dump.
+- Distilled per-product layout/color/typography/data-presentation/motion findings + "institutional vs toy" signals; formulated 12 RTL/security-specific design critiques; produced final design brief (verdict, tokens, IA, RTL rules, 5 signature elements). No project code touched.
+
+Stage Summary:
+- Layout verdict: right-side RTL sidebar + 5 view split (Overview bento / Vault dense grid / Ops / Audit / Settings) — one screen one decision (Stripe/Linear principle), not single-scroll.
+- Institutional = grayscale-first + hairline surfaces + tabular monospace numbers + honest state labels (Vercel/Geist, WANDR, Bloomberg); toy = gradients-everywhere + confetti (Rainbow lesson: adopt motion quality, not decoration).
+- Tokens fixed: canvas #09090b, surfaces #0f0f12/#17171c, hairline #26262c, gold #d4a94e (reserved), emerald #10b981 (status), warn #f59e0b, danger #ef4444; 4px spacing scale; Heebo/Geist + JetBrains Mono tabular-nums; radius 6/10/14; layered shadow + single reserved gold glow.
+- RTL rules: sidebar right, logical properties only, numbers/txids/keys dir="ltr" islands, charts stay LTR (M3 Hebrew nuance), mirrored chevrons only, RTL-flipped animation via CSS var.
+- 5 signature elements: live-pulse chain ring, bento hero KPI band with deltas, monospace key matrix (masked), animated vault seal (gold→emerald), single ambient gold glow; honest pending/verified states everywhere (WANDR trust pattern).
+- Full design brief delivered to orchestrator (also in final agent message); research artifacts in /tmp/design-research/.
+
+---
+Task ID: 5
+Agent: Z.ai Code (orchestrator + design-research subagent Task 2-a)
+Task: Full professional UI/UX redesign of the Sovereign Control Center — competitor research → design system → implementation → E2E → push.
+
+Work Log:
+- Competitor research (Task 2-a, 15 web searches): Zerion, DeBank, Kubera, MetaMask Portfolio, Rainbow, Linear, Vercel/Geist teardowns → design brief: one-screen-one-decision, hero net-worth first, grayscale+hairlines institutional discipline, gold-once, mono tabular numbers, RTL rules (sidebar right, LTR number islands)
+- GitHub review via API: 12 repos (all private), saos-control-center = live canonical
+- Connectivity verified live: STEEM api.steemit.com ✓, HIVE api.hive.blog (block 109.7M) ✓, BLURT blurt-rpc.saboin.com (block 63.4M) ✓, relay socket.io :3003 ✓ via Caddy XTransformPort handshake, vault 148 keys/144 verified/28 entities/36 balance pairs, all GETs public (200)
+- Design system in globals.css: tokens (--canvas #09090b, --surface-1, --raised, --well, hairlines #26262c/#34343c, gold #d4a94e/#ecd28b once-per-view, emerald #10b981 health), .sv-card/.sv-well/.sv-hero (ambient gold glow breathe 8s), pulse-ring heartbeat, label-caps, font-data (JetBrains Mono tabular-nums), prefers-reduced-motion fallback
+- layout.tsx: Heebo (Hebrew) + JetBrains Mono via Google Fonts link, viewport themeColor
+- New component architecture src/components/sv/: shared.tsx (types, dual-carrier auth, fmtAgo, perChainTotals, BalLine, RoleChip with chain dots), sigil.tsx (animated vault seal), sidebar.tsx (264px right sidebar RTL + MobileNav 5-tab bottom bar + MobileTopbar), login-dialog.tsx, overview.tsx (hero band + KPI bento + chain liveness + activity feed), vault-view.tsx (search + chain filter chips + monospace matrix + archive collapsible), ops-view.tsx (chat primary + agents + tasks), audit-view.tsx (searchable dense log), settings-view.tsx (owner-lock + session + policy + system posture)
+- page.tsx rewritten as shell: all logic preserved 1:1 (dual-carrier auth, socket events, 8s polling, 5min verify, needAuth gating), view state routing, footer mt-auto sticky
+- Fixed: ops-view material/archive dedup; Overview tasksOpen falls back to live tasks list when status.tasksOpen is null (logged-out)
+- Verification: lint 0 errors; browser E2E via agent-browser — desktop 1440×900 overview/authed/vault/settings screenshots ✓, socket LIVE via gateway ✓, real login headcorner steem active ✓ (identity owner:headcorner), chat send persisted DOM+DB ✓, task create ✓, verify-all ✓ (96 checked/4 archive-dead), footer sticks 900/900 on short view + pushes naturally on long ✓, mobile iPhone 14 (hero stacked, bottom nav, auth persisted across reload via Bearer) ✓, API regression suite 10/10 GREEN
+- Pushed to roshpinacare-sys/saos-control-center (private) via inline token
+
+Stage Summary:
+- The platform is now a 5-view institutional console (ראשי/כספת/מבצעים/ביקורת/הגדרות) replacing the flat card stack — design language: grayscale surfaces separated by hairlines, gold reserved for the hero liquid totals + primary CTA, emerald = verified/live, all numbers LTR mono islands in Hebrew RTL shell
+- Zero backend changes (per owner instruction) — all APIs, auth carriers and data contracts untouched; E2E regression 10/10 proves it
+- Screenshots: tool-results/redesign-{desktop-overview,authed,vault,settings,mobile,final-desktop}.png

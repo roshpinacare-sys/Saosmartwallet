@@ -1,8 +1,28 @@
 @import "tailwindcss";
 
+/* ─── SAOS Sovereign Design Tokens — institutional dark ─────────────────────
+   Canvas/surfaces layered by hairlines (Vercel discipline), never by color.
+   Gold = sovereignty, ONCE per view (focal metric / primary CTA).
+   Emerald = verified / live / healthy. Everything else grayscale.
+   Numbers, addresses, keys → JetBrains Mono with tabular-nums, LTR islands. */
 :root {
-  --gold: #f5b841;
-  --sovereign: #18181b;
+  --canvas: #09090b;
+  --surface-1: #0f0f12;
+  --raised: #17171c;
+  --well: #0c0c0e;
+  --hairline: #26262c;
+  --hairline-strong: #34343c;
+  --gold: #d4a94e;
+  --gold-bright: #ecd28b;
+  --gold-deep: #8f6c1f;
+  --emerald: #10b981;
+  --emerald-bright: #34d399;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --txt-hi: #f4f4f5;
+  --txt-mid: #a1a1aa;
+  --txt-low: #71717a;
+  --glow-gold: 0 0 24px rgba(212, 169, 78, 0.15);
 }
 
 html {
@@ -11,14 +31,93 @@ html {
 
 body {
   font-family:
-    "Rubik", "Heebo", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew", system-ui,
-    -apple-system, sans-serif;
-  /* רקע-מוסדי טהור: zinc-950 בלבד — בלי גרדיאנטים, בלי רעש (Zero-Tolerance) */
-  background: #09090b;
+    "Heebo", "Rubik", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew",
+    system-ui, -apple-system, sans-serif;
+  background: var(--canvas);
+  color: var(--txt-hi);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* custom scrollbar — ניטרלי-מוסדי (zinc) */
+/* data face — every number/address/key lives here */
+.font-data {
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas,
+    monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* institutional card — surface separated by hairline + layered shadow */
+.sv-card {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.sv-well {
+  background: var(--well);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+}
+
+/* the single expressive moment — ambient gold glow behind the hero */
+.sv-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, #13110c 0%, var(--surface-1) 42%, var(--surface-1) 100%);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.sv-hero::before {
+  content: "";
+  position: absolute;
+  top: -45%;
+  inset-inline-end: -12%;
+  width: 540px;
+  height: 540px;
+  background: radial-gradient(circle, rgba(212, 169, 78, 0.13) 0%, transparent 62%);
+  pointer-events: none;
+  animation: breathe 8s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.07); }
+}
+
+/* live-pulse status ring — honest heartbeat */
+@keyframes ring-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.35); }
+  70% { box-shadow: 0 0 0 9px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+.pulse-ring {
+  animation: ring-pulse 2.4s ease-out infinite;
+}
+@keyframes ring-pulse-amber {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+  70% { box-shadow: 0 0 0 9px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.pulse-ring-amber {
+  animation: ring-pulse-amber 2.4s ease-out infinite;
+}
+
+.label-caps {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--txt-low);
+  font-weight: 600;
+}
+
+/* custom scrollbar — institutional zinc */
 .scroll-slim::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -65,28 +164,24 @@ input[type="range"].sovereign-range::-moz-range-thumb {
 }
 
 @keyframes pulse-gold {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 .animate-pulse-gold {
   animation: pulse-gold 2.2s ease-in-out infinite;
 }
 
 @keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .animate-rise {
-  animation: rise 0.45s ease-out both;
+  animation: rise 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise, .pulse-ring, .pulse-ring-amber, .sv-hero::before,
+  .animate-pulse-gold {
+    animation: none !important;
+  }
 }

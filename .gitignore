@@ -66,3 +66,4 @@ agent/keys/
 # SAOS-DEX — independent sub-project (own git repo, port 3010)
 /saos-dex/
 .secrets/
+tool-results/

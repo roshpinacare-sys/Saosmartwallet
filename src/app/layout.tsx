@@ -1,21 +1,28 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SAOS-DEX — Sovereign Trading Terminal",
+  title: "SAOS — מרכז-השליטה הריבוני",
   description:
-    "בורסה ריבונית אוטונומית: ספר-הזמנות דטרמיניסטי, בריכות 30bps, עיגון-חי Steem/Hive/TRON עם אימות-עצמי, fail-fast invariants. מהדורה מוסדית.",
-  other: {
-    // Zero-Tolerance: אפס-הסתמכות על cache ישן — הדפדפן תמיד מבקש גרסה-חיה
-    "Cache-Control": "no-store, must-revalidate",
-    Pragma: "no-cache",
-  },
+    "מערכת ריבונית אישית: כספת מפתחות מוצפנת עם אימות-חי מול השרשרת, צירוף סוכנים דרך API, צ׳אט ומשימות בזמן-אמת ויומן-ביקורת. Steem · Hive · Blurt.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl">
-      <body className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100 antialiased">
+      <body className="min-h-screen flex flex-col antialiased">
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
         {children}
       </body>
     </html>
