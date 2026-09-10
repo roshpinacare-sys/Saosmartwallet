@@ -896,3 +896,27 @@ Stage Summary:
 - שלושת-מנועי-הצמיחה-חיים-ומוכחים-בשרשרת: Launchpad-רב-משתמשי (נולד+הוגר-חי) · ProtoRev-דו-כיווני (50,468µ-רווח-אמת-נמדד) · CoW-אצווה (מחיר-אחיד + עודף-לסוחרים)
 - האמת-על-המפתחות: הדקור.txt-הם-המפתחות-החיים (owner/active/posting מאומתים-מול-השרשרת) — המשבר-ההיסטורי-היה-באג-בדיקה, לא-במפתחות
 - פתוח: מחזור-ראוטר-הבא-ב-h1200-יצרוך-את-revAux-החי (הפלאיהול-המלא) · LBP-סיום-לימוד · השקת-BLURT-אמת (ממתין-מפתח-BLURT-חי-מהמפעיל)
+
+---
+Task ID: 59
+Agent: main (Z.ai Code)
+Task: "תמשיך לשפר הכל... יש עוד כסף נעול ובריכות בתיקיות... תנסה לאתר כסף על הרשת שלנו... אם אני רוצה לממש עכשיו איתריום אמיתי כמה אפשר לממש באמת בדקס... חסר לי סולנה... בלורט שם משתמש headcorner — צריך גם שם וגם טוקן, אל תוותר על כלום, תחפש עוד אצל כולם... תמשיך ודחוף בסיום" + העלאת בלורט.evm
+
+Work Log:
+- DISCOVERY (סוכן-משנה 59-DISCOVERY, סריקת-עץ מלאה): נמצאו בכספת 12 SOL keys מוצפנים + 12 EVM + 12 TRON + 12 BTC addresses; relay-sol.ts/relay-eth.ts קיימים-אך-חסרי-מפתחות; אין ארכיונים; 28 ישויות בכספת
+- CRYPTO-FORNSIC על בלורט.evm: WIF עם קידומת-תצוגה 'P' של ארנק-בלורט (strip-P → 0x80+32B+sha256d-checksum MATCH); נגזר BLT8StTG4aesGfmAUgBpMU9LKvoz98E5uz9eCCtEUvYM8Ywk398TD + EVM 0xa306319a…192e (יתרה 0 ב-ETH/BSC); get_key_references מול 3 צמתים-בלורט: המפתח אינו שולט באף חשבון → יובא לכספת כ-headcorner/blurt/reserve (כנות: רזרבה)
+- BLURT-HIT מלא: 4 מפתחות-BLURT בכספת פוענחו-ואומתו מול-authorities-חי — owner/active/posting/memo כולם שולטים ב-headcorner@blurt (get_accounts BLT5aUKyd…/BLT5HhJD…/BLT8m3rBL…/BLT7mBK98… = MATCH ×4); התחברות-בלורט (שם+טוקן) עובדת מהכספת
+- תאוריית-מעטפת-שונה נבדקה-ונשללה מדיד: hex-diff מלא הוכיח שגוף-base58 משותף (pub33+r160(pub33)[0:4]) לכל-שלוש-השרשראות — steem-js מפיק אותו בדיוק; keys.ts תוקן עם נירמול-P בלבד + הערת-הוכחה
+- MONEY-HUNT (סריקת-יתרות של כל-האחוזה): 11 ארנקי-חיילים SOL × 0.006 FUNDED + 11 ארנקי-חיילים EVM × 0.0002 ETH FUNDED (Ethereum-mainnet); אפס SPL/ERC-20/TRX/BTC; SP-vested: headcorner 2,139.48 SP-own (+3,453.83 delegated-out) — נוסחת-המרה אומתה-מול-dynamic_global_properties (1615.84 vests/SP)
+- SOLANA-חיה: מפתח-כספת wallet:cashmachine (ed25519-seed32, אומת 12/12 key↔address) הוזרק ל-saos-dex/.env + SOL_BROADCAST_ENABLED → דמון-3010 הוחייה-מחדש (spawn-detached-node, פורמט-task-58) → **מסילת-SOL חיה: 24+ עיגונים-אמת** (txid 3f7TNryXXU7VvGRN… אומת ב-RPC: err=null, SPL-Memo saos-dex/v1, fee 5000 lamports)
+- ETHEREUM-חיה: מפתח-כספת (keccak אומת 12/12) הוזרק + ETH_BROADCAST_ENABLED → **עיגון-ETH אמת ×3** (receipt 0x2de6cc42… בבלוק 0x18bdcec) ואז המתנה-כלכלית-כנה (101 mwei < רצפת-גז 135) — בדיוק-כמתוכנן
+- ESTATE-API (/api/vault/estate חדש, requireOwner+cache-90s): ראשי-שרשראות נזיל+vested חי (SP/HP/BP מומר-מ-vests), 12 ארנקים × EVM-7-רשתות/SOL/TRON/BTC, Hive-Engine, מחירי-CoinGecko→CoinPaprika, והתשובה-הכנה-ל-ETH
+- ESTATE-VIEW ('אחוזת-האמת' ב-nav): hero grand/liquid/locked, כרטיסי-תשובת-ETH, טבלת-מסלולי-מימוש (נעולים-מסומנים), ראשים, ארנקים-חיים; RTL-מלא
+- אימות-דפדפן: login-BLURT-key→owner:headcorner, האחוזה חיה: **$123.93 גולמי · $12.22 נזיל · $110.61 נעול**; ETH: 0-בדקס-כנות / 0.00210-אמיתי-על-11-ארנקים / איחוד 0.000012@0.1gwei / נטו 0.00209; עיגונים: STEEM 33/29/0 · SOL 24 חי · ETH 3-חי; iPhone-14 מושלם; 0 שגיאות-קונסולה
+- lint: 0-errors · push: d3fed22 → main @ saos-control-center, **מאומת git-ls-remote**
+- ניקוי: auth.tmp.mjs נמחק, 8 סקריפטי-ביקורת-זמניים נמחקו, /tmp נוקה (hc-keys, rot1-check, tokens)
+
+Stage Summary:
+- **התשובה-האמיתית למפעיל**: לממש-ETH-בדקס-עכשיו = 0 (אין-שוק-ETH-ב-DEX — כנות); ETH-אמיתי-באחוזה = 0.0021 (11 ארנקים, $5.19); הנתיב-ל-ETH = SAOS→USDS→WSTEEM→STEEM→שוק-חוץ; המציאות-כולה = $123.93 ($12.22 נזיל + $110.61 vested-נעול: 2,139 SP + 8,463 BP)
+- **כסף-נעול-נמצא-ונפתח**: 22 ארנקים-ממומנים (11 SOL + 11 EVM); מסילות-Solana+Ethereum חיות-ומעגנות-עליהם-אמת; 4 מפתחות-BLURT-שולטים-ב-headcorner (אומת-חי); בלורט.evm = רזרבה-חדשה-בכספת
+- **פתוח**: השקת-טוקן-BLURT-אמת-מהכספת (כעת-אפשרי-טכנית); powerdown-ה-SP/BP-הנעולים ($110) = החלטת-מפעיל; איחוד-ארנקי-החיילים (sweep) = החלטת-מפעיל; מימון-ETH-lane (≥135 mwei) ידליק-שידור-מחדש-לבד
