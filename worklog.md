@@ -1364,3 +1364,20 @@ Stage Summary:
 - roast-66 נסגר: ה-HALT-החי-הפך-לתיקון-המבני-השביעי (חצי-פעולה/LP-רפאים), המבקר-המוסדי-חזר-לחיים (realMoney.ok=true), הפייק-האחרון-בסולם-נגזר, SOL-נקשר-בסכום, וה-ZFB-הופך-את-הגשר-הרב-רשתי-לאוטומטי-אמת-אפס-עמלה
 - מדיניות-חדשה: wrap-הוא-מסילת-פרוטוקול (גז-0); מד-מזינות-LP-חשוף-לכול; journal.t-אחיד-בכל-הנתיבים; allowlist-env-מחייב-גם-בתהליך-השלישי
 - פתוח-להמשך: SOL-broadcast-simulation-failed (אבחון-תפעולי), gasTank-מלא (רביע-10% מ-revAux), meta-tx-v2-על-ETH, חותם-אמת-ל-hive-rail (החלטת-מפעיל)
+---
+Task ID: 67 (lead) · roast-67
+Agent: integrator (main)
+Task: "תמשיך ודחוף לריפו" — המשך-roast-66: SOL-broadcast, gasTank, תיקונים-קטנים
+
+Work Log:
+- FIX(Roast-67 · sol-rent-floor) — אבחון-בסימולציה-חיה (probe-זמני, simulateTransaction-mock-payload מול-mainnet, לא-שידור, נמחק): השגיאה-האמתית **InsufficientFundsForRent{account_index:0}** — BALANCE_FLOOR=10_000-הישן-היה-שקר-מבני: חשבון-החותם-חייב-פטור-משכרת-**וגם**-עמלה. הרצפה-עתה-דינמית: getMinimumBalanceForRentExemption(מ-RPC, fallback-890,880)+5,000+margin-1,000; הודעת-unfunded-מדויקת-עם-הסכום-החסר. אימות-חי-אחרי-ריסטארט: "unfunded: 815,000 < rent-exempt 810,624 + fee 5,000 = 816,624 — חסרים-1,624-lamports" — **breaker: closed, failures: 0** (היה: 22-hard-failures/open). המיון-הכלכלי (/unfunded/i ב-relay.ts:894) מסווג-עתה-את-המסילה-כ-pendingFunding-כן-ולא-כשל-קשה. המפעיל-צריך-עוד-~0.0000016-SOL-בלבד-כדי-להדליק-את-מסילת-העיגון-הזולה-ביותר
+- FIX(Roast-67 · ZFB-gas-tank): economy.revenueCycle — 10% (ZFB_GAS_PCT) מכל-מחזור-ראוטר → קרדיטים-לארנק-האוצר (FUEL_FUNDER) בסמנטיקות-mint_fuel-המלאות (feeMinted↑ + treasuryProfit↓/feeMeter↓ מעל-רצפות; כל-µ-פעם-אחת) — האינווריאנטות (a)+(d) נשמרות-בדיוק; st.gasFundedMu-קנוני + חשיפה ב-getState ו-saos_gas_funded_total-ב-metrics; האוצר-מפיץ-דרך-refuel-קיים — ריצת-המערכת-לא-תיגמר-בשקט (היה: runway-crit-5.6h-ללא-תשובה)
+- FIX(Roast-67 · route-depth-neck): router.routableMap — עומק-מסלול=הצוואר-בבק (min-בין-רגליים); היה-Math.max → depthUsdsMu-נופח-למסלולי-רגליים
+- FIX(Roast-67 · bench-gate): GET-/api/dex/bench (עד-200k-applyOp-ציבורי = וקטור-DoS, לא-בשימוש-UI) → operatorAuth fail-closed
+- FIX(Roast-67 · showcase-fee-honesty): "שעתוק-מדויק... זהה-ל-amm.ts" מול-עמלה-דינמית-חיה → סימון-כן: מצג-סטטי-בסיס-30bps
+- אימות: tsc=0 · fence-check-נקי+selftest-30/30 · kernel-selftest-11/11 · halted=0-לאורך · metrics-חי
+
+Stage Summary:
+- מסילת-SOL: מ"תעלומת-simulation-failed-שמבעירה-breaker" ל"pendingFunding-כן-עם-סכום-חסר-מדויק" — פריצת-האמת-הקטנה-עם-התגלית-המדויקת ביותר (1,624-lamports-מפרידים-בין-מסילה-מתה-לחיה)
+- gasTank: הפלאיהול-הכלכלי-הושלם — עמלות→ראוטר→(40% שריפה/40% ve/20% אוצר)→10%-מהמחזור-חוזר-כדלק — כלכלה-סגורה-שלא-נגמרת
+- פתוח: עידכון-מזומן-זעיר-ל-SOL-ארנק (החלטת-מפעיל), meta-tx-v2-על-ETH, חותם-hive-rail
