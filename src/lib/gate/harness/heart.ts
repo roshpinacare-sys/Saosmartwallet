@@ -31,6 +31,7 @@ import { parseBrain, pickCheckerBrain } from "./brain";
 import { workerId, claimRun, LEASE_MS } from "./lease";
 import { expireStaleOrders } from "./orders";
 import { steemMarket } from "@/lib/steem-server";
+import { MODULES } from "./modules";
 
 /* ── tuned constants (fleet discipline — the army must never stampede) ── */
 export const HEART_TICK_MS = 20_000; // one bounded pass every 20s
@@ -561,7 +562,7 @@ export async function tickOnce(): Promise<HeartPulse> {
   try {
     p.enabled = await readAutonomyEnabled();
     if (p.enabled) {
-      await ensureTriggerPolicy().catch(() => { /* policy sync must never stall the beat */ });
+      await ensureTriggerPolicy().catch((e) => { console.error("[heart] ensureTriggerPolicy failed:", e?.message ?? e); /* policy sync must never stall the beat */ });
       const stages: [string, () => Promise<void>][] = [
         ["reaper", () => stageReap(p)],
         ["scheduler", () => stageSchedules(p)],
@@ -608,6 +609,25 @@ async function armedAgentsList() {
 async function ensureTriggerPolicy(): Promise<void> {
   const armed = await armedAgentsList();
   if (!armed.length) return;
+  /* ── ARSENAL SYNC — every beat, idempotent, self-healing ──
+   * Live roast finding (2026-09-10): all 5 agents were still armed with the
+   * ORIGINAL 24 modules while the arsenal grew to 30 — the daily editor/
+   * treasurer duties told agents to use tools (steem.edit, social.audit,
+   * steem.trends, steem.rewards, steem.claim) that were NEVER in their hands:
+   * doctrine on paper, hands that can't reach it. Now the arsenal is a
+   * fleet-wide right: any module registered later auto-reaches every active
+   * agent on the next beat. Cheap (5 rows × 30 ids) and honest by design. */
+  const allIds = MODULES.map((m) => m.id);
+  for (const a of await db.gateAgent.findMany({ where: { active: true }, select: { id: true, modules: true } })) {
+    let cur: string[] = [];
+    try { cur = JSON.parse(a.modules || "[]"); if (!Array.isArray(cur)) cur = []; } catch { cur = []; }
+    const missing = allIds.filter((id) => !cur.includes(id));
+    if (missing.length) {
+      await db.gateAgent
+        .update({ where: { id: a.id }, data: { modules: JSON.stringify([...cur, ...missing]) } })
+        .catch(() => {});
+    }
+  }
   /* ── builder/guardian cadence — the fleet doesn't just patrol, it BUILDS ──
    * One daily builder goal per armed agent: pick ONE real improvement and
    * execute it (publish value to the chain via steem.post, write a proven
@@ -710,12 +730,13 @@ async function ensureTriggerPolicy(): Promise<void> {
   // PUBLISH-DESK v3 — the language-routing doctrine reaches the EXISTING
   // editor schedules too (marker-based, idempotent): publish in English,
   // report in Hebrew, pick topics from live demand, not gut feeling.
+  const EDITOR_MODULES = ["steem.trends", "social.audit", "steem.edit", "steem.post", "memory.write", "chat.report"];
   const staleEditors = await db.gateSchedule.findMany({
-    where: { label: { startsWith: "editor:" }, goal: { not: { contains: LANG_MARKER } } },
+    where: { label: { startsWith: "editor:" }, OR: [{ goal: { not: { contains: LANG_MARKER } } }, { modules: null }] },
     select: { id: true },
   });
   for (const s of staleEditors) {
-    await db.gateSchedule.update({ where: { id: s.id }, data: { goal: editorV3, doneMeans: editorMeans } }).catch(() => {});
+    await db.gateSchedule.update({ where: { id: s.id }, data: { goal: editorV3, doneMeans: editorMeans, modules: JSON.stringify(EDITOR_MODULES) } }).catch(() => {});
   }
   if (armed.length && !editorLabels.has(armed[0].name)) {
     await db.gateSchedule.create({
@@ -724,6 +745,7 @@ async function ensureTriggerPolicy(): Promise<void> {
         agentName: armed[0].name,
         goal: editorV3,
         doneMeans: editorMeans,
+        modules: JSON.stringify(EDITOR_MODULES), // defense-in-depth: the duty carries its own hands, not just the agent's armed set
         budget: 8,
         kind: "daily",
         hourUtc: 13, // 16:00 Israel — prime publishing hours
@@ -740,10 +762,20 @@ async function ensureTriggerPolicy(): Promise<void> {
     (await db.gateSchedule.findMany({ where: { label: { startsWith: "treasurer:" } }, select: { agentName: true } })).map((s) => s.agentName),
   );
   const treasurerMeans = JSON.stringify([
-    "steem.rewards חי נקרא — הסקר החוזר על כל הצי (כמה חשבונות, כמה ממתין בכל אחד)",
-    "לכל חשבון עם ממתינים ומפתח בכספת: steem.claim בוצע עם txId אמיתי — או נימוק כן מדוע לא (אין מפתח / אין ממתינים)",
+    "steem.rewards חי נקרא — הסקר החוזר על כל הצי (כמה חשבונות, כמה ממתין בכל אחד) — ראייה: צעד steem.rewards עם ok=true",
+    "לכל חשבון עם ממתינים ומפתח בכספת: steem.claim בוצע עם txId אמיתי — או נימוק כן מדוע לא (אין מפתח / אין ממתינים). שים-לב, בודק: אם אין ממתינים בכלל — זו הצלחה מלאה, לא כשל; הדוח עם מספרי-היתרות הוא הראיה",
     "דוח עברית קצר לגשר-הפיקוד: סה״כ נקצר היום + txIds, ומה נשאר תקוע ולמה",
   ]);
+  const TREASURER_MARKER = "זו הצלחה מלאה";
+  const staleTreasurers = await db.gateSchedule.findMany({
+    where: { label: { startsWith: "treasurer:" }, doneMeans: { not: { contains: TREASURER_MARKER } } },
+    select: { id: true },
+  });
+  for (const s of staleTreasurers) {
+    await db.gateSchedule
+      .update({ where: { id: s.id }, data: { doneMeans: treasurerMeans, modules: JSON.stringify(["steem.rewards", "steem.claim", "chat.report"]) } })
+      .catch((e) => { console.error("[heart] treasurer refresh failed:", e?.message ?? e); });
+  }
   if (armed.length && !treasurerLabels.has(armed[0].name)) {
     await db.gateSchedule.create({
       data: {
@@ -756,6 +788,7 @@ async function ensureTriggerPolicy(): Promise<void> {
           "(3) דווח לגשר בעברית: כמה נקצר (STEEM/SBD/VESTS לכל חשבון), ה-txIds, ומה נשאר. " +
           "הערה-מדיניות: תביעה מזיזה את התגמול ליתרות בפועל — היא לא מוכרת ולא מזיזה כספים בין חשבונות (זו סמכות-active, לא שלך).",
         doneMeans: treasurerMeans,
+        modules: JSON.stringify(["steem.rewards", "steem.claim", "chat.report"]), // defense-in-depth: the duty carries its own hands
         budget: 7,
         kind: "daily",
         hourUtc: 5, // early sweep — the day's earnings from yesterday get harvested first
