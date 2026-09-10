@@ -25,6 +25,7 @@ import { ProView } from '@/components/dex/pro-view';
 import { PoolsView } from '@/components/dex/pools-view';
 import { EconomyView } from '@/components/dex/economy-view';
 import { PortfolioView } from '@/components/dex/portfolio-view';
+import { EstateView } from '@/components/dex/estate-view';
 import { AnchorsView } from '@/components/dex/anchors-view';
 
 export default function SovereignDex() {
@@ -225,6 +226,7 @@ export default function SovereignDex() {
         {view === 'portfolio' && (
           <PortfolioView world={world} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} onDone={refetchNow} />
         )}
+        {view === 'estate' && <EstateView />}
         {view === 'anchors' && <AnchorsView world={world} />}
 
         {/* platform views — the sovereign control center, dark-skinned */}

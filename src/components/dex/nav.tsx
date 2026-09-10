@@ -8,7 +8,7 @@ import { useState } from 'react';
 import {
   ArrowLeftRight, CandlestickChart, Droplets, Wallet, Anchor, Coins,
   Fingerprint, Landmark, Zap, ScrollText, Settings2, LogIn, LogOut,
-  Menu, ChevronDown, Activity,
+  Menu, ChevronDown, Activity, Globe2,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
@@ -19,7 +19,7 @@ import type { StatusData } from '@/components/sv/shared';
 import type { World } from './common';
 import { fmtInt } from './common';
 
-export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'portfolio' | 'anchors'
+export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'portfolio' | 'estate' | 'anchors'
   | 'vault' | 'towers' | 'ops' | 'audit' | 'settings';
 
 export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
@@ -28,6 +28,7 @@ export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.Compon
   { id: 'pools', label: 'בריכות', icon: Droplets },
   { id: 'economy', label: 'כלכלה', icon: Coins },
   { id: 'portfolio', label: 'תיק', icon: Wallet },
+  { id: 'estate', label: 'אחוזה', icon: Globe2 },
   { id: 'anchors', label: 'עיגונים', icon: Anchor },
 ];
 
@@ -201,15 +202,15 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
           {/* more sheet */}
           <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger className="flex flex-col items-center gap-0.5 py-1.5">
-              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
-              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
+              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
+              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
             </SheetTrigger>
             <SheetContent side="bottom" className="dx-card border-[color:var(--line)] rounded-t-3xl px-4 pt-3 pb-8" dir="rtl">
               <SheetHeader className="p-0 mb-2">
                 <SheetTitle className="text-sm text-[color:var(--text-1)]">כל התצוגות</SheetTitle>
               </SheetHeader>
               <div className="grid grid-cols-3 gap-2">
-                {[{ id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, ...PLATFORM_NAV].map(v => {
+                {[{ id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, { id: 'estate' as ViewId, label: 'אחוזה', icon: Globe2 }, ...PLATFORM_NAV].map(v => {
                   const Icon = v.icon;
                   return (
                     <button key={v.id} onClick={() => { onNavigate(v.id); setMoreOpen(false); }}
