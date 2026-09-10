@@ -27,7 +27,7 @@ import {
 } from "../../chain-adapter";
 import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
-import type { LimitOrderCancelOperation, LimitOrderCreateOperation, SteemOperationName } from "./operations";
+import type { CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemOperationName, VoteOperation } from "./operations";
 import {
   STEEM_CHAIN_ID,
   SIGNATURE_SIZE,
@@ -264,6 +264,77 @@ export class SteemAdapter implements ChainAdapter {
     }
   }
 
+  /** Permlink rules: lowercase [a-z0-9-], 1..512 — the chain rejects anything else. */
+  private static validatePermlink(permlink: unknown, field: string): string {
+    if (typeof permlink !== "string" || permlink.length === 0 || permlink.length > 512) {
+      throw new SerializationError(`${field} must be a non-empty string ≤ 512 chars`);
+    }
+    if (!/^[a-z0-9-]+$/.test(permlink)) throw new SerializationError(`${field} must be lowercase [a-z0-9-]`);
+    return permlink;
+  }
+
+  private validateVotePayload(p: Record<string, unknown>): void {
+    if (typeof p.voter !== "string") throw new SerializationError("vote requires string voter");
+    validateAccountName(p.voter);
+    if (typeof p.author !== "string") throw new SerializationError("vote requires string author");
+    validateAccountName(p.author);
+    SteemAdapter.validatePermlink(p.permlink, "vote permlink");
+    if (!Number.isInteger(p.weight) || (p.weight as number) < -10000 || (p.weight as number) > 10000) {
+      throw new SerializationError("vote weight must be an integer in [-10000, 10000]");
+    }
+  }
+
+  private validateCommentPayload(p: Record<string, unknown>): void {
+    // parent_author "" = root post; otherwise a real account.
+    if (typeof p.parent_author !== "string") throw new SerializationError("comment requires string parent_author (empty for a root post)");
+    if (p.parent_author !== "") validateAccountName(p.parent_author);
+    if (typeof p.parent_permlink !== "string" || p.parent_permlink.length === 0 || p.parent_permlink.length > 512) {
+      throw new SerializationError("comment requires parent_permlink (1..512 chars)");
+    }
+    if (typeof p.author !== "string") throw new SerializationError("comment requires string author");
+    validateAccountName(p.author);
+    SteemAdapter.validatePermlink(p.permlink, "comment permlink");
+    if (typeof p.title !== "string" || p.title.length > 256) throw new SerializationError("comment title must be a string ≤ 256 chars");
+    if (typeof p.body !== "string" || p.body.length === 0 || p.body.length > 60000) {
+      throw new SerializationError("comment body must be a non-empty string ≤ 60000 chars");
+    }
+    if (typeof p.json_metadata !== "string" || p.json_metadata.length > 2000) {
+      throw new SerializationError("comment json_metadata must be a string ≤ 2000 chars");
+    }
+    if (p.json_metadata.length > 0) {
+      try {
+        const parsed = JSON.parse(p.json_metadata) as unknown;
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new SerializationError("comment json_metadata must stringify to a JSON object");
+        }
+      } catch (e) {
+        if (e instanceof SerializationError) throw e;
+        throw new SerializationError("comment json_metadata is not valid JSON");
+      }
+    }
+  }
+
+  private validateCustomJsonPayload(p: Record<string, unknown>): void {
+    if (!Array.isArray(p.required_auths) || (p.required_auths as unknown[]).some((a) => typeof a !== "string")) {
+      throw new SerializationError("custom_json requires required_auths as string[] (keep it empty for posting-only)");
+    }
+    if (!Array.isArray(p.required_posting_auths) || (p.required_posting_auths as unknown[]).some((a) => typeof a !== "string")) {
+      throw new SerializationError("custom_json requires required_posting_auths as string[]");
+    }
+    for (const a of p.required_posting_auths as string[]) validateAccountName(a);
+    if (typeof p.id !== "string" || p.id.length === 0 || p.id.length > 32 || !/^[a-z0-9._-]+$/.test(p.id)) {
+      throw new SerializationError('custom_json id must match [a-z0-9._-]{1,32} (e.g. "follow")');
+    }
+    if (typeof p.json !== "string" || p.json.length === 0 || p.json.length > 8192) {
+      throw new SerializationError("custom_json json must be a non-empty string ≤ 8192 chars");
+    }
+    try {
+      JSON.parse(p.json);
+    } catch {
+      throw new SerializationError("custom_json json is not valid JSON");
+    }
+  }
+
   /**
    * Builds an unsigned transaction with fresh ref-block fields and expiration.
    * M0: transfer. M1: + limit_order_create (the DEX op). M3+: limit_order_cancel
@@ -287,9 +358,15 @@ export class SteemAdapter implements ChainAdapter {
         this.validateLimitOrderPayload(op.payload);
       } else if (op.type === "limit_order_cancel") {
         this.validateLimitOrderCancelPayload(op.payload);
+      } else if (op.type === "vote") {
+        this.validateVotePayload(op.payload);
+      } else if (op.type === "comment") {
+        this.validateCommentPayload(op.payload);
+      } else if (op.type === "custom_json") {
+        this.validateCustomJsonPayload(op.payload);
       } else {
         throw new SerializationError(
-          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel)`,
+          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, vote, comment, custom_json)`,
         );
       }
     }
@@ -356,6 +433,45 @@ export class SteemAdapter implements ChainAdapter {
       const p = op.payload as { owner: string; orderid: number };
       const body: LimitOrderCancelOperation = { owner: p.owner, orderid: p.orderid };
       return { name: "limit_order_cancel", body };
+    }
+    if (op.type === "vote") {
+      this.validateVotePayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as { voter: string; author: string; permlink: string; weight: number };
+      const body: VoteOperation = { voter: p.voter, author: p.author, permlink: p.permlink, weight: p.weight };
+      return { name: "vote", body };
+    }
+    if (op.type === "comment") {
+      this.validateCommentPayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as {
+        parent_author: string;
+        parent_permlink: string;
+        author: string;
+        permlink: string;
+        title: string;
+        body: string;
+        json_metadata: string;
+      };
+      const body: CommentOperation = {
+        parent_author: p.parent_author,
+        parent_permlink: p.parent_permlink,
+        author: p.author,
+        permlink: p.permlink,
+        title: p.title,
+        body: p.body,
+        json_metadata: p.json_metadata,
+      };
+      return { name: "comment", body };
+    }
+    if (op.type === "custom_json") {
+      this.validateCustomJsonPayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as { required_auths: string[]; required_posting_auths: string[]; id: string; json: string };
+      const body: CustomJsonOperation = {
+        required_auths: p.required_auths,
+        required_posting_auths: p.required_posting_auths,
+        id: p.id,
+        json: p.json,
+      };
+      return { name: "custom_json", body };
     }
     throw new SerializationError(`operation "${op.type}" cannot be signed (unsupported)`);
   }

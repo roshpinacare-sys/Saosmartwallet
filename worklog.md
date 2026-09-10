@@ -1141,3 +1141,26 @@ Stage Summary:
 - לולאת-הריצה חזקה יותר: מגן-התקדמות מונע שריפת-תקציב על לולאות-עצירה — נמדד חי לפני/אחר.
 - גבולות כנים נשמרו: TRON לא מומש (אין adapter — לא נכתוב קריפטו ביד), חתימת ETH/SOL נשארת סגורה עד בונה-לא-חתום משלהן (M0).
 - קבצים: src/lib/multichain-server.ts (חדש) · src/lib/gate/harness/modules.ts · src/lib/gate/harness/loop.ts · docs/autonomy-audit.md · db/custom.db · worklog.md.
+
+---
+Task ID: 14
+Agent: Z.ai Code (main)
+Task: "אני רוצה שהסוכנים יהיו המנהלים הריבוניים האוטונומיים של הרשת… שיעבדו עם כל הפונקציות… יבינו ויבחרו נכון… שיבנו על הרשת כל הזמן דברים… ישפרו יחברו יאבטחו יביאו ערך ורווח… ודחוף לריפו" — SOVEREIGN-VOICE: הסוכנים בונים על הרשת.
+
+Work Log:
+- החלטת-גבול מהותית: posting-authority = ידי-הסוכנים (השרשרת עצמה מונעת ממנה הזזת-כספים) → פעולות-קול רצות ישר על החלטת-סוכן במסילות (4 פרסומים/יום · 12 אינטראקציות/יום · הצבעה ≤20%) עם GateAction + גשר + ראיה-שרשרת; active-authority נשאר אך-ורק למפעיל (SOVEREIGN-HAND לא נגע).
+- packages/chains/steem: packOperation הורחב — vote (op 0, int16 two's-complement u16) · comment (op 1, 7 strings) · custom_json (op 18, vector<string>×2 + id + json); unpackOperation עודכן בהתאמה; adapter: validateVote/Comment/CustomJson + buildOperations + toWireOperation. **אומת ביט-מדויק מול condenser_api.get_transaction_hex (470 תווים זהים + digest שווה עם קידומת chain_id) לפני שידור-ראשון** — אותה מתודולוגיית-oracle של M0/M1. מדיניות-חתימה קיימת נשמרת (posting אף-פעם לא ops-כספים).
+- src/lib/steem-social.ts (חדש): בונים ללא-מפתחות — Post/Vote/Follow/Reblog + permlinkFromTitle (uniqueness suffix), json_metadata {tags, app: saos-gate/v1}.
+- src/lib/gate/harness/social.ts (חדש): SOCIAL_RAILS · commanderPostingKey (כספת, toSigningKey מ-orders — אותו-quirk) · signAndBroadcast (adapter מאושר-broadcast) · publishPostFromAgent · interactFromAgent (vote/follow/reblog) · GateAction + גשר תמיד.
+- modules.ts: `steem.post` + `steem.interact` (actor, needsVault) — המחסן 22 → **24**.
+- חימוש-מלא: 5 הסוכנים הפעילים → 24 מודולים כל-אחד.
+- לב: ensureTriggerPolicy מזריע `builder:*` + `guardian:*` (סדרי-יום, upsert-if-missing, hourUtc מפוזר) — הצי בונה ומאבטח כל-יום, לא רק סורק.
+- אימות חי (אפס דמו, נתיב-אוטונומי מלא — ריצות הוזרקו לתור והלב חילק): ריצה done 62.5s — steem.post → `post-mtusiimi` (tx c64766e7… @ block 109443160; get_content + get_transaction בצומת-ציבורי מאשרים תוכן עברית + json_metadata מדויק) · ריצה done 37.6s — steem.interact vote 500/10000 → tx 048b3162… (active_votes=1 חי). chat.report עם ה-permlink/txId בגשר בשתיהן.
+- שני לקחים שנתפסו חי: ① daemon-state עם רשומות-null מטען fleet.status — חוזק normalizeSaosNet (סינון-null ב-5 ה-maps); הסוכן דיווח בכנות ולא פרסם בלי נתונים. ② תהליך-הלב אינו hot-reload — הפעלה-מחדש נדרשת למודולים-חדשים ("module not armed" על מודול-קיים = סימן-אבחון); גם מדיניות-סשן-מפעיל-יחיד תועדה (כניסה-חדשה מבטלת קודמת).
+- lint 0 · docs/autonomy-audit.md 3e · worklog 14.
+
+Stage Summary:
+- הסוכנים קיבלו קול אמיתי ברשת: מפרסמים, מצביעים, עוקבים, מריבלוגים — חי, ממוסגר, מבוקר, עם txId לכל פעולה. "בונים על הרשת כל-הזמן" הוא עכשיו קוד (builder+guardian יומי) לא הצהרה.
+- גבול-הריבונות נשמר בדיוק: posting=אוטונומיה-מסוגרת, active=הכרעת-מפעיל, אפס-חפיפה.
+- המחסן: 24 מודולים, כל-הסוכנים חמושים בהכל.
+- קבצים: packages/chains/steem/src/{operations,adapter}.ts · src/lib/steem-social.ts · src/lib/gate/harness/{social,modules,heart,orders}.ts · src/lib/eco-server.ts · docs/autonomy-audit.md · worklog.md · db/custom.db.

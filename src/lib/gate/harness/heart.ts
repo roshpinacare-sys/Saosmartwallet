@@ -608,6 +608,61 @@ async function armedAgentsList() {
 async function ensureTriggerPolicy(): Promise<void> {
   const armed = await armedAgentsList();
   if (!armed.length) return;
+  /* ── builder/guardian cadence — the fleet doesn't just patrol, it BUILDS ──
+   * One daily builder goal per armed agent: pick ONE real improvement and
+   * execute it (publish value to the chain via steem.post, write a proven
+   * fact to fleet memory, propose a goal, or prepare a DEX order) — plus one
+   * daily guardian sweep (vault + networks + fleet security, honest report).
+   * Re-synced every beat like the triggers: created only when missing,
+   * staggered hourUtc so the fleet never fires in a stampede. */
+  const builderLabels = new Set(
+    (await db.gateSchedule.findMany({ where: { label: { startsWith: "builder:" } }, select: { agentName: true } })).map((s) => s.agentName),
+  );
+  const guardianLabels = new Set(
+    (await db.gateSchedule.findMany({ where: { label: { startsWith: "guardian:" } }, select: { agentName: true } })).map((s) => s.agentName),
+  );
+  const builderMeans = JSON.stringify([
+    "פעולה אמיתית אחת לפחות בוצעה והוכחה בראיה: פרסום חי (steem.post עם txId), או memory.write עם ממצא מנומק, או goal.propose מוצדק, או הצעת-פקודת DEX (steem.order.build)",
+    "דוח עברית נשלח לגשר-הפיקוד עם הראיה",
+  ]);
+  const guardianMeans = JSON.stringify([
+    "vault.verify או net.health הוחזרו חי, וכל חריגה נבדקה",
+    "fleet.status חי — מי מחובר, מי נופל מ-RC",
+    "דוח אבטחה כן בעברית לגשר (או ״הכל תקין״ עם המספרים)",
+  ]);
+  for (let idx = 0; idx < armed.length; idx++) {
+    const a = armed[idx];
+    if (!builderLabels.has(a.name)) {
+      await db.gateSchedule.create({
+        data: {
+          label: `builder:${a.name}`,
+          agentName: a.name,
+          goal:
+            "תור-הבונה היומי: בחר שיפור אמיתי אחד לרשת ובצע אותו מקצה-לקצה — הערך הגבוה ביותר קודם: (1) פרסם לשרשרת תוכן בעל-ערך (steem.post — דוח/ממצא/ניתוח), או (2) רשום ממצא מוכח חדש לזיכרון-הצי (memory.write), או (3) הצע יעד מוצדק (goal.propose), או (4) הכן הצעת-פקודת DEX מושכלת (steem.order.build — רחוקה מהספר, ממתינה לאישור-מפעיל). בצע אחד היטב — לא ארבעה במקרה.",
+          doneMeans: builderMeans,
+          budget: 6,
+          kind: "daily",
+          hourUtc: 8 + (idx % 12), // staggered — the fleet builds across the whole day
+          maxPerDay: 1,
+        },
+      });
+    }
+    if (!guardianLabels.has(a.name)) {
+      await db.gateSchedule.create({
+        data: {
+          label: `guardian:${a.name}`,
+          agentName: a.name,
+          goal:
+            "סיור-שומר יומי: vault.verify (או vault.stats אם הכספת נעולה), net.health, fleet.status — ודווח דוח-אבטחה כן לגשר: מה חי, מה חריג, מה דורש תשומת-לב. אתה המשגיח-הריבוני של הרשת היום.",
+          doneMeans: guardianMeans,
+          budget: 5,
+          kind: "daily",
+          hourUtc: 20 + (idx % 4), // evening sweep — covers the day's drift
+          maxPerDay: 1,
+        },
+      });
+    }
+  }
   const existing = await db.gateTrigger.findMany({ where: { on: "message.mentions" }, select: { agentName: true } });
   const have = new Set(existing.map((t) => t.agentName));
   const mentionMeans = JSON.stringify([

@@ -57,6 +57,7 @@ function toSigningKey(wif: string): PrivateKey {
   }
   return PrivateKey.fromWif(trimmed); // otherwise let the package fail closed
 }
+export { toSigningKey }; // shared with SOVEREIGN-VOICE (social.ts) — same 33-byte quirk applies to every headcorner role
 
 /** The commander account whose ACTIVE key lives in the vault — never taken from agent input. */
 export const COMMANDER_ACCOUNT = "headcorner";
