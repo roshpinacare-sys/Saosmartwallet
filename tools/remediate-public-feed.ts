@@ -57,8 +57,10 @@ const ALL_EDITS: Array<{ permlink: string; title: string; body: string; tags: st
 ];
 
 // operator can pass specific permlinks: bun tools/remediate-public-feed.ts permlink1 permlink2
+// RAIL=steem|hive (default steem) — the hive attempt documents the honest RC wall.
 const ONLY = process.argv.slice(2);
 const EDITS = ONLY.length ? ALL_EDITS.filter((e) => ONLY.includes(e.permlink)) : ALL_EDITS;
+const RAIL = (process.env.RAIL === "hive" ? "hive" : "steem") as "steem" | "hive";
 
 async function relightMasterFromTokenFile(): Promise<void> {
   const token = (await fs.readFile(TOKEN_FILE, "utf8").catch(() => "")).trim();
@@ -112,7 +114,7 @@ async function main(): Promise<void> {
       const r = await editPostFromAgent({
         agentName: "operator",
         runId: RUN_ID,
-        rail: "steem",
+        rail: RAIL,
         permlink: e.permlink,
         title: e.title,
         body: e.body,
