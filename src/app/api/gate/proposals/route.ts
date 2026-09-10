@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { requireOperator } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { GateError } from "@/lib/gate/crypto";
-import { launchProposal, readProposalPolicy, writeProposalPolicy } from "@/lib/gate/harness/heart";
+import { launchProposal, readProposalPolicy, writeProposalPolicy, adoptScheduleProposal } from "@/lib/gate/harness/heart";
 
 export const runtime = "nodejs";
 
@@ -26,7 +26,10 @@ export async function GET() {
 
 /**
  * PATCH /api/gate/proposals — the operator's verdict on a pending proposal:
- *   { id, decision: "approve" } → launches a real run (origin=proposal)
+ *   { id, decision: "approve" } → run-kind: launches a real run (origin=proposal);
+ *                                  schedule-create kind: ADOPTS the patrol as a
+ *                                  real recurring schedule (sovereign decision —
+ *                                  the policy engine may never adopt structure)
  *   { id, decision: "reject"  } → rejected honestly, visible in the bridge
  */
 export async function PATCH(req: Request) {
@@ -57,6 +60,13 @@ export async function PATCH(req: Request) {
         })
         .catch(() => {});
       return ok({ status: "rejected" });
+    }
+    // r15 — structural proposals adopt differently: a schedule-create
+    // becomes a real GateSchedule (status "adopted", no run), everything
+    // else launches a run (status "launched").
+    if ((p.kind || "run") === "schedule-create") {
+      const adopted = await adoptScheduleProposal(id);
+      return ok({ status: "adopted", ...adopted });
     }
     const runId = await launchProposal(id, "operator");
     return ok({ status: "launched", runId });

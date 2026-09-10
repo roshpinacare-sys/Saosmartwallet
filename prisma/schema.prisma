@@ -239,9 +239,16 @@ model GateProposal {
   rationale String? // WHY the agent believes this is worth doing
   doneMeans String // JSON array — the pass-gate the proposer binds itself to
   budget    Int       @default(4)
-  status    String    @default("pending") // pending | launched | rejected | expired
+  // r15 — proposal kinds: "run" = one goal-loop (the classic, policy may
+  // launch it); "schedule-create" = the agent designed its own RECURRING
+  // employment (a patrol). A schedule is structural — the policy engine may
+  // NEVER auto-adopt one; only the operator can (the initiative stage skips
+  // non-run kinds by design — the same doctrine as budget > maxBudget).
+  kind      String    @default("run")
+  payload   String? // JSON — structured data for non-run kinds (schedule spec)
+  status    String    @default("pending") // pending | launched | adopted | rejected | expired
   decidedBy String? // operator | policy
-  runId     String? // the run created on approval (lineage)
+  runId     String? // the run created on approval (lineage; null for adopted schedules)
   createdAt DateTime  @default(now())
   decidedAt DateTime?
 

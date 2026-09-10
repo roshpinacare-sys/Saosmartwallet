@@ -42,12 +42,20 @@ export async function GET() {
     // claim is computed LIVE from the proposal table, never hardcoded:
     // a hardcoded truth expired once already (the r12 filing died as
     // "expired" 16s in) and the page kept saying "open".
+    // r15 gap-57 — "launched" alone still allowed the page to claim "the run
+    // is alive right now" while the run had already blocked honestly (the
+    // steemauto closure run died to a missing tool). The banner now reads the
+    // RUN's terminal state too — a claim may never outlive its evidence.
     const steemauto = await db.gateProposal.findFirst({
       where: { goal: { contains: "steemauto" } },
       orderBy: { createdAt: "desc" },
-      select: { status: true, decidedBy: true, createdAt: true },
+      select: { status: true, decidedBy: true, createdAt: true, runId: true },
     });
-    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto });
+    let steemautoRunStatus: string | null = null;
+    if (steemauto?.runId) {
+      steemautoRunStatus = await db.gateRun.findUnique({ where: { id: steemauto.runId }, select: { status: true } }).then((r) => r?.status ?? null);
+    }
+    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto ? { ...steemauto, runStatus: steemautoRunStatus } : null });
   } catch (e) {
     return fail(e);
   }

@@ -139,6 +139,14 @@ export interface RailAccountRaw {
   memo_key?: string;
   json_metadata?: string;
   posting_json_metadata?: string;
+  // r15 — governance presence (returned natively by condenser get_accounts;
+  // optional because graphene nodes may omit fields they don't implement)
+  witness_votes?: string[]; // witnesses this account votes for
+  proxy?: string; // non-empty = governance delegated to a proxy
+  follower_count?: number;
+  following_count?: number;
+  last_post?: string;
+  last_vote_time?: string;
 }
 
 export async function railAccounts(rail: Rail, names: string[]): Promise<RailAccountRaw[]> {
@@ -155,6 +163,8 @@ export interface RailPost {
   created: string;
   lastUpdate: string; // STEEM_MIN_COMMENT_EDIT_INTERVAL pacing reads this
   payout: string; // pending or claimed — whichever the chain reports
+  netVotes: number; // real engagement — the echo measurement (r15)
+  comments: number; // children count — the discussion the post created
   bodyPreview: string; // bounded preview for UI lists
   body: string; // FULL body — the doctrine audit scans the WHOLE post, not its first 400 chars
   tags: string[];
@@ -186,6 +196,8 @@ export async function railBlogPosts(rail: Rail, account: string, limit = 10): Pr
       created: String(p.created || ""),
       lastUpdate: String(p.last_update || p.created || ""),
       payout: String(p.pending_payout_value || p.total_payout_value || "0"),
+      netVotes: Number(p.net_votes) || 0,
+      comments: Number(p.children) || 0,
       bodyPreview: String(p.body || "").slice(0, 400),
       body: String(p.body || ""),
       tags,
@@ -208,6 +220,8 @@ export async function railGetContent(rail: Rail, author: string, permlink: strin
     created: String(p.created || ""),
     lastUpdate: String((p as Record<string, string>).last_update || p.created || ""),
     payout: String(p.pending_payout_value || p.total_payout_value || "0"),
+    netVotes: Number(p.net_votes) || 0,
+    comments: Number(p.children) || 0,
     bodyPreview: String(p.body || "").slice(0, 400),
     body: String(p.body || ""),
     tags,

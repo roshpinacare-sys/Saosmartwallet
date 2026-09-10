@@ -57,7 +57,9 @@ interface HeartPulse {
   // process-local (never carried across restarts) so the operator can SEE
   // which code the heart actually executes, right now.
   boot?: { pid: number; bootedAt: string; codeSha: string };
-  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number };
+  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number; idleFired: number };
+  // r15 — idle self-employment observability: what the fleet does with its
+  // free time, and which rotation slot it is on (visible to the operator).
   // ROAST r9 gap-37 — the heart now SEES the trust surface it manages:
   // live trusted devices, ones nearing expiry, and what hygiene did this beat.
   devices?: { live: number; expiringSoon: number; reaped: number; warned: number };
@@ -82,7 +84,7 @@ async function enqueueRun(opts: {
   modules: string[] | null;
   brain: string | null;
   budget: number;
-  origin: "schedule" | "trigger" | "proposal";
+  origin: "schedule" | "trigger" | "proposal" | "idle";
   meta: Record<string, unknown>;
 }): Promise<string> {
   const agent = await db.gateAgent.findFirst({ where: { name: opts.agentName, active: true } });
@@ -124,8 +126,8 @@ async function enqueueRun(opts: {
     await db.gateRun.update({ where: { id: run.id }, data: { lessons: JSON.stringify(lessons) } });
   }
   void run;
-  const originIcon = opts.origin === "schedule" ? "⏰" : opts.origin === "proposal" ? "💡" : "⚡";
-  const originText = opts.origin === "schedule" ? "סיור מתוכנן" : opts.origin === "proposal" ? "יוזמת-יעד" : "טריגר אירוע";
+  const originIcon = opts.origin === "schedule" ? "⏰" : opts.origin === "proposal" ? "💡" : opts.origin === "idle" ? "🌿" : "⚡";
+  const originText = opts.origin === "schedule" ? "סיור מתוכנן" : opts.origin === "proposal" ? "יוזמת-יעד" : opts.origin === "idle" ? "תעסוקה-עצמית" : "טריגר אירוע";
   const note = typeof meta.brainNote === "string" ? ` · ${meta.brainNote}` : "";
   await db.gateMessage.create({
     data: {
@@ -518,8 +520,12 @@ async function stageProposals(p: HeartPulse): Promise<void> {
   // never stamped. An over-budget proposal is the DESIGNED sovereign gate
   // ("a proposal asking for more steps waits for the operator") — so
   // operator-only items should file with budget > maxBudget.
+  // r15 — schedule-create proposals are skipped by KIND, not by budget: a
+  // recurring patrol is structural employment, and structure is the
+  // operator's sovereign decision (the agents design, the operator adopts).
   let cand: (typeof pend)[number] | undefined;
   for (const x of pend) {
+    if (x.kind && x.kind !== "run") continue; // structural proposals ⇒ operator-only, forever if needed
     if (x.budget > policy.maxBudget) continue; // above-cap ⇒ operator-only — waits, forever if needed
     const agent = await db.gateAgent.findFirst({ where: { name: x.agentName, active: true, autonomy: true } });
     if (!agent) continue; // unknown/inactive agent ⇒ the operator's call — stays pending
@@ -583,6 +589,191 @@ export async function launchProposal(proposalId: string, decidedBy: "operator" |
     data: { status: "launched", decidedBy, decidedAt: new Date(), runId },
   });
   return runId;
+}
+
+/**
+ * r15 — the operator ADOPTS an agent-designed patrol (kind=schedule-create):
+ * the proposal's payload becomes a REAL GateSchedule and the proposal closes
+ * as "adopted". Structural employment is sovereign — this is called only
+ * from the operator's approve path, never from the policy engine. Every
+ * spec field is re-validated against the same hard bounds the proposer
+ * faced (cadence floor, budget clamp, module registry) — the DB never
+ * trusts a payload it hasn't re-checked.
+ */
+export async function adoptScheduleProposal(proposalId: string): Promise<{ scheduleId: string; label: string }> {
+  const p = await db.gateProposal.findUnique({ where: { id: proposalId } });
+  if (!p) throw new Error("אין הצעה כזו");
+  if (p.status !== "pending") throw new Error(`ההצעה כבר הוכרעה (${p.status})`);
+  if ((p.kind || "run") !== "schedule-create") throw new Error("זו אינה הצעת-סיור — השתמש בהזנקה רגילה");
+  let payload: {
+    label?: string; kind?: string; hourUtc?: number | null; everyMs?: number | null;
+    budget?: number; maxPerDay?: number; modules?: string[] | null;
+  } = {};
+  try { payload = JSON.parse(p.payload || "{}"); } catch { payload = {}; }
+  const label = String(payload.label || "").trim();
+  const kind = payload.kind === "interval" ? "interval" : payload.kind === "daily" ? "daily" : "";
+  const goal = String(p.goal || "").trim().slice(0, 1200);
+  const doneMeans = (() => { try { return JSON.parse(p.doneMeans || "[]"); } catch { return []; } })();
+  const budget = Math.min(Math.max(Number(payload.budget) || 3, 1), 8);
+  const maxPerDay = Math.min(Math.max(Number(payload.maxPerDay) || 4, 1), 12);
+  const hourUtc = payload.hourUtc === null || payload.hourUtc === undefined ? null : Math.min(Math.max(Number(payload.hourUtc), 0), 23);
+  const everyMs = payload.everyMs === null || payload.everyMs === undefined ? null : Math.max(Number(payload.everyMs), MIN_SCHEDULE_EVERY_MS);
+  if (!label || label.length < 3 || label.length > 60) throw new Error("שם-הסיור בפיילוד לא תקין");
+  if (!kind) throw new Error("סוג-הקצב בפיילוד לא תקין");
+  if (kind === "daily" && hourUtc === null) throw new Error("daily דורש hourUtc תקין");
+  if (kind === "interval" && !everyMs) throw new Error("interval דורש everyMs תקין");
+  if (!Array.isArray(doneMeans) || !doneMeans.length) throw new Error("ההצעה ללא שער-מעבר — אין לאמץ");
+  // armed-set re-check: every module id must exist in the registry, or the
+  // schedule would arm a patrol with phantom hands
+  const mods = Array.isArray(payload.modules) ? payload.modules.filter((m) => typeof m === "string" && MODULES.some((x) => x.id === m)) : null;
+  if (Array.isArray(payload.modules) && mods!.length !== payload.modules.length) {
+    throw new Error("הפיילוד מציין מודולים שאינם במחסן — נדחה");
+  }
+  const dup = await db.gateSchedule.findFirst({ where: { label } });
+  if (dup) throw new Error(`קיים כבר סיור בשם "${label}"`);
+  const next =
+    kind === "daily"
+      ? (() => { const d = new Date(); d.setUTCHours(hourUtc!, 0, 0, 0); if (d.getTime() <= Date.now()) d.setUTCDate(d.getUTCDate() + 1); return d; })()
+      : new Date(Date.now() + everyMs!);
+  const s = await db.gateSchedule.create({
+    data: {
+      label,
+      agentName: p.agentName,
+      goal,
+      doneMeans: JSON.stringify(doneMeans),
+      modules: mods ? JSON.stringify(mods) : null,
+      brain: null, // the agent's own brain rules (enqueueRun re-checks)
+      budget,
+      kind,
+      everyMs: kind === "interval" ? everyMs : null,
+      hourUtc: kind === "daily" ? hourUtc : null,
+      maxPerDay,
+      enabled: true,
+      nextRunAt: next,
+    },
+  });
+  await db.gateProposal.update({
+    where: { id: proposalId },
+    data: { status: "adopted", decidedBy: "operator", decidedAt: new Date() },
+  });
+  await db.gateMessage.create({
+    data: {
+      channel: "command",
+      fromKind: "system",
+      fromName: "harness",
+      body: `🌸 המפעיל אימץ את סיור-הרשת "${label}" שעיצב ${p.agentName} — תעסוקה קבועה חדשה נרשמה (ההזנקה הראשונה: ${next.toISOString().slice(0, 16).replace("T", " ")} UTC)`,
+      meta: JSON.stringify({ proposalId, scheduleId: s.id }),
+    },
+  }).catch(() => {});
+  return { scheduleId: s.id, label };
+}
+
+/* ════════════════ idle self-employment (r15) ════════════════
+ * gap-56: when the queue is empty and no schedule is due, the fleet IDLED —
+ * proven brains, armed modules, and zero work. "עוד תעסוקה שתקדם אותנו ואת
+ * הרשת" is now a heartbeat stage: every 12th beat (~4min), if the WHOLE
+ * fleet is idle (queue empty, nothing running, both dispatch slots free),
+ * the heart enqueues ONE light network-presence mission from a rotating
+ * roster to a rotating agent — budget 2, fleet-wide cap 6/day, honest meta.
+ * Bounded initiative doctrine applies unchanged: the heart only LAUNCHES
+ * what it is allowed to launch (light, public, capped), and the rotation
+ * watermark lives in GateState so restarts don't reset the day's quota.
+ */
+const IDLE_KEY = "idle-employment";
+const IDLE_EVERY_BEATS = 12; // ~4min between idle craft opportunities
+const IDLE_MAX_PER_DAY = 6; // fleet-wide self-employment cap
+const IDLE_BUDGET = 2;
+const IDLE_ROSTER: { module: string; goal: string; doneMeans: string[] }[] = [
+  {
+    module: "chain.pulse",
+    goal: "תעסוקה-עצמית (דופק): הפעל chain.pulse והוכח מכנית אילו מסילות מייצרות בלוקים עכשיו. דווח לגשר בעברית בשורה-אחת.",
+    doneMeans: ["chain.pulse הופעל והחזיר דלתא-בלוקים לכל מסילה שנענתה", "שורת-דיווח עברית נכתבה לגשר עם המספרים שנמדדו"],
+  },
+  {
+    module: "fleet.presence",
+    goal: "תעסוקה-עצמית (נוכחות): הפעל fleet.presence ומדוד איפה הצי נמצא בשלוש-המסילות. דווח לגשר בעברית בשורה-אחת.",
+    doneMeans: ["fleet.presence הופעל והחזיר ספירת-חשבונות לכל מסילה שנענתה", "שורת-דיווח עברית נכתבה לגשר"],
+  },
+  {
+    module: "social.engagement",
+    goal: "תעסוקה-עצמית (הד): הפעל social.engagement ומדוד האם הפוסטים-האחרונים מקבלים הצבעות/תגובות. דווח לגשר בעברית.",
+    doneMeans: ["social.engagement הופעל ומדד הצבעות/תגובות לפוסטי-המפקד", "שורת-דיווח עברית נכתבה לגשר"],
+  },
+  {
+    module: "governance.scan",
+    goal: "תעסוקה-עצמית (ממשל): הפעל governance.scan ומפה למי הצי מצביע-עדים ומי שותק. דווח לגשר בעברית.",
+    doneMeans: ["governance.scan הופעל והחזיר ספירת-מצביעים/נציגויות/שותקים", "שורת-דיווח עברית נכתבה לגשר"],
+  },
+  {
+    module: "steem.trends",
+    goal: "תעסוקה-עצמית (מכ\"ם): הפעל steem.trends וראה מה הרשת קוראת עכשיו — מועמדויות-נושא לפרסום הבא. דווח לגשר בעברית.",
+    doneMeans: ["steem.trends הופעל והחזיר תגיות/דיונים-חמים חיים", "שורת-דיווח עברית עם מועמדות-נושא אחת לפחות"],
+  },
+  {
+    module: "market.watch",
+    goal: "תעסוקה-עצמית (שוק): הפעל market.watch עם depth 5 ומדוד את מצב ה-DEX עכשיו. דווח לגשר בעברית.",
+    doneMeans: ["market.watch הופעל והחזיר טיקר/ספר-הזמנות חיים", "שורת-דיווח עברית עם המחיר שנמדד"],
+  },
+];
+
+async function stageIdle(p: HeartPulse): Promise<void> {
+  const loops = () => ({ lastAt: new Date().toISOString(), ok: true, fired: 0 });
+  if (p.beats % IDLE_EVERY_BEATS !== 0) {
+    if (!p.loops.idleCraft) p.loops.idleCraft = loops();
+    return;
+  }
+  const queued = await db.gateRun.count({ where: { status: "queued" } });
+  const running = await db.gateRun.count({ where: { status: "running" } });
+  if (queued > 0 || running >= MAX_CONCURRENT_RUNS) {
+    p.loops.idleCraft = loops();
+    return; // the fleet is busy — self-employment never displaces real work
+  }
+  const state = await db.gateState.findUnique({ where: { key: IDLE_KEY } });
+  let marks: { dayKey?: string; count?: number; idx?: number } = {};
+  try { if (state) marks = JSON.parse(state.value) as typeof marks; } catch { /* fresh */ }
+  const dk = dayKeyNow();
+  const count = marks.dayKey === dk ? marks.count ?? 0 : 0;
+  if (count >= IDLE_MAX_PER_DAY) {
+    p.loops.idleCraft = loops();
+    return;
+  }
+  const idx = ((marks.idx ?? -1) + 1) % IDLE_ROSTER.length;
+  const roster = IDLE_ROSTER[idx];
+  // rotate across active, autonomous, currently-idle agents — self-employment
+  // is spread across the fleet, never stacked on one worker
+  const agents = await db.gateAgent.findMany({ where: { active: true, autonomy: true }, orderBy: { name: "asc" } });
+  const pool: string[] = [];
+  for (const a of agents) {
+    const busy = await db.gateRun.count({ where: { agentName: a.name, status: { in: ["queued", "running"] } } });
+    if (busy === 0) pool.push(a.name);
+  }
+  if (!pool.length) {
+    p.loops.idleCraft = loops();
+    return;
+  }
+  const agentName = pool[idx % pool.length];
+  try {
+    await enqueueRun({
+      agentName,
+      goal: roster.goal,
+      doneMeans: roster.doneMeans,
+      modules: [roster.module, "chat.report"],
+      brain: null,
+      budget: IDLE_BUDGET,
+      origin: "idle",
+      meta: { selfEmployment: true, roster: roster.module, rotation: `${idx}/${IDLE_ROSTER.length}`, count: `${count + 1}/${IDLE_MAX_PER_DAY}` },
+    });
+    p.counters.idleFired = (p.counters.idleFired || 0) + 1;
+    p.loops.idleCraft = { lastAt: new Date().toISOString(), ok: true, fired: 1 };
+    const value = JSON.stringify({ dayKey: dk, count: count + 1, idx });
+    await db.gateState.upsert({ where: { key: IDLE_KEY }, create: { key: IDLE_KEY, value }, update: { value } });
+  } catch (e) {
+    // rotation index advances anyway — a broken roster slot must not loop forever
+    const value = JSON.stringify({ dayKey: dk, count, idx });
+    await db.gateState.upsert({ where: { key: IDLE_KEY }, create: { key: IDLE_KEY, value }, update: { value } }).catch(() => {});
+    p.loops.idleCraft = { lastAt: new Date().toISOString(), ok: false, fired: 0 };
+    console.error("eart] idle-craft failed:", e instanceof Error ? e.message : e);
+  }
 }
 
 async function stageDispatch(p: HeartPulse): Promise<void> {
@@ -718,7 +909,7 @@ export async function tickOnce(): Promise<HeartPulse> {
     lastTickAt: "",
     beats: 0,
     enabled: true,
-    counters: { dispatched: 0, reaped: 0, recovered: 0, schedulesFired: 0, schedulesDeferred: 0, triggersFired: 0, proposalsFired: 0, eventsSeen: 0, ordersExpired: 0, marketMoves: 0 },
+    counters: { dispatched: 0, reaped: 0, recovered: 0, schedulesFired: 0, schedulesDeferred: 0, triggersFired: 0, proposalsFired: 0, eventsSeen: 0, ordersExpired: 0, marketMoves: 0, idleFired: 0 },
     loops: {},
   };
   if (!g) {
@@ -751,6 +942,7 @@ export async function tickOnce(): Promise<HeartPulse> {
         ["initiative", () => stageProposals(p)],
         ["orders", () => stageOrders(p)],
         ["market", () => stageMarket(p)],
+        ["idleCraft", () => stageIdle(p)],
         ["dispatch", () => stageDispatch(p)],
       ];
       for (const [name, fn] of stages) {

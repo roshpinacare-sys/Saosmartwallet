@@ -399,4 +399,54 @@ export async function verifyAll(): Promise<{ entries: EntryVerify[]; steemOk: bo
   return { entries, steemOk, hiveOk, blurtOk, githubOk };
 }
 
+/**
+ * r15 — targeted re-scan: verify ONLY entries still marked "imported"
+ * (material the vault inherited but never proved live). verifyAll proves
+ * everything but is a full sweep; this closes the honest "imported" backlog
+ * with a bounded, cheap pass the fleet can run as a DAILY MISSION (the
+ * vault-rescan patrol). Same probe machinery, same persistence rules, same
+ * bounded concurrency — never downgrades a rotated-out key, never fakes a
+ * live: network-silent probes keep the entry imported (honest-null).
+ */
+export async function verifyImported(): Promise<{
+  scanned: number;
+  verified: number;
+  failed: number;
+  stillImported: number;
+  entries: EntryVerify[];
+}> {
+  const rows = await db.vaultEntry.findMany({
+    where: { status: "imported" },
+    orderBy: [{ chain: "asc" }, { account: "asc" }, { role: "asc" }],
+    take: 30,
+  });
+  const fetched = rows.length ? await fetchChainAuthorityMap() : null;
+  const entries: EntryVerify[] = [];
+  if (rows.length && fetched) {
+    const alive = { steem: fetched.steemOk, hive: fetched.hiveOk, blurt: fetched.blurtOk };
+    const CONCURRENCY = 4;
+    let cursor = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, rows.length) }, async () => {
+        while (cursor < rows.length) {
+          const e = rows[cursor++];
+          const v = await verifyEntry(e, fetched.map, alive);
+          // same persistence contract as verifyAll: live=true → verified,
+          // live=false → unverified (rotated-out stays), live=null → untouched
+          const newStatus = v.liveOk === true ? "verified" : v.liveOk === false ? (e.status === "rotated-out" ? "rotated-out" : "unverified") : e.status;
+          await db.vaultEntry.update({
+            where: { id: e.id },
+            data: { status: newStatus, verifiedAt: new Date() },
+          });
+          entries.push(v);
+        }
+      }),
+    );
+  }
+  const verified = entries.filter((v) => v.liveOk === true).length;
+  const failed = entries.filter((v) => v.liveOk === false).length;
+  const stillImported = await db.vaultEntry.count({ where: { status: "imported" } });
+  return { scanned: entries.length, verified, failed, stillImported, entries };
+}
+
 export { FLEET_ACCOUNTS };
