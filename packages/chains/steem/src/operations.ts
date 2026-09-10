@@ -28,7 +28,22 @@
 
 import { ByteReader, ByteWriter, type Asset, packAsset, unpackAsset } from "./serializer";
 
-/** Standard Steem operation ids (graphene op tag order). */
+/**
+ * Standard Steem operation ids — LEGACY GRAPHENE WIRE TAGS, oracle-proven.
+ *
+ * ⚠ LIVE-PROVEN against the node's own serializer (condenser_api.get_transaction_hex,
+ * api.steemit.com, 2026-09-10): the tag numbering has a legacy quirk — there is
+ * NO gap before transfer_to_savings (the deleted "pow" at 14 consumes its slot,
+ * and the post-31 ops run CONTIGUOUSLY from 32). An earlier draft of this table
+ * shifted 32..50 by +1 and was caught by the byte-oracle on the very first
+ * claim_reward_balance vector (node 0x27, table 0x28). Oracle vectors:
+ *   transfer_to_savings      → 32   (node byte 11, 53B tx)
+ *   claim_reward_balance     → 39   (node byte 11, 73B tx)
+ *   delegate_vesting_shares  → 40   (node byte 11, 45B tx)
+ *   account_update2          → 43   (node byte 11, 57B tx)
+ * (vote=0/comment=1/transfer=2/limit_order_create=5/limit_order_cancel=6/
+ *  custom_json=18 were already bit-proven live in M0/M1/M3.)
+ */
 export const OP_IDS = {
   vote: 0,
   comment: 1,
@@ -44,6 +59,7 @@ export const OP_IDS = {
   witness_update: 11,
   account_witness_vote: 12,
   account_witness_proxy: 13,
+  pow: 14,
   custom: 15,
   report_over_production: 16,
   delete_comment: 17,
@@ -61,24 +77,24 @@ export const OP_IDS = {
   escrow_release: 29,
   pow2: 30,
   escrow_approve: 31,
-  transfer_to_savings: 33,
-  transfer_from_savings: 34,
-  cancel_transfer_from_savings: 35,
-  custom_binary: 36,
-  decline_voting_rights: 37,
-  reset_account: 38,
-  set_reset_account: 39,
-  claim_reward_balance: 40,
-  delegate_vesting_shares: 41,
-  account_create_with_delegation: 42,
-  witness_set_properties: 43,
-  account_update2: 44,
-  create_proposal: 45,
-  update_proposal_votes: 46,
-  remove_proposal: 47,
-  update_proposal: 48,
-  collateralized_convert: 49,
-  recurrent_transfer: 50,
+  transfer_to_savings: 32,
+  transfer_from_savings: 33,
+  cancel_transfer_from_savings: 34,
+  custom_binary: 35,
+  decline_voting_rights: 36,
+  reset_account: 37,
+  set_reset_account: 38,
+  claim_reward_balance: 39,
+  delegate_vesting_shares: 40,
+  account_create_with_delegation: 41,
+  witness_set_properties: 42,
+  account_update2: 43,
+  create_proposal: 44,
+  update_proposal_votes: 45,
+  remove_proposal: 46,
+  update_proposal: 47,
+  collateralized_convert: 48,
+  recurrent_transfer: 49,
 } as const;
 
 export type OperationId = (typeof OP_IDS)[keyof typeof OP_IDS];
@@ -108,20 +124,37 @@ export interface LimitOrderCreateOperation {
   expiration: number;
 }
 
+/**
+ * Claim pending rewards (SOVEREIGN-TREASURY). Pending author/curation rewards
+ * accrue into reward_steem/reward_sbd/reward_vests and stay INVISIBLE to
+ * spendable balances until a claim_reward_balance op moves them into
+ * balance/sbd_balance/vesting_shares. Posting-authority op by the chain's own
+ * design (steemd: get_required_posting_authorities) — the agents can harvest
+ * what they earned without ever touching funds-moving authority.
+ */
+export interface ClaimRewardBalanceOperation {
+  account: string;
+  reward_steem: Asset; // "0.000 STEEM" (3dp)
+  reward_sbd: Asset; // "0.000 SBD" (3dp)
+  reward_vests: Asset; // "0.000000 VESTS" (6dp)
+}
+
 export type SteemOperationBody =
   | TransferOperation
   | LimitOrderCreateOperation
   | LimitOrderCancelOperation
   | VoteOperation
   | CommentOperation
-  | CustomJsonOperation;
+  | CustomJsonOperation
+  | ClaimRewardBalanceOperation;
 export type SteemOperationName =
   | "transfer"
   | "limit_order_create"
   | "limit_order_cancel"
   | "vote"
   | "comment"
-  | "custom_json";
+  | "custom_json"
+  | "claim_reward_balance";
 
 /**
  * Internal-market order cancel (M3+ DEX lifecycle closure). Cancels the
@@ -245,6 +278,16 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
       w.string(j.json);
       return;
     }
+    case "claim_reward_balance": {
+      const c = body as ClaimRewardBalanceOperation;
+      // steemd field order: account, reward_steem, reward_sbd, reward_vests
+      w.varint(OP_IDS.claim_reward_balance);
+      w.string(c.account);
+      packAsset(w, c.reward_steem);
+      packAsset(w, c.reward_sbd);
+      packAsset(w, c.reward_vests);
+      return;
+    }
     default: {
       // Exhaustiveness guard — TypeScript rejects unhandled names at compile time.
       const _never: never = name;
@@ -316,8 +359,15 @@ export function unpackOperation(r: ByteReader): UnpackedOperation {
     const json = r.string();
     return { id, name: "custom_json", body: { required_auths, required_posting_auths, id: jsonId, json } };
   }
+  if (id === OP_IDS.claim_reward_balance) {
+    const account = r.string();
+    const reward_steem = unpackAsset(r);
+    const reward_sbd = unpackAsset(r);
+    const reward_vests = unpackAsset(r);
+    return { id, name: "claim_reward_balance", body: { account, reward_steem, reward_sbd, reward_vests } };
+  }
   throw new Error(
-    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5), "limit_order_cancel" (6), "vote" (0), "comment" (1) and "custom_json" (18); ` +
+    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5), "limit_order_cancel" (6), "vote" (0), "comment" (1), "custom_json" (18) and "claim_reward_balance" (40); ` +
       `extend packOperation/unpackOperation before parsing other op types`,
   );
 }

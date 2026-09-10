@@ -21,7 +21,7 @@ import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
-import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, SOCIAL_RAILS } from "./social";
+import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, SOCIAL_RAILS } from "./social";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
@@ -563,6 +563,39 @@ export const MODULES: HarnessModule[] = [
         unfollow: args.unfollow === true,
       });
       return { ...r, meaning: `פעולה חיה בשרשרת — ${r.detail}` };
+    },
+  },
+  {
+    id: "steem.rewards",
+    name: "אוצר-ריבוני — סקר תגמולים",
+    kind: "connector",
+    desc: 'האמת על הכסף שהצי הרוויח: סקר חי של כל חשבונות-הצי על steem — תגמולי-סופרים ותגמולי-קוראים שנצברו וממתינים ברנק (reward_*) עדיין לא הועברו ליתרה הניתנת-לשימוש. על steem, תגמול נשאר "תקוע" עד שפעולת claim_reward_balance חתומה מביאה אותו ליתרות בפועל — זו בדיוק הסיבה ש"יש תגמול בארנק ואי אפשר לממש אותו". הסקר מציג לכל חשבון: מה ממתין, שקול-STEEM, והאם יש לנו מפתח-posting בכספת לתבוע בשמו. קרא את זה לפני steem.claim.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const c = await fleetRewardsCensus();
+      return { ...c, meaning: c.summary };
+    },
+  },
+  {
+    id: "steem.claim",
+    name: "אוצר-ריבוני — תביעת תגמולים",
+    kind: "actor",
+    desc: `תביעה אמיתית של התגמולים הממתינים של חשבון-צי על steem: השער קורא את היתרות-הממתינות מהשרשרת עצמה (לעולם לא מהפרמטרים שלך), מוכיח שמפתח-הכספת הוא הסמכות-הנוכחית, משדר claim_reward_balance חתום עם מפתח-posting (לעולם לא נוגע בכספים — זו סמכות-הקציר שהשרשרת עצמה נותנת), וקורא שוב כדי לאמת שהממתינים התאפסו. תקרה ${SOCIAL_RAILS.maxClaimsPerDay}/יום לצי. txId אמיתי + אימות חי מוחזרים. אם אין מה לתבוע — תקבל תשובה כנה, לא שגיאה-שקרית.`,
+    args: '{"account":"ברירת-מחדל headcorner — חשבון אחר רק אם steem.rewards הראה שיש לו ממתינים"}',
+    needsVault: true,
+    cacheable: false,
+    async exec(args, ctx) {
+      const r = await claimRewardsFromAgent({
+        agentName: ctx.agentName,
+        runId: ctx.runId,
+        account: typeof args.account === "string" ? args.account : undefined,
+      });
+      return {
+        ...r,
+        meaning: `תביעה חיה בשרשרת: @${r.account} קיבל ${r.claimed.steem} + ${r.claimed.sbd} + ${r.claimed.vests} — txId ${r.txId}${r.verified ? " · אומת חי (הממתינים אופסו)" : ""}`,
+      };
     },
   },
   {

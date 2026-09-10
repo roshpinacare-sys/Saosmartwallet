@@ -330,6 +330,18 @@ export default function Page() {
           }
         } catch { /* network hiccup — the lock screen stays honest */ }
       }
+      // open gate: token-only entry (operator policy — "זה רק אני ואתה").
+      // The server re-lights the vault from its own lifeline token; no key needed.
+      if (!okIn) {
+        try {
+          const s = await fetch("/api/gate/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then((x) => x.json());
+          if (s?.ok && s?.in && s?.token) {
+            setToken(s.token as string);
+            okIn = await refreshStatus();
+            if (okIn) toast.success("השער נפתח בטוקן — בלי להדביק מפתח");
+          }
+        } catch { /* the lock screen stays honest */ }
+      }
       setBooting(false);
     })();
   }, [refreshStatus]);

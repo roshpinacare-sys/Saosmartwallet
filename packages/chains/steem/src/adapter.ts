@@ -27,7 +27,7 @@ import {
 } from "../../chain-adapter";
 import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
-import type { CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemOperationName, VoteOperation } from "./operations";
+import type { ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemOperationName, VoteOperation } from "./operations";
 import {
   STEEM_CHAIN_ID,
   SIGNATURE_SIZE,
@@ -264,6 +264,29 @@ export class SteemAdapter implements ChainAdapter {
     }
   }
 
+  /**
+   * Validates a claim_reward_balance payload (SOVEREIGN-TREASURY). Symbols and
+   * precisions are chain-exact (STEEM/SBD 3dp, VESTS 6dp) and the total must
+   * be non-zero — steemd itself refuses "Cannot claim a total of 0".
+   * NOT a FUNDS_OP by the chain's own authority model: posting authority is
+   * the legal signer (the claim only harvests what the account already earned).
+   */
+  private validateClaimRewardPayload(p: Record<string, unknown>): void {
+    if (typeof p.account !== "string") throw new SerializationError("claim_reward_balance requires string account");
+    validateAccountName(p.account);
+    if (typeof p.reward_steem !== "string" || typeof p.reward_sbd !== "string" || typeof p.reward_vests !== "string") {
+      throw new SerializationError('claim_reward_balance requires asset strings like "0.156 STEEM", "0.000 SBD", "1401.361689 VESTS"');
+    }
+    const steem = parseAsset(p.reward_steem);
+    const sbd = parseAsset(p.reward_sbd);
+    const vests = parseAsset(p.reward_vests);
+    if (steem.symbol !== "STEEM" || steem.precision !== 3) throw new SerializationError(`reward_steem must be a 3dp STEEM asset (got ${steem.symbol}/${steem.precision}dp)`);
+    if (sbd.symbol !== "SBD" || sbd.precision !== 3) throw new SerializationError(`reward_sbd must be a 3dp SBD asset (got ${sbd.symbol}/${sbd.precision}dp)`);
+    if (vests.symbol !== "VESTS" || vests.precision !== 6) throw new SerializationError(`reward_vests must be a 6dp VESTS asset (got ${vests.symbol}/${vests.precision}dp)`);
+    if (steem.amount < 0n || sbd.amount < 0n || vests.amount < 0n) throw new SerializationError("reward amounts must be non-negative");
+    if (steem.amount + sbd.amount + vests.amount <= 0n) throw new SerializationError("cannot claim a total of 0 (chain refuses) — read the live pending rewards first");
+  }
+
   /** Permlink rules: lowercase [a-z0-9-], 1..512 — the chain rejects anything else. */
   private static validatePermlink(permlink: unknown, field: string): string {
     if (typeof permlink !== "string" || permlink.length === 0 || permlink.length > 512) {
@@ -364,9 +387,11 @@ export class SteemAdapter implements ChainAdapter {
         this.validateCommentPayload(op.payload);
       } else if (op.type === "custom_json") {
         this.validateCustomJsonPayload(op.payload);
+      } else if (op.type === "claim_reward_balance") {
+        this.validateClaimRewardPayload(op.payload);
       } else {
         throw new SerializationError(
-          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, vote, comment, custom_json)`,
+          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, vote, comment, custom_json, claim_reward_balance)`,
         );
       }
     }
@@ -472,6 +497,17 @@ export class SteemAdapter implements ChainAdapter {
         json: p.json,
       };
       return { name: "custom_json", body };
+    }
+    if (op.type === "claim_reward_balance") {
+      this.validateClaimRewardPayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as { account: string; reward_steem: string; reward_sbd: string; reward_vests: string };
+      const body: ClaimRewardBalanceOperation = {
+        account: p.account,
+        reward_steem: parseAsset(p.reward_steem),
+        reward_sbd: parseAsset(p.reward_sbd),
+        reward_vests: parseAsset(p.reward_vests),
+      };
+      return { name: "claim_reward_balance", body };
     }
     throw new SerializationError(`operation "${op.type}" cannot be signed (unsupported)`);
   }
