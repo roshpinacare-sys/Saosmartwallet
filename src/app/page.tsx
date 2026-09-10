@@ -89,6 +89,11 @@ interface Inventory {
   ok: boolean; locked: boolean; entries: Entry[];
   summary?: { total: number; verified: number; failed: number; noLive: number; rails: Record<string, number> };
   chains?: { steemOk: boolean; hiveOk: boolean; blurtOk: boolean; githubOk: boolean | null };
+  // r13 gap-54 — the LIVE status of the steemauto door-closure proposal;
+  // the custody banner's "awaiting operator" claim is computed from it,
+  // never hardcoded (the old hardcoded "open" claim outlived its truth:
+  // the r12 filing was auto-expired by policy and the page kept lying).
+  steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string } | null;
 }
 interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
@@ -861,7 +866,14 @@ function VaultGrid() {
                   ({steemOrphans.filter((r) => r.rails.includes("hive")).length}) ועל <b className="text-emerald-400">blurt</b>{" "}
                   ({steemOrphans.filter((r) => r.rails.includes("blurt")).length}) — וכולל <b className="text-emerald-400">ynet@blurt: שליטה מלאה owner+active+posting+memo</b>{" "}
                   (ynet לא היה נשלט באף רשת עד עכשיו). חומר-מת אחד נאטם בכנות (אין-התאמה חיה על אף רשת).
-                  דלתות-פרסום חוץ-מיושנות (steemauto, שירות צד-שלישי 2017) אותרו על 9 חשבונות-hive + ynet@steem — הצעה פתוחה ממתינה להכרעת-מפעיל לסגירתן.
+                  דלתות-פרסום חוץ-מיושנות (steemauto, שירות צד-שלישי 2017) אותרו על 9 חשבונות-hive + ynet@steem — {(() => {
+                    const s = inv?.steemautoProposal;
+                    if (!s) return <span className="text-zinc-400">אין כרגע הצעה פתוחה לסגירתן.</span>;
+                    if (s.status === "pending") return <span className="text-amber-300">הצעה פתוחה כרגע ממתינה להכרעת-המפעיל לסגירתן (פאנל יוזמות-היעד).</span>;
+                    if (s.status === "launched") return <span className="text-emerald-300">הריצה לסגירתן חיה כרגע.</span>;
+                    if (s.status === "rejected") return <span className="text-rose-300">המפעיל דחה את הצעת-הסגירה.</span>;
+                    return <span className="text-zinc-400">ההצעה פגתה במדיניות — דורשת הגשה-מחדש.</span>;
+                  })()}
                   עוגן-סופי על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">saos.vault.anchor.v1 · block 109465716 · tx 95a33fcb…</span>
                 </p>
               </div>

@@ -6,7 +6,9 @@ import { verifyAll } from "@/lib/gate/verify";
 
 export const runtime = "nodejs";
 
-/** GET /api/gate/inventory — operator. Live-verify the whole vault (fresh chain calls). */
+/** GET /api/gate/inventory — operator. Live-verify the whole vault (fresh chain calls).
+ *  r13: also ships the LIVE status of the steemauto door-closure proposal
+ *  (the custody banner computes its claim from it — no hardcoded truths). */
 export async function GET() {
   try {
     await requireOperator();
@@ -36,7 +38,16 @@ export async function GET() {
         github: entries.filter((e) => e.chains.includes("github")).length,
       },
     };
-    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk } });
+    // r13 gap-54 — the custody banner's "open proposal awaiting operator"
+    // claim is computed LIVE from the proposal table, never hardcoded:
+    // a hardcoded truth expired once already (the r12 filing died as
+    // "expired" 16s in) and the page kept saying "open".
+    const steemauto = await db.gateProposal.findFirst({
+      where: { goal: { contains: "steemauto" } },
+      orderBy: { createdAt: "desc" },
+      select: { status: true, decidedBy: true, createdAt: true },
+    });
+    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto });
   } catch (e) {
     return fail(e);
   }
