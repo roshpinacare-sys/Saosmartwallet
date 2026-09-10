@@ -32,6 +32,7 @@ export async function GET() {
         ethereum: entries.filter((e) => e.chains.includes("ethereum")).length,
         tron: entries.filter((e) => e.chains.includes("tron")).length,
         solana: entries.filter((e) => e.chains.includes("solana")).length,
+        bitcoin: entries.filter((e) => e.chains.includes("bitcoin")).length,
         github: entries.filter((e) => e.chains.includes("github")).length,
       },
     };

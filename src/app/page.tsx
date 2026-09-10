@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
-  KeyRound, ShieldCheck, LogOut, Copy, Eye, EyeOff, Bot, Send, RefreshCw,
+  KeyRound, ShieldCheck, ShieldAlert, LogOut, Copy, Eye, EyeOff, Bot, Send, RefreshCw,
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
@@ -747,7 +747,7 @@ function Connections() {
           {summary.failed > 0 ? <span className="text-rose-400">{summary.failed} נכשלו</span> : <span className="text-zinc-600">0 נכשלו</span>} ·{" "}
           {summary.noLive} ללא-בדיקה-אפשרית
           {summary.rails && (
-            <> · סמכויות-חיה: steem {summary.rails.steem ?? 0} · hive {summary.rails.hive ?? 0} · blurt {summary.rails.blurt ?? 0} · ETH {summary.rails.ethereum ?? 0} · TRX {summary.rails.tron ?? 0} · SOL {summary.rails.solana ?? 0}</>
+            <> · סמכויות-חיה: steem {summary.rails.steem ?? 0} · hive {summary.rails.hive ?? 0} · blurt {summary.rails.blurt ?? 0} · ETH {summary.rails.ethereum ?? 0} · TRX {summary.rails.tron ?? 0} · SOL {summary.rails.solana ?? 0} · BTC {summary.rails.bitcoin ?? 0}</>
           )}
         </motion.p>
       )}
@@ -786,6 +786,21 @@ function VaultGrid() {
   }
 
   const entries = inv?.entries || [];
+  // r11 — rewards-level control truth, computed live from the sweep, not a claim:
+  // a soldier's steem-key row counts as "steem-controlled" only when the live
+  // authorities contain it ON STEEM. Rows live on hive/blurt but rotated off
+  // steem surface in the custody banner below.
+  const controlMatrix = useMemo(() => {
+    const soldiers = ["cashmachine","haran","israelnews","lsa","macrame","siq","tov","wic","wog","woq","ynet"];
+    const rows = soldiers.map((name) => {
+      const steemRows = entries.filter((e) => e.kind === "steem-key" && e.account === name);
+      const onSteem = steemRows.some((e) => (e.chains || []).includes("steem") && e.liveOk === true);
+      const rails = new Set(steemRows.flatMap((e) => e.chains || []));
+      return { name, onSteem, rails: [...rails] };
+    });
+    return rows;
+  }, [entries]);
+  const steemOrphans = controlMatrix.filter((r) => !r.onSteem);
   const chainsList = useMemo(
     () => Array.from(new Set(entries.flatMap((e) => [(e.chain || e.kind), ...(e.chains || [])]))).sort(),
     [entries],
@@ -826,6 +841,28 @@ function VaultGrid() {
           <FilterChip key={c} active={chain === c} onClick={() => setChain(c)} label={`${c} (${entries.filter((e) => (e.chain || e.kind) === c || (e.chains || []).includes(c)).length})`} />
         ))}
       </motion.div>
+
+      {steemOrphans.length > 0 && (
+        <motion.div {...rise} className="mb-5">
+          <GlowCard className="p-4 border-amber-500/30 bg-amber-500/5">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" aria-hidden />
+              <div className="text-sm leading-relaxed">
+                <p className="font-semibold text-amber-300">שליטת-תגמולים — האמת החיה פר-חייל ({controlMatrix.length} נבדקו on-chain)</p>
+                <p className="text-zinc-400 mt-1">
+                  <b className="text-emerald-400">{controlMatrix.length - steemOrphans.length}/{controlMatrix.length}</b> חיילים נשלטים מלא גם על steem.
+                  <b className="text-amber-300"> {steemOrphans.length}</b> נותרו בלי owner/active/posting חי על steem —
+                  רוטציית 2026-09-08T21:33Z הוציאה את המפתחות-הישנים מהשרשרת והמפתחות-החיים אצל המפעיל:
+                  <span className="font-mono text-[11px] text-amber-200/90" dir="ltr"> {steemOrphans.map((r) => r.name).join(", ")}</span>.
+                  אותו חומר-מפתח עדיין שולט live על <b className="text-emerald-400">hive</b>{" "}
+                  ({steemOrphans.filter((r) => r.rails.includes("hive")).length}) ועל <b className="text-emerald-400">blurt</b>{" "}
+                  ({steemOrphans.filter((r) => r.rails.includes("blurt")).length}) — תגמולים שם ניתנים לתביעה; תגמולי-steem של אלה ממתינים למפתח-המפעיל.
+                </p>
+              </div>
+            </div>
+          </GlowCard>
+        </motion.div>
+      )}
 
       {loading && entries.length === 0 ? (
         <GlowCard className="p-12 flex items-center justify-center gap-2 text-zinc-500 text-sm">

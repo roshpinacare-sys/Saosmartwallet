@@ -15,6 +15,89 @@ import { db } from "@/lib/db";
 import { openSecret } from "./crypto";
 import { chainPub, evmAddress, tronAddress, solAddress, fetchChainAuthorityMap, FLEET_ACCOUNTS } from "./key-id";
 import bs58 from "bs58";
+import { createHash } from "crypto";
+import { secp256k1 } from "@noble/curves/secp256k1.js";
+
+// ── r11: bech32 (BIP-173) P2WPKH v0 encoding for bitcoin fleet addresses ──
+const B32CHARS = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+function bech32Polymod(values: number[]): number {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  let chk = 1;
+  for (const v of values) {
+    const b = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((b >> i) & 1) chk ^= GEN[i];
+  }
+  return chk;
+}
+/** BIP-173 hrp-expand: HIGH for every char, then 0, then LOW for every char. */
+function bech32HrpExpand(hrp: string): number[] {
+  const r: number[] = [];
+  for (const c of hrp) r.push(c.charCodeAt(0) >> 5);
+  r.push(0);
+  for (const c of hrp) r.push(c.charCodeAt(0) & 31);
+  return r;
+}
+function convertBits(data: number[], from: number, to: number, pad: boolean): number[] | null {
+  let acc = 0, bits = 0;
+  const out: number[] = [];
+  const maxv = (1 << to) - 1;
+  for (const v of data) {
+    if (v < 0 || (v >> from) !== 0) return null;
+    acc = (acc << from) | v;
+    bits += from;
+    while (bits >= to) {
+      bits -= to;
+      out.push((acc >> bits) & maxv);
+    }
+  }
+  if (pad) {
+    if (bits) out.push((acc << (to - bits)) & maxv);
+  } else if (bits >= from || ((acc << (to - bits)) & maxv)) return null;
+  return out;
+}
+export function btcP2wpkhAddress(privHex: string): string {
+  const priv = Buffer.from(privHex.replace(/^0x/, ""), "hex");
+  const pubC = Buffer.from(secp256k1.getPublicKey(new Uint8Array(priv), true)); // 33B compressed
+  const h160 = createHash("ripemd160").update(createHash("sha256").update(pubC).digest()).digest();
+  const prog = convertBits(Array.from(h160), 8, 5, true)!;
+  const hrp = "bc";
+  const data = bech32HrpExpand(hrp).concat([0]).concat(prog);
+  const mod = bech32Polymod(data.concat([0, 0, 0, 0, 0, 0])) ^ 1;
+  const chk: number[] = [];
+  for (let i = 0; i < 6; i++) chk.push((mod >> (5 * (5 - i))) & 31);
+  return hrp + "1" + [0].concat(prog, chk).map((d) => B32CHARS[d]).join("");
+}
+
+// ── r11: live BTC probe — mempool.space primary, blockstream fallback ──
+async function liveBtc(address: string): Promise<{ ok: boolean; detail: string }> {
+  const nodes = ["https://mempool.space/api/address/", "https://blockstream.info/api/address/"];
+  let lastErr = "לא נענה";
+  for (const node of nodes) {
+    try {
+      const r = await fetch(node + address, { signal: AbortSignal.timeout(15000) });
+      if (r.status === 429 || r.status === 403) {
+        lastErr = `HTTP ${r.status}`;
+        continue;
+      }
+      if (!r.ok) {
+        lastErr = `HTTP ${r.status}`;
+        continue;
+      }
+      const j = (await r.json()) as { chain_stats?: { funded_txo_sum?: number; tx_count?: number }; mempool_stats?: { funded_txo_sum?: number; tx_count?: number } };
+      const cs = j.chain_stats, ms = j.mempool_stats;
+      const funded = ((cs?.funded_txo_sum ?? 0) + (ms?.funded_txo_sum ?? 0)) / 1e8;
+      const txs = (cs?.tx_count ?? 0) + (ms?.tx_count ?? 0);
+      return {
+        ok: true,
+        detail: `אומת live מול Bitcoin mainnet · txs=${txs}${funded > 0 ? ` · מומן ${funded} BTC` : " · כתובת עוד לא מומנה"}`,
+      };
+    } catch (e) {
+      lastErr = (e as Error).message;
+    }
+  }
+  return { ok: false, detail: `Bitcoin mainnet לא נענה: ${lastErr}` };
+}
 
 export interface EntryVerify {
   id: string;
@@ -145,6 +228,13 @@ async function verifyEntry(e: {
   // PUBLIC key alone — metadata, plaintext, no master needed. The sweep now
   // proves the whole graphene plane even while the vault is LOCKED; sealed
   // material is opened only for kinds that must derive an address.
+  if (e.status === "operator-custody") {
+    // r11: an honest-null placeholder (e.g. @ynet) — no key material is held,
+    // so "failed" would be a lie: nobody controls it from here by design.
+    base.liveOk = null;
+    base.detail = "מפתח-חי אצל המפעיל (רוטציה חוץ-מערכתית) — הכספת מחזיקה רישום-מצב בלבד, ללא חומר-מפתח";
+    return base;
+  }
   if (e.kind === "steem-key") {
     const raw = e.pub ? pub33Hex(e.pub) : null;
     const controls = raw ? authority.get(raw) || [] : [];
@@ -215,6 +305,21 @@ async function verifyEntry(e: {
       base.liveOk = live.ok ? true : null;
       base.chains = live.ok ? ["solana"] : [];
       base.detail = live.ok ? `${live.detail} · כתובת SOL נגזרה תואמת` : `הגזירה תואמת אך ${live.detail}`;
+      return base;
+    }
+    if (e.kind === "btc-key") {
+      // r11: the 32-byte priv IS the BIP-32 leaf key — address = P2WPKH(hash160(compressed-pub))
+      const derived = btcP2wpkhAddress(priv);
+      const match = e.pub ? derived === e.pub : true;
+      if (!match) {
+        base.liveOk = false;
+        base.detail = `אי-התאמה: נגזר ${derived} אך הרישום ${e.pub}`;
+        return base;
+      }
+      const live = await liveBtc(derived);
+      base.liveOk = live.ok ? true : null; // derivation proved the binding; a silent network is null, never false
+      base.chains = live.ok ? ["bitcoin"] : [];
+      base.detail = live.ok ? `${live.detail} · כתובת נגזרה תואמת: ${derived}` : `הגזירה תואמת (${derived}) אך ${live.detail}`;
       return base;
     }
     if (e.kind === "mnemonic") {
