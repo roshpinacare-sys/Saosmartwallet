@@ -320,11 +320,24 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
   const rec = run;
   const attempt = run.attempt;
   if (attempt > run.maxAttempts) {
+    // ROAST r8 — this path used to die MUTE (error set, report NULL). A run
+    // that exhausted its attempts must confess in Hebrew like every other
+    // terminal failure — the bridge reads REPORTS, not error columns.
+    const msg = `watchdog: חריגה מ-${run.maxAttempts} ניסיונות — נכשל בכנות`;
     await db.gateRun.update({
       where: { id: runId },
-      data: { status: "failed", error: `watchdog: חריגה מ-${run.maxAttempts} ניסיונות — נכשל בכנות`, finishedAt: new Date(), ...LEASE_CLEAR },
+      data: {
+        status: "failed",
+        error: msg,
+        report: `🛑 הריצה חרגה ממכסת-הניסיונות (${run.maxAttempts}) ונכשלה סופית. מטרה: ${String(run.goal).slice(0, 200)}. זו כשל-כנה — אין דוח-תוצרים כי העבודה לא הושלמה.`,
+        finishedAt: new Date(),
+        ...LEASE_CLEAR,
+      },
     });
     await emitEvent("run.failed", { agent: run.agentName, goal: run.goal, gaps: "" }, "harness");
+    await db.gateMessage.create({
+      data: { channel: "command", fromKind: "system", fromName: "harness", body: `🛑 הרצת-מטרה של ${run.agentName} חרגה ממכסת-הניסיונות ונכשלה — וידוי כן נכתב לדוח שלה`, meta: JSON.stringify({ runId }) },
+    }).catch(() => {});
     return;
   }
   const recovering = attempt > 1;
