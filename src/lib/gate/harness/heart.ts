@@ -707,45 +707,47 @@ async function ensureTriggerPolicy(): Promise<void> {
   for (const s of staleBuilders) {
     await db.gateSchedule.update({ where: { id: s.id }, data: { goal: builderV3 } }).catch(() => {});
   }
-  /* ── the editor — one daily publishing duty, full doctrine ──
-   * The fleet must keep a PRESENCE on the networks without leaking: trends
-   * first (live demand), audit second (fix flagged), then publish ONE clean,
-   * valuable, SEO-aware ENGLISH post (language routing: audience language
-   * outward). Bounded 1/day. */
+  /* ── the editor — one daily AUDIT+REMEDIATE duty, single-lane ──
+   * roast-2026-09-10: v3 gave the editor 4 jobs and 6 modules — EVERY editor
+   * run ended blocked (the maker burned its budget in analysis loops and
+   * never posted). The proven recipe from the live E2E runs: FEW modules,
+   * ONE lane, action every step. The editor audits and remediates; the
+   * PUBLISHING lane belongs to the builders (no new posts here). */
   const editorLabels = new Set(
     (await db.gateSchedule.findMany({ where: { label: { startsWith: "editor:" } }, select: { agentName: true } })).map((s) => s.agentName),
   );
   const editorMeans = JSON.stringify([
-    "steem.trends חי נקרא — הנושא נבחר מתוך מועמדויות-הביקוש (או נימוק מדוע נבחר נושא אחר)",
-    "social.audit חי נקרא (מספר פוסטים + מדוגלים) — וההחלטה עליהם נעשתה: תיקון דרך steem.edit עם txId, או נימוק מדוע לא נדרש תיקון",
-    "פרסום חי אחד נקי ממדיניות-חשיפה באנגלית (steem.post עם permlink + txId אמיתיים) — או נימוק כן מדוע היום אין מה לפרסם",
+    "social.audit חי נקרא (מספר פוסטים + מדוגלים) — ראייה: צעד social.audit עם ok=true",
+    "לכל פוסט מדוגל: steem.edit בוצע עם כותרת+גוף+תגיות באנגלית נקייה ו-txId אמיתי — או נימוק כן מדוע לא נתוקן; אם אין מדוגלים בכלל — זו הצלחה מלאה, לא כשל",
     "דוח עברית קצר לגשר-הפיקוד עם ה-permlinks וה-txIds",
   ]);
-  const editorV3 =
-    "תור-העורך היומי (v3): אתה הדובר של הרשת היום. (1) steem.trends — מכ\"ם-נושאים חי: מה הקהל קורא עכשיו; בחר נושא שיש עליו ביקוש אמיתי מהרשימה. " +
-    "(2) social.audit — קרא את הפיד החי של החשבונות על steem ו-hive; מה שמדוגל (סודות/שמות-קוד/דוחות פנימיים/כפילויות) — תקן דרך steem.edit בגוף ציבורי-נקי. " +
-    "(3) פרסם פוסט אחד נקי ומקורי באנגלית (ניתוב-שפה: הקהל ברשת דובר-אנגלית; עברית נשארת בפנים בלבד) עם ערך אמיתי (steem.post; rail=steem או rail=hive): " +
-    "כותרת מדויקת, פתיחה שתופסת, גוף עם מצביעות, תגיות מתוך מכ\"ם-הנושאים (≤5, ממוקדות) — ולעולם בלי סודות, נתיבים, שמות-קוד או תוכניות פנימיות (מדיניות-חשיפה תחסום אותך אחרת). " +
-    "(4) דווח לגשר בעברית: אילו נושאים נסרקו במכ\"ם, מה תיקנת, מה פרסמת — עם permlinks ו-txIds.";
-  // PUBLISH-DESK v3 — the language-routing doctrine reaches the EXISTING
-  // editor schedules too (marker-based, idempotent): publish in English,
-  // report in Hebrew, pick topics from live demand, not gut feeling.
-  const EDITOR_MODULES = ["steem.trends", "social.audit", "steem.edit", "steem.post", "memory.write", "chat.report"];
+  const EDITOR_V4_MARKER = "מסלול-יחיד";
+  const editorV4 =
+    "תור-העורך היומי (v4, מסלול-יחיד): אתה הדובר של הרשת — פעולה אחת בכל צעד, אין לולאות-ניתוח. " +
+    "(1) social.audit — סרוק את הפיד החי של החשבונות על steem ו-hive. " +
+    "(2) לכל פוסט מדוגל (עברית/סודות/שמות-קוד/דוחות-פנימיים/הזמנת-השקעה): steem.edit — כותרת+גוף+תגיות מוחלפים באנגלית ציבורית נקייה " +
+    "(ניתוב-שפה: אנגלית החוצה; עברית נשארת בפנים; פוסט-תיקון מסביר באנגלית שהתוכן הקודם הוחלף ושהעדכונים הציבוריים ממשיכים כאן). " +
+    "אם עריכת-hive נחסמת על ידי תקציב-משאבים של השרשרת — תעד זאת בכנות ועבור הלאה. " +
+    "(3) chat.report — דוח עברית: מה סרקת, מה תיקנת (permlinks+txIds), מה נותר ולמה. " +
+    "אין פרסום-חדש בתור-העורך — הבונים מפרסמים. אל תקרא מודול פעמיים עם אותם ארגומנטים.";
+  const EDITOR_MODULES_V4 = ["social.audit", "steem.edit", "chat.report"];
   const staleEditors = await db.gateSchedule.findMany({
-    where: { label: { startsWith: "editor:" }, OR: [{ goal: { not: { contains: LANG_MARKER } } }, { modules: null }] },
+    where: { label: { startsWith: "editor:" }, OR: [{ goal: { not: { contains: EDITOR_V4_MARKER } } }, { modules: null }] },
     select: { id: true },
   });
   for (const s of staleEditors) {
-    await db.gateSchedule.update({ where: { id: s.id }, data: { goal: editorV3, doneMeans: editorMeans, modules: JSON.stringify(EDITOR_MODULES) } }).catch(() => {});
+    await db.gateSchedule
+      .update({ where: { id: s.id }, data: { goal: editorV4, doneMeans: editorMeans, modules: JSON.stringify(EDITOR_MODULES_V4) } })
+      .catch((e) => { console.error("[heart] editor refresh failed:", e?.message ?? e); });
   }
   if (armed.length && !editorLabels.has(armed[0].name)) {
     await db.gateSchedule.create({
       data: {
         label: `editor:${armed[0].name}`,
         agentName: armed[0].name,
-        goal: editorV3,
+        goal: editorV4,
         doneMeans: editorMeans,
-        modules: JSON.stringify(EDITOR_MODULES), // defense-in-depth: the duty carries its own hands, not just the agent's armed set
+        modules: JSON.stringify(EDITOR_MODULES_V4), // defense-in-depth: the duty carries its own hands
         budget: 8,
         kind: "daily",
         hourUtc: 13, // 16:00 Israel — prime publishing hours
@@ -768,12 +770,27 @@ async function ensureTriggerPolicy(): Promise<void> {
   ]);
   const TREASURER_MARKER = "זו הצלחה מלאה";
   const staleTreasurers = await db.gateSchedule.findMany({
-    where: { label: { startsWith: "treasurer:" }, doneMeans: { not: { contains: TREASURER_MARKER } } },
+    where: { label: { startsWith: "treasurer:" }, OR: [{ doneMeans: { not: { contains: TREASURER_MARKER } } }, { goal: { not: { contains: "סקר-צי שלם" } } }] },
     select: { id: true },
   });
   for (const s of staleTreasurers) {
     await db.gateSchedule
-      .update({ where: { id: s.id }, data: { doneMeans: treasurerMeans, modules: JSON.stringify(["steem.rewards", "steem.claim", "chat.report"]) } })
+      .update({
+        where: { id: s.id },
+        data: {
+          doneMeans: treasurerMeans,
+          modules: JSON.stringify(["steem.rewards", "steem.claim", "chat.report"]),
+          // roast-2026-09-10: the live gap was "steem.rewards called without
+          // account list" — the census module needs NO arguments; it reads the
+          // fleet itself. The goal now says so explicitly (single-lane).
+          goal:
+            "תור-הגזבר היומי (v2, מסלול-יחיד): אתה האוצר של הרשת היום — פעולה אחת בכל צעד. " +
+            "(1) steem.rewards עם ארגומנטים ריקים {} — זהו סקר-צי שלם: המודול קורא בעצמו את כל החשבונות ומחזיר מי עם ממתינים; אין להזין רשימות חשבונות. " +
+            "(2) לכל חשבון שהסקר החזיר עם ממתינים: steem.claim עם פרטי הממתינים כפי שהמודול החזיר (בלי להמציא סכומים). " +
+            "(3) chat.report — דוח עברית: יתרות, מה נקצר (txIds), או 'אין ממתינים — הצלחה מלאה'. " +
+            "הערה-מדיניות: תביעה מזיזה תגמול ליתרות בפועל — היא לא מוכרת ולא מזיזה כספים בין חשבונות (זו סמכות-active, לא שלך).",
+        },
+      })
       .catch((e) => { console.error("[heart] treasurer refresh failed:", e?.message ?? e); });
   }
   if (armed.length && !treasurerLabels.has(armed[0].name)) {
