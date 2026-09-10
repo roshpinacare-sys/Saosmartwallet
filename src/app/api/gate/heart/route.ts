@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
-import { requireOperator } from "@/lib/gate/session";
+import { requireOperator, openSessionMaster } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
-import { GateError } from "@/lib/gate/crypto";
+import { GateError, masterReady, setMaster } from "@/lib/gate/crypto";
 import { readPulse, HEART_CONSTANTS, tickOnce, readProposalPolicy } from "@/lib/gate/harness/heart";
 
 export const runtime = "nodejs";
@@ -16,6 +16,16 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await requireOperator();
+    // r19 — WAKE (same doctrine as status/inventory): the operator's own live
+    // session re-lights the master from its sealed copy. The console polls
+    // this route every 8s, so an open page keeps the vault warm across
+    // restarts without ever weakening the credential (a valid operator
+    // session with a decryptable sealed master is the SAME credential class
+    // as the status wake — nothing new is trusted).
+    if (!masterReady()) {
+      const m = await openSessionMaster();
+      if (m) setMaster(m);
+    }
     const [pulse, queued, running, schedules, triggers, events, cfg, agents, proposals, policy, checkerRow] = await Promise.all([
       readPulse(),
       db.gateRun.count({ where: { status: "queued" } }),

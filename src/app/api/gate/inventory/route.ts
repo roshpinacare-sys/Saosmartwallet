@@ -27,6 +27,9 @@ export async function GET() {
       total: entries.length,
       verified: entries.filter((e) => e.liveOk === true).length,
       failed: entries.filter((e) => e.liveOk === false).length,
+      // r19 — rotated-out rows are EXPECTED to fail a live check (their keys
+      // are no longer on chain by design); they are history, not failures.
+      rotatedOut: entries.filter((e) => e.status === "rotated-out").length,
       noLive: entries.filter((e) => e.liveOk === null).length,
       rails: {
         steem: entries.filter((e) => e.chains.includes("steem")).length,

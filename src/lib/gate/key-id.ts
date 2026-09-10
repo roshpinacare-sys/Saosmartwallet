@@ -90,10 +90,31 @@ export function wifToPrivHex(wif: string): string {
   return (compressed ? body.subarray(0, 32) : body).toString("hex");
 }
 
-/** Canonical public key via steem-js (authoritative for both 5… and K/L… WIFs). */
+/** Canonical public key. r17/r19 chain-proven semantics for THIS fleet's
+ *  compressed material (ROT1 / הדקור, K/L… WIFs): the 33-BYTE body (32-byte
+ *  value ‖ 0x01) is the private scalar mod N — the standard "0x01 is a
+ *  compression flag" reading yields a DIFFERENT pubkey (re-proven live r19:
+ *  stored==live, standard-derivation≠live). Canonical 5… WIFs stay on the
+ *  steem-js path (authoritative there). */
 export function wifToChainPub(wif: string): string {
-  if (steemAuth?.wifToPublic) return String(steemAuth.wifToPublic(wif.trim()));
-  return chainPub(wifToPrivHex(wif), true);
+  const w = wif.trim();
+  let raw: Buffer | null = null;
+  try { raw = Buffer.from(bs58.decode(w)); } catch { raw = null; }
+  if (raw && raw.length === 38 && raw[0] === 0x80 && raw[33] === 0x01) {
+    const calc = crypto.createHash("sha256").update(crypto.createHash("sha256").update(raw.subarray(0, 34)).digest()).digest().subarray(0, 4);
+    if (!raw.subarray(34, 38).equals(calc)) throw new Error("bad WIF checksum");
+    const d = BigInt("0x" + raw.subarray(1, 34).toString("hex")) % 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+    // wire encoding must match the chain's own (steem-js key_public.toPublicKeyString):
+    // checksum = ripemd160(pubbody)[0:4] — NOT ripemd160(sha256()) (re-proven live r19)
+    const pk = Buffer.from(
+      ethers.SigningKey.computePublicKey(("0x" + d.toString(16).padStart(64, "0")) as `0x${string}`, true).slice(2),
+      "hex",
+    );
+    const ck = crypto.createHash("ripemd160").update(pk).digest().subarray(0, 4);
+    return "STM" + bs58.encode(Buffer.concat([pk, ck]));
+  }
+  if (steemAuth?.wifToPublic) return String(steemAuth.wifToPublic(w));
+  return chainPub(wifToPrivHex(w), true);
 }
 
 export function evmAddress(privHex: string): string {
