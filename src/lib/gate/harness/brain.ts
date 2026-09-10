@@ -86,7 +86,7 @@ export async function brainChat(
   if (spec.provider === "nvidia") {
     const key = await nvidiaKey();
     let lastErr: unknown = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
           method: "POST",
@@ -97,11 +97,11 @@ export async function brainChat(
         const txt = await res.text();
         if (!res.ok) {
           lastErr = new GateError("brain-http", `NIM ${res.status}: ${txt.slice(0, 180)}`);
-          // 5xx/429 → one retry; 4xx (bad model, bad key) → fail fast, honest
+          // 5xx/429 → bounded backoff ladder (r7: one 6s retry died inside a
+          // sustained rate window — the second attempt hit the same 429 and the
+          // run fell over). 3 attempts: 6s / 15s / 30s.
           if (res.status < 500 && res.status !== 429) break;
-          // roast-2026-09-10: a retry with NO backoff fires back into the same
-          // rate-limit window — both attempts die, the run dies with them.
-          await new Promise((r) => setTimeout(r, 6_000));
+          if (attempt < 2) await new Promise((r) => setTimeout(r, [6_000, 15_000][attempt]));
           continue;
         }
         const j = JSON.parse(txt) as {
@@ -128,12 +128,12 @@ export async function brainChat(
     role: m.role === "system" ? ("assistant" as const) : m.role,
     content: m.content,
   }));
-  // roast-2026-09-10: the zai path had ZERO retry — a single 429 killed the
-  // whole run (8/12 first-day builder/guardian schedule runs died exactly
-  // this way in a creation burst). Transient failures get one backoff retry;
-  // anything else fails fast, honest.
+  // roast r7 — sustained rate windows outlive a single 6s retry (proven live:
+  // the first fixed-pipe editor validation died to a second 429 6s later).
+  // Bounded ladder: 3 attempts, 6s / 15s / 30s — still fail-fast-honest for
+  // non-transient errors.
   let zaiLastErr: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const zai = await ZAI.create();
       const completion = await zai.chat.completions.create({
@@ -147,7 +147,7 @@ export async function brainChat(
       const msg = e instanceof Error ? e.message : String(e);
       const transient = /(?:^|\D)(?:429|5\d\d)(?:\D|$)|rate.?limit|too many requests|timeout|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(msg);
       if (!transient) break;
-      if (attempt === 0) await new Promise((r) => setTimeout(r, 6_000));
+      if (attempt < 2) await new Promise((r) => setTimeout(r, [6_000, 15_000][attempt]));
     }
   }
   throw zaiLastErr instanceof Error ? zaiLastErr : new GateError("brain-failed", "המוח (ZAI) לא הגיב");

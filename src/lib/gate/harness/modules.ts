@@ -526,7 +526,46 @@ export const MODULES: HarnessModule[] = [
     async exec(args) {
       const limit = Math.min(Math.max(Number(args.limit) || 8, 1), 10);
       const audit = await auditFleetContent(limit);
-      return { ...audit, meaning: audit.summary };
+      // ROAST r7 — the first-ever live editor run (45s, blocked) proved the
+      // evidence-pipe hole: the full audit object blows past the 1400-char
+      // result clamp, and the flagged post (deep in the posts array) never
+      // reached the brain — which then hallucinated placeholder permlinks and
+      // burned its budget. The module must LEAD with the actionable evidence,
+      // compact enough to survive the clamp intact.
+      const flagged = audit.posts.filter((p) => p.needsEdit);
+      const immutableOnly = audit.posts.filter((p) => !p.needsEdit && p.immutableFindings.length > 0);
+      const compact = {
+        rails: audit.rails,
+        flaggedPosts: flagged.map((p) => ({
+          rail: p.rail,
+          permlink: p.permlink,
+          title: String(p.title || "").slice(0, 60),
+          findings: p.findings.slice(0, 4),
+          note: "needsEdit — זה הפוסט לתיקון",
+        })),
+        immutablePosts: immutableOnly.map((p) => ({
+          rail: p.rail,
+          permlink: p.permlink,
+          findings: p.immutableFindings.slice(0, 2),
+          note: "immutable (parent_permlink נחרת בפרסום) — אין לנסות עריכה; חשיפה בלבד",
+        })),
+        cleanPosts: audit.posts.length - flagged.length - immutableOnly.length,
+        customJson: audit.customJson
+          ? {
+              windowOps: audit.customJson.windowOps,
+              codenameOps: audit.customJson.codenameOps,
+              originNote: String(audit.customJson.originNote || "").slice(0, 140),
+            }
+          : undefined,
+        meaning:
+          flagged.length > 0
+            ? `דוגלים לעריכה (${flagged.length}): ${flagged.map((p) => `${p.rail}/${p.permlink}`).join(" · ")}. ` +
+              `עבור דוגל-על-hive: עריכת-hive עלולה להיתקל בחומת-משאבים של השרשרת — נסה עם rail=hive ואם נחסמת תעד בכנות ועבור הלאה. ` +
+              (immutableOnly.length > 0 ? `${immutableOnly.length} פוסטים נוספים נושאים ממצא-immutable בלבד — אין לערוך אותם.` : "")
+            : "אפס דוגלים לעריכה — הפיד נקי (אין מה לתקן זו הצלחה מלאה). " +
+              (immutableOnly.length > 0 ? `${immutableOnly.length} פוסטים נושאים ממצא-immutable שאינם ניתנים לתיקון בעריכה — מדווחים בכנות.` : ""),
+      };
+      return compact;
     },
   },
   {

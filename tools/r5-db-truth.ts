@@ -59,7 +59,11 @@ function classifyBase58(s: string): "steem-pub" | "wif-priv" | "invalid" | "othe
 }
 
 const WIF_RE = /\b5[HJK][1-9A-HJ-NP-Za-km-z]{49}\b/g;
-const DEV_FAUCET_WIF = "5Kd3NBUAdUnhyzenEwVLy9pBKxSwXvE9FMPyR4UKZvpe6E3AgLr";
+// ROAST r7: the dev-faucet WIF was embedded here as a literal — a doctrine
+// violation inside the scanner itself (r5's "git grep 5[HJK] = zero" claim was
+// false against this very file). The known historical key now arrives via env;
+// without it, this one check reports skipped instead of pretending to run.
+const DEV_FAUCET_WIF = process.env.DEV_FAUCET_WIF || "";
 
 let breach = 0;
 
@@ -103,6 +107,7 @@ async function main() {
       const cols = await db.$queryRawUnsafe<Array<{ name: string }>>(`PRAGMA table_info("${name}")`);
       const textCols = cols.map((c) => c.name).filter((c) => !c.endsWith("Iv") && !c.endsWith("Tag"));
       for (const c of textCols) {
+        if (!DEV_FAUCET_WIF) break;
         const vals = await db.$queryRawUnsafe<Array<Record<string, unknown>>>(
           `SELECT rowid, "${c}" as v FROM "${name}" WHERE "${c}" LIKE '%${DEV_FAUCET_WIF}%'`,
         );
@@ -110,7 +115,8 @@ async function main() {
       }
     } catch { /* non-text table */ }
   }
-  if (!faucetHit) console.log("✅ dev-faucet WIF: absent from every table");
+  if (!DEV_FAUCET_WIF) console.log("⚠ dev-faucet WIF check: SKIPPED (set DEV_FAUCET_WIF env to run it) — honest skip, not a fake pass");
+  else if (!faucetHit) console.log("✅ dev-faucet WIF: absent from every table");
 
   console.log("== [3] GateMessage / GateRun / GateAction / GateOrder — WIF-shaped secrets in free text ==");
   const msgs = await db.gateMessage.findMany({ select: { id: true, body: true, meta: true } });
