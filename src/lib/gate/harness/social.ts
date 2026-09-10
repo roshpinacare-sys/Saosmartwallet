@@ -25,6 +25,8 @@ import { toSigningKey, COMMANDER_ACCOUNT } from "./orders";
 import { renewLease } from "./lease";
 import { assertPublishable, scanExposure } from "./exposure";
 import {
+  blurtAdapter,
+  blurtBroadcastAdapter,
   hiveBroadcastAdapter,
   railBlogPosts,
   railGetContent,
@@ -46,7 +48,12 @@ export const SOCIAL_RAILS = {
   maxTags: 5,
 } as const;
 
-export type PublishRail = "steem" | "hive";
+export type PublishRail = "steem" | "hive" | "blurt";
+
+/** Normalizes an agent-supplied rail to a real PublishRail (steem is default). */
+function toPublishRail(rail: unknown): PublishRail {
+  return rail === "hive" ? "hive" : rail === "blurt" ? "blurt" : "steem";
+}
 
 function dayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -58,14 +65,25 @@ async function socialMsg(body: string, meta: Record<string, unknown>): Promise<v
     .catch(() => {});
 }
 
-/** The vault POSTING key of the commander on a rail — never taken from agent input. */
+/** The vault POSTING key of the commander on a rail — never taken from agent input.
+ *  r10: graphene keys are chain-agnostic MATERIAL, but each chain may hold a
+ *  DIFFERENT generation (headcorner's posting key was rotated per-chain). So:
+ *  prefer the rail's own vault row; fall back to the graphene family only if
+ *  no rail-specific row exists. verifyPostingKeyOnChain against the TARGET
+ *  rail remains the fail-closed oracle that decides. */
 async function commanderPostingKey(rail: Rail = "steem"): Promise<PrivateKey> {
   requireMaster();
-  const entry = await db.vaultEntry.findFirst({
-    where: { chain: rail, account: COMMANDER_ACCOUNT, role: "posting" },
-    orderBy: { updatedAt: "desc" },
-  });
-  if (!entry) throw new GateError("vault-missing-key", `אין מפתח-posting של ${COMMANDER_ACCOUNT} על ${rail} בכספת`);
+  const family = ["steem", "hive", "blurt"].filter((c) => c !== rail);
+  const entry =
+    (await db.vaultEntry.findFirst({
+      where: { chain: rail, account: COMMANDER_ACCOUNT, role: "posting" },
+      orderBy: { updatedAt: "desc" },
+    })) ??
+    (await db.vaultEntry.findFirst({
+      where: { chain: { in: family }, account: COMMANDER_ACCOUNT, role: "posting" },
+      orderBy: { updatedAt: "desc" },
+    }));
+  if (!entry) throw new GateError("vault-missing-key", `אין מפתח-posting של ${COMMANDER_ACCOUNT} בכספת (משפחת-גרפן למסילה ${rail})`);
   const wif = openSecret({ encPriv: entry.encPriv, privIv: entry.privIv, privTag: entry.privTag });
   return toSigningKey(wif);
 }
@@ -96,7 +114,7 @@ async function signAndBroadcastRail(
   evidence: Record<string, unknown>,
 ): Promise<{ txId: string; blockNum?: number }> {
   const priv = await verifiedRailKey(rail);
-  const adapter = rail === "hive" ? hiveBroadcastAdapter() : steemBroadcastAdapter();
+  const adapter = rail === "hive" ? hiveBroadcastAdapter() : rail === "blurt" ? blurtBroadcastAdapter() : steemBroadcastAdapter();
   try {
     const signed = await adapter.sign(built.unsigned, { byRole: { posting: priv } }, ["posting"]);
     const res = await adapter.broadcast(signed);
@@ -133,7 +151,7 @@ async function signAndBroadcast(
 }
 
 export interface VoicePostResult {
-  rail?: string; // "steem" | "hive" — the SOVEREIGN-VOICE lane this went out on
+  rail?: string; // "steem" | "hive" | "blurt" — the SOVEREIGN-VOICE lane this went out on
   permlink: string;
   category: string;
   txId: string;
@@ -143,8 +161,9 @@ export interface VoicePostResult {
 
 /**
  * Publish a REAL post to a rail — exposure-gated, bounded, audited,
- * chain-evidenced. rail="hive" runs the SAME wire-exact packer against a
- * hive node after verifyPostingKeyOnChain proved the vault key rules there.
+ * chain-evidenced. rail="hive"/"blurt" run the SAME wire-exact packer
+ * against that rail's node after verifyPostingKeyOnChain proved the vault
+ * key rules there (blurt chain id: oracle-proven cd8d90f2…, r10).
  */
 export async function publishPostFromAgent(input: {
   agentName: string;
@@ -155,7 +174,7 @@ export async function publishPostFromAgent(input: {
   rail?: PublishRail;
   replyTo?: { author: string; permlink: string };
 }): Promise<VoicePostResult> {
-  const rail: PublishRail = input.rail === "hive" ? "hive" : "steem";
+  const rail: PublishRail = toPublishRail(input.rail);
   const postsToday = await dayCount("sovereign-voice:post");
   if (postsToday >= SOCIAL_RAILS.maxPostsPerDay) {
     throw new GateError("rate-limited", `תקרת-הפרסום היומית של הצי מוצו (${postsToday}/${SOCIAL_RAILS.maxPostsPerDay}) — איכות קודמת לכמות`);
@@ -194,7 +213,7 @@ export async function publishPostFromAgent(input: {
   }
   const built = await buildSteemPostTx(
     { author: COMMANDER_ACCOUNT, title: input.title, body, tags, replyTo: input.replyTo },
-    rail === "hive" ? hiveBroadcastAdapter() : undefined, // build ref-block FROM the rail we broadcast to
+    rail === "hive" ? hiveBroadcastAdapter() : rail === "blurt" ? blurtAdapter() : undefined, // build ref-block FROM the rail we broadcast to
   );
   const { txId, blockNum } = await signAndBroadcastRail(rail, "post", input.agentName, built, {
     agentName: input.agentName, runId: input.runId, permlink: built.permlink, title: input.title.slice(0, 120), tags,
@@ -207,7 +226,7 @@ export async function publishPostFromAgent(input: {
   );
   return {
     rail, permlink: built.permlink, category: built.category, txId, blockNum,
-    url: rail === "hive" ? `https://peakd.com/@${COMMANDER_ACCOUNT}/${built.permlink}` : `https://steemit.com/@${COMMANDER_ACCOUNT}/${built.permlink}`,
+    url: rail === "hive" ? `https://peakd.com/@${COMMANDER_ACCOUNT}/${built.permlink}` : rail === "blurt" ? `https://blurtter.com/@${COMMANDER_ACCOUNT}/${built.permlink}` : `https://steemit.com/@${COMMANDER_ACCOUNT}/${built.permlink}`,
   };
 }
 
@@ -243,7 +262,7 @@ export async function editPostFromAgent(input: {
    */
   operatorOverride?: boolean;
 }): Promise<VoiceEditResult> {
-  const rail: PublishRail = input.rail === "hive" ? "hive" : "steem";
+  const rail: PublishRail = toPublishRail(input.rail);
   if (input.operatorOverride === true && input.agentName !== "operator") {
     throw new GateError("bad-input", "עקיפת-תקרה מותרת למפעיל בלבד (agentName=operator)");
   }
@@ -302,7 +321,7 @@ export async function editPostFromAgent(input: {
       permlink, // SAME permlink + SAME original category parent = edit, not a new post
       category: original.category || undefined,
     },
-    rail === "hive" ? hiveBroadcastAdapter() : undefined,
+    rail === "hive" ? hiveBroadcastAdapter() : rail === "blurt" ? blurtAdapter() : undefined,
   );
   const { txId, blockNum } = await signAndBroadcastRail(rail, "edit", input.agentName, built, {
     agentName: input.agentName, runId: input.runId, permlink, title: input.title.slice(0, 120),
@@ -314,7 +333,7 @@ export async function editPostFromAgent(input: {
   );
   return {
     rail, permlink, txId, blockNum, changedChars: newBody.length - original.bodyPreview.length,
-    url: rail === "hive" ? `https://peakd.com/@${COMMANDER_ACCOUNT}/${permlink}` : `https://steemit.com/@${COMMANDER_ACCOUNT}/${permlink}`,
+    url: rail === "hive" ? `https://peakd.com/@${COMMANDER_ACCOUNT}/${permlink}` : rail === "blurt" ? `https://blurtter.com/@${COMMANDER_ACCOUNT}/${permlink}` : `https://steemit.com/@${COMMANDER_ACCOUNT}/${permlink}`,
   };
 }
 
@@ -372,7 +391,7 @@ export interface CustomJsonStreamAudit {
  *     editor never burns its daily cap re-editing what no edit can change.
  */
 export async function auditFleetContent(limitPerRail = 20): Promise<FleetContentAudit> {
-  const rails: Array<PublishRail> = ["steem", "hive"];
+  const rails: Array<PublishRail> = ["steem", "hive", "blurt"]; // r10: blurt joins the audited surface (endpoint live, chain id proven)
   const posts: FleetContentAuditRow[] = [];
   const railStats: FleetContentAudit["rails"] = [];
   for (const rail of rails) {
@@ -501,10 +520,18 @@ export async function fleetRailsOverview(): Promise<RailsOverview> {
   const perRail: RailsOverview["commander"]["perRail"] = [];
   for (const rail of all) {
     const health = rails.find((r) => r.rail === rail);
-    const entry = await db.vaultEntry.findFirst({
-      where: { chain: rail, account: COMMANDER_ACCOUNT, role: "posting" },
-      orderBy: { updatedAt: "desc" },
-    });
+    // r10: graphene key material is chain-agnostic, but each chain may hold a
+    // DIFFERENT generation — prefer the rail's own row, fall back to the family.
+    // The on-chain verifyPostingKeyOnChain proof (with the BLT prefix fix) decides.
+    const entry =
+      (await db.vaultEntry.findFirst({
+        where: { chain: rail, account: COMMANDER_ACCOUNT, role: "posting" },
+        orderBy: { updatedAt: "desc" },
+      })) ??
+      (await db.vaultEntry.findFirst({
+        where: { chain: { in: ["steem", "hive", "blurt"] }, account: COMMANDER_ACCOUNT, role: "posting" },
+        orderBy: { updatedAt: "desc" },
+      }));
     if (!entry) {
       perRail.push({ rail, keyInVault: false, accountOnChain: null, keyVerifiedAgainstChain: null, chainPub: null, derivedPub: null, reason: "אין מפתח-posting של המפקד בכספת למסילה זו" });
       continue;
@@ -532,7 +559,7 @@ export async function fleetRailsOverview(): Promise<RailsOverview> {
     rails,
     commander: { account: COMMANDER_ACCOUNT, perRail },
     broadcastPolicy:
-      "שידור מותר רק על מסילה שבה המפתח אומת מול השרשרת (steem+hive כרגע) · blurt נשאר סגור עד endpoint מאומת + מפתח · posting לעולם לא נוגע בכספים",
+      "שידור מותר רק על מסילה שבה המפתח אומת מול השרשרת (steem+hive+blurt — אותו חומר-מפתח גרפני, האורקל על השרשרת מכריע) · blurt: endpoint חי + chain-id מוכח-אמפירית (r10) · posting לעולם לא נוגע בכספים",
   };
 }
 

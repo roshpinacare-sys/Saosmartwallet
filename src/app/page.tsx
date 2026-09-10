@@ -83,12 +83,12 @@ interface GateStatus {
 interface Entry {
   id: string; kind: string; chain: string | null; account: string | null;
   role: string | null; pub: string | null; status: string;
-  liveOk: boolean | null; detail: string;
+  liveOk: boolean | null; chains: string[]; detail: string;
 }
 interface Inventory {
   ok: boolean; locked: boolean; entries: Entry[];
-  summary?: { total: number; verified: number; failed: number; noLive: number };
-  chains?: { steemOk: boolean; hiveOk: boolean; githubOk: boolean };
+  summary?: { total: number; verified: number; failed: number; noLive: number; rails: Record<string, number> };
+  chains?: { steemOk: boolean; hiveOk: boolean; blurtOk: boolean; githubOk: boolean | null };
 }
 interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
@@ -696,15 +696,19 @@ function Connections() {
   const cards = [
     {
       name: "STEEM", icon: <Globe className="h-5 w-5" />, ok: chains?.steemOk,
-      endpoint: "api.steemit.com", count: (byChain["steem"] || 0) + (byChain["steem-key"] || 0),
+      endpoint: "api.steemit.com", count: summary?.rails?.steem ?? 0, secrets: byChain["steem"] || 0,
     },
     {
       name: "HIVE", icon: <Globe className="h-5 w-5" />, ok: chains?.hiveOk,
-      endpoint: "api.hive.blog", count: (byChain["hive"] || 0) + (byChain["hive-key"] || 0),
+      endpoint: "api.hive.blog", count: summary?.rails?.hive ?? 0, secrets: byChain["hive"] || 0,
+    },
+    {
+      name: "BLURT", icon: <Globe className="h-5 w-5" />, ok: chains?.blurtOk,
+      endpoint: "blurt-rpc.saboin.com", count: summary?.rails?.blurt ?? 0, secrets: byChain["blurt"] || 0,
     },
     {
       name: "GITHUB", icon: <Github className="h-5 w-5" />, ok: chains?.githubOk,
-      endpoint: "api.github.com", count: byChain["github"] || 0,
+      endpoint: "api.github.com", count: summary?.rails?.github ?? 0, secrets: byChain["github"] || 0,
     },
   ];
 
@@ -716,7 +720,7 @@ function Connections() {
           <RefreshCw className={"h-3.5 w-3.5" + (busy ? " animate-spin" : "")} /> אמת הכל עכשיו
         </Button>
       </motion.div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cards.map((c, i) => (
           <motion.div key={c.name} {...rise} transition={{ ...rise.transition, delay: i * 0.08 }}>
             <GlowCard className={"p-6 h-full relative overflow-hidden " + (c.ok === true ? "border-emerald-500/30" : c.ok === false ? "border-rose-500/30" : "")}>
@@ -730,7 +734,8 @@ function Connections() {
                     : <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />}
               </div>
               <p className="mt-4 font-mono text-3xl font-black">{busy && !inv ? "…" : c.count}</p>
-              <p className="text-xs text-zinc-500 mt-1">סודות בכספת</p>
+              <p className="text-xs text-emerald-500/90 mt-1">מפתחות עם סמכות-חיה ברשת</p>
+              <p className="text-xs text-zinc-500 mt-0.5">{c.secrets} סודות בכספת</p>
               <p className="mt-3 font-mono text-[10px] text-zinc-600" dir="ltr">{c.endpoint}</p>
             </GlowCard>
           </motion.div>
@@ -741,6 +746,9 @@ function Connections() {
           אימות-חי אחרון: <b className="text-emerald-400">{summary.verified}</b> עברו ·{" "}
           {summary.failed > 0 ? <span className="text-rose-400">{summary.failed} נכשלו</span> : <span className="text-zinc-600">0 נכשלו</span>} ·{" "}
           {summary.noLive} ללא-בדיקה-אפשרית
+          {summary.rails && (
+            <> · סמכויות-חיה: steem {summary.rails.steem ?? 0} · hive {summary.rails.hive ?? 0} · blurt {summary.rails.blurt ?? 0} · ETH {summary.rails.ethereum ?? 0} · TRX {summary.rails.tron ?? 0} · SOL {summary.rails.solana ?? 0}</>
+          )}
         </motion.p>
       )}
     </section>
@@ -778,13 +786,18 @@ function VaultGrid() {
   }
 
   const entries = inv?.entries || [];
-  const chainsList = useMemo(() => Array.from(new Set(entries.map((e) => (e.chain || e.kind)))).sort(), [entries]);
+  const chainsList = useMemo(
+    () => Array.from(new Set(entries.flatMap((e) => [(e.chain || e.kind), ...(e.chains || [])]))).sort(),
+    [entries],
+  );
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return entries.filter((e) => {
-      if (chain !== "*" && (e.chain || e.kind) !== chain) return false;
+      // r10: a graphene key rules multiple rails — filter matches the stored
+      // label AND every rail the live sweep proved authority on
+      if (chain !== "*" && (e.chain || e.kind) !== chain && !(e.chains || []).includes(chain)) return false;
       if (!needle) return true;
-      return [e.account, e.role, e.kind, e.chain, e.pub].some((f) => (f || "").toLowerCase().includes(needle));
+      return [e.account, e.role, e.kind, e.chain, e.pub, ...(e.chains || [])].some((f) => (f || "").toLowerCase().includes(needle));
     });
   }, [entries, q, chain]);
 
@@ -810,7 +823,7 @@ function VaultGrid() {
       <motion.div {...rise} className="flex flex-wrap gap-2 mb-5">
         <FilterChip active={chain === "*"} onClick={() => setChain("*")} label={`הכול (${entries.length})`} />
         {chainsList.map((c) => (
-          <FilterChip key={c} active={chain === c} onClick={() => setChain(c)} label={`${c} (${entries.filter((e) => (e.chain || e.kind) === c).length})`} />
+          <FilterChip key={c} active={chain === c} onClick={() => setChain(c)} label={`${c} (${entries.filter((e) => (e.chain || e.kind) === c || (e.chains || []).includes(c)).length})`} />
         ))}
       </motion.div>
 
@@ -827,6 +840,9 @@ function VaultGrid() {
                 <div key={e.id} className="px-4 py-3.5 transition-colors hover:bg-zinc-900/40">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <Badge variant="secondary" className="font-mono text-[10px] bg-zinc-800/80 text-amber-300/90 border border-amber-500/20">{e.chain || e.kind}</Badge>
+                    {(e.chains || []).filter((c) => c !== (e.chain || e.kind)).map((c) => (
+                      <Badge key={c} variant="secondary" className="font-mono text-[10px] bg-emerald-500/10 text-emerald-300/90 border border-emerald-500/20">+{c}</Badge>
+                    ))}
                     <span className="font-mono text-sm font-bold">{e.account || "—"}</span>
                     {e.role && <span className="font-mono text-[10px] text-zinc-500">@{e.role}</span>}
                     <LiveDot ok={e.liveOk} />

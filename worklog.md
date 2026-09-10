@@ -1413,3 +1413,27 @@ Stage Summary:
 - הפער-השישי נחתך: המערכת טענה שהיא מנהלת אמון — ולא ניהלה אפילו את הזיכרון שלו. פגי-תוקף נספרו "פעילים", שלילה הייתה דגל (הצופן נשאר ב-DB), הדלתות שמכשיר פתח נשארו פתוחות 30 יום, החוזה פג בשקט, והאזהרה היחידה הייתה קוד-מת שהשער-הפתוח בלע.
 - עכשיו מישור-המכשירים חי בתוך הלב: גורע פגי-תוקף עם הצופן, מתריע 7 ימים מראש, מגביל את משטח-האמון ב-10, חודש ברוטציה במקום שכפול, סוגר דלתות בשלילה (ומשאיר את המפעיל בפנים), ומדווח על עצמו בדופק החי.
 - קבצים: prisma/schema.prisma · src/lib/gate/{device,session}.ts · src/lib/gate/harness/heart.ts · src/app/api/gate/device/{route,login,forget}.ts · src/app/api/gate/reset/route.ts · src/app/page.tsx · tools/{r9-device-probe,r9-device-truth}.ts · docs/roast-audit.md · worklog.md · db/custom.db.
+
+---
+Task ID: 26
+Agent: Z.ai Code (main)
+Task: ROAST r10 — "השרת נפל · בחן את כל התיקיות ואת קובץ הזיפ של סטים · וודא שכולם מחוברים לרשתות גם hive גם blurt ועוד · לא יתכן שרק steemit מאומת בכספת · אמת כל טענה מול האמת ודחוף"
+
+Work Log:
+- השרת: אובחן נפילה מלאה (אין תהליך, אין פורט-3000) → הוחזר לחיים; בתום העבודה הופעל מחדש שוב כדי שהתהליך החי יריץ את התיקון (שיעור-r8), והדפדפן אימת שהקוד-החדש הוא שרץ.
+- תיקיות/זיפ: סריקה מחדש איששה את תוצר-20260907 — לא קיים קובץ זיפ של סטים בסביבה (0 זיפים); הארכיונים חיים ב-repo `Project-files` ב-GitHub; נרשם בכנות במקום ניתוח-קלט-נעדר. המפתחות (PAT/EVM/steem-keys) אותרו ונוצלו.
+- אמת-כספת (tools/r10-vault-truth.ts): 97 כניסות; בבוקר רק 4 מאומתות (headcorner@steem) — ליבת תלונת-המפעיל.
+- אמת-שרשרת (tools/r10-crosschain-authority.ts): השוואת בייטים גולמיים מול steem+hive+blurt — **88 התאמות חיות** (steem 4 · hive ~40 · blurt ~44): המפתחות "unverified" שלטו על 2–3 רשתות במקביל.
+- פער 39: verify.ts טען "מחובר להכל" אך שאל steem+hive בלבד ובהשוואת-מחרוזות (STM מול BLT — בלתי-אפשרי מבנית). תיקון: מפת-סמכויות על hex-33-בייטים + blurt במפה + `EntryVerify.chains[]` + תגיות +blurt/+hive ב-UI + כרטיס BLURT חי.
+- פער 40: "Blurt סגורה 0/6" התיישן — `blurt-rpc.saboin.com` חי. ה-chain-id הוכח אמפירית (tools/r10-blurt-digest-oracle.ts): שחזור חתימות-על מול authorities — `cd8d90f2…` 3/3, zeros/hive/testnet 0/3; בקרת-steem עברה 5/5; ה-serialization שלנו זהה ביט-מול-ביט לחוט blurt (r10-blurt-wire-check). `BLURT_CHAIN_ID` + `blurtAdapter/blurtBroadcastAdapter` + מסילת-פרסום blurt ב-publish/edit + auditFleetContent סורקת גם blurt. פער-צד: config.hpp של blurt מגדיר אפסים — ה-genesis הפרוס מכתיב אחרת; השרשרת היא האורקל.
+- פער 41: באג-BLT-prefix — `steemPublicKeyDecode(...,["STM","TST","HIVE","BLURT"])` היה עיוור לחוט של blurt ("BLT") → verifyPostingKeyOnChain("blurt") פסל כל מפתח. תוקן והוכח חי.
+- פער 42: "verified" של EVM/TRON/SOL היה נגזרת-פנימית בלבד → בדיקות-רשת חיות (ETH publicnode · TRON v1→full-node fallback · SOL mainnet-beta→publicnode). כלל-כן: נגזרה-תואמת + רשת-שקטה = null, לעולם לא false. יתרות-חי נמדדו.
+- פער 43: הסוויפ ייצר כשלים-משלו (14 probes מקבילים → 429 המוני; hive/blurt שהאיטו → 57 "נכשלו" בריצה אחת). תיקון: תחרות-מוגבלת (4) + backoff + failover-פר-מסילה + retry + **false רק מול מישור מלא**. ריצה-חיה אחרי-התיקון: 83 עברו · 0 נכשלו · 14 ללא-בדיקה.
+- פער 44 (רגרסיה-עצמית שנתפסה חי): חיפוש-מפתח-פרסום משפחתי עלול לבחור דור-שגוי (ל-headcorner דורות-מפתח שונים לכל רשת — נמדד) → קודם שורת-הרשת, משפחה כגיבוי.
+- eco-registry/SCAN_META/publishing-network: עודכנו לאמת-r10 (blurt נפתחה, הפער "nodes down" הוחלף ב"ריכוז-endpoint"), פער-חדש ב-eco_gaps.
+- דפדפן (agent-browser): כרטיסי STEEM 4/HIVE 40/BLURT 44/GITHUB 1; מסנן blurt(44) עם 36 גם-hive; מובייל 390px אפס-גלילה-אופקית; פוטר טבעי; אפס שגיאות-קונסולה; סשן-הבדיקה נשלל בתום הבדיקה. tsc 0 · lint 0.
+
+Stage Summary:
+- הפער-השביעי נחתך: "מחובר להכל" שאל שתי רשתות בסקריפט שלא היה מסוגל מבנית לזהות התאמה בשלישית. האמת הייתה על השרשרות — 44 מפתחות שלטו על blurt והכספת סימנה אותם unverified.
+- המצב החי: כל שלוש מסילות-הגרפן חיות ומאומתות מול עצמן (בייטים, לא תוויות); מסילת-פרסום שלישית פתוחה fail-closed; EVM/TRON/SOL עם עדות-רשת אמיתית; הסוויפ לא ממציא כשלים (0 נכשלו); 83/97 מאומתות עם עדות-שרשרת, 14 כנות "ללא בדיקה".
+- קבצים: src/lib/gate/{verify,key-id}.ts · src/lib/social/rails-server.ts · src/lib/gate/harness/social.ts · src/app/api/gate/inventory/route.ts · src/app/page.tsx · src/lib/eco-registry.ts · docs/{roast-audit,publishing-network}.md · tools/r10-{vault-truth,crosschain-authority,blurt-digest-oracle,blurt-wire-check,steem-control,final-truth,api-sweep}.ts · worklog.md.

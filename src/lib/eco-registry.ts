@@ -173,8 +173,8 @@ export const ECO_NETWORKS: EcoNetworkInfo[] = [
     name: "BLURT",
     family: "Graphene",
     kind: "L1 public",
-    role: "Anchor rail — canonical signature format proven on-chain",
-    adapterStatus: "NO ADAPTER YET — nodes 0/6 live at scan time (honest)",
+    role: "Anchor rail + publishing rail — endpoint live, chain id signature-oracle-proven (r10)",
+    adapterStatus: "ADAPTER DONE (r10) — blurt-rpc.saboin.com live · BLURT_CHAIN_ID proven 3/3 by on-chain signature recovery · wire serialization bit-identical",
   },
   {
     id: "tron",
@@ -296,19 +296,19 @@ export const ECO_SERVICES: EcoServiceInfo[] = [
 // ---------------------------------------------------------------------------
 
 export const ECO_GAPS: EcoGap[] = [
-  { title: "No Hive/Blurt/TRON adapters in Saosmartwallet", detail: "M0 proves the adapter pattern on Steem; M3 added Ethereum + Solana. The Graphene twins remain cheap ports; TRON needs a TVM adapter. Until then this wallet signs STEEM-family + EVM + SPL only.", severity: "high" },
+  { title: "No Hive/TRON adapters in Saosmartwallet", detail: "M0 proves the adapter pattern on Steem; M3 added Ethereum + Solana; r10 opened BLURT (endpoint + chain-id oracle + 44 live authority matches). Hive remains a cheap port; TRON needs a TVM adapter. Until then this wallet signs STEEM-family (now including blurt) + EVM + SPL only.", severity: "high" },
   { title: "No bridge contract/program deployed (ETH/SOL)", detail: "M3 ships the adapters, the router and the lock-op spec, but the mint side of STEEM→ETHEREUM / STEEM→SOLANA awaits a deployed + verified bridge contract/program. Routes quote honestly as gated.", severity: "high" },
   { title: "Signing keys held hot in sandbox", detail: "M2 keystore seals keys (AES-256-GCM under Argon2id) and gates every signature through policy + audit, but key material still lives on the app server. Hardware/air-gapped signing is the next hardening step.", severity: "medium" },
   { title: "Hive RC regen wait", detail: "Fleet soldiers RC-starved (2–5% manabar); heal loop allocates HP, ETA measured ~5 days. Anchors honestly gated meanwhile.", severity: "medium" },
-  { title: "Blurt nodes down (0/6)", detail: "saboin RPC 'down for maintenance' — probes fail; anchors on Blurt paused honestly with 30min cooldown.", severity: "medium" },
+  { title: "Blurt endpoint concentration", detail: "ONE live public endpoint (blurt-rpc.saboin.com) as of r10 — the rest of the historical fleet is DNS-dead. The rail works but is single-endpoint; more live endpoints should be verified before anchoring load moves there.", severity: "low" },
   { title: "TRON identity funding", detail: "Bridge identity derived and proven but auto-anchoring waits on ≥0.3 TRX funding; ring runs free-bandwidth only.", severity: "low" },
 ];
 
 export const SCAN_META = {
-  scannedAt: "2026-09-08",
+  scannedAt: "2026-09-10 (r10 refresh)",
   method: "GitHub API (repos list, trees, READMEs, live state files) + live RPC probes",
   reposScanned: 8,
   networksFound: 7,
   tokensTracked: 25,
-  liveSources: ["api.steemit.com", "api.hive.blog", "rpc.blurt.world", "api.trongrid.io", "ethereum-rpc.publicnode.com", "api.mainnet-beta.solana.com", "steem repo (SAOS-NET state.json — daemon-pushed)"],
+  liveSources: ["api.steemit.com", "api.hive.blog", "blurt-rpc.saboin.com (r10: live, chain-id oracle-proven)", "api.trongrid.io", "ethereum-rpc.publicnode.com", "api.mainnet-beta.solana.com", "steem repo (SAOS-NET state.json — daemon-pushed)"],
 };
