@@ -1,7 +1,7 @@
 'use client';
 
 // ─── Connect Wallet — אימות-סטייל-איתריום (SIWE) על הרשת הריבונית ────────────
-// שלב 1: חיבור (חשבון+רשת → אתגר-חתימה חי מהשרת, כמו eth_personalSign)
+// שלב 1: חיבור (חשבון+רשת → אתגר-חי מהשרת) · FIX(Roast-63 · H7): כנות — אין-חתימה-קריפטוגרפית; זו-הוכחת-החזקה של מפתח-הרשת (WIF→פאב→סמכויות-חי-בשרת)
 // שלב 2: אישור (הצגת-האתגר + מפתח → סשן-30-יום דו-נשא — נשארים מחוברים)
 
 import { useState } from 'react';
@@ -62,14 +62,14 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
             <span className="w-9 h-9 rounded-xl bg-[color:var(--pink)] flex items-center justify-center shadow-[0_0_24px_-6px_rgba(255,55,199,0.8)]">
               <Wallet className="w-4.5 h-4.5 text-white" />
             </span>
-            {step === 'connect' ? 'חבר ארנק — הרשת הריבונית' : 'אשר את החתימה'}
+            {step === 'connect' ? 'חבר ארנק — הרשת הריבונית' : 'אמת בעלות-על-המפתח'}
           </DialogTitle>
         </DialogHeader>
 
         {step === 'connect' ? (
           <div className="space-y-4" data-testid="connect-step">
             <p className="text-[12px] text-[color:var(--text-2)] leading-relaxed">
-              התחברות חכמה אל הטוקן שלנו — כמו Connect באיתריום: השרת מנפיק אתגר-חתימה
+              התחברות-מאומתת אל הטוקן שלנו: השרת מנפיק אתגר-התחברות חד-פעמי, והמפתח שלך מאומת מול הסמכויות על השרשרת
               חד-פעמי, אתה מאשר אותו עם המפתח, והסשן <span className="text-[color:var(--text-1)] font-semibold">נשאר מחובר 30 יום</span> (דו-נשא: cookie מאובטח + Bearer).
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -109,7 +109,7 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
           <div className="space-y-4" data-testid="sign-step">
             <div className="rounded-xl border border-[color:var(--line)] bg-black/30 p-3 max-h-40 overflow-y-auto" data-testid="challenge-box">
               <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--text-3)] mb-2">
-                <PenLine className="w-3 h-3" /> אתגר-חתימה · SHA-256
+                <PenLine className="w-3 h-3" /> אתגר-התחברות · nonce חד-פעמי
                 <span className="dx-num text-[color:var(--text-3)]" dir="ltr">{challenge?.digest.slice(0, 16)}…</span>
               </div>
               <pre className="text-[10.5px] leading-relaxed text-[color:var(--text-2)] whitespace-pre-wrap font-data" dir="rtl">{challenge?.message}</pre>

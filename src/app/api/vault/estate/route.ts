@@ -2,6 +2,7 @@
 // כל-מספר כאן מגיע מ-RPC ציבורי בזמן-אמת — אפס הנחות, אפס יתרות-ספר פנימיות.
 // התשובה הכנה לשאלת-המפעיל: "כמה אפשר לממש עכשיו באמת?"
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { requireOwner } from '@/lib/auth';
 import { audit } from '@/lib/audit';
@@ -24,7 +25,7 @@ async function jrpc(url: string, method: string, params: unknown, timeout = 1200
 }
 
 // ── price feeds: CoinGecko → CoinPaprika (fallback) ──
-const COINGECKO_IDS: Record<string, string> = { steem: 'steem', hive: 'hive', blurt: 'blurt', eth: 'ethereum', sol: 'solana', btc: 'bitcoin', trx: 'tron' };
+const COINGECKO_IDS: Record<string, string> = { steem: 'steem', sbd: 'steem-dollars', hive: 'hive', blurt: 'blurt', eth: 'ethereum', sol: 'solana', btc: 'bitcoin', trx: 'tron' };
 type Prices = Record<string, { usd: number; src: string }>;
 async function getPrices(): Promise<Prices> {
   const out: Prices = {};
@@ -41,7 +42,7 @@ async function getPrices(): Promise<Prices> {
   } catch { /* fallback */ }
   const missing = Object.keys(COINGECKO_IDS).filter(s => !out[s]);
   if (missing.length) {
-    const paprika: Record<string, string> = { steem: 'steem-steem', hive: 'hive-hive', eth: 'eth-ethereum', sol: 'sol-solana', btc: 'btc-bitcoin', trx: 'trx-tron' };
+    const paprika: Record<string, string> = { steem: 'steem-steem', sbd: 'sbd-steem-dollars', hive: 'hive-hive', eth: 'eth-ethereum', sol: 'sol-solana', btc: 'btc-bitcoin', trx: 'trx-tron' };
     await Promise.allSettled(missing.map(async sym => {
       const slug = paprika[sym]; if (!slug) return;
       try {
@@ -103,7 +104,7 @@ const TRON_LEGACY: Array<{ name: string; address: string }> = [
   { name: 'legacy-m2/2', address: 'TNd4aFZk1YUeP9uzUWCefJyadjCxZXBoBg' },
 ];
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const owner = await requireOwner(req);
   if (!owner) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
 
@@ -229,7 +230,9 @@ export async function GET(req: Request) {
   const solAddrs = entities.filter(([, w]) => w.sol);
   try {
     const j = await jrpc(SOL_RPC, 'getMultipleAccounts', [solAddrs.map(([, w]) => w.sol), { encoding: 'base64', dataSlice: { offset: 0, length: 0 } }], 15000);
-    const vals = (j.result?.value as Array<{ lamports?: number } | null> | undefined) || [];
+    // FIX(Roast-63 · H8): טיפוס-אמת-לתשובת-RPC (היה-{} גורר-Property-'value'-לא-קיים)
+    const jv = j as { result?: { value?: Array<{ lamports?: number } | null> } };
+    const vals = jv.result?.value ?? [];
     solAddrs.forEach(([name, w], i) => {
       const lam = vals[i]?.lamports ?? 0;
       if (lam > 0) solRows.push({ entity: name, address: w.sol!, sol: lam / 1e9 });
@@ -298,7 +301,8 @@ export async function GET(req: Request) {
   const totals = {
     steemLiquidUsd: s ? usd('steem', s.liquid) : 0,
     steemVestedUsd: s ? usd('steem', s.spOwn) : 0,
-    sbdUsd: s ? s.sbd * 1 : 0, // SBD נעוגן ~1$ — שער-כנה מוצהר
+    // FIX(Roast-63 · H4): SBD-לא-נסחר-עוד-ב-1$-מזמן — מחיר-אמת-מהפיד (steem-dollars).
+    sbdUsd: s ? usd('sbd', s.sbd) : 0,
     hiveLiquidUsd: h ? usd('hive', h.liquid) : 0,
     hiveVestedUsd: h ? usd('hive', h.hpOwn) : 0,
     blurtLiquidUsd: b ? usd('blurt', b.liquid) : 0,
@@ -332,17 +336,24 @@ export async function GET(req: Request) {
     },
     paths: [
       { name: 'STEEM נזיל (headcorner) → שוק-חוץ → ETH', amount: s?.liquid || 0, sym: 'STEEM', usd: totals.steemLiquidUsd },
-      { name: 'SBD (עוגן-דולר 1:1) → שוק-חוץ', amount: s?.sbd || 0, sym: 'SBD', usd: totals.sbdUsd },
+      { name: 'SBD → שוק-חוץ (מחיר-אמת-מהפיד — לא-עוגן-1:1)', amount: s?.sbd || 0, sym: 'SBD', usd: totals.sbdUsd },
       { name: 'BLURT נזיל → שוק-חוץ', amount: b?.liquid || 0, sym: 'BLURT', usd: totals.blurtLiquidUsd },
       { name: 'HIVE נזיל → שוק-חוץ', amount: h?.liquid || 0, sym: 'HIVE', usd: totals.hiveLiquidUsd },
       { name: 'SOL חיילים (איחוד → שוק-חוץ)', amount: solTotal, sym: 'SOL', usd: totals.solUsd },
       { name: 'ETH חיילים (איחוד → שוק-חוץ)', amount: ethTotal, sym: 'ETH', usd: totals.evmEthUsd },
-      { name: 'צי-HIVE מצטבר (12 חשבונות נזיל) → שוק-חוץ', amount: fleetHiveLiquidTotal, sym: 'HIVE', usd: totals.fleetHiveUsd },
+      { name: `צי-HIVE מצטבר (${fleetHiveRows.length} חשבונות-נסרקו) → שוק-חוץ`, amount: fleetHiveLiquidTotal, sym: 'HIVE', usd: totals.fleetHiveUsd },
       { name: 'טרון-לגסי (אבק-מנמוניק #2) — להעביר ל-TVN3 ולממש', amount: tronLegacyTrx, sym: 'TRX', usd: totals.tronLegacyUsd },
       { name: 'STEEM vested (powerdown 13שב׳) — נעול-מובנה', amount: s?.spOwn || 0, sym: 'SP', usd: totals.steemVestedUsd, locked: true },
       { name: 'BLURT vested (powerdown) — נעול-מובנה', amount: b?.bpOwn || 0, sym: 'BP', usd: totals.blurtVestedUsd, locked: true },
     ],
   };
+
+  // FIX(Roast-63 · H3): ספירות-אמת-לדוח-הסריקה (מהקוד-שרץ, לא-ממחרוזת)
+  const totalKeys = await db.vaultKey.count();
+  const evmCount = entities.filter(([, w]) => w.evm).length;
+  const solCount = entities.filter(([, w]) => w.sol).length;
+  const tronCount = entities.filter(([, w]) => w.tron).length;
+  const btcCount = entities.filter(([, w]) => w.btc).length;
 
   const data = {
     at: new Date().toISOString(),
@@ -352,8 +363,17 @@ export async function GET(req: Request) {
     fleetHive: { rows: fleetHiveRows, liquidTotal: fleetHiveLiquidTotal },
     scan: {
       sweep: 'task-60',
-      checked: '149 מפתחות-כספת · 12 EVM×7רשתות · 12 SOL+SPL · 12 TRON + 3 לגסי · 12 BTC · ERC-20 (USDT/USDC/DAI/BUSD) · צי-HIVE',
-      zero: 'BTC · SPL · ERC-20 · BSC/Polygon/ARB/Base/OP/AVAX — כולם אפסים כנים',
+      // FIX(Roast-63 · H3): כל-המספרים-כאן-מחושבים-מהקוד-שרץ-בפועל (היו-מחרוזת-קבועה-שהציגה-
+      // סריקות-שלא-בוצעו: ERC-20/SPL מעולם-לא-נסרקו-בקוד-זה).
+      checked: [
+        `${entities.length} מפתחות-כספת-נסרקו (מתוך ${totalKeys} בכספת)`,
+        `${evmCount} ארנקי-EVM × ${Object.keys(EVM_RPCS).length} רשתות (יתרת-נייטיב-בלבד)`,
+        `${solCount} ארנקי-SOL (יתרת-נייטיב; SPL-טוקנים לא-נסרקו-בסבב-זה)`,
+        `${tronCount} ארנקי-TRON + ${tronLegacyRows.length} לגסי`,
+        `${btcCount} ארנקי-BTC`,
+        `${fleetHiveRows.length} חשבונות-צי-HIVE`,
+      ].join(' · '),
+      zero: 'BTC · BSC/Polygon/ARB/Base/OP/AVAX — אפסים כנים · ERC-20 (USDT/USDC/DAI/BUSD) ו-SPL-טוקנים: לא-נסרקו-בקוד-זה (כנות)',
       resolved: 'מעטפת-0.0997ETH = דלק-DEX-היסטורי · ״legacy 117k״ = תווית-דור מהפרויקט-הישן (לא סכום) · 9.68-HIVE = מדידה-היסטורית-שגויה (אין-op-עברה-בשרשרת)',
     },
     prices,

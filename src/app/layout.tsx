@@ -1,5 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { Heebo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+// FIX(Roast-63 · M10): היה-<link>-גוגל-פונטס-בתוך-<body> (אזהרת-no-page-custom-font,
+// טעינה-לא-אידיאלית). next/font = אותם-פונטים, self-hosted-בזמן-בנייה, אפס-בקשות-חוץ.
+const heebo = Heebo({
+  subsets: ["hebrew", "latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-heebo",
+  display: "swap",
+});
+const jbMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-jbmono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "SAOS DEX — הבורסה הריבונית",
@@ -15,14 +31,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" className={`${heebo.variable} ${jbMono.variable}`}>
       <body className="min-h-screen flex flex-col antialiased">
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
         {children}
       </body>
     </html>

@@ -5,11 +5,16 @@ import crypto from 'crypto';
 const SECRET = process.env.SOVEREIGN_VAULT_SECRET || '';
 
 if (!SECRET || SECRET.length < 32) {
-  // Fail loud at import time — never fall back to a weak key silently.
-  console.warn('[vault] SOVEREIGN_VAULT_SECRET missing/short — vault crypto disabled');
+  // FIX(Roast-63 · H5): fail-closed אמת — ההערה-הקודמת ("fail loud") שקרה:
+  // היא-הזהירה-והמשיכה → scryptSync('') מצפין-הכל-תחת-מפתח-מרוקן. עכשיו: כל
+  // ניסיון-הצפנה/פענוח-זורק. האפליקציה-עולה, אך-הכספת-סגורה-בקול — לא-שקט-חלש.
+  console.warn('[vault] SOVEREIGN_VAULT_SECRET missing/short — vault operations will THROW (fail-closed)');
 }
 
 function derivedKey(): Buffer {
+  if (!SECRET || SECRET.length < 32) {
+    throw new Error('SOVEREIGN_VAULT_SECRET missing/short (32+ chars required) — vault crypto fail-closed');
+  }
   return crypto.scryptSync(SECRET, 'sovereign-vault-v1', 32);
 }
 

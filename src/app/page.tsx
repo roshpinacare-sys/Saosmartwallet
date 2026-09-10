@@ -159,6 +159,12 @@ export default function SovereignDex() {
   }
 
   function doLogout() {
+    // FIX(Roast-63 · C2): התנתקות-אמת — הסשן-מבוטל-בשרת (ה-Bearer-מת, ה-30-יום-נגמרים-עכשיו)
+    // בנוסף-לניקוי-המקומי. היה-תיאטרון: הכפתור-ניקה-localStorage-בלבד.
+    try {
+      void fetch('/api/vault/logout', { method: 'POST', headers: authHeaders() });
+      document.cookie = 'saos_session=; Max-Age=0; Path=/';
+    } catch { /* מתנתקים-מקומית-בכל-מקרה */ }
     storeToken('');
     setAuthed(false); setStatus(s => (s ? { ...s, me: null } : s));
     setLoginMsg(null);

@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
   const keys = await db.vaultKey.findMany({ orderBy: [{ account: 'asc' }, { chain: 'asc' }, { role: 'asc' }] });
   const guard = await db.guardState.findUnique({ where: { id: 'singleton' } });
   const agents = await db.agentNode.findMany({ orderBy: { createdAt: 'desc' } });
-  const [{ count: sessions }, { count: tasksOpen }] = await Promise.all([
+  // FIX(Roast-63 · H8): count() מחזיר-Number — לא-אובייקט-{count} (היה-undefined-בריצה)
+  const [sessions, tasksOpen] = await Promise.all([
     db.session.count({ where: { revoked: false, expiresAt: { gt: new Date() }, scope: 'owner' } }),
     db.taskItem.count({ where: { status: { in: ['open', 'claimed'] } } }),
   ]);
@@ -47,11 +48,13 @@ export async function GET(req: NextRequest) {
 
   // Live balances: serve stale cache immediately; refresh in background when stale.
   const chainAccounts = [...new Set(keys.filter(k => ['steem', 'hive', 'blurt'].includes(k.chain)).map(k => k.account))];
-  let balances: BalMap = g.__svBal?.data ?? {};
-  if (!g.__svBal) {
+  // FIX(Roast-63 · H8): היה-Property-'data'-on-'never' (היצרות-narrowing-חוצה-await)
+  const cached = g.__svBal;
+  let balances: BalMap = cached?.data ?? {};
+  if (!cached) {
     await refreshBalances(chainAccounts); // first call in this process — fetch now
     balances = g.__svBal?.data ?? {};
-  } else if (Date.now() - g.__svBal.at > BAL_TTL_MS) {
+  } else if (Date.now() - cached.at > BAL_TTL_MS) {
     void refreshBalances(chainAccounts).catch(() => { /* keep stale */ });
   }
 

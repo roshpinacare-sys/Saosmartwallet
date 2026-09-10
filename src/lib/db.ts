@@ -7,7 +7,8 @@ const globalForPrisma = globalThis as unknown as {
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ['query'],
+    // FIX(Roast-63 · M7): שאילתות-SQL-מלאות-ללוג-רק-בפיתוח (היה-שופך-chat/sessions-ל-dev.log-בכל-ריצה)
+    log: process.env.NODE_ENV === 'development' ? ['query'] : [],
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

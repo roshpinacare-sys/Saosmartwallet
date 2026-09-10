@@ -67,3 +67,4 @@ agent/keys/
 /saos-dex/
 .secrets/
 tool-results/
+# FIX(Roast-63 · C1): כספת-המפתחות-המוצפנת — אף-פעם-לא-בגיט (היה-עוקב למרות *.db — נוסף-אחרי-המעקב)

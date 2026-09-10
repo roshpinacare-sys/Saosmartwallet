@@ -32,7 +32,7 @@ export function OpsView({ status, authed, messages, onSend, tasks, onCreateTask,
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
   const activeAgents = status?.agents.filter(a => a.status === 'active').length || 0;
-  const tasksOpen = tasks.filter(t => t.status === 'pending' || t.status === 'claimed').length;
+  const tasksOpen = tasks.filter(t => t.status === 'open' || t.status === 'claimed').length; // FIX(Roast-63 · M5): 'pending' לא-קיים-ב-enum (היה-0-open-תמיד)
 
   return (
     <div className="space-y-4">
@@ -155,7 +155,7 @@ curl -X POST <origin>/api/agent/task \\
       <section className="sv-card">
         <div className="px-4 py-3 border-b border-[#eeeeea] flex items-center justify-between">
           <span className="text-[13px] font-semibold flex items-center gap-2 text-zinc-800"><ListChecks className="w-4 h-4 text-emerald-600" />משימות לסוכנים</span>
-          <span className="font-data text-[10px] text-zinc-400" dir="ltr">{tasksOpen} open / {tasks.length} total</span>
+          <span className="font-data text-[10px] text-zinc-400" dir="ltr">{tasksOpen ?? 0} open / {tasks.length} total</span>
         </div>
         <div className="p-4 space-y-3">
           <div className="flex gap-2 flex-wrap">

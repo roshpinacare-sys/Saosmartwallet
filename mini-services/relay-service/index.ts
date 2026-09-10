@@ -2,17 +2,20 @@
 // Browser connects via /?XTransformPort=3003 (Caddy) — path must stay '/'.
 // Next.js API routes push events to the INTERNAL admin port 3004 (/emit).
 import { createServer } from 'http';
-try { fs.writeFileSync('/tmp/relay-hot-probe', new Date().toISOString()) } catch {}
-import { Server } from 'socket.io';
 import fs from 'fs';
 import path from 'path';
+// FIX(Roast-63 · L3): fs-היה-בשימוש-לפני-הייבוא-שלו (עבד-רק-בזכות-ESM-hoisting — מוקש-TDZ)
+try { fs.writeFileSync('/tmp/relay-hot-probe', new Date().toISOString()) } catch {}
+import { Server } from 'socket.io';
 
 // Load project root .env (mini-service has its own cwd)
 if (!process.env.SOVEREIGN_RELAY_TOKEN) {
   try {
-    for (const line of fs.readFileSync(path.join(import.meta.dir, '../../.env'), 'utf8').split('\n')) {
+    // FIX(Roast-63): import.meta.dir הוא-Bun-בלבד — cast-מפורש (tsc-נקי)
+    const bunMeta = import.meta as unknown as { dir: string };
+    for (const line of fs.readFileSync(path.join(bunMeta.dir, '../../.env'), 'utf8').split('\n')) {
       const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-      if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+      if (m && m[1] && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
     }
   } catch { /* .env optional */ }
 }
@@ -74,7 +77,8 @@ void guardianBoot();
 setInterval(() => { void guardianBoot(); }, 30_000).unref?.();
 // ────────────────────────────────────────────────────────────────────────────
 
-io.httpServer?.listen(PUBLIC_PORT, () => console.log(`[relay] socket.io on :${PUBLIC_PORT}`));
+// FIX(Roast-63 · M9): loopback-בלבד — הדפדפן-מגיע-דרך-Caddy-בלבד
+io.httpServer?.listen(PUBLIC_PORT, '127.0.0.1', () => console.log(`[relay] socket.io on :${PUBLIC_PORT} (loopback)`));
 
 // internal admin server — broadcast endpoint
 const admin = createServer((req, res) => {

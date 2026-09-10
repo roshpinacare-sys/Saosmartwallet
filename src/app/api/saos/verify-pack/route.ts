@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { buildMerkleTree, merkleProof, verifyMerkleProof } from "@/lib/saos/merkle";
-import { forgeReceipt } from "@/lib/saos/evidence";
+import { canonicalDigest } from "@/lib/saos/canonical-json";
 
 export const dynamic = "force-dynamic";
 
@@ -39,24 +39,33 @@ export async function GET() {
     }
     const allVerified = proofs.every((p) => p.verified);
 
-    const prev = await db.evidenceReceipt.findFirst({ orderBy: { createdAt: "desc" } });
-    const receipt = await forgeReceipt(
-      "verify-pack",
-      { sealRoot: seal.root, leaves: leaves.length, allVerified, rootMatches },
-      prev?.digest ?? null
-    );
-    try {
-      await db.evidenceReceipt.create({
-        data: {
-          kind: receipt.kind,
-          digest: receipt.digest,
-          prevDigest: receipt.prevDigest,
-          payload: JSON.stringify(receipt.payload)
-        }
-      });
-    } catch {
-      // repeat-run digest collision — tolerated
+    // FIX(Roast-63 · H2): אין-עוד-כתיבה-ב-GET (היה-רישום-קבלה-בכל-סקר = הצפת-שרשרת).
+    // FIX(Roast-63 · M12): במקום-זאת — **מאמתים-את-שרשרת-העדויות-עצמה** כאן
+    // (verifyChain היה-מוגדר-ומעולם-לא-נקרא — השרשרת-יכלה-להיחבל-בלי-שאף-אחד-יבחין).
+    // שחזור-ה-preimage: {kind, at, payload, prevDigest} — ה-"at" לא-נשמר-בפני-עצמו,
+    // רק-createdAt (אותו-שעון-תהליך; ms-גבולי-עלול-להחליק) → שני-candidates-כנים.
+    const receipts = await db.evidenceReceipt.findMany({ orderBy: { createdAt: "asc" } });
+    let prevDigest: string | null = null;
+    let chainOk = true;
+    let chainBrokenAt: number | null = null;
+    for (let i = 0; i < receipts.length; i++) {
+      const r = receipts[i]!;
+      const payload = JSON.parse(r.payload) as Record<string, unknown>;
+      const cands = [
+        r.createdAt.toISOString(),
+        new Date(Math.floor(r.createdAt.getTime() / 1000) * 1000).toISOString(),
+      ];
+      let matched: string | null = null;
+      for (const at of cands) {
+        const d = await canonicalDigest({ kind: r.kind, at, payload, prevDigest: r.prevDigest });
+        if (d === r.digest) { matched = d; break; }
+      }
+      if (matched === null || r.prevDigest !== prevDigest) {
+        chainOk = false; chainBrokenAt = i; break;
+      }
+      prevDigest = r.digest;
     }
+    const chainCheck = { ok: chainOk, brokenAt: chainBrokenAt };
 
     return NextResponse.json({
       ok: true,
@@ -71,7 +80,7 @@ export async function GET() {
       allVerified,
       proofs,
       sampleProof: await merkleProof(tree, 0),
-      receipt: receipt.digest,
+      evidenceChain: { receipts: receipts.length, ok: chainCheck.ok, brokenAt: chainCheck.brokenAt },
       howToVerify: [
         "קח את sampleProof.path",
         "hash = leaf; לכל צעד: dir==='R' ? sha256(hash+sibling) : sha256(sibling+hash)",

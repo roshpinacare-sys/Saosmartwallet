@@ -40,6 +40,14 @@ export async function requireOwner(req: NextRequest): Promise<{ id: string; scop
   return s && s.scope === 'owner' ? s : null;
 }
 
+// FIX(Roast-63 · H1): ownerLock — עד-היום-הדגל-רק-הוצג-ב-UI ואף-מוטציה-לא-בדקה-אותו.
+// עכשיו: קריאה-קנונית-להמוטציות. אין-שורה-בטבלה = נעול-כברירת-מחדל (fail-closed,
+// בהתאם-ל-schema: default(true)).
+export async function ownerLockActive(): Promise<boolean> {
+  const g = await db.guardState.findUnique({ where: { id: 'singleton' } });
+  return g ? g.ownerLock === true : true;
+}
+
 // Agent Bearer token → AgentNode (updates lastSeenAt).
 export async function agentFrom(req: NextRequest): Promise<{ id: string; name: string; capabilities: string } | null> {
   const h = req.headers.get('authorization') || '';

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { spawn } from "child_process";
+import net from "net";
+import { requireOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +47,22 @@ async function dexAlive(): Promise<boolean> {
   }
 }
 
-function spawnDex(): boolean {
+// FIX(Roast-63 · HIGH): מניעת-split-brain — next dev שנדחף-על-פורט-תפוס-עולה-אוטומטית
+// ל-3011 = דמון-זומבי-עם-מנוע-משלו. חייב-בדיקת-תפוסה-אמיתית (TCP) לפני-שגר,
+// כי dexAlive() מקבל-false-שקרי-בזמן-קומפילציה (4s-timeout).
+function dexPortBusy(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = net.createConnection({ port: 3010, host: '127.0.0.1' });
+    const done = (v: boolean) => { s.destroy(); resolve(v); };
+    s.once('connect', () => done(true));
+    s.once('error', () => done(false));
+    setTimeout(() => done(false), 900).unref?.();
+  });
+}
+
+async function spawnDex(): Promise<boolean> {
+  // פורט-תפוס = תהליך-קיים (גם-אם-מתקמפל) — אל-תשגר-כפילות
+  if (await dexPortBusy()) return false;
   try {
     const child = spawn(
       "bash",
@@ -52,6 +70,8 @@ function spawnDex(): boolean {
       { detached: true, stdio: "ignore", cwd: DEX_DIR },
     );
     child.unref();
+    // אימות-לאחר-שגר: אם-הפורט-לא-עלה-תוך-~8ש׳ וגם-לא-היה-תפוס — דווח-כנה
+    setTimeout(() => { void dexPortBusy(); }, 8_000)?.unref?.();
     return true;
   } catch {
     return false;
@@ -64,7 +84,7 @@ async function ensureAlive(): Promise<{ ok: boolean; revived: boolean }> {
   r.lastCheck = Date.now();
   r.lastOk = alive;
   if (alive) return { ok: true, revived: false };
-  const spawned = spawnDex();
+  const spawned = await spawnDex();
   if (spawned) {
     r.revivals++;
     r.lastRevivalAt = Date.now();
@@ -72,7 +92,8 @@ async function ensureAlive(): Promise<{ ok: boolean; revived: boolean }> {
     // נותנים-לשרת לקום — בדיקה-חוזרת-אחרי-20 שניות לא חוסמת-כאן
     setTimeout(() => void dexAlive().then((ok) => { r.lastOk = ok; if (!ok) r.lastError = "revived-but-not-responding-yet"; }), 20_000).unref?.();
   } else {
-    r.lastError = "spawn-failed";
+    // FIX(Roast-63): כשל-שגר-או-פורט-תפוס-ממילא — לא-זהם-lastError כשזה-תפוס-בריא
+    r.lastError = (await dexPortBusy()) ? "port-busy-but-health-fail" : "spawn-failed";
   }
   return { ok: false, revived: spawned };
 }
@@ -102,7 +123,10 @@ export async function GET() {
   });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // FIX(Roast-63 · M13): השומר-הוא-שער-תהליכים — stop/start-דורשים-owner (היה-פתוח)
+  const owner = await requireOwner(req);
+  if (!owner) return NextResponse.json({ ok: false, error: "owner-only (guardian = שליטה-בתהליכים)" }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as { action?: string };
   if (body.action === "stop") {
     const r = rt();
@@ -111,5 +135,5 @@ export async function POST(req: Request) {
   }
   startWatchdog();
   const res = await ensureAlive();
-  return NextResponse.json({ ok: true, ...res, guardian: rt().revivals });
+  return NextResponse.json({ ...res, ok: true, guardian: rt().revivals }); // FIX: ok-אחרי-...res (היה-נדרס)
 }

@@ -10,7 +10,7 @@ import { wifLooksValid, wifToPublic } from '@/lib/keys';
 import { encryptSecret, fingerprint } from '@/lib/vault';
 import { createSession, SESSION_COOKIE, cookieOptions } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
-import { consumeChallenge, peekChallenge } from '@/app/api/vault/challenge/route';
+import { consumeChallenge, peekChallenge } from '@/lib/siwe'; // FIX(Roast-63 · H8): לא-מקובץ-route
 
 const CHAINS = ['steem', 'hive', 'blurt'] as const;
 type Ch = (typeof CHAINS)[number];

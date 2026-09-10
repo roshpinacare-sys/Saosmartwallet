@@ -47,7 +47,7 @@ html {
 
 body {
   font-family:
-    "Heebo", "Rubik", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew",
+    var(--font-heebo), "Heebo", "Rubik", "Segoe UI", "Arial Hebrew", "Noto Sans Hebrew",
     system-ui, -apple-system, sans-serif;
   background: var(--canvas);
   color: var(--text-1);
@@ -58,7 +58,7 @@ body {
 
 /* data face — every number/address/key lives here */
 .font-data {
-  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-jbmono), "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
@@ -229,7 +229,7 @@ body {
 
 /* number island — every figure in the RTL shell */
 .dx-num {
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: var(--font-jbmono), "JetBrains Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   unicode-bidi: isolate;
   direction: ltr;

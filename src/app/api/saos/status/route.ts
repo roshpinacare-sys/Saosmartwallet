@@ -10,20 +10,28 @@ export async function GET() {
     const rcPct = Number(process.env.HIVE_RC_PCT ?? 0.6);
     const tronEnergy = Number(process.env.TRON_ENERGY ?? 0);
 
-    const [seals, receipts, opCount] = await Promise.all([
+    const [seals, receipts, opCount, latestAnchors] = await Promise.all([
       db.sealRecord.findMany({
         orderBy: { createdAt: "desc" },
         take: 8,
         include: { anchors: true, _count: { select: { leaves: true } } }
       }),
       db.evidenceReceipt.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
-      db.opLog.count()
+      db.opLog.count(),
+      // FIX(Roast-63 · M1): סטטוס-עדכני-פר-רשת מהנתונים-האמת
+      db.anchorTx.findMany({ orderBy: { createdAt: "desc" }, take: 24, select: { network: true, status: true } })
     ]);
+    const lastByNetwork: Record<string, string> = {};
+    for (const a of latestAnchors) if (!(a.network in lastByNetwork)) lastByNetwork[a.network] = a.status;
 
     return NextResponse.json({
       ok: true,
       motto: "אנחנו מנצחים את הבלוקצ'יין",
-      matrix: anchoringMatrix(rcPct, tronEnergy),
+      matrix: anchoringMatrix(rcPct, tronEnergy, {
+        steem: lastByNetwork["STEEM"] ?? null,
+        blurt: lastByNetwork["BLURT"] ?? null,
+        hive: lastByNetwork["HIVE"] ?? null,
+      }),
       historic: HISTORIC_ANCHORS,
       seals: seals.map((s) => ({
         id: s.id,

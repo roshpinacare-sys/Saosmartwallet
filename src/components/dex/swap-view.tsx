@@ -10,6 +10,7 @@ import {
   XCircle, Layers, ShieldCheck, Search, Loader2, Users,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getToken } from '@/components/sv/shared';
 import { Input } from '@/components/ui/input';
 import {
   type World, type RouteQuote, TOKEN_META, TokenMedallion, DEX_ASSETS,
@@ -127,11 +128,13 @@ export function SwapView({ world, online, onNeedAuth }: {
 
   const amountMax = balIn / MU;
   // Task 58 · מחיר-ברירת-מחדל ל-CoW: מחיר-השוק-החי (fair) של-הזוג-הנבחר
+  // FIX(Roast-63 · M4): fair-הוא-µ — השדה-ביחידות-תצוגה (היה-מוזרק-1500µ-כאילו-הוא-"1.5")
   const defaultCowPrice = useMemo(() => {
     const m = (world?.markets ?? []).find(x => x.base === assetIn && x.quote === assetOut)
       ?? (world?.markets ?? []).find(x => x.base === assetOut && x.quote === assetIn);
     if (!m) return 0;
-    return m.base === assetIn ? m.fair : (m.fair > 0 ? Math.floor((MU * MU) / m.fair) : 0);
+    const fairMu = m.base === assetIn ? m.fair : (m.fair > 0 ? Math.floor((MU * MU) / m.fair) : 0);
+    return fairMu / MU;
   }, [world, assetIn, assetOut]);
   const ctaLabel: Record<CtaState, string> = {
     empty: 'הזן סכום',
@@ -494,12 +497,14 @@ function CowPanel({ world, onNeedAuth, defaultBase, defaultQuote, defaultPrice }
     return () => { stop = true; clearTimeout(timer); };
   }, []);
 
-  const priceMu = Math.floor(parseFloat(priceStr) || 0);
+  // FIX(Roast-63 · M4): הקלט-ביחידות-תצוגה → מומר-ל-µ (היה-נבלע-כµ-גולמי: הקלדת-2.5-שלחה-2µ)
+  const priceMu = Math.floor((parseFloat(priceStr) || 0) * MU);
   const amtMu = Math.floor((parseFloat(amtStr) || 0) * MU);
   const estPayMu = priceMu > 0 && amtMu > 0 ? Math.floor((priceMu * amtMu) / MU) : 0;
 
   async function submit(op: string, payload: Record<string, unknown>, tag: string) {
-    onNeedAuth();
+    // FIX(Roast-63 · H6): פתיחת-דיאלוג-התחברות-על-כל-שליחה-גם-כשמחוברים — עכשיו-רק-כשאין-טוקן
+    if (!getToken()) onNeedAuth();
     setBusy(true); setMsg(null);
     try {
       const j = await dxPost('cow', { op, ...payload });

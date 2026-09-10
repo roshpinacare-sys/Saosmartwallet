@@ -988,3 +988,32 @@ Stage Summary:
 - **הכסף-האמת-זורם**: powerdown-חי = 436.7-SP/שבוע ≈ $20/שבוע × 4-שבועות ≈ $80.4-נכנסים-ל-STEEM-נזיל-ב-headcorner — דלק-הגריד-האמת-השבועי; 150-SP-משמשים-RC-לעיגונים (השער-הציבורי-שרד)
 - **המפתחות**: כל-מפתחות-ה-active/posting-של-headcorner-על-STEEM-ו-HIVE-מאומתים-חי-ובשימוש-מוסדי (signAndBroadcast-אחיד); החתימה-על-STEEM-דורשת-את-ה-scalar-ההיסטורי-ה"מוזר" — מתועד-בקוד
 - פתוח: HIVE-HP-18.9-+BLURT-BP-8,463 (powerdown-אפשרי-באותם-מפתחות — החלטת-מפעיל; Blurt-דורש-שיקול-RC-לעיגון-ולמסילה) · מכירת-תשלומי-ה-STEEM-השבועיים-בשוק-חוץ (Binance-דורש-חשבון) · גריד-אוטומטי-שבועי (place-בכל-תשלום)
+
+---
+Task ID: 63
+Agent: main (Z.ai Code)
+Task: "עזוב את זה... חפש בעיות רבות ותקן את כולן, חפש פערים רבים וסדר אותם — מלא פערים בין אמת למציאות — תעשה roast חריף לרשת כדי לחשוף, ותתקן ודחוף"
+
+Work Log:
+- **ROAST מקביל ×3**: שלושה-סוכני-ביקורת-עצמאיים (main-repo · saos-dex · תשתית) סרקו-את-כל-הקבצים — נחשפו ~50 ממצאים. כל-אחד-תוקן-או-תויג-בכנות.
+- **CRITICAL-DEX · הדפסת-כסף-ב-CoW (cow.ts)**: cow_order לא-מחייב-יתרה-בהצבה (רק-נועל-ערבות) — אך-כשל-קשה-בברירת-המחדל-ביצע addBal(+rem) על-שחרור-הנעילה = **הטבעת-יתרות-מהאוויר** (Σbalances-מתנפחת → אודיט-שימור-נכשל → HALT). ה-addBal-נמחק — הכסף-כבר-פנוי.
+- **CRITICAL-DEX · SAOS-"מחיר-חוץ"-מזויף (price-proof+truth)**: מחיר-SAOS-ב-$-חושב-מבריכות-פנימיות-×-STEEM-אמת — כולל-פרמיית-WSTEEM-הפנימית (~×2.5, 150,379-bps-נמדד!) — והוצג-כ"ext-$". שדה-שונה-ל-saosSimUsd*+saosPremiumBps (סימולציה-מוצהרת); בפסק-הדין-SAOS-מקבל-externalPriceUsd=null-כנה.
+- **CRITICAL-DEX · הגשר-משלם-על-64hex-מומצא (bridge.ts)**: claim/release-אימתו-רק-פורמט. עכשיו: **verifyFarTx-אמת** — eth/bsc-eth_getTransactionReceipt (סטטוס+קיום) · steem/hive-get_transaction · tron-gettransactionbyid · sol-getSignatureStatuses — הכל-דרך-fence. בלי-אימות → אין-תשלום-escrow. גם: חתימות-SOL-base58-היו-נחסמות-ע"י-hex64-תוקן.
+- **CRITICAL-MAIN · הכספת-בגיט**: db/custom.db (AES-256-GCM-ciphertexts-של-149-מפתחות!) היה-עקוב-בגיט-ונדחף-ל-GitHub-מאז-הקמת-הריפו. **git rm --cached+gitignore** בוצע-עכשיו (מסמך-היסטוריה: נדרש-purge-ב-filter-repo-החלטת-מפעיל).
+- **HIGH-MAIN · logout-תיאטרון**: הכפתור-ניקה-localStorage-בלבד — ה-Bearer-היה-חי-30-יום. עכשיו-קורא-ל-/api/vault/logout-אמת-ומנקה-קוקי.
+- **HIGH-MAIN · ownerLock-שמר-על-כלום**: הדגל-רק-הוצג! נוסף-ownerLockActive()-ב-auth.ts (fail-closed) ונאכף-ב-seal. seal-היה-כתיבה-גלויה → requireOwner+ownerLock. guardian-stop/revive(spawn!)-ננעלו. GET-kernel/verify-pack-הפסיקו-לכתוב-קבלות (הצפת-שרשרת); verify-pack-עכשיו **מאמת-את-שרשרת-העדויות** (verifyChain-היה-מת-מאז-הלידה).
+- **HIGH-MAIN · SBD-כפול-שקר**: שרת=1$-קשיח ("עוגן-כנה") · קליינט=SBD×STEEM (באג). עכשיו: מחיר-אמת-מהפיד (steem-dollars-ב-CoinGecko+Paprika), עמודה-אחת-קנונית.
+- **HIGH-MAIN · estate-ספירות-דמה**: "149-מפתחות...ERC-20" הייתה-מחרוזת-קבועה — ERC-20/SPL-מעולם-לא-נסרקו-בקוד! עכשיו: ספירות-חיות-מה-DB+entities, והטענות-שאין-להן-מסלול-קוד-מנוסחות-כנה.
+- **HIGH-DEX · SOL-אזעקת-שווא-נרפאה**: "awaiting-finalized-block"-נספר-כ-mismatch → 68-עיגוני-SOL-אמת-סומנו-זיוף, realMoney.ok-לא-יכול-היה-להיות-true. סווג-מחדש-ב-relay+settle. **אחרי-הריסטארט: realMoney.ok=true-בפעם-הראשונה**.
+- **HIGH-DEX · גדר-עקופה**: realmarket.ts-והive-rail.ts-קראו-החוצה-בלי-assertAllowedHost (fence-check-אדום). שני-המודולים-מגודרים + publicnode/bsc-מקובעים → **fence-check-ירוק (18-pinned)**.
+- **HIGH-DEX · GET-/truth-היה-מטבע**: קריאה-ציבורית-כתבה-asset_list+wrap_mint-לגרעין. ההטבעה-עברה-ל-POST-מאומת-operatorAuth; GET-קריאה-בלבד.
+- **חשיפת-הסורקים-המתים**: swap-view.tsx הכיל **שורה-פגומה-בגיט-מאז-58** (`const sg, setMsg]`) — syntax-error-מוסתר-ע"י-ignoreBuildErrors+lint-כבוי! תוקן ל-[msg, setMsg]. בנוסף: destructuring-שגוי-של-session.count (undefined-בריצה), guardian-ok-נדרס, NextRequest-לא-מיובא, {}-לא-טיפוסי-ב-SOL-RPC, BigInt-literals, import.meta.dir. **bunx tsc --noEmit = 0-שגיאות-בשני-הריפו** (בעבר: 10-ב-main).
+- **תוויות-אמת-נוספות**: MEV-EXTRACTED→"MEV-SIMULATION·סים" · פנקס-ההכנסה-מסומן-כסים-פנימי · ale-honesty-השקרית-תוקן (gיבוי=ספר-פנימי, לא-STEEM-אמת) · עיגון-"×5-רשתות"→"עד-5-עם-החיות-בכרטיס" · אנקור-מטריצה-נגזרת-מ-AnchorTx (לא-hardcoded-"anchored") · "ממתין-לשידור"-ל-pending · ladder-SOL-txids-מסומנים-היסטוריים · BLURT-42.28-קבוע→חי · portfolio-b-"שמורה-לא-מומנת" · audit-package-מוגן-בחותמת-קפיאה-כנה (לא-מזויף-כ-byte-identity) · STATUS.md/README-מסונכרנים-ל-1.17.0/38-ops · SIWE→"הוכחת-החזקה" (אין-חתימה-של-digest-מעולם) · devnet→mainnet-explorer-link.
+- **תשתית**: Caddyfile-הפרויקט-ננעל-לוויטליסט (3010/3003 — החי-ב-/app-מחוץ-לריפו, מתועד) · guardian-מנועה-מלשגר-דמון-כפול (port-busy-probe-נגד-split-brain-3011) · relay-מקשיב-127.0.0.1 · .env- chmod 600 · state/*.json-והive-rail-fence-check-ירוקים · תלות-גוססות-הוסרו (tronweb, dhive) · קבצים-מתים-נמחקו (sidebar/overview/sigil/kit/hello-route/tailwind.config-מאובן-v3) · פונטים→next/font (self-hosted, אפס-אזהרות) · prisma-logs-רק-ב-dev.
+- **אימות-חי**: lint=0-0 · tsc=0/0 · fence=ירוק · דפדפן: main+trade+estate+anchors+דקס-קונסולה-רנדר-מלא, CoW-פאנל-חי ("CoW-אצווה-מחיר-שווק-אחיד"), MEV-SIMULATION+SIM-pills+RAILS-5-רנדר, NO-HSCROLL-iPhone-14, קונסולה-נקייה, אפס-500/404-בלוג. truth-מדווח-BACKING-BROKEN-אמת-על-סטייה-ריאלית-של-0.129-BLURT (42,154-חי-מול-42,283-מגובה) — מנוע-האמת-ערני.
+
+Stage Summary:
+- **הרוסט-הזה הוציא-מהארון את-כל-הפערים**: כסף-מדומה-ב-CoW, מחיר-חוץ-פיקטיבי-ל-SAOS, גשר-שמשלם-על-האשים, כספת-מוצפנת-בגיט-ציבורי, כפתור-התנתקות-ריק, שומר-ownerLock-שלא-שמר, וסורקים-מתים-שהסתירו-קוד-שבור-אמיתי-בפרודקשן.
+- **העיקרון-החדש-נאכף בקוד**: אין-GET-עם-side-effect · אין-תשלום-בלי-אימות-שרשרת-חוץ · אין-מספר-שנטען-בלי-מסלול-קוד · אין-טענת-אמת-בלי-ראיה.
+- **פתוח-להחלטת-מפעיל**: (1) purge-היסטוריית-db/custom.db-מגיט (filter-repo משנה-האשים!) (2) טעינת-BLURT-0.129-להחזרת-BACKING-VERIFIED (3) סוד-ה-ה-גיט-היסטוריה: רוטציית-SOVEREIGN_VAULT_SECRET.
+- lint/typecheck/fence/דפדפן — הכל-ירוק. שני-הריפו-נדחפים.

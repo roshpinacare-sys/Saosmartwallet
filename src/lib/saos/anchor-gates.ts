@@ -71,25 +71,40 @@ export function hiveRcRecoveryPlan(currentPct: number): HiveRcPlan {
   return { currentPct, lightFloorHours: Number(lightH.toFixed(1)), heavyFloorHours: Number(heavyH.toFixed(1)), verdict, path };
 }
 
-/** the full anchoring matrix as the platform sees it today */
-export function anchoringMatrix(rcPct: number, tronEnergy: number): ChainGate[] {
+/**
+ * FIX(Roast-63 · M1): המטריצה-חיה-מהנתונים — סטטוס-STEEM/BLURT נגזר-משורות-
+ * AnchorTx-האחרונות (היה-מקודד-קשיח-"anchored"-מעל-שורות-אמת-שאמרו-"pending").
+ * lastStatus יכול-להיות null (אין-רשומות עדיין) → "pending" כנה.
+ * הדמון-הריבוני (saos-dex :3010) משדר-STEEM/HIVE בפועל ממפתחות-הפעיל —
+ * הסטטוס-האמת-שלהם-מתפרסם-בכרטיס-Real-Money של-ה-DEX; המטריצה-הזו משקפת-
+ * את-העיגונים-של-הפלטפורמה-הזו (SealRecord/AnchorTx).
+ */
+export function anchoringMatrix(
+  rcPct: number,
+  tronEnergy: number,
+  lastStatus?: { steem?: string | null; blurt?: string | null; hive?: string | null },
+): ChainGate[] {
+  const fromTx = (s?: string | null): "anchored" | "pending" | "gated" =>
+    s === "anchored" || s === "verified" ? "anchored" : s ? "pending" : "pending";
   const steem: ChainGate = {
     network: "STEEM",
-    status: "anchored",
-    gate: null,
-    detail: "custom_json id=saos.weave.v1 (active, חינם-RC) + קריאת-היסטוריה לאימות",
-    recovery: null
+    status: fromTx(lastStatus?.steem),
+    gate: lastStatus?.steem ? null : "אין-עיגון-מתועד-עדיין (AnchorTx ריק)",
+    detail: "custom_json id=saos.weave.v1 (active, חינם-RC) + קריאת-היסטוריה לאימות · סטטוס-נגזר-מ-AnchorTx-האחרון",
+    recovery: lastStatus?.steem ? null : "הרץ פעימת-עגינה (POST /api/saos/seal) כדי-ליצור-רשומה-ראשונה"
   };
   const blurt: ChainGate = {
     network: "BLURT",
-    status: "anchored",
-    gate: null,
-    detail: `חתימה קנונית ידנית (low-s loop), עמלה ${BLURT_FEE_FORMULA}, cooldown ${BLURT_COOLDOWN_MIN} דק׳ מדוד`,
-    recovery: null
+    status: fromTx(lastStatus?.blurt),
+    gate: lastStatus?.blurt ? null : "אין-עיגון-מתועד-עדיין (AnchorTx ריק)",
+    detail: `חתימה קנונית ידנית (low-s loop), עמלה ${BLURT_FEE_FORMULA}, cooldown ${BLURT_COOLDOWN_MIN} דק׳ מדוד · סטטוס-נגזר-מ-AnchorTx-האחרון`,
+    recovery: lastStatus?.blurt ? null : "הרץ פעימת-עגינה כדי-ליצור-רשומה-ראשונה"
   };
   const hive: ChainGate = {
     network: "HIVE",
-    status: rcPct >= HIVE_RC_FLOOR_LIGHT ? "pending" : "gated",
+    status: lastStatus?.hive === "anchored" || lastStatus?.hive === "verified"
+      ? "anchored"
+      : rcPct >= HIVE_RC_FLOOR_LIGHT ? "pending" : "gated",
     gate: rcPct >= HIVE_RC_FLOOR_LIGHT ? null : `rc-floor(${rcPct}%<${HIVE_RC_FLOOR_LIGHT}%)`,
     detail: "אותה משפחת Graphene — dhive raw sign, chain_id קבוע; הקוד מוכח, החסם הוא RC בלבד",
     recovery:

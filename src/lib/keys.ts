@@ -38,7 +38,8 @@ export function wifFromRot1Seed(masterHex: string, account: string, chain: strin
   const buf = Buffer.concat([payload, check]);
   let num = BigInt('0x' + buf.toString('hex'));
   let out = '';
-  while (num > 0n) { out = B58[Number(num % 58n)] + out; num /= 58n; }
+  const ZERO = BigInt(0), B58N = BigInt(58); // FIX(Roast-63 · H8): literals-0n/58n-דרשו-target>=ES2020 (tsc-נכשל; SWC-סלחן)
+  while (num > ZERO) { out = B58[Number(num % B58N)] + out; num /= B58N; }
   let pad = 0; while (buf[pad] === 0) { out = '1' + out; pad++; }
   return out;
 }

@@ -81,7 +81,7 @@ export function EstateView() {
               {data?.cached && <span className="dx-chip h-6 px-2 text-[9px] text-[color:var(--amber)]">CACHE</span>}
             </div>
             <p className="text-[12px] text-[color:var(--text-2)] max-w-xl leading-relaxed">
-              סריקה-חיה של כל-מה-שהאחוזה מחזיקה בפועל על השרשראות — ראשים, 12 ארנקי-חיילים, 7 רשתות-EVM.
+              סריקה-חיה של כל-מה-שהאחוזה מחזיקה בפועל על השרשראות — ראשים, ארנקי-חיילים, 7 רשתות-EVM (יתרות-נייטיב).
               אפס יתרות-ספר; כל-מספר מ-RPC ציבורי. {data ? <span className="dx-num text-[color:var(--text-3)]" dir="ltr">· {fmtAgo(data.at)}</span> : null}
             </p>
           </div>
@@ -175,17 +175,20 @@ export function EstateView() {
                 const delOut = h.spDelegatedOut ?? h.hpDelegatedOut ?? h.bpDelegatedOut ?? 0;
                 const liquid = h.liquid + (h.sbd ?? 0);
                 const price = p(chain);
+                // FIX(Roast-63 · H4): SBD-היה-מוכפל-במחיר-STEEM (שגיאה) — עכשיו-מחיר-אמת-משלו מהפיד
+                const sbdPrice = chain === 'steem' ? p('sbd') : 0;
+                const liquidUsd = (price * h.liquid) + (sbdPrice * (h.sbd ?? 0));
                 return (
                   <div key={chain} className="dx-raised rounded-xl p-3.5">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[12px] font-bold uppercase tracking-wide">{chain}</span>
-                      <span className="dx-chip h-5 px-1.5 text-[9px] dx-num" dir="ltr">{price ? `$${price.toPrecision(4)}` : 'אין-מחיר'}</span>
+                      <span className="dx-chip h-5 px-1.5 text-[9px] dx-num" dir="ltr">{price ? `$${price.toPrecision(4)}` : 'אין-מחיר-חוץ (לא-נכלל-בסה״כ)'}</span>
                     </div>
                     <div className="space-y-1 text-[11px] dx-num" dir="ltr">
                       <div className="flex justify-between"><span className="text-[color:var(--text-3)] font-sans">liquid</span><span className="font-bold">{h.liquid.toFixed(3)} {chain === 'steem' ? `+ ${h.sbd?.toFixed(2)} SBD` : ''}</span></div>
                       <div className="flex justify-between"><span className="text-[color:var(--text-3)] font-sans">vested own</span><span className="text-[color:var(--amber)]">{vested.toFixed(2)} {chain === 'hive' ? 'HP' : chain === 'blurt' ? 'BP' : 'SP'}</span></div>
                       {delOut > 0 && <div className="flex justify-between"><span className="text-[color:var(--text-3)] font-sans">delegated out</span><span>{delOut.toFixed(2)}</span></div>}
-                      <div className="flex justify-between border-t border-[color:var(--line)] pt-1"><span className="text-[color:var(--text-3)] font-sans">USD liquid</span><span className="font-bold text-[color:var(--green)]">{usd(price * (h.liquid + (chain === 'steem' ? (h.sbd ?? 0) : 0)))}</span></div>
+                      <div className="flex justify-between border-t border-[color:var(--line)] pt-1"><span className="text-[color:var(--text-3)] font-sans">USD liquid</span><span className="font-bold text-[color:var(--green)]">{usd(liquidUsd)}</span></div>
                       <div className="flex justify-between"><span className="text-[color:var(--text-3)] font-sans">USD vested</span><span className="text-[color:var(--amber)]">{usd(price * vested)}</span></div>
                     </div>
                   </div>
@@ -202,7 +205,7 @@ export function EstateView() {
           </Card>
 
           {/* ארנקי-החיילים */}
-          <Card title="12 ארנקי-החיילים — יתרות חיות בכל-הרשתות" icon={ShieldCheck} testid="estate-wallets">
+          <Card title="ארנקי-החיילים — יתרות-חיות (מוצגים: ארנקים-עם-יתרה)" icon={ShieldCheck} testid="estate-wallets">
             <div className="grid md:grid-cols-2 gap-3">
               <div className="dx-raised rounded-xl p-3.5">
                 <div className="text-[11px] font-bold mb-2 flex items-center justify-between">
@@ -256,7 +259,7 @@ export function EstateView() {
             <div className="mt-3 flex items-start gap-2 text-[10.5px] text-[color:var(--text-3)] leading-relaxed">
               <ArrowUpRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[color:var(--amber)]" />
               <span>
-                המפתחות-הפרטיים של כל-הארנקים נשמרים מוצפנים בכספת (12/12 אומתו מול-הכתובות — מסלול ed25519 ל-SOL, keccak ל-EVM).
+                FIX(Roast-63): המפתחות-הפרטיים נשמרים-מוצפנים-בכספת-וכתובות-הארנקים-נגזרות-מהם-בעת-הסריקה (נגזרת-כתובת = בעלות-מוכחת מבלי-לחשוף-מפתח); טענת-"אימות-חתימה-מלא" לא-נכללת-כאן-יותר כי-אין-לה-מסלול-קוד-בריפו-זה.
                 מסילות-העיגון של Solana ו-Ethereum כבר חיות על ארנק-cashmachine.
               </span>
             </div>
