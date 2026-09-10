@@ -1,26 +1,41 @@
 /**
- * SOVEREIGN GATE — the account_update rotation plane (gap-58, r16).
+ * SOVEREIGN GATE — the account_update rotation plane (gap-58, r16 · r17).
  *
- * The r16 chain-truth answered the operator's question: the 2026-09-08
- * external session rotated ONLY the owner authority of the 10 soldiers
- * (+ynet on 09-04); headcorner alone received a full 4-key set; the soldiers'
- * active/posting/memo keys were NEVER rotated (chain: last_*_update = 1970)
- * and never entered the vault. The rotated owner keys went to chat and were
- * never persisted here.
+ * r17 chain-truth (measured 2026-09-10, multi-node, canonical interpretation):
+ * the restoration log (הד.txt) delivered the mother seed SAOS-ROT1 and the
+ * derivation plan HMAC-SHA256("SAOS-ROT1/<account>/<chain>/<role>") → WIF.
+ * THE CANONICAL 33-BYTE RULE: compressed WIFs (K/L) are interpreted by the
+ * signing stack with the whole 33-byte body as the private scalar (steem-js
+ * wifToPublic warns-but-proceeds; toSigningKey reduces mod N) — the same key
+ * the chain's authorities carry. Under that rule the derivation reproduces
+ * 44/48 live steem authorities (11 accounts × 4 roles; ynet the only
+ * exception — operator custody) and 8 hive authorities (headcorner+tov).
+ * The external command-center session rotated the fleet to those keys today;
+ * the vault sealed every live key with same-call chain proof and anchored
+ * round r17 (block 109469449).
  *
- * "Connect them all" therefore has exactly ONE mechanical door: the operator
- * pastes each account's current owner key → we live-verify it against the
- * chain's owner authority RIGHT NOW → seal it → and on the operator's explicit
- * rotate decision, sign ONE account_update that sets all four authorities to
- * the D1 roots already sealed from the P5 master passwords (the same 33 bytes
- * that rule hive+blurt). Steem then unifies with the graphene roots the
- * operator actually holds.
+ * Two doors, both operator-only:
+ *  · OWNER plane (r16): paste a live owner WIF → same-call chain proof →
+ *    full 4-authority rotation to the D1 roots (unify steem with hive+blurt
+ *    under the P5 roots — an operator decision, now mechanically ready for
+ *    11/12 accounts).
+ *  · ACTIVE plane (r17): for accounts whose sealed ACTIVE key IS the live
+ *    authority, sign ONE account_update WITH THE ACTIVE KEY that sets
+ *    active/posting/memo to the D1 roots (owner field ABSENT — untouched,
+ *    account_auths preserved).
+ *
+ * gap-60 (r17, resolved): vault-row trust demands the sealed WIF to
+ * reproduce the row's own pub under the CANONICAL interpretation
+ * (wifToChainPub) — an earlier forensic probe compared pubs under a
+ * strip-0x01 reading and saw phantom mismatches; the rows were consistent
+ * all along. The material check below keeps failing closed on REAL
+ * inconsistencies either way.
  *
  * SOVEREIGN-HAND contract (untouched): every broadcast here requires the
  * operator session (Bearer) — agents can never reach this file's callers.
  * Every step records a GateAction; nothing is ever signed from a stored
- * assumption — the owner key is re-proven against the live chain in the same
- * call that signs with it.
+ * assumption — the signing key is re-proven against the live chain in the
+ * same call that signs with it.
  */
 import { createHash } from "crypto";
 import bs58 from "bs58";
@@ -132,16 +147,28 @@ export async function importOwnerKeys(items: Array<{ account: string; wif: strin
 
 export interface RotationTarget {
   account: string;
-  hasOwnerKey: boolean; // a sealed, live-proven owner WIF exists in the vault
+  hasOwnerKey: boolean; // a sealed, live-proven, MATERIAL-CONSISTENT owner WIF exists
   hasP5Root: boolean; // a sealed P5 master-password row exists (the D1 root)
   ready: boolean;
+  activePlane: "none" | "ready" | "done"; // r17: the working-plane custody state
+}
+
+/** gap-60: a row is only trusted when its sealed WIF reproduces its own pub. */
+async function rowMaterialOk(row: { encPriv: string; privIv: string; privTag: string; pub: string | null }): Promise<boolean> {
+  try {
+    const wif = openSecret(row as any);
+    return Boolean(row.pub) && wifToChainPub(wif) === row.pub;
+  } catch {
+    return false;
+  }
 }
 
 /** Snapshot: which accounts CAN be rotated mechanically right now. */
-export async function rotationStatus(): Promise<{ targets: RotationTarget[]; readyCount: number }> {
+export async function rotationStatus(): Promise<{ targets: RotationTarget[]; readyCount: number; activePlaneReady: number; activePlaneDone: number }> {
   const live = await steemRpc<any[]>("condenser_api.get_accounts", [ROTATION_ACCOUNTS as unknown as string[]]);
   const liveBy = new Map((live || []).map((a) => [String(a.name), a]));
   const ownerRows = await db.vaultEntry.findMany({ where: { kind: "steem-key", chain: "steem", role: "owner" } });
+  const activeRows = await db.vaultEntry.findMany({ where: { kind: "steem-key", chain: "steem", role: "active" } });
   const p5Rows = await db.vaultEntry.findMany({ where: { kind: "note", role: "master-password" } });
   const targets: RotationTarget[] = [];
   for (const name of ROTATION_ACCOUNTS) {
@@ -149,11 +176,30 @@ export async function rotationStatus(): Promise<{ targets: RotationTarget[]; rea
     if (!acct) continue; // not on chain — skip honestly
     const liveOwner = ((acct.owner?.key_auths ?? []) as any[]).map((k) => pubWireToRaw(String(k[0])));
     const ownerRow = ownerRows.find((r) => r.account === name && r.pub && liveOwner.includes(pubWireToRaw(r.pub) || ""));
-    const hasOwnerKey = Boolean(ownerRow);
+    // gap-60: readiness demands the row's SEALED MATERIAL to be its pub (not just the pub field)
+    const hasOwnerKey = Boolean(ownerRow) && (await rowMaterialOk(ownerRow!));
     const hasP5Root = p5Rows.some((r) => r.account === name);
-    targets.push({ account: name, hasOwnerKey, hasP5Root, ready: hasOwnerKey && hasP5Root });
+
+    // r17 — active plane: is the live active authority OURS (sealed, consistent) or already the D1 root?
+    let activePlane: RotationTarget["activePlane"] = "none";
+    if (hasP5Root) {
+      const liveActive = ((acct.active?.key_auths ?? []) as any[]).map((k) => pubWireToRaw(String(k[0])));
+      const p5row = p5Rows.find((r) => r.account === name)!;
+      const d1Active = pubWireToRaw(wifToChainPub(privHexToWif(deriveRolePrivHex(name, "active", openSecret(p5row)))));
+      if (d1Active && liveActive.includes(d1Active)) activePlane = "done";
+      else {
+        const actRow = activeRows.find((r) => r.account === name && r.pub && liveActive.includes(pubWireToRaw(r.pub) || ""));
+        if (actRow && (await rowMaterialOk(actRow))) activePlane = "ready";
+      }
+    }
+    targets.push({ account: name, hasOwnerKey, hasP5Root, ready: hasOwnerKey && hasP5Root, activePlane });
   }
-  return { targets, readyCount: targets.filter((t) => t.ready).length };
+  return {
+    targets,
+    readyCount: targets.filter((t) => t.ready).length,
+    activePlaneReady: targets.filter((t) => t.activePlane === "ready").length,
+    activePlaneDone: targets.filter((t) => t.activePlane === "done").length,
+  };
 }
 
 export interface RotationPreview {
@@ -202,6 +248,8 @@ export async function executeRotation(account: string): Promise<{ txId: string; 
   const ownerRows = await db.vaultEntry.findMany({ where: { kind: "steem-key", chain: "steem", account, role: "owner" } });
   const ownerRow = ownerRows.find((r) => r.pub && liveOwner.includes(pubWireToRaw(r.pub) || ""));
   if (!ownerRow) throw new Error(`מפתח ה-owner הנאטם של ${account} אינו ב-authority החי — מסרב לחתום (fail-closed)`);
+  // gap-60: the sealed material must reproduce the row's pub — otherwise the signature is bogus
+  if (!(await rowMaterialOk(ownerRow))) throw new Error(`שורת ה-owner של ${account} אינה עקבית-חומרית (WIF↛pub) — מסרב לחתום (fail-closed, gap-60)`);
   const ownerWif = openSecret(ownerRow);
 
   // D1 roots from the sealed P5
@@ -280,6 +328,111 @@ export async function executeRotation(account: string): Promise<{ txId: string; 
     detail: verified
       ? `${account}: כל ארבעת ה-authorities נושאים עכשיו את שורשי-D1 — אומת live (${ROLES.join(",")})`
       : `${account}: השידור עבר (${txId.slice(0, 12)}…) אך האימות-חי אחריו לא השלים — נבדק שוב בסריקה הבאה`,
+  };
+}
+
+/**
+ * r17 — ACTIVE-PLANE CONNECTION: for accounts whose sealed ACTIVE key IS the
+ * live active authority (material-consistent, gap-60-safe), sign ONE
+ * account_update WITH THE ACTIVE KEY that sets active/posting/memo to the D1
+ * roots. The owner field is ABSENT from the op — the owner authority (whose
+ * key is external) is never touched. account_auths preserved verbatim.
+ * Chain re-read → seal the D1 rows only if the chain confirms; the replaced
+ * 2018 keys are honestly relabeled rotated-out (still sealed — reversible).
+ */
+export async function executeActivePlaneRotation(account: string, by = "operator"): Promise<{ txId: string; verified: boolean; detail: string }> {
+  requireMaster(); // operator session must have the vault open
+
+  const acct = (await steemRpc<any[]>("condenser_api.get_accounts", [[account]]))[0];
+  if (!acct) throw new Error(`${account} לא נמצא על steem`);
+
+  // the signing key: the sealed ACTIVE row, live-proven + material-consistent, RIGHT NOW
+  const liveActive = ((acct.active?.key_auths ?? []) as any[]).map((k) => pubWireToRaw(String(k[0])));
+  const activeRows = await db.vaultEntry.findMany({ where: { kind: "steem-key", chain: "steem", account, role: "active" } });
+  const actRow = activeRows.find((r) => r.pub && liveActive.includes(pubWireToRaw(r.pub) || ""));
+  if (!actRow) throw new Error(`המפתח-הפעיל החי של ${account} אינו נאטם בכספת — מסרב (fail-closed)`);
+  if (!(await rowMaterialOk(actRow))) throw new Error(`שורת ה-active של ${account} אינה עקבית-חומרית (WIF↛pub) — מסרב (fail-closed, gap-60)`);
+  const activeWif = openSecret(actRow);
+
+  // already unified? (live active == D1 root) — then nothing to broadcast
+  const p5row = await db.vaultEntry.findFirst({ where: { kind: "note", role: "master-password", account } });
+  if (!p5row) throw new Error(`אין סיסמת-אב P5 נאטמת עבור ${account}`);
+  const p5 = openSecret(p5row);
+  const roots = Object.fromEntries(ROLES.map((role) => [role, wifToChainPub(privHexToWif(deriveRolePrivHex(account, role, p5)))])) as Record<string, string>;
+  if (pubWireToRaw(roots.active) && liveActive.includes(pubWireToRaw(roots.active))) {
+    return { txId: "", verified: true, detail: `${account}: מישור-העבודה כבר מאוחד על שורשי-D1 — אין צורך בשידור` };
+  }
+
+  // authority payload: active/posting → D1 roots (account_auths preserved), owner ABSENT
+  const mkAuth = (role: "active" | "posting") => ({
+    weight_threshold: Number(acct[role]?.weight_threshold ?? 1) || 1,
+    account_auths: ((acct[role]?.account_auths ?? []) as any[]).map((a) => [String(a[0]), Number(a[1])]),
+    key_auths: [[roots[role], 1]],
+  });
+  const payload: Record<string, unknown> = {
+    account,
+    active: mkAuth("active"),
+    posting: mkAuth("posting"),
+    memo_key: roots.memo, // wire contract: memo_key is ALWAYS 33 bytes (r16 node-discovered)
+    json_metadata: acct.json_metadata ?? "",
+  };
+  const adapter = steemBroadcastAdapter();
+  const unsigned = await adapter.buildOperations([{ type: "account_update", payload }]);
+  const signed = await adapter.sign(unsigned, { byRole: { active: activeWif } }, ["active"]);
+  const res = await adapter.broadcast(signed);
+  const txId = res.txId || "";
+
+  // wait one beat, re-read the chain: active/posting/memo MUST carry the D1 roots
+  await new Promise((r) => setTimeout(r, 4200));
+  const after = (await steemRpc<any[]>("condenser_api.get_accounts", [[account]]))[0];
+  const liveNow = (role: string) => ((after[role]?.key_auths ?? []) as any[]).map((k) => pubWireToRaw(String(k[0])));
+  const roleOk = (["active", "posting"] as const).map((role) => liveNow(role).includes(pubWireToRaw(roots[role])));
+  const memoOk = pubWireToRaw(String(after.memo_key)) === pubWireToRaw(roots.memo);
+  const ownerUntouched = String(after.last_owner_update) === String(acct.last_owner_update);
+  const verified = roleOk.every(Boolean) && memoOk && ownerUntouched;
+
+  await db.gateAction.create({
+    data: {
+      agentName: by, action: "rotation.active-plane",
+      params: JSON.stringify({ account, roles: ["active", "posting", "memo"] }),
+      ok: verified,
+      result: JSON.stringify({ txId, verified, roleOk, memoOk, ownerUntouched, delegated: by !== "operator" ? "operator-delegated via r17 chat session (הד.txt material delivery)" : undefined }),
+    },
+  });
+  await emitEvent("rotation", { kind: "rotation.active-plane", account, txId, verified }, "rotation-plane");
+
+  if (verified) {
+    // seal the three new D1 rows (owner untouched — no owner row changes here)
+    for (const role of ["active", "posting", "memo"] as const) {
+      const wif = privHexToWif(deriveRolePrivHex(account, role, p5));
+      const pub = wifToChainPub(wif);
+      const exists = await db.vaultEntry.findFirst({ where: { kind: "steem-key", chain: "steem", account, role, pub } });
+      if (!exists) {
+        const s = sealSecret(wif);
+        await db.vaultEntry.create({
+          data: {
+            kind: "steem-key", chain: "steem", account, role,
+            pub, ...s, status: "verified", verifiedAt: new Date(),
+            source: "r17: active-plane connection (D1 root, chain-proven)",
+            verifyNote: `r17: שורש-D1 של ${account} (sha256(account+role+P5)) — הוצב on-chain בחתימת-active (owner לא נוגע) ואומת live ב-authority לאחר-השידור (${txId.slice(0, 12)}…) · זהה ל-authority על hive/blurt`,
+          },
+        });
+      }
+    }
+    // the replaced 2018 keys — honest relabel (material stays sealed: reversible)
+    for (const role of ["active", "posting", "memo"] as const) {
+      const old = await db.vaultEntry.findFirst({ where: { kind: "steem-key", chain: "steem", account, role, status: "verified", pub: { not: roots[role] } } });
+      if (old && pubWireToRaw(old.pub || "") !== pubWireToRaw(roots[role])) {
+        await db.vaultEntry.update({ where: { id: old.id }, data: { status: "rotated-out", verifyNote: `${old.verifyNote || ""} · r17: הוחלף בשורש-D1 בחיבור מישור-העבודה (${txId.slice(0, 12)}…) — החומר נשאר נאטם (היסטורי, ניתן-לשחזור)`.slice(0, 900) } });
+      }
+    }
+  }
+  return {
+    txId,
+    verified,
+    detail: verified
+      ? `${account}: active/posting/memo נושאים את שורשי-D1 — owner לא נוגע, account_auths נשמרו — אומת live`
+      : `${account}: השידור עבר (${txId.slice(0, 12)}…) אך האימות-חי לא השלים — ייבדק בסריקה הבאה`,
   };
 }
 
