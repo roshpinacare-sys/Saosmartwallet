@@ -65,7 +65,11 @@ export function chainPub(privHex: string, compressed: boolean): string {
 
 /** WIF → 32B private entropy (handles 5… uncompressed and K…/L… compressed). */
 export function wifToPrivHex(wif: string): string {
-  const raw = bs58.decode(wif.trim());
+  // ROAST r4: bs58 v6 decode returns a RAW Uint8Array — `.equals` doesn't
+  // exist (TypeError on every call) and `.toString("hex")` yields a decimal
+  // list, silently corrupting the derived key. Copy into a Buffer first:
+  // real methods, real hex, real checksum verification.
+  const raw = Buffer.from(bs58.decode(wif.trim()));
   if (raw[0] !== 0x80) throw new Error("not a WIF payload");
   const calc = crypto
     .createHash("sha256")

@@ -19,7 +19,7 @@ import {
   type SteemTransaction,
 } from "../../packages/chains/steem/src/transaction";
 import type { ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, VoteOperation } from "../../packages/chains/steem/src/operations";
-import { SerializationError } from "../../packages/chains/steem/src/serializer";
+import { SerializationError, parseAsset } from "../../packages/chains/steem/src/serializer";
 import type { UnsignedTx } from "../../packages/chains/chain-adapter";
 import { steemAdapter } from "./steem-server";
 
@@ -219,14 +219,28 @@ export interface SteemClaimSpec {
 export async function buildSteemClaimTx(spec: SteemClaimSpec): Promise<SocialBuild> {
   const account = spec.account.trim().toLowerCase();
   if (!/^[a-z0-9.\-]{3,16}$/.test(account)) throw new SerializationError("account is not a valid account name");
-  const payload: ClaimRewardBalanceOperation = {
-    account,
+  // ROAST r4: this builder passed raw ASSET STRINGS into finalize() →
+  // serializeTransaction → packAsset, which needs {amount:bigint,precision,symbol}
+  // — every local build died on `i64(undefined)` while the LIVE evidence came
+  // only from the adapter's own toWireOperation path. The local wire path now
+  // parses the same strings into real Assets (same parseAsset, same bytes).
+  const strings = {
     reward_steem: String(spec.rewardSteem),
     reward_sbd: String(spec.rewardSbd),
     reward_vests: String(spec.rewardVests),
   };
   const adapter = steemAdapter();
-  const unsigned = await adapter.buildOperations([{ type: "claim_reward_balance", payload: payload as unknown as Record<string, unknown> }]);
-  const ops: SteemTransaction["operations"] = [{ name: "claim_reward_balance", body: payload }];
+  const unsigned = await adapter.buildOperations([{ type: "claim_reward_balance", payload: { account, ...strings } }]);
+  const ops: SteemTransaction["operations"] = [
+    {
+      name: "claim_reward_balance",
+      body: {
+        account,
+        reward_steem: parseAsset(strings.reward_steem),
+        reward_sbd: parseAsset(strings.reward_sbd),
+        reward_vests: parseAsset(strings.reward_vests),
+      } satisfies ClaimRewardBalanceOperation,
+    },
+  ];
   return finalize(adapter, unsigned, ops);
 }

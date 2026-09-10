@@ -698,8 +698,8 @@ export const MODULES: HarnessModule[] = [
       const [ticker, book, chain] = await Promise.all([m.ticker(), m.orderBook(depth), m.chainStatus()]);
       return {
         ticker: ticker ?? null, chainStatus: chain ?? null,
-        asks: (book?.asks ?? []).slice(0, depth).map((a) => ({ price: a.price, amount: a.amount })),
-        bids: (book?.bids ?? []).slice(0, depth).map((b) => ({ price: b.price, amount: b.amount })),
+        asks: (book?.asks ?? []).slice(0, depth).map((a) => ({ price: a.price, amount: a.steemAmount })),
+        bids: (book?.bids ?? []).slice(0, depth).map((b) => ({ price: b.price, amount: b.steemAmount })),
       };
     },
     cacheKeyOf: (args) => `depth:${Math.min(Math.max(Number(args.depth) || 10, 1), 25)}`,

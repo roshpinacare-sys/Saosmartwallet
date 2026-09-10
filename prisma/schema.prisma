@@ -280,3 +280,81 @@ model GateOrder {
 
   @@index([status, createdAt])
 }
+
+// ── Developer console (ROAST r4: the module claimed "gated with the same
+// discipline as the keys themselves" while its DB models DID NOT EXIST — every
+// POST was a live 500. These models make the discipline REAL.) ──────────────
+model ApiKey {
+  id         String    @id @default(cuid())
+  keyHash    String    @unique // SHA-256(key) — plaintext shown once, never stored
+  prefix     String // first 16 chars — safe to display
+  name       String
+  active     Boolean   @default(true) // revoked = soft delete, usage history kept
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  records  UsageRecord[] // executed-call ledger
+  counters QuotaCounter[] // atomic daily quota reservation
+
+  @@index([createdAt])
+}
+
+model UsageRecord {
+  id        String   @id @default(cuid())
+  keyId     String
+  key       ApiKey   @relation(fields: [keyId], references: [id])
+  endpoint  String
+  outcome   String // PROVEN | FAILED | ERROR — metering follows real work
+  username  String?
+  latencyMs Int
+  createdAt DateTime @default(now())
+
+  @@index([keyId, createdAt])
+  @@index([createdAt])
+}
+
+model AdminCredential {
+  id        String   @id // FIXED singleton id ("admin-primary") — bootstrap-once
+  tokenHash String   @unique // SHA-256 of the admin bearer
+  label     String   @default("bootstrap")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QuotaCounter {
+  id        String   @id // qc_… (client-generated for the atomic upsert)
+  keyId     String
+  key       ApiKey   @relation(fields: [keyId], references: [id])
+  dayUtc    String // "YYYY-MM-DD" — the quota window
+  used      Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([keyId, dayUtc]) // the INSERT..ON CONFLICT contract in api-keys.ts
+}
+
+// ── M2 vault persistence (ROAST r4, continued): vault-stores.ts claimed
+// "per the frozen prisma/schema.prisma models" for VaultState and AuditEvent
+// while NEITHER model existed in the schema — the vault could never persist
+// a byte (STORAGE_FAILURE on every touch). The seam is real now. ────────────
+model VaultState {
+  id          String   @id // singleton row: "vault"
+  stateJson   String // the full sealed VaultState document (keys stay AES-256-GCM envelopes)
+  genesisHash String
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditEvent {
+  id                String  @id
+  seq               Int     @unique // hash-chain ordering — concurrent append must collide here
+  timestamp         BigInt // epoch ms (Int32 overflows)
+  type              String
+  actorJson         String // JSON — metadata-only by construction
+  targetJson        String // JSON — metadata-only by construction
+  result            String // success | failure | blocked
+  reason            String?
+  previousEventHash String
+  eventHash         String
+
+  @@index([seq])
+  @@index([type])
+}

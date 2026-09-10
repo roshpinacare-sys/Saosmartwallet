@@ -1289,3 +1289,22 @@ Stage Summary:
 - הפיד-הפומבי שלנו על steem: אפס עברית בכל 203 הפוסטים שנכתבו בידינו; מה שבלתי-ניתן לתיקון מטבע-השרשרת מוצג בכנות במקום להיספר כ"תוקן".
 - השיעור המתודולוגי: roast תקף גם את כלי-ה-roast עצמם (הסריקה שספרה ריבלוגים, הכלי ששידר עריכות-אפס) — כלי-אימות הם גם קוד שיכול לשקר.
 - קבצים: packages/chains/steem/src/adapter.ts · src/lib/steem-server.ts · src/lib/social/rails-server.ts · src/lib/gate/harness/social.ts · src/lib/steem-social.ts · tools/{roast3-chain-truth,roast3-full-history-scan,roast3-verify-fixes}.ts · tools/remediate-public-feed.ts · docs/roast-audit.md · worklog.md · db/custom.db.
+
+---
+Task ID: 20
+Agent: Z.ai Code (main)
+Task: DEEP-ROAST-AUDIT r4 — "תבדוק שוב ותוודא הכל יותר לעומק ממה שעשית ותתקן יותר טוב ודחוף": רוסט על-הרוסט, אימות מחדש של כל טענות r2/r3, משטחי-התקפה שלא נגעו בהם, תיקון-הכל עם הוכחות, דחיפה.
+
+Work Log:
+- רוסט-על-הרוסט: tools/roast3-verify-fixes.ts הורץ חי — 6/6 txים על-צומת-ציבורי, census 0, immutable-findings כנים; ETH/SOL failover נמצא קיים בקוד (טענה שעמדה); קבצים-קפואים/מפתחות/ריצות-תקועות/mock — כולם נסרקו ועמדו.
+- משטח חדש 1 — שכבת-ה-Gate: כל נקודות-הקצה נסרקו; כל הרגישות מגודרות requireOperator/requireAgent; status פתוח במכוון (מצב-נעילה בלבד).
+- משטח חדש 2 — כספת-M2: 4 נתיבי-מוטציה (policy PUT / networks POST / backup POST+PUT / lock POST) **בלי שום אימות** בזמן שה-docstrings טענו "unlocked session required" — גודרו requireOperator fail-closed; 401 מוכח חי על ארבעתם.
+- משטח חדש 3 — סכימה vs קוד: db.apiKey/usageRecord/adminCredential/quotaCounter **לא היו בסכימה** (מסוף-המפתח: קוד-מת, POST=500 חי מוכח) — ארבעת המודלים נכתבו לפי החוזה בקוד + db push + E2E חי (bootstrap→מפתח→usage); גם VaultState/AuditEvent נכתבו (vault-stores התיימר "frozen schema models" שמעולם לא היו).
+- משטח חדש 4 — טיפוסים: 16 שגיאות tsc קבורות מאחורי tsconfig-רעש — page.tsx (Ep PATCH/PUT, RunDetail-extends-סתירה), loop.ts (run-null ×2 בקלוז'רים, saveRun tokens), run/route (avgMs), key-id.ts (**bs58 v6 Uint8Array: .equals-קריסה + toString("hex") מושחת — שחיתות-מפתח שקטה**), steem-social.ts (**buildSteemClaimTx הזריק strings ל-packAsset — כל בנייה-מקומית מתה; הראיות החיות היו רק מנתיב-ה-adapter**), multichain/social/modules — הכל תוקן; tsconfig ממוקד (examples/skills/engineering excluded); **tsc 0 + lint 0**.
+- הוכחות: tools/roast4-crypto-verify.ts — wifToPrivHex roundtrip אמת + buildSteemClaimTx מקומי מול בנייה-בלתי-תלויה דרך-ה-adapter = **BIT-IDENTICAL 72B**; dev server restart; דפדפן: רנדור מלא 130K תווים, אפס שגיאות, פוטר-צמוד gap=0, גשר גלילה-פנימית, מובייל 390px תקין.
+- docs/roast-audit.md ראונד 4 (פערים 15–17 + הוכחות); worklog עודכן.
+
+Stage Summary:
+- הפער העמוק הפעם לא היה בין "המערכת לרשת" אלא בין "המערכת לטענות-על-עצמה": מסמכי-עדות נכתבו לפני הקוד (סכימה "קפואה" שהמודלים שלה מעולם לא נכתבו), ו-lint-0 סינן את הראיה האמתית (tsc).
+- המצב החי: כל נתיבי-הכספת fail-closed; מסוף-המפתח אמתי מקצה-לקצה; נתיב-ה-claim מאומת בייט-מול-בייט; אפס דליפת-מפתחות; הפיד נקי עם 6 immutable כנים; hive נעולה כלכלית (RC) — מדווח בכנות.
+- קבצים: prisma/schema.prisma (6 מודלים חדשים) · src/app/api/vault/{policy,networks,backup,lock}/route.ts · src/app/page.tsx · src/app/api/gate/run/route.ts · src/lib/gate/harness/{loop,social,modules}.ts · src/lib/gate/key-id.ts · src/lib/steem-social.ts · src/lib/multichain-server.ts · tsconfig.json · tools/{roast4-crypto-verify.ts,roast3-chain-truth.ts,hive-chainid-oracle.ts} · docs/roast-audit.md · worklog.md · db/custom.db.

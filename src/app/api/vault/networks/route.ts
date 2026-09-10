@@ -4,6 +4,11 @@
  * Upsert semantics: update the existing network vault when present, create
  * it otherwise. Amounts stay satoshi strings; requires an unlocked session
  * (security-relevant configuration).
+ *
+ * ROAST r4: the docstring CLAIMED "requires an unlocked session" while the
+ * route verified NOTHING — an unauthenticated caller could rewrite daily
+ * limits, allowed operations or flip a network vault offline the moment the
+ * vault exists. Now gated behind the sovereign operator session, fail-closed.
  */
 
 import { NextResponse } from "next/server";
@@ -11,6 +16,7 @@ import { NextResponse } from "next/server";
 import { VaultError, getVaultRuntime, getInstanceId, mapVaultError, parseSats } from "@/lib/vault-runtime";
 import type { NetworkId, NetworkVaultConfig, UpsertNetworkRequest, UpsertNetworkResponse } from "@/lib/vault-contracts";
 import type { OperationType, StorageKind } from "@/lib/vault-runtime";
+import { requireOperator } from "@/lib/gate/session";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +24,13 @@ const NETWORK_IDS: ReadonlySet<string> = new Set(["steem", "hive", "tron", "blur
 const STORAGE_KINDS: ReadonlySet<string> = new Set(["hot", "cold", "air-gapped"]);
 
 export async function POST(req: Request) {
+  // Fail-closed operator gate — ROAST r4: this route checked nothing at all.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
+
   let body: UpsertNetworkRequest;
   try {
     body = (await req.json()) as UpsertNetworkRequest;
