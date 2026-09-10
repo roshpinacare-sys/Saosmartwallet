@@ -24,6 +24,7 @@
  * messages, leases guard real rows. Zero mock. Fail-closed everywhere —
  * a beat that errors writes the error into its pulse and lives on.
  */
+import { execSync } from "child_process";
 import { db } from "@/lib/db";
 import { masterReady } from "@/lib/gate/crypto";
 import { processRun, buildLessons } from "./loop";
@@ -48,6 +49,13 @@ interface HeartPulse {
   lastTickAt: string;
   beats: number;
   enabled: boolean;
+  // ROAST r8 — live code identity: the fleet once ran for hours on a process
+  // booted BEFORE a fix landed in the tree (14:08/14:10Z mute failures were
+  // processed by pre-r7 code — the 6.1s ladder duration proved it). "The code
+  // is fixed" is not "the running process runs the fix". This stamp is
+  // process-local (never carried across restarts) so the operator can SEE
+  // which code the heart actually executes, right now.
+  boot?: { pid: number; bootedAt: string; codeSha: string };
   counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number };
   loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>;
   error?: string;
@@ -143,18 +151,44 @@ async function stageReap(p: HeartPulse): Promise<void> {
     },
     data: { status: "queued", leaseOwner: null, leaseExpiresAt: null, heartbeatAt: null },
   });
-  // runs that keep dying: past their last allowed attempt → honest failure
-  const exhausted = await db.gateRun.updateMany({
+  // runs that keep dying: past their last allowed attempt → honest failure.
+  // ROAST r8 — this path used to die MUTE: error set, report NULL, no bridge
+  // message. Live proof: run cmtvmw5v (14:40Z) — crashed twice off-process
+  // (sandbox reaper), the exhausted-reaper marked it failed, and the bridge
+  // showed NOTHING. r7's "no run dies mute" only covered the in-process
+  // catch. Every terminal failure path must confess in Hebrew.
+  const exhaustedRows = await db.gateRun.findMany({
     where: { status: "queued", attempt: { gte: 2 }, maxAttempts: { lte: 2 } },
-    data: {
-      status: "failed",
-      error: "watchdog: הרצה קרסה יותר מדי פעמים — הוחזרה לתור ונכשלה בכנות",
-      finishedAt: now,
-    },
+    select: { id: true, agentName: true, goal: true, error: true, attempt: true },
+    take: 20,
   });
+  let exhausted = 0;
+  for (const run of exhaustedRows) {
+    const prevSteps = await db.gateRun.findUnique({ where: { id: run.id }, select: { steps: true } }).then((r) => {
+      try { return r?.steps ? (JSON.parse(r.steps) as unknown[]) : []; } catch { return []; }
+    });
+    const makerDone = prevSteps.filter((s) => (s as { side?: string; ok?: boolean }).side === "maker" && (s as { side?: string; ok?: boolean }).ok).length;
+    await db.gateRun.update({
+      where: { id: run.id },
+      data: {
+        status: "failed",
+        error: "watchdog: הרצה קרסה יותר מדי פעמים — הוחזרה לתור ונכשלה בכנות",
+        report:
+          `🛑 הריצה קרסה ${run.attempt} פעמים והשומר הכריז עליה כישלון סופי. ` +
+          `מטרה: ${String(run.goal).slice(0, 200)}. צעדים שהוכחו לפני הקריסות: ${makerDone}. ` +
+          `השגיאה האחרונה: ${String(run.error || "לא דווח").slice(0, 220)}. ` +
+          `זו כשל-כנה של הסביבה או הפרוטוקול — לא דוח-תוצרים, כי העבודה לא הושלמה.`,
+        finishedAt: new Date(),
+      },
+    });
+    exhausted++;
+    await db.gateMessage.create({
+      data: { channel: "command", fromKind: "system", fromName: "harness", body: `🫀 ריצת-מטרה של ${run.agentName} קרסה ${run.attempt} פעמים ונכשלה סופית — וידוי כן נכתב לדוח שלה`, meta: JSON.stringify({ runId: run.id }) },
+    }).catch(() => {});
+  }
   p.counters.reaped += reaped.count;
-  if (reaped.count || exhausted.count) {
-    p.loops.reaper = { lastAt: now.toISOString(), ok: true, fired: reaped.count };
+  if (reaped.count || exhausted > 0) {
+    p.loops.reaper = { lastAt: now.toISOString(), ok: true, fired: reaped.count + exhausted };
     if (reaped.count) {
       await db.gateMessage.create({
         data: { channel: "command", fromKind: "system", fromName: "harness", body: `🫀 השומר החזיר ${reaped.count} ריצה/ות קרוסות לתור — יוכרו מחדש עם עקבותיהן (התאוששות-מקריסה)`, meta: "{}" },
@@ -610,6 +644,13 @@ export async function tickOnce(): Promise<HeartPulse> {
       if (prev?.counters) p.counters = { ...p.counters, ...prev.counters };
       if (prev?.startedAt) p.startedAt = prev.startedAt;
     } catch { /* fresh start is acceptable */ }
+    // ROAST r8 — live code identity (process-local, never carried across boots):
+    // the operator must always be able to answer "WHICH code is the running
+    // heart executing?" — the mute failures at 14:08/14:10Z happened because
+    // nothing could answer that question.
+    let codeSha = "unknown";
+    try { codeSha = execSync("git rev-parse --short HEAD", { cwd: process.cwd(), timeout: 4_000 }).toString().trim() || "unknown"; } catch { /* sandbox without git — stamp stays "unknown" */ }
+    p.boot = { pid: process.pid, bootedAt: new Date().toISOString(), codeSha };
   }
   p.lastTickAt = new Date().toISOString();
   p.beats++;

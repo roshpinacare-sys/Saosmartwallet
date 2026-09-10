@@ -88,7 +88,15 @@ async function main() {
       breach++;
       console.log(`❌ ${e.id} encPriv is NOT pure hex (len=${e.encPriv.length}, head=${e.encPriv.slice(0, 10)}…) — PLAINTEXT MATERIAL IN STORAGE`);
     }
-    if (e.encPriv.toLowerCase().includes(DEV_FAUCET_WIF.toLowerCase()) || (e.encPriv && WIF_RE.test(e.encPriv))) {
+    // ROAST r8 — the r7 "literal→env" fix reintroduced a 100% FALSE-POSITIVE
+    // oracle here: with DEV_FAUCET_WIF unset, includes("") is ALWAYS true, so
+    // every vault entry was flagged "contains WIF-shaped material" (97/97
+    // breaches, all fake — alarm fatigue that would mask a REAL leak). The
+    // honest behavior the r7 comment promised: skip when the env is absent.
+    if (
+      DEV_FAUCET_WIF &&
+      (e.encPriv.toLowerCase().includes(DEV_FAUCET_WIF.toLowerCase()) || (e.encPriv && WIF_RE.test(e.encPriv)))
+    ) {
       breach++;
       console.log(`❌ ${e.id} encPriv contains WIF-shaped material`);
     }
