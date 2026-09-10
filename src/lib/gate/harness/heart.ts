@@ -711,6 +711,38 @@ async function ensureTriggerPolicy(): Promise<void> {
       },
     });
   }
+  /* ── the treasurer — one daily REWARDS duty, full autonomy ──
+   * The fleet must harvest what it EARNED: pending rewards sit stuck in the
+   * wallet until a signed claim_reward_balance moves them (the exact reason
+   * "יש תגמול בארנק ואי אפשר לממש אותו"). Census first, claim per account
+   * with live pending, honest report. Bounded 1/day. */
+  const treasurerLabels = new Set(
+    (await db.gateSchedule.findMany({ where: { label: { startsWith: "treasurer:" } }, select: { agentName: true } })).map((s) => s.agentName),
+  );
+  const treasurerMeans = JSON.stringify([
+    "steem.rewards חי נקרא — הסקר החוזר על כל הצי (כמה חשבונות, כמה ממתין בכל אחד)",
+    "לכל חשבון עם ממתינים ומפתח בכספת: steem.claim בוצע עם txId אמיתי — או נימוק כן מדוע לא (אין מפתח / אין ממתינים)",
+    "דוח עברית קצר לגשר-הפיקוד: סה״כ נקצר היום + txIds, ומה נשאר תקוע ולמה",
+  ]);
+  if (armed.length && !treasurerLabels.has(armed[0].name)) {
+    await db.gateSchedule.create({
+      data: {
+        label: `treasurer:${armed[0].name}`,
+        agentName: armed[0].name,
+        goal:
+          "תור-הגזבר היומי: אתה האוצר של הרשת היום. (1) steem.rewards — סקר חי של התגמולים הממתינים בכל חשבונות-הצי. " +
+          "(2) לכל חשבון שיש לו תגמולים ממתינים ומפתח-posting בכספת — בצע steem.claim (החשבון המבוקש בפרמטר account); " +
+          "אל תנסה חשבון שאין לו מפתח או שאין לו ממתינים — קבל את התשובה הכנה ועבור הלאה. " +
+          "(3) דווח לגשר בעברית: כמה נקצר (STEEM/SBD/VESTS לכל חשבון), ה-txIds, ומה נשאר. " +
+          "הערה-מדיניות: תביעה מזיזה את התגמול ליתרות בפועל — היא לא מוכרת ולא מזיזה כספים בין חשבונות (זו סמכות-active, לא שלך).",
+        doneMeans: treasurerMeans,
+        budget: 7,
+        kind: "daily",
+        hourUtc: 5, // early sweep — the day's earnings from yesterday get harvested first
+        maxPerDay: 1,
+      },
+    });
+  }
   const existing = await db.gateTrigger.findMany({ where: { on: "message.mentions" }, select: { agentName: true } });
   const have = new Set(existing.map((t) => t.agentName));
   const mentionMeans = JSON.stringify([

@@ -19,7 +19,7 @@
 import { db } from "@/lib/db";
 import { requireMaster, openSecret, GateError } from "@/lib/gate/crypto";
 import { steemBroadcastAdapter } from "@/lib/steem-server";
-import { buildSteemPostTx, buildSteemVoteTx, buildSteemFollowTx, buildSteemReblogTx, type SocialBuild } from "@/lib/steem-social";
+import { buildSteemPostTx, buildSteemVoteTx, buildSteemFollowTx, buildSteemReblogTx, buildSteemClaimTx, type SocialBuild } from "@/lib/steem-social";
 import { PrivateKey } from "../../../../packages/crypto/src/index";
 import { toSigningKey, COMMANDER_ACCOUNT } from "./orders";
 import { assertPublishable, scanExposure } from "./exposure";
@@ -38,6 +38,7 @@ export const SOCIAL_RAILS = {
   maxPostsPerDay: 4, // fleet-wide real publications per UTC day
   maxInteractionsPerDay: 12, // votes + follows + reblogs combined per UTC day
   maxEditsPerDay: 8, // fixing exposed/wrong content is a duty, not spam — but bounded
+  maxClaimsPerDay: 16, // harvesting what the fleet EARNED — bounded diligence, not greed
   maxVoteWeight: 2000, // ≤ 20% — the fleet votes with conviction, never spam
   maxPostBodyChars: 20000,
   maxTags: 5,
@@ -415,4 +416,187 @@ export async function interactFromAgent(input: {
   });
   await socialMsg(`🤝 ${input.agentName} פעל ברשת: ${detail} · txId: ${txId}`, { action: input.action, txId, runId: input.runId });
   return { kind: kind!, txId, blockNum, detail };
+}
+
+/* ══════════════ SOVEREIGN-TREASURY — the fleet harvests what it EARNED ══════════════
+ *
+ * How Steem rewards actually work (the doctrine behind this code):
+ *   · author + curation payouts accrue into reward_steem / reward_sbd /
+ *     reward_vests — PENDING balances visible in the wallet but NOT spendable;
+ *   · until a claim_reward_balance op moves them into balance / sbd_balance /
+ *     vesting_shares, nobody can transfer or power them anywhere — this is why
+ *     "יש תגמול בארנק ואי אפשר לממש אותו"; the missing step is the CLAIM;
+ *   · the chain itself allows the POSTING key to claim (never funds authority).
+ * Census is read-only truth; the claim is a real signed tx with chain evidence.
+ */
+
+const STEEM_NODE = "https://api.steemit.com";
+
+async function steemRpc<T>(method: string, params: unknown[]): Promise<T> {
+  const res = await fetch(STEEM_NODE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  const j = (await res.json()) as { result?: T; error?: { message?: string } };
+  if (j.error) throw new GateError("rpc-error", `Steem RPC נכשל: ${j.error.message ?? "unknown"}`);
+  return j.result as T;
+}
+
+interface RawAccount {
+  name: string;
+  reward_steem_balance: string;
+  reward_sbd_balance: string;
+  reward_vesting_balance: string;
+  reward_vesting_steem: string;
+  balance: string;
+  sbd_balance: string;
+  vesting_shares: string;
+}
+
+function num(s: string): number {
+  return parseFloat(String(s).split(" ")[0]) || 0;
+}
+
+export interface FleetRewardRow {
+  account: string;
+  rewardSteem: string;
+  rewardSbd: string;
+  rewardVests: string;
+  steemEquiv: number; // pending STEEM + vests component (reward_vesting_steem)
+  claimable: boolean; // vault holds a live posting key for this account on steem
+  balance: string;
+  sbdBalance: string;
+  vestingShares: string;
+}
+
+export interface FleetRewardsCensus {
+  accounts: FleetRewardRow[];
+  unclaimedCount: number;
+  totalSteemEquiv: number;
+  summary: string;
+}
+
+/**
+ * The live reward census across the WHOLE fleet — "כמה כל חשבון צבר ומה ממתין
+ * לתביעה". Read-only, no keys touched, honest about which accounts we can
+ * actually claim for (posting key in the vault).
+ */
+export async function fleetRewardsCensus(): Promise<FleetRewardsCensus> {
+  const vaultRows = await db.vaultEntry.findMany({
+    where: { chain: "steem", role: "posting", status: "verified" },
+    select: { account: true },
+  });
+  const claimable = new Set(vaultRows.map((r) => r.account));
+  const accounts = [...claimable]; // census the accounts we can act on — no dead weight
+  if (accounts.length === 0) throw new GateError("vault-missing-key", "אין בכספת מפתחות-posting מאומתים על steem — אין למי לתבוע");
+  const raw = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [accounts]);
+  const rows: FleetRewardRow[] = raw.map((a) => ({
+    account: a.name,
+    rewardSteem: a.reward_steem_balance,
+    rewardSbd: a.reward_sbd_balance,
+    rewardVests: a.reward_vesting_balance,
+    steemEquiv: num(a.reward_steem_balance) + num(a.reward_vesting_steem),
+    claimable: claimable.has(a.name),
+    balance: a.balance,
+    sbdBalance: a.sbd_balance,
+    vestingShares: a.vesting_shares,
+  }));
+  rows.sort((x, y) => y.steemEquiv - x.steemEquiv);
+  const unclaimed = rows.filter((r) => num(r.rewardSteem) > 0 || num(r.rewardSbd) > 0 || num(r.rewardVests) > 0);
+  const total = rows.reduce((acc, r) => acc + r.steemEquiv, 0);
+  return {
+    accounts: rows,
+    unclaimedCount: unclaimed.length,
+    totalSteemEquiv: total,
+    summary:
+      unclaimed.length === 0
+        ? `סקר-תגמולים חי: ${rows.length} חשבונות נבדקו — אין תגמולים ממתינים לתביעה באף חשבון`
+        : `סקר-תגמולים חי: ${unclaimed.length}/${rows.length} חשבונות מחזיקים תגמולים שלא נתבעו (${total.toFixed(3)} STEEM שקול) — ${unclaimed.map((u) => u.account).join(", ")} · תביעה = claim_reward_balance חתום (steem.claim)`,
+  };
+}
+
+export interface VoiceClaimResult {
+  account: string;
+  claimed: { steem: string; sbd: string; vests: string };
+  txId: string;
+  blockNum?: number;
+  verified: boolean; // live re-read AFTER broadcast: pending rewards are gone
+}
+
+/** Vault posting key of ANY fleet account (steem) — never taken from agent input paths blindly. */
+async function postingKeyFor(account: string): Promise<PrivateKey> {
+  requireMaster();
+  const entry = await db.vaultEntry.findFirst({
+    where: { chain: "steem", account, role: "posting" },
+    orderBy: { updatedAt: "desc" },
+  });
+  if (!entry) throw new GateError("vault-missing-key", `אין מפתח-posting של @${account} בכספת — אי אפשר לתבוע בשמו`);
+  const wif = openSecret({ encPriv: entry.encPriv, privIv: entry.privIv, privTag: entry.privTag });
+  return toSigningKey(wif);
+}
+
+/**
+ * CLAIM pending rewards for a fleet account — the missing step between "יש
+ * תגמול בארנק" and כסף/כוח בפועל. Reads the LIVE pending amounts (never trusts
+ * the caller's numbers), refuses zero claims, proves the vault key against the
+ * chain, broadcasts, then RE-READS the account to verify the harvest.
+ */
+export async function claimRewardsFromAgent(input: {
+  agentName: string;
+  runId: string;
+  account?: string;
+}): Promise<VoiceClaimResult> {
+  const today = await dayCount("sovereign-voice:claim");
+  if (today >= SOCIAL_RAILS.maxClaimsPerDay) {
+    throw new GateError("rate-limited", `תקרת-התביעות היומית מוצו (${today}/${SOCIAL_RAILS.maxClaimsPerDay})`);
+  }
+  const account = String(input.account || COMMANDER_ACCOUNT).trim().toLowerCase().replace(/^@/, "");
+  if (!/^[a-z0-9.\-]{3,16}$/.test(account)) throw new GateError("bad-input", "שם-חשבון לא תקין");
+
+  // live pending rewards — the chain's numbers, never the caller's
+  const [raw] = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [[account]]);
+  if (!raw) throw new GateError("no-account", `החשבון @${account} לא נמצא בשרשרת`);
+  const rewardSteem = raw.reward_steem_balance;
+  const rewardSbd = raw.reward_sbd_balance;
+  const rewardVests = raw.reward_vesting_balance;
+  if (num(rewardSteem) === 0 && num(rewardSbd) === 0 && num(rewardVests) === 0) {
+    throw new GateError("nothing-to-claim", `ל@${account} אין תגמולים ממתינים — אין מה לתבוע (זו תשובה כנה, לא כשל)`);
+  }
+
+  const priv = await postingKeyFor(account);
+  // fail-closed: the vault key must be the account's CURRENT posting authority
+  const proof = await verifyPostingKeyOnChain("steem", account, { pub33: priv.publicKey.bytes });
+  if (!proof.match) {
+    throw new GateError(
+      "rail-key-mismatch",
+      `מפתח הכספת של @${account} אינו הסמכות הנוכחית בשרשרת (chain: ${proof.chainPub ?? "—"}) — התביעה נחסמת`,
+    );
+  }
+
+  const built = await buildSteemClaimTx({ account, rewardSteem, rewardSbd, rewardVests });
+  const adapter = steemBroadcastAdapter();
+  try {
+    const signed = await adapter.sign(built.unsigned, { byRole: { posting: priv } }, ["posting"]);
+    const res = await adapter.broadcast(signed);
+    const txId = res.txId || built.txId;
+    await audit(`sovereign-voice:claim`, input.agentName, { account, rewardSteem, rewardSbd, rewardVests }, true, { txId, blockNum: res.blockNum ?? null });
+
+    // verification: the chain itself must now report zero pending
+    const [after] = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [[account]]);
+    const verified =
+      !!after && num(after.reward_steem_balance) === 0 && num(after.reward_sbd_balance) === 0 && num(after.reward_vesting_balance) === 0;
+    await socialMsg(
+      `🪙 ${input.agentName} תבע את התגמולים של @${account}: ${rewardSteem} + ${rewardSbd} + ${rewardVests} · txId: ${txId}` +
+        (verified ? " · אומת חי: הממתינים התאפסו" : " · האימות החי עדיין מציג ממתינים (הצומת מתעדכן)"),
+      { account, txId, runId: input.runId },
+    );
+    return { account, claimed: { steem: rewardSteem, sbd: rewardSbd, vests: rewardVests }, txId, blockNum: res.blockNum, verified };
+  } catch (e) {
+    const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300);
+    await audit(`sovereign-voice:claim`, input.agentName, { account, rewardSteem, rewardSbd, rewardVests }, false, { error: msg });
+    await socialMsg(`❌ תביעת-תגמולים של @${account} נכשלה: ${msg} — נרשם בכנות`, {}).catch(() => {});
+    throw new GateError("broadcast-failed", `התביעה נכשלה: ${msg}`);
+  }
 }

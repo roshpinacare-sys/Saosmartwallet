@@ -1187,3 +1187,24 @@ Stage Summary:
 - רב-מסילות אמיתי: steem חי מלא · hive קריפטוגרפית-חיה (chain-id הוכח באורקל חתימות; דורש הטבעה/האצלת HP) · blurt כנה-סגור · LEO=תגית-hive בדוקטרינה.
 - הלב מנהל את זה יום-יום: builder v2 (מדיניות+אל-תשכפל) + עורך יומי. המחסן 27 מודולים.
 - קבצים: src/lib/gate/harness/{exposure,social,modules,heart}.ts · src/lib/social/rails-server.ts · src/lib/steem-social.ts · docs/publishing-network.md · docs/autonomy-audit.md · tools/hive-chainid-oracle.ts · worklog.md · db/custom.db.
+
+---
+Task ID: 15
+Agent: Z.ai Code (main)
+Task: SOVEREIGN-TREASURY — מנוע תגמולים אוטונומי (התגמול התקוע בארנק נקצר) + שער-פתוח בטוקן + תורת-ניתוב-שפה (עברית בפנים/אנגלית בחוץ).
+
+Work Log:
+- סיור: קמפוס 12 חשבונות-הצי בשרשרת — רק headcorner מחזיק תגמולים לא-נתבעים (0.156 STEEM + 1401.361689 VESTS ≈ 1.023 STEEM שקול); 11 מפתחות-posting בכספת (steem) + headcorner (hive); hive ללא ממתינים.
+- oracle חי: claim_reward_balance נבנה ב-packer ונבדק מול condenser_api.get_transaction_hex — ה-oracle תפס שטבלת OP_IDS הייתה מוסטת ב-1 בטווח 32..50 (מוזרות-לגאציה של תגי-גרפין); תוקן עם 4 וקטורי-ראיה מהצומת (transfer_to_savings=32, claim=39, delegate=40, account_update2=43); התאמה ביטית מלאה (73B).
+- packages/chains/steem: ClaimRewardBalanceOperation (pack+unpack) + validateClaimRewardPayload (סמלים/דיוקים chain-exact, איסור-תביעת-אפס) + toWireOperation.
+- steem-social: buildSteemClaimTx (wire-exact, oracle-מחתים).
+- harness/social: fleetRewardsCensus (סקר חי + claimable לפי כספת) + claimRewardsFromAgent (קריאת-ממתינים מהשרשרת בלבד, אימות-מפתח מול-השרשרת, שידור, קריאה-חוזרת לאימות-איפוס) + תקרה יומית 16.
+- modules: +steem.rewards (connector) +steem.claim (actor) — סדר-הכוחות 27→29.
+- heart: תור-הגזבר היומי (treasurer:) — סקר→תביעה לכל מי שיש לו ממתינים ומפתח→דוח עברית לגשר.
+- שער-פתוח: POST/GET /api/gate/session (סולם-הצתה כן: master בזיכרון → קובץ-טוקן /tmp/gate_token → טוקן-המבקש; לעולם לא ממציא master) + UI נכנס אוטומטית בטוקן בלי מפתח.
+- docs/rewards-doctrine.md: מנגנון-התגמולים המלא מנתונים חיים + ניתוב-שפה (עברית פנימה, אנגלית החוצה) + SEO + חשיבה-גדולה (קומפאונד, מיפוי-השאלות 5.58M VESTS, רב-מסילה, DEX).
+
+Stage Summary:
+- הסיבה האמיתית ל"תגמול תקוע" הוסברה ונפתרה בקוד: ממתינים דורשים claim_reward_balance חתום — עכשיו יש פרימיטיב מוכח-ביטים + אוטומציה יומית.
+- אין סינית ב-UI (סריקת-CJK נקייה); כל הדוחות למפעיל בעברית, כל התוכן-החוצה באנגלית.
+- המשך פתוח-כנה: hive-claim לא מומש (אין ממתינים שם ולא נבדק שידור); תביעות מקצירות בלבד — מכירה/power-up נשארים סמכות-active של המפעיל.

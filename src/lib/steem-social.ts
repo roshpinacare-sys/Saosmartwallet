@@ -19,7 +19,7 @@ import {
   STEEM_CHAIN_ID,
   type SteemTransaction,
 } from "../../packages/chains/steem/src/transaction";
-import type { CommentOperation, CustomJsonOperation, VoteOperation } from "../../packages/chains/steem/src/operations";
+import type { ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, VoteOperation } from "../../packages/chains/steem/src/operations";
 import { SerializationError } from "../../packages/chains/steem/src/serializer";
 import type { UnsignedTx } from "../../packages/chains/chain-adapter";
 import { steemAdapter } from "./steem-server";
@@ -195,4 +195,34 @@ export async function buildSteemReblogTx(spec: { account: string; author: string
   const author = spec.author.trim().toLowerCase();
   const permlink = assertPermlink(spec.permlink, "permlink");
   return buildSteemCustomJsonTx({ account, id: "reblog", json: ["reblog", { account, author, permlink }] });
+}
+
+export interface SteemClaimSpec {
+  account: string;
+  rewardSteem: string; // "0.156 STEEM" — 3dp
+  rewardSbd: string; // "0.000 SBD" — 3dp
+  rewardVests: string; // "1401.361689 VESTS" — 6dp
+}
+
+/**
+ * claim_reward_balance (SOVEREIGN-TREASURY) — harvests the account's PENDING
+ * author/curation rewards into its spendable/staked balances. Posting-authority
+ * op by the chain's own design — the agents' hands can pick what they grew.
+ * Wire-exactness oracle-proven: our packer vs condenser_api.get_transaction_hex
+ * → bit-identical 73B tx (op-id 39; the legacy-tag table shift was caught and
+ * fixed by this very oracle, 2026-09-10).
+ */
+export async function buildSteemClaimTx(spec: SteemClaimSpec): Promise<SocialBuild> {
+  const account = spec.account.trim().toLowerCase();
+  if (!/^[a-z0-9.\-]{3,16}$/.test(account)) throw new SerializationError("account is not a valid account name");
+  const payload: ClaimRewardBalanceOperation = {
+    account,
+    reward_steem: String(spec.rewardSteem),
+    reward_sbd: String(spec.rewardSbd),
+    reward_vests: String(spec.rewardVests),
+  };
+  const adapter = steemAdapter();
+  const unsigned = await adapter.buildOperations([{ type: "claim_reward_balance", payload: payload as unknown as Record<string, unknown> }]);
+  const ops: SteemTransaction["operations"] = [{ name: "claim_reward_balance", body: payload }];
+  return finalize(adapter, unsigned, ops);
 }
