@@ -322,29 +322,54 @@ function TapePanel({ world }: { world: World | null }) {
 function ArenaPanel({ world }: { world: World | null }) {
   const arena = world?.arena;
   if (!arena) return null;
+  // FIX(Roast-70 · gas-truth): האמת-על-הדלק — החיילים-היו-מוצגים-עם-PnL-אך-המנוע-דחה-את-הפקודות-שלהם
+  // (insufficient-credits). עכשיו: credits-חיים-פר-חייל + דחיות-הבלוק-האחרון + מיכל-הגז. אפס-תיאטרון.
+  const creditOf = (name: string): number => world?.wallets.find(w => w.name === name)?.credits ?? 0;
+  const rejected = world?.state.rejectedLast;
+  const gasFunded = world?.state.gasFundedMu ?? 0;
   return (
     <div className="dx-card p-4" data-testid="arena-panel">
       <div className="text-[11px] label-caps mb-2 flex items-center gap-1.5">
         <Swords className="w-3 h-3" /> ארנת עשיית-השוק · {arena.params.enabled ? 'פעילה' : 'כבויה'}
       </div>
       <div className="space-y-2">
-        {arena.soldiers.map(s => (
-          <div key={s.name} className="dx-raised p-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold dx-num">{s.name}</span>
-              <span className={`dx-num ${(s.pnl || 0) >= 0 ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>
-                {(s.pnl >= 0 ? '+' : '') + fmtMu(s.pnl)}
-              </span>
+        {arena.soldiers.map(s => {
+          const cr = creditOf(s.name);
+          const starving = cr < 100;
+          return (
+            <div key={s.name} className="dx-raised p-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold dx-num">{s.name}</span>
+                <span className={`dx-num ${(s.pnl || 0) >= 0 ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>
+                  {(s.pnl >= 0 ? '+' : '') + fmtMu(s.pnl)}
+                </span>
+              </div>
+              <div className="text-[10px] text-[color:var(--text-3)] dx-num mt-0.5">
+                equity {fmtMu(s.equity)} · {s.liveQuotes} quotes ·{' '}
+                <span className={starving ? 'text-[color:var(--red)] font-semibold' : 'text-[color:var(--text-3)]'}>
+                  gas {fmtInt(cr)} credits{starving ? ' (מוגבל!)' : ''}
+                </span>
+              </div>
             </div>
-            <div className="text-[10px] text-[color:var(--text-3)] dx-num mt-0.5">
-              equity {fmtMu(s.equity)} · {s.liveQuotes} quotes
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+      {rejected && rejected.count > 0 && (
+        <div className="mt-2 rounded-lg border border-[color:var(--amber)]/30 bg-[color:var(--amber)]/10 px-2.5 py-1.5" data-testid="rejections-strip">
+          <div className="text-[10px] text-[color:var(--amber)] font-semibold">
+            נדחו בבלוק h{fmtInt(rejected.h)}: {fmtInt(rejected.count)} פעולות
+          </div>
+          {rejected.sample?.[0] && (
+            <div className="text-[9.5px] text-[color:var(--text-3)] dx-num truncate" dir="ltr" title={rejected.sample.join(' · ')}>
+              {rejected.sample[0]}
+            </div>
+          )}
+        </div>
+      )}
       <p className="text-[10px] text-[color:var(--text-3)] mt-2 leading-relaxed">
         {/* FIX(Roast-65-e4 · F8): המספר-חי מ-arena.soldiers.length + תווית-כנה (הארנה = סים) */}
         ארנה-פנימית (סים) — מספקת-נזילות לספר-הסים · {arena.soldiers.length} חיילים · {arena.params.spreadBps}bps{arena.params.requoteBps != null ? ` · requote ${arena.params.requoteBps}bps` : ''}
+        {' · '}מיכל-גז: <span className="dx-num">{fmtMu(gasFunded, 0)}µ</span> ממומן
       </p>
     </div>
   );

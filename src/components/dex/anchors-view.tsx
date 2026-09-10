@@ -1,8 +1,8 @@
 'use client';
 
 // ─── עיגונים · Anchors — הוכחות-חיים על שרשראות-ציבור ──────────────────────
-// Relay → Steem/Hive/TRON (txid + סיירים) · חותמות-מרקל חיות ·
-// מפת-הנזילות-החוץ (onramp) · כנות מלאה: מה-חי, מה-מושבת ולמה.
+// Relay → Steem/Hive/TRON/ETH/SOL (txid + סיירים) · חותמות-מרקל חיות ·
+// עוגן-אבני-דרך על Hive · מפת-הנזילות-החוץ (onramp) · כנות מלאה: מה-חי, מה-מושבת ולמה.
 
 import { useCallback, useEffect, useState } from 'react';
 import { Anchor, ExternalLink, RefreshCcw, ShieldCheck, ShieldAlert, Landmark, Loader2 } from 'lucide-react';
@@ -153,6 +153,48 @@ export function AnchorsView({ world }: { world: World | null }) {
           )}
         </div>
       )}
+
+      {/* FIX(Roast-70 · milestone+rail-truth): עוגן-אבני-הדרך (P&L נעגן אוטומטית על Hive דרך הצי)
+      ומסילת-המיקרו (P&L מסומן-לעוגן) — חיים-ב-state-של-המנוע-והיו בלתי-נראים ב-UI-האם */}
+      {(() => {
+        const ms = world?.state.milestone;
+        const rl = world?.state.rail;
+        if (!ms && !rl) return null;
+        return (
+          <div className="dx-card p-4 md:p-5" data-testid="milestone-panel">
+            <h3 className="text-base font-semibold flex items-center gap-2 mb-3">
+              <Landmark className="w-4 h-4 text-[color:var(--pink)]" />
+              עוגן-אבני-דרך · P&amp;L על השרשרת-הציבורית
+            </h3>
+            {ms && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2" data-testid="milestone-stats">
+                <Stat label="אבני-דרך-נעוגנות" value={fmtInt(ms.anchored)} ok={ms.anchored > 0 ? true : undefined} />
+                <Stat label="המתנות-RC" value={fmtInt(ms.skippedNoRc)} />
+                <Stat label="פערי-דופק" value={fmtInt(ms.skippedGap)} />
+                <Stat label="שגיאות" value={fmtInt(ms.errors)} ok={ms.errors === 0 ? true : undefined} />
+              </div>
+            )}
+            {ms && (
+              <p className="text-[10px] text-[color:var(--text-3)] leading-relaxed">
+                {ms.anchored === 0 && ms.skippedNoRc > 0
+                  ? <>המסילה-חמושה — ממתינה להתחדשות-מאגר-ה-RC של חשבון-העוגן ({fmtInt(ms.skippedNoRc)} ניסיונות-נדחו-בכנות). דופק-12 שעות · פער-מחייב ≥55 דק׳ · עלות-אפס (posting-only).</>
+                  : ms.lastTxid
+                    ? <>עוגן-אחרון: h{fmtInt(ms.lastHeight ?? 0)} · חשבון <span className="dx-num" dir="ltr">{ms.lastAccount ?? '—'}</span> · נטו אחרון {ms.lastNetMu != null ? `${fmtInt(ms.lastNetMu)}µ` : '—'} · <a className="underline hover:text-[color:var(--text-1)]" href={`https://hiveblocks.com/tx/${ms.lastTxid}`} target="_blank" rel="noreferrer" dir="ltr">{ms.lastTxid.slice(0, 18)}…</a></>
+                    : ms.note}
+              </p>
+            )}
+            {rl && rl.enabled && (
+              <div className="dx-raised p-2.5 mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" data-testid="rail-strip">
+                <span className="text-[color:var(--text-2)]">מסילת-המיקרו:</span>
+                <span>equity <span className="dx-num">{fmtInt(rl.equityMu)}µ</span></span>
+                <span>נטו <span className={`dx-num ${rl.netMu >= 0 ? 'text-[color:var(--green)]' : 'text-[color:var(--red)]'}`}>{rl.netMu >= 0 ? '+' : ''}{fmtInt(rl.netMu)}µ</span></span>
+                <span>מנות <span className="dx-num">{fmtInt(rl.doses)}</span></span>
+                <span className="text-[color:var(--text-3)] w-full text-[10px]">{rl.note}</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* merkle seal — live verify */}
       <div className="dx-card p-4 md:p-5" data-testid="merkle-panel">

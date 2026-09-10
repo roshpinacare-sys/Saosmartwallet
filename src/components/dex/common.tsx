@@ -21,6 +21,9 @@ export type Pool = {
   mid: number; swaps: number; feeAccruedTreasury: number; k: number;
   // FIX(Roast-65-e4 · F4): עמלת-הבריכה-החיה (bps) — אופציונלי עד-שהשרת-מספק; ה-UI מציג '—' כשחסר
   feeBps?: number;
+  // FIX(Roast-70 · pol-truth): אמת-ה-POL מהמנוע (roast-68) — עמלות-שהוטבעו-ל-LP,
+  // תשואת-עמלות-ליחידת-LP (lifetime, bps) וחלק-הנזילות-בבעלות-הפרוטוקול.
+  lpFeesMu?: number; lpYieldBps?: number; polShareBps?: number;
 };
 export type Wallet = { name: string; credits: number; balances: Record<string, number>; locked: Record<string, number> };
 export type Soldier = { name: string; saos: number; usds: number; equity: number; pnl: number; liveQuotes: number; locked: Record<string, number> };
@@ -38,6 +41,14 @@ export type ChainState = {
   ladder?: { refPrice: number; lifts: number; spentMu: number };
   assets?: Record<string, { refPrice?: number }>;
   backing?: unknown;
+  // FIX(Roast-70 · honesty): דחיות-פעולות-אחרונות + מיכל-הגז — האמת-על-מה-המנוע-דחה וכמה-דלק-ממומן.
+  gasFundedMu?: number;
+  rejectedLast?: { h: number; count: number; sample: string[] };
+  // FIX(Roast-70 · income/rail/milestone): הכנסות-האוצר, מסילת-המיקרו ועוגן-אבני-הדרך —
+  // כבר-חיים-בטרמינל-המנוע; עכשיו גם ב-UI-האם.
+  income?: { poolFeesMu: number; feeMeterMu: number; treasuryProfitMu: number; ladderSpentMu: number; backingWsteemMu: number; hub: string };
+  rail?: { enabled: boolean; equityMu: number; fundedMu: number; netMu: number; doses: number; note: string };
+  milestone?: { enabled: boolean; started?: boolean; anchored: number; skippedNoRc: number; skippedGap: number; errors: number; lastAnchorAt: number | null; lastNetMu: number | null; lastHeight: number | null; lastTxid: string | null; lastAccount: string | null; lastError: string | null; note: string };
 };
 export type World = {
   version: number;
@@ -60,7 +71,9 @@ export type RouteQuote = {
 export type RoutableEntry = { asset: string; tier: string; note?: string };
 export type LpValuation = { key: string; valueMu: number; sharePct?: number };
 
-export const DEX_ASSETS = ['SAOS', 'USDS', 'WSTEEM', 'ENERGY', 'WSBD', 'PHIVE', 'STEEM'] as const;
+// FIX(Roast-70 · real-assets): WBLURT (עטיפה-מגובה-1:1 ב-BLURT, roast-66) ו-LB|LA (טוקן-השקה
+// שסיים-לבריכה-חיה) היו-נכסי-מנוע-אמת אך-בלתי-נראים-ל-UI — עכשיו סחירים/מוצגים.
+export const DEX_ASSETS = ['SAOS', 'USDS', 'WSTEEM', 'ENERGY', 'WSBD', 'PHIVE', 'STEEM', 'WBLURT', 'LB|LA'] as const;
 export type DexAsset = (typeof DEX_ASSETS)[number];
 
 // deterministic token identity — pastel medallion + honest label
@@ -72,6 +85,8 @@ export const TOKEN_META: Record<string, { name: string; hue: number }> = {
   WSBD: { name: 'Wrapped SBD', hue: 0 },
   ENERGY: { name: 'ENERGY', hue: 155 },
   PHIVE: { name: 'pHIVE', hue: 40 },
+  WBLURT: { name: 'Wrapped BLURT', hue: 210 },   // עטיפה 1:1 מגובה ב-BLURT
+  'LB|LA': { name: 'Launch A', hue: 265 },       // טוקן-השקה (launchpad)
 };
 
 export function tokenColor(sym: string): string {
@@ -215,6 +230,20 @@ export function StaleChip({ show = true, className = '' }: { show?: boolean; cla
 // ── wallet balance helper ──
 export function walletBal(world: World | null, wallet: string, asset: string): number {
   return world?.wallets.find(w => w.name === wallet)?.balances[asset] ?? 0;
+}
+
+// FIX(Roast-70 · lp-valuation): שווי-עמדת-LP — חלק-יחסי משתי-שמורות-הבריכה במחירי-האוצר החיים.
+// מגשים-את-ההבטחה "שווי-LP נפרד למטה" שהייתה-עד-היום מילים-בלי-מספר.
+// אין-מחיר-אוצר לאחד-הנכסים → null (כנות: לא-ממציאים הערכה).
+export function lpValueMu(world: World | null, poolKey: string, lpBal: number): number | null {
+  if (!world || lpBal <= 0) return null;
+  const p = world.pools.find(x => x.key === poolKey);
+  if (!p || p.lp <= 0) return null;
+  const ref = (a: string): number => (a === 'USDS' ? MU : world.state.assets?.[a]?.refPrice ?? 0);
+  const ra = ref(p.a), rb = ref(p.b);
+  if (!ra || !rb) return null;
+  const poolValueMu = (p.ra / MU) * ra + (p.rb / MU) * rb;
+  return Math.floor((poolValueMu * lpBal) / p.lp);
 }
 
 // ── mutations — through the secured bridge ──

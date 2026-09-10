@@ -8,17 +8,25 @@ import { useEffect, useMemo, useState } from 'react';
 import { Wallet, Send, Loader2, Layers, Globe2, ShieldCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  TokenMedallion, fmtMu, fmtInt, dxPost, type World, DEX_ASSETS, TOKEN_META, MU,
+  TokenMedallion, fmtMu, fmtInt, dxPost, lpValueMu, type World, DEX_ASSETS, TOKEN_META, MU,
 } from './common';
 
-const WALLET_LABELS: Record<string, string> = {
-  operator: 'המפעיל (אתה)',
-  treasury: 'האוצר הריבוני',
-  arena: 'ארנת עשיית-השוק',
-  'portfolio-b': 'תיק ב׳',
-  've-vault': 'כספת-veSAOS (נעול)',
-  've-pot': 'קרן-תגמולי-ve',
-};
+// FIX(Roast-70 · live-labels): תוויות-הארנקים עודכנו לצי-החי (היו-מתות: portfolio-b · ve-vault;
+// חסרות: חיילי-הארנה, בוטים, מסילת-המיקרו, קרן-ההשקות)
+function walletLabel(name: string): string {
+  const fixed: Record<string, string> = {
+    operator: 'המפעיל (אתה)',
+    treasury: 'האוצר הריבוני',
+    arena: 'ארנת עשיית-השוק',
+    rail: 'מסילת-המיקרו (P&L לעוגן)',
+    've-pot': 'קרן-תגמולי-ve',
+    'launch:lp-1': 'קרן-נזילות-השקות',
+  };
+  if (fixed[name]) return fixed[name];
+  if (name.startsWith('soldier-')) return `חייל-ארנה ${name.slice(8)}`;
+  if (name.startsWith('bot-')) return `בוט-מסחר ${name.slice(4).toUpperCase()}`;
+  return name;
+}
 
 interface RealRow { account: string; liquidHive: number; hbd: number; hp: number; role: string }
 interface SteemHead { account: string; steem: number; sbd: number; sp: number }
@@ -81,6 +89,20 @@ export function PortfolioView({ world, onNeedAuth, onDone }: {
     return Object.entries(operator.balances).filter(([k]) => k.startsWith('LP|'));
   }, [operator]);
 
+  // FIX(Roast-70 · lp-valuation): שווי-LP-אמת — מומשת-ההבטחה "שווי-LP נפרד למטה" (הייתה מילים-בלי-מספר)
+  const lpTotalMu = useMemo(
+    () => lpLines.reduce((s, [k, v]) => s + (lpValueMu(world, k.slice(3), v) ?? 0), 0),
+    [lpLines, world],
+  );
+
+  // FIX(Roast-70 · real-assets): הגריד-מציג-את-כל-מה-שבאמת-מוחזק (union עם רשימת-היסוד) —
+  // היה-פער-מטעה: הסה"כ-למעלה כלל נכסים (LB|LA · WBLURT) שהגריד-הסתיר
+  const gridAssets = useMemo(() => {
+    const held = Object.keys(operator?.balances ?? {}).filter(a => !a.startsWith('LP|'));
+    const extra = held.filter(a => !(DEX_ASSETS as readonly string[]).includes(a));
+    return [...DEX_ASSETS, ...extra];
+  }, [operator]);
+
   return (
     <div className="max-w-5xl mx-auto space-y-4 pb-6" data-testid="portfolio-view">
       {/* hero */}
@@ -92,7 +114,10 @@ export function PortfolioView({ world, onNeedAuth, onDone }: {
               {fmtInt(myTotalMu / MU)} <span className="text-lg text-[color:var(--text-2)]">USDS</span>
             </div>
             <div className="text-[11px] text-[color:var(--text-3)] mt-1.5">
-              ארנק operator · גובה שרשרת <span className="dx-num">{world ? fmtInt(world.state.height) : '—'}</span> · שווי-LP נפרד למטה
+              ארנק operator · גובה שרשרת <span className="dx-num">{world ? fmtInt(world.state.height) : '—'}</span>
+              {' · '}{lpTotalMu > 0
+                ? <>שווי-עמדות-LP <span className="dx-num">{fmtInt(lpTotalMu / MU)}</span> USDS — בפירוט למטה</>
+                : 'ללא עמדות-LP (נזילות-הג׳נזיס מוחזקת-כ-POL של האוצר)'}
             </div>
           </div>
           <button onClick={() => setTransferOpen(true)} className="dx-cta h-10 px-5 text-sm flex items-center gap-2">
@@ -100,9 +125,9 @@ export function PortfolioView({ world, onNeedAuth, onDone }: {
           </button>
         </div>
 
-        {/* my assets grid */}
+        {/* my assets grid — FIX(Roast-70): כל-המוחזק-באמת, לא-רק-רשימת-היסוד */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mt-5" data-testid="asset-grid">
-          {DEX_ASSETS.map(a => {
+          {gridAssets.map(a => {
             const bal = operator?.balances[a] ?? 0;
             const rp = refPrices[a];
             const val = rp ? (bal * (rp / MU)) / MU : null;
@@ -124,10 +149,15 @@ export function PortfolioView({ world, onNeedAuth, onDone }: {
         {lpLines.length > 0 && (
           <div className="dx-raised p-3 mt-3 flex items-center gap-2 flex-wrap" data-testid="lp-lines">
             <Layers className="w-3.5 h-3.5 text-[color:var(--pink)]" />
-            <span className="text-[11px] text-[color:var(--text-2)]">עמדות LP:</span>
-            {lpLines.map(([k, v]) => (
-              <span key={k} className="dx-chip px-2 py-0.5 text-[10px] dx-num">{k.slice(3)}: {fmtInt(v)}</span>
-            ))}
+            <span className="text-[11px] text-[color:var(--text-2)]">עמדות LP (שווי-ייחוס חי):</span>
+            {lpLines.map(([k, v]) => {
+              const vMu = lpValueMu(world, k.slice(3), v);
+              return (
+                <span key={k} className="dx-chip px-2 py-0.5 text-[10px] dx-num">
+                  {k.slice(3)}: {fmtInt(v)}{vMu != null ? ` · ≈${fmtInt(vMu / MU)} USDS` : ''}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
@@ -228,7 +258,7 @@ export function PortfolioView({ world, onNeedAuth, onDone }: {
           {wallets.map(w => (
             <div key={w.name} className="dx-raised p-3">
               <div className="flex items-center justify-between flex-wrap gap-1">
-                <span className="text-xs font-semibold">{WALLET_LABELS[w.name] || w.name}</span>
+                <span className="text-xs font-semibold">{walletLabel(w.name)}</span>
                 <span className="text-[10px] text-[color:var(--text-3)] dx-num">credits {fmtInt(w.credits)}</span>
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5" dir="ltr">
@@ -303,6 +333,10 @@ function TransferModal({ world, onClose, onNeedAuth, onDone }: {
               className="dx-num w-full mt-1 h-11 px-2 rounded-xl dx-raised outline-none border border-[color:var(--line)] bg-[color:var(--raised)] text-sm"
             >
               {DEX_ASSETS.map(a => <option key={a} value={a}>{a}</option>)}
+              {/* FIX(Roast-70): נכסים-מוחזקים-שמחוץ-לרשימת-היסוד — ניתנים-להעברה-גם-כן */}
+              {Object.keys(world?.wallets.find(w => w.name === 'operator')?.balances ?? {})
+                .filter(a => !a.startsWith('LP|') && !(DEX_ASSETS as readonly string[]).includes(a))
+                .map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </label>
           <label className="block">

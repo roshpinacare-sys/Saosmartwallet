@@ -3,11 +3,13 @@
 // ─── בריכות · Pools — נזילות AMM עם ניהול-עמדות ────────────────────────
 // x·y=k שלמים · עמלה-דינמית (feeBps-חי-מה-API, 70% LP · 30% אוצר) · add פרופורציונלי ·
 // remove pro-rata · עמדות-ה-LP שלי מהארנק החי.
+// FIX(Roast-70 · pol-truth): כל-בריכה-מציגה-עכשיו את אמת-ה-POL שהמנוע-כבר-מחשב
+// (lpYieldBps · lpFeesMu · polShareBps — roast-68) שהייתה-עד-היום בלתי-נראית.
 
 import { useState } from 'react';
 import { Droplets, Loader2, Plus, Minus, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TokenMedallion, fmtMu, fmtPrice, fmtInt, dxPost, walletBal, type World, type Pool, MU } from './common';
+import { TokenMedallion, fmtMu, fmtPrice, fmtInt, fmtBps, dxPost, walletBal, type World, type Pool, MU } from './common';
 
 // FIX(Roast-65-e4 · F4): עמלה-חי-מה-API — feeBps-פר-בריכה; בלי-נתון → '—' (אין-עוד 0.30% מקודד)
 const feeLabel = (p?: Pool | null): string => p?.feeBps != null ? `${(p.feeBps / 100).toFixed(2)}%` : '—';
@@ -44,7 +46,12 @@ export function PoolsView({ world, onNeedAuth, onDone }: {
         {myPositions.length === 0 ? (
           <div className="dx-card p-8 text-center">
             <p className="text-sm text-[color:var(--text-2)]">אין לך עדיין עמדות נזילות</p>
-            <p className="text-xs text-[color:var(--text-3)] mt-1">הצטרף לבריכה למטה — העמלות זורמות 70/30 לספקי-הנזילות (השיעור-החי מוצג-על-כל-בריכה)</p>
+            {/* FIX(Roast-70): האמת על הבריכות — נזילות-הג'נזיס הוטבעה-כעמדת-POL של האוצר
+            (roast-68 · pol-retro-mint): implied=0 לנצח, וכל-LP-חוץ מקבל נתח pro-rata כן מהעמלות */}
+            <p className="text-xs text-[color:var(--text-3)] mt-1 max-w-md mx-auto leading-relaxed">
+              נזילות-הג'נזיס מוחזקת-ריבונית-בידי-האוצר (POL) — חלק-הפרוטוקול-מוצג-על-כל-בריכה למטה.
+              הצטרף לבריכה ותקבל נתח pro-rata כן מהעמלות — התשואה-החיה מוצגת-על-כל-כרטיס.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -124,6 +131,26 @@ export function PoolsView({ world, onNeedAuth, onDone }: {
                   <div className="dx-raised p-2">
                     <div className="text-[9px] label-caps">סוואג'ים</div>
                     <div className="dx-num text-[11px] mt-0.5">{fmtInt(p.swaps)}</div>
+                  </div>
+                </div>
+                {/* FIX(Roast-70 · pol-truth): שורת-אמת-ה-LP — תשואת-עמלות-חיה ליחידת-LP, עמלות-שהוטבעו
+                לספקי-הנזילות, וחלק-הנזילות-בבעלות-הפרוטוקול. הכל-חי-מה-API; בלי-נתון → '—' */}
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  <div className="dx-raised p-2">
+                    <div className="text-[9px] label-caps">תשואת-LP (lifetime)</div>
+                    <div className="dx-num text-[11px] mt-0.5 text-[color:var(--green)]">
+                      {p.lpYieldBps != null ? fmtBps(p.lpYieldBps) : '—'}
+                    </div>
+                  </div>
+                  <div className="dx-raised p-2">
+                    <div className="text-[9px] label-caps">עמלות-שהוטבעו ל-LP</div>
+                    <div className="dx-num text-[11px] mt-0.5">{p.lpFeesMu != null ? `${fmtMu(p.lpFeesMu, 0)} µ` : '—'}</div>
+                  </div>
+                  <div className="dx-raised p-2">
+                    <div className="text-[9px] label-caps">נזילות-בבעלות-פרוטוקול</div>
+                    <div className={`dx-num text-[11px] mt-0.5 ${p.polShareBps != null && p.polShareBps > 5000 ? 'text-[color:var(--pink)]' : ''}`}>
+                      {p.polShareBps != null ? fmtBps(p.polShareBps) : '—'}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center justify-between mt-3">
