@@ -1381,3 +1381,34 @@ Stage Summary:
 - מסילת-SOL: מ"תעלומת-simulation-failed-שמבעירה-breaker" ל"pendingFunding-כן-עם-סכום-חסר-מדויק" — פריצת-האמת-הקטנה-עם-התגלית-המדויקת ביותר (1,624-lamports-מפרידים-בין-מסילה-מתה-לחיה)
 - gasTank: הפלאיהול-הכלכלי-הושלם — עמלות→ראוטר→(40% שריפה/40% ve/20% אוצר)→10%-מהמחזור-חוזר-כדלק — כלכלה-סגורה-שלא-נגמרת
 - פתוח: עידכון-מזומן-זעיר-ל-SOL-ארנק (החלטת-מפעיל), meta-tx-v2-על-ETH, חותם-hive-rail
+---
+Task ID: 68-a
+Agent: census-main
+Task: מפקד-מערכת-מלא של-הריפו-הראשי (לפני-הצתה) — קריאה-בלבד, אפס-שינויי-קוד
+
+Work Log:
+- מיפוי-מלא: 1 דף (src/app/page.tsx · 345ש׳) + 23 route.ts-ים תחת src/app/api; כל-אחד-נקרא וסווג (חי-מחובר/יתום/חיצוני)
+- ניתוח-page.tsx: 12 view-ים (swap/pro/pools/economy/portfolio/estate/anchors + vault/towers/ops/audit/settings); grep מלא של fetch/io מכל-src → מפת-קריאות UI→API מדויקת
+- קריאת-כל-23 הראוטים (dx/chat/task/audit/guard/guardian/agent×3/vault×6/saos×8) כולל זיהוי requireOwner/ownerLock/scrub בכולם
+- מיפוי-src/lib (9 מודולים + 9 saos/*): הכל-מיובא ובשימוש חוץ מ-0; מיפוי-47 קומפוננטות-ui: רק-9 נגישות-מ-page.tsx (dialog/input/badge/select/scroll-area/collapsible/tabs/sheet/dropdown-menu) — השאר 38 מתות-כולל-button-טרנזיטיבית
+- מיפוי-hooks: use-mobile+use-toast מתים (מיובאים-רק-ע"י-sidebar/toaster-מתים)
+- relay-service: קריאת-index.ts-מלאה (socket.io :3003 loopback + admin-emit :3004 עם X-Relay-Token + guardianBoot ל:3000) — סריקת-פורטים: לא-רץ (3003/3004-refused, אין-תהליך)
+- mini-services: dex-daemon = manifest-בלבד (package.json-ללא-קוד, alias-ל-hרצת-saos-dex); relay-service-כמו-למעלה
+- prisma/schema.prisma: 15 מודלים; grep שימושים: 13 חיים, EnergyPlan+EconomySnapshot-מתים (אפס-אזכורים); saos-dex-בעל-DB-משלו (saos-dex/db/dex.db, 4 מודלים) — אין-שיתוף (instrumentation.ts-כופה-DATABASE_URL-נפרד-לילד)
+- בדיקה-חיה: curl-מול-9 נקודות-קצה — גילוי-קריטי (ראו-Stage-Summary); ss: 3000-UP, 3010-UP, 81-Caddy-UP, 3003/3004-DOWN
+- dev.log (97,895 שורות): 254×P2021-פעילים; boot-יחיד-בקו-8 (השרת-לא-אותחל-מאז-01:09)
+- שחזור-שורש: db/custom.db-מכיל-בדיוק-את-4 הטבלאות-של-schema-saos-dex (BlockHeader/ArenaJournal/EvidenceReceipt/SealRecord) = נדרס-ע"י-db-push-של-סכימת-הדקס; /tmp/custom-restore.db (15:45) = הסכימה-המלאה-עם-נתונים (149-מפתחות/1192-חותמות/146-אודיט/11-הודעות/38-סשנים)
+- מלאי-שורש: .env (5 מפתחות — שמות-בלבד), Caddyfile-חי, README-SAOS, docs/ROAST-65-NETWORK, research/R56 (8-קבצים), research-r.mjs, examples/websocket (תבנית), tests (3×shell-תשתית), .zscripts (dev.sh-מריץ-mini-services), db/, public/ (logo.svg-לא-ממוקף+robots.txt), upload/ (3-קבצי-משתמש), skills/ (71-תיקיות-פלטפורמה), tool-results/ (פסולת-כלי-סוכן)
+- תלויות: 16 חבילות-אפס-שימוש ב-src/scripts (next-auth, next-intl, dnd-kit×3, mdxeditor, react-query/table, react-markdown, syntax-highlighter, date-fns, uuid, zustand, sharp, zod, framer-motion, @reactuses/core, socket.io-server-כפול, z-ai-sdk) + ~10 חבילות-שימוש-עקיף-רק-דרך-קומפוננטות-מתות
+- בדיקת-כפילויות-מול-saos-dex: 2 חזיתות-על-אותו-מנוע; guardian-משולש (guardian-route + dex-bridge-route + instrumentation.ts) + רביעי ב-relay; שמות-מודלים-זהים-SealRecord/EvidenceReceipt-בשתי-הסכימות (הסיבה-המבנית-לדריסה)
+
+Stage Summary:
+- 🔴 קריטי-חי: מסד-הנתונים-הראשי (db/custom.db) נדרס — הוא-מכיל-את-סכימת-saos-dex (4 טבלאות) במקום-15 המודלים-של-האם → כל-הראוטים-הנוגעים-ב-DB מחזירים-500 P2021 עכשיו (vault/status, chat, task, login, verify, estate, audit, agent/*, saos/status, seal, verify-pack, research). אומת-חי: 3×500+2×ok:false. שחזור-אפשרי: /tmp/custom-restore.db-מלא (15:45) או `bun run db:push`-עם-ה-DATABASE_URL-הראשי — **זו-הפעולה-הראשונה-לפני-כל-דבר**
+- 🔴 relay-service לא-רץ (3003/3004): אין-push-חי ל-UI (relayBroadcast-נכשל-בשקט-וה-UI-נשען-על-polling), וגם-guardianBoot-שלו-לא-שומר-על-3000. להריץ: `cd mini-services/relay-service && bun run dev`
+- 🟡 יתומים-פונקציונליים: /api/guardian (watchdog-3010 — אף-קורא; מזוין-רק-בפנייה) · /api/saos/dex-bridge (spawn-בקשת-owner — אף-קורא; הוחלף-בפועל-ע"י-instrumentation.ts). שניהם-תקינים-אך-מיותרים-מול-instrumentation.ts → מועמדים-למחיקה-או-לחיבור
+- 🟡 מודלים-מתים: EnergyPlan, EconomySnapshot (אפס-שימוש) · קוד-מת: dex/chart.tsx, dex/kit.tsx (אפס-מייבאים), 38-קומפוננטות-ui-מתות (כולל-button-שרק-המתים-מייבאים-אותו), hooks/use-mobile, hooks/use-toast, public/logo.svg
+- 🟡 תלויות-מתות: ~16 חבילות-אפס-שימוש + ~10 בשימוש-רק-דרך-קוד-מת (recharts, embla, react-hook-form, cmdk, vaul, input-otp, sonner, next-themes, react-day-picker, react-resizable-panels, date-fns וכו')
+- ✅ חי-ומחובר: 20 מתוך-23 ראוטים-ל-UI/סוכנים-חיצוניים; כל-src/lib-בשימוש; גשר-dx-מאובטח (whitelist-11-פעולות + DEX_OPERATOR_TOKEN-שרת-בלבד + as=owner); saos-dex-UP וחי (h23,834); Caddy-UP-עם-whitelist-XTransformPort
+- חיבורים: דפדפן→3000 (דפים+API) · דפדפן→(rewrite-/saos-dex/)→3010 (קריאות-מנוע) · 3000→3010 (מוטציות-dx-עם-טוקן-מפעיל) · 3000→3004 (emit-ל-relay — מת-כרגע) · דפדפן→81→3003 (socket.io — מת-כרגע) · instrumentation.ts-מאמץ-את-3010-כילד · saos-dex-לא-קורא-ל-3000-כלל
+- כפילויות-מבניות: 2 חזיתות-מסחר-על-אותו-מנוע (הטרמינל-של-saos-dex-מול-ה-view-ים-של-הדף-הראשי); guardian×3+relay×1; שמות-מודלים-זהים-בשתי-סכימות = המוקש-שהפעיל-את-הדריסה
+- ניקוי-מוצע (בהמשך-נפרד): מחיקת-38-ui-מתות+2-hooks+chart/kit+logo.svg, 2 ראוטים-יתומים-או-חיבורם, 2 מודלים-מתים-מהסכמה, ~26 חבילות; והקצאת-בעלים-יחיד-ל-guardian
