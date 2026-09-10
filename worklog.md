@@ -1268,3 +1268,24 @@ Stage Summary:
 - הפער הגדול בין אמת למציאה נחתך לשניים: מה שטענו ולא עמד (עורך-אוטונומי, ניתוב-שפה, ניקיון-פיד) — נחשף, תוקן בקוד ובשרשרת, ואומת בצומת-ציבורי; ומה שעמד (אוצר, חימוש 5×30, הצפנת-כספת, קפאון-משמעת) — זוכה בראיות.
 - השיעור המתודולוגי: כל טענה חייבת ראייה-מחזורית — מול השרשרת, מול ה-DB, ומול הקוד; כלי-האימות עצמם (regex-ים, שאילתות) גם צריכים roast.
 - קבצים: src/lib/gate/harness/{brain,exposure,social,heart}.ts · tools/remediate-public-feed.ts (חדש) · docs/roast-audit.md (חדש) · worklog.md · db/custom.db.
+
+---
+Task ID: 19
+Agent: Z.ai Code (main)
+Task: ROAST round 3 — "חפש בעיות רבות ותקן את כולן בבלוקצ'יין עצמו על SAOS": ביקורת-אדיברסרית על שכבת-השרשרת עצמה (adapters/RPC/כספת/פיד), תיקון הכל, רמדיאציה חיה, ודחיפה.
+
+Work Log:
+- אמת-חיה מול השרשרת (tools/roast3-chain-truth.ts, קריאה-בלבד): 13/13 פעולות sovereign-voice עם ok:true מאומתות על שרשרת (get_transaction) — כל ה-txIds מראונד 2 אמת · census 0 ממתינים · headcorner 8.645M VESTS · ETH 0.002101 (12/12) · SOL 0.063335 (12/12).
+- סריקת-היסטוריה מלאה (tools/roast3-full-history-scan.ts — 474 פוסטים על steem+hive): חשפה שטענת ראונד 2 "אפס עברית בכל הפוסטים" הייתה אמת-חלקית — 24 הפרות חיות, בכללן העותק-המלא-בעברית של מפרט SAOS-1 על HIVE שראונד 2 לא נגע בו · תיקון-עצמי: 82 ריבלוגים נספרו בטעות כהפרות (get_content ריק למחבר-אחר = ראיה חיה) — הסריקה תוקנה למחבר-אמיתי.
+- תיקוני-תשתית בשכבת-השרשרת: SteemAdapter קיבל rpcUrls failover (הכתיבה הייתה node-יחיד = נקודת-כשל; פסק-דין שרשרת עדיין מתפשט) · steem-server חיבר failover לקריאה+שידור · hive adapter קיבל אותו טיפול · steemRpc ב-social.ts רוכב על railRpc (סוף ל-transport מקבילי חלש).
+- תיקוני-אמת: auditFleetContent סורק גוף-מלא+תגיות (היה עיוור מעבר ל-400 תווים!) · ממצאי-קטגוריה בלתי-ניתנים-לתיקון מדווחים immutableFindings (לא מזויפים כניתנים-לתיקון) · verifyPostingKeyOnChain משווה כל key_auths (לא רק [0]) · census מדווח notOnChain (headcorner-legacy = משקל-מת בכספת) · finalize() משתמש בדומיין-ה-adapter האמיתי ל-digest-evidence (hive=beeab0de, לא אפסים-steem) · dedupe תגיות ב-trends+בנאי · קצב עריכות (last_update, ~8s) סוף-סוף במודול עצמו · שומר self-vote-forbidden (נמצא חי: הצי הצביע 500/10000 לפוסט-של-עצמו, tx 048b3162) · שומר no-op-edit (הרצה-חוזרת של הכלי שידרה 6 עריכות-אפס זהות — נתפס ותוקן חי) · operatorOverride מבוקר לעקיפת-תקרה (רק agentName=operator, השער-ואימות-המפתח נשארים).
+- רמדיאציה חיה על steem (tools/remediate-public-feed.ts): 9 פוסטים תוקנו — 5vmvfj, 7ssdza, bandwidth, 2gqskj, yizkor (הודעת-ארכיון כנה באנגלית) + celebrating-the-jewish-new-year תיקון-ניתוחי שמרני (רק שם-קובץ-תמונה עברי הוחלף) · txים על השרשרת: 579df569@109449501, 68e46a11@109449506, 8c8bc2a8@109449514, 7a16ad61@109449516, 3196302d@109449519, cbbcb4f8@109449522 (אומתו צומת-ציבורי) · נותרו על steem רק 6 דליפות-קטגוריה בלתי-ניתנות-לתיקון (parent_permlink נחרת בפרסום) — מוצגות בכנות.
+- hive נמדד חי עד הסוף: העריכה עברה שער-חשיפה (תגיות-נקיות) והגיעה לשידור אמיתי — ונעצרה בפסק-הדין של השרשרת על 3 צמתים: 179,228,713 RC מול 914,847,138 דרושים · 4 הפרות נעולות כלכלית — פתוח-כנה, לא מזויף.
+- אימות לאחר-תיקון (tools/roast3-verify-fixes.ts): census חי דרך הקוד החדש · auditFleetContent חי — 40 פוסטים/2 מסילות, 6 immutables מוצגים, המפרט-העברי מדוגל needsEdit כנה · 6/6 txים על השרשרת.
+- restart dev-server · דף 200 · 30 מודולים חיים · דפדפן: רנדור מלא 7,681px, scrollY=0 יציב, אפס שגיאות · lint 0 · docs/roast-audit.md ראונד 3.
+
+Stage Summary:
+- הפער הגדול בין אמת למציאה נחתך בשכבת-הבלוקצ'יין עצמה: "הביקורת סורקת הכל" (סרקה 400 תווים), "הפיד נקי" (24 הפרות חיות), "השידור עמיד" (node יחיד), "הראיות נכונות" (digest בדומיין שגוי ל-hive) — כולן נחשפו, תוקנו בקוד, והוכחו חי.
+- הפיד-הפומבי שלנו על steem: אפס עברית בכל 203 הפוסטים שנכתבו בידינו; מה שבלתי-ניתן לתיקון מטבע-השרשרת מוצג בכנות במקום להיספר כ"תוקן".
+- השיעור המתודולוגי: roast תקף גם את כלי-ה-roast עצמם (הסריקה שספרה ריבלוגים, הכלי ששידר עריכות-אפס) — כלי-אימות הם גם קוד שיכול לשקר.
+- קבצים: packages/chains/steem/src/adapter.ts · src/lib/steem-server.ts · src/lib/social/rails-server.ts · src/lib/gate/harness/social.ts · src/lib/steem-social.ts · tools/{roast3-chain-truth,roast3-full-history-scan,roast3-verify-fixes}.ts · tools/remediate-public-feed.ts · docs/roast-audit.md · worklog.md · db/custom.db.
