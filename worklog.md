@@ -1497,3 +1497,25 @@ Stage Summary:
 - המפה-החיה: SAOS-deep · USDS-hub · WSTEEM-deep · STEEM-rail · WSBD-deep(50k) · PHIVE-deep(4k) · BLURT-rail(42µ) · WBLURT-deep(42µ) · ENERGY-micro(2.9k) · LB|LA-deep(2M)
 - אמת-אחת: ציטוט-GET-וביצוע-POST-והראוטר = אותו-מנוע-quoteRoute+batch-אטומי
 - פתוח-להצתה (מעודכן): SOL-1,624-lamports · meta-tx-v2-ETH · hive-rail-86-המתנות-RC · נזילות-ארנה-insufficient-credits-מבני (fountain-מתחת-סף-20k — feeMeter-44,989-צומח-~3µ/בלוק) · עומקי-בריכות-ההמרה-החדשות-זעירים (42µ/4k) — ניתנים-להעמקה-ב-pool_add-אוצר-כשהדלק-יחזור
+
+---
+Task ID: 72 (lead) · roast-72
+Agent: Z.ai Code (main)
+Task: דבר-המפעיל: "יש לי קצת TRX (5$) וסול עוד קצת — צריך להגיע לרמה שאפשר לעשות סוואפ פה בדקס ולקבל נתון-שוק-אמת-חי. מה-חסר-מפה-לשם? כובע-מיוחד — חשיבה-מיוחדת איך-לעשות-את-זה על-הרשת-שלנו"
+
+Work Log:
+- 72-a kernel: Asset+=WTRX/WSOL · GAS_TABLE+=oracle_set:0 (משפחת-הערוצים-הריבוניים — אפס-גז, מגן-מבני=אוצר-בלבד) · DexState.oracle (µ-USDS-ל-יחידה + atH + src — חלק-מה-stateRoot) · case oracle_set (אוצר-בלבד · שלמים fail-closed · src-גלוי)
+- 72-b chain: לולאת-אורקל-חוץ-מצב (60ש׳) — extFeeds (TTL-משותף-עם-price-proof) → oracle_set אוצר **רק-כשמחיר-שינה** (אין-רעש-מצב) · CODE_VERSION→1.18.0+task72-coin-door
+- 72-c peg-door.ts: זהויות-פקדה נגזרות-מהזרע-הריבוני (TRX=secp256k1→keccak→base58check מה-WIF · SOL=ed25519 solIdentity — פלט-ציבורי-בלבד) · אימות-פקדה keyless מול-RPC-ציבורי (trongrid gettransactionbyid · solana getTransaction-delta) · מדידת-משמורת-חי TTL-60ש׳ · רצפות-עיגון (TRX 0.3 · SOL 896,880-lamports)
+- 72-d /api/dex/door: GET-דוח-ציבורי (זהויות/משמורת/אורקל/בריכות-spread-verdict/יומן) · POST-מפעיל: peg-in (אימות→**batch אטומי** wrap_mint-external+claim-חד-פעמי → xfer_free למפקיד · 1 TRX=1,000µ · 1 sun=0.001µ · 1 lamport=1e-6µ) · peg-out (xfer_free→peg-outbox+attest-יעד — השליחה-הפיזית כנה-בידי-המפעיל) · open-pool (oracle-fresh-gate→xfer_free-הזרעה→pool_open במחיר-אורקל) · refresh-oracle
+- 72-e peg-selftest: **27/27** — oracle_set±רשויות±float-reject · wrap_mint-external+backing · double-claim-reject · batch-אטומי · pool_open-mid=273,100-מדויק-0bps-מהאורקל · pool_swap=quote-מדויק · minOut-guard · peg-out-outbox · stateRoot-דטרמיניסטי
+- 72-f UI-אם: nav דלת-מטבעות (desktop+mobile-sheet, bottom-nav-4+עוד) · door-view (שוק-חי/כתובות+copy/peg-in/בריכות-verdict/פדיון/יומן) · WTRX/WSOL ב-DEX_ASSETS+TOKEN_META · dx-whitelist door · FIX-relay-spawn-env-types (@types/node NODE_ENV-חובה)
+- 72-g אימות: tsc=0-שני-הריפו · lint-נקי · fence-84-קבצים+30/30 · chaos-13/13 (positive-control-STEEM-h27,396) · שליליות-חי: no-token→503 · fake-txid→not-found-כן · no-console-header→CSRF-block · דפדפן: desktop+mobile-iPhone14, אפס-שגיאות-קונסולה, footer-mt-auto
+- 72-h push: saos-dex 9aebe14 · אם bb13bb2
+
+Stage Summary:
+- **האורקל-הקנוני-חי**: נתון-שוק-אמת (median×3-מקורות) כבר-על-השרשרת — WTRX=$0.3401→$0.3405→$0.34048 (שתי-עדכונים-אוטומטיים h27,377→h27,496: WSTEEM/HIVE/WBLURT/ETH=$2,459/BTC=$77,134-נכללו) — **בתוך-ה-stateRoot**, ריפליי-דטרמיניסטי, גלוי-לציבור
+- **זהויות-הפקדה-הריבוניות** (הדלת-חמושה): TRX=TN7eCah4oTmv47SV8KSimF7WCNPv1fJ9D2 (משמורת 0 — ממתין ל-5$-המפעיל) · SOL=HBBdhpbpFP3BwqcvrxJ44hAyKSid3D6AB4SFvtrN736s (משמורת 815,000-lamports — המפעיל-העלה!)
+- **מה-חסר-מפה-לסוואפ-הראשון** (מדויק-ופומבי-בדלת): (1) מפעיל-שולח ~18.3-TRX-אמת לכתובת-הפקדה (5$) — מממן-בדרך-גם-את-עיגון-TRON (0.3-חסרים); (2) מדביק txid-בדלת → אימות-RPC→הטבעה-אטומית; (3) כפתור-פתח-בריכה → USDS/WTRX-במחיר-שוק-חי; (4) סוואפ-אמת. ל-SOL: חסרים רק-81,880-lamports לרצפת-העיגון (0.000082-SOL ≈ $0.008)
+- האמת-הקריפטוגרפית: תביעה-חד-פעמית-בגרעין (extClaims) · גיבוי-משמורת-נמדד-חי-מול-RPC-ציבורי · אפס-סמכות-סגורה · אפס-סודות-בפלט
+- פתוח-להצתה: הפקדה-ראשונה-אמת → בריכה-ראשונה → הסוואפ-האמת-הראשון של TRX/SOL על-הרשת-הריבונית
