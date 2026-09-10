@@ -165,6 +165,11 @@ function dayKeyNow(): string {
 
 async function stageSchedules(p: HeartPulse): Promise<void> {
   const now = Date.now();
+  // ROAST r5: a daily schedule whose window passed long ago (boot catch-up at
+  // 03:00 Israel) must NOT fire — the staggered-hours doctrine exists so the
+  // fleet reads like a living community, and the boot-fire also consumed the
+  // day quota, silently cancelling that day's real window.
+  const DAILY_GRACE_MS = 2 * 60 * 60_000;
   const due = await db.gateSchedule.findMany({
     where: { enabled: true, nextRunAt: { lte: new Date(now) } },
     orderBy: { nextRunAt: "asc" },
@@ -175,6 +180,19 @@ async function stageSchedules(p: HeartPulse): Promise<void> {
     try {
       const dk = dayKeyNow();
       const count = s.dayKey === dk ? s.dayCount : 0;
+      if (s.kind === "daily" && typeof s.hourUtc === "number") {
+        const win = new Date();
+        win.setUTCHours(s.hourUtc, 0, 0, 0);
+        if (now - win.getTime() > DAILY_GRACE_MS) {
+          // window long gone — defer to TOMORROW's window, quota untouched
+          await db.gateSchedule.update({
+            where: { id: s.id },
+            data: { nextRunAt: new Date(win.getTime() + DAY_MS), dayKey: dk, dayCount: count },
+          });
+          p.counters.schedulesDeferred++;
+          continue;
+        }
+      }
       if (count >= s.maxPerDay) {
         // cap reached — honestly push to tomorrow-ish (next interval), no silent lies
         await db.gateSchedule.update({
@@ -889,9 +907,14 @@ async function seedDefaults(): Promise<void> {
   await ensureTriggerPolicy();
   const scheduleCount = await db.gateSchedule.count();
   if (scheduleCount === 0) {
+    // ROAST r5: the patrol's old contract was self-contradictory — the goal
+    // demanded "one bare line" while doneMeans demanded "real data", so the
+    // checker flip-flopped on identical runs (06:52 done vs 06:21 blocked).
+    // The report must now CARRY the two live numbers — self-evident proof,
+    // nothing left for the checker to judge by taste.
     const patrolMeans = JSON.stringify([
-      "vault.stats הוחזר עם נתונים אמיתיים מהשער",
-      "chain.steem health/יתרות הוחזרו חי מהשרשרת",
+      "הדוח לגשר כולל את ספירת-הסודות האמיתית כפי שהוחזרה ב-trace של vault.stats",
+      "הדוח לגשר כולל מספר-בלוק חי כפי שהוחזר ב-trace של chain.steem",
       "דוח עברית נשלח לגשר-הפיקוד",
     ]);
     const first = armed[0];
@@ -899,7 +922,7 @@ async function seedDefaults(): Promise<void> {
       data: {
         label: "סיור-שער תקופתי",
         agentName: first.name,
-        goal: "סיור אוטונומי של השער: בדוק את מצב השער (vault.stats), אמת שהשרשרת חיה (chain.steem health או יתרות headcorner), ודווח לגשר בעברית בקצרה. אם הכול תקין — שורה-אחת בלבד, אל תנפח.",
+        goal: "סיור אוטונומי של השער: (1) vault.stats — מצב השער; (2) chain.steem — בריאות השרשרת. דווח לגשר בעברית בשורה-אחת קומפקטית שחייבת לכלול את שני המספרים-החיים מה-trace: ספירת-הסודות מ-vault.stats ומספר-הבלוק החי מ-chain.steem. בלי המספרים — הדוח לא נחשב.",
         doneMeans: patrolMeans,
         budget: 4,
         kind: "interval",
