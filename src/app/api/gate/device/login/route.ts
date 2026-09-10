@@ -27,12 +27,16 @@ export async function POST(req: Request) {
     const { master, device } = await deviceMaster(token);
 
     setMaster(master);
+    // disclosed policy (r9 gap-32): one door at a time — this re-entry revokes
+    // every OTHER live operator session. Never hidden again.
     await revokeOtherSessions();
-    const sessionToken = await createSession("operator", "operator", ["*"], master);
+    // r9 gap-33: the new session remembers which device minted it — revoking
+    // that device later closes this door too (bounded, disclosed).
+    const sessionToken = await createSession("operator", "operator", ["*"], master, device.id);
     await db.gateDevice.update({ where: { id: device.id }, data: { lastUsedAt: new Date() } });
     await db.gateConfig.update({ where: { id: "gate" }, data: { unlockedAt: new Date() } }).catch(() => {});
     await db.gateMessage.create({
-      data: { fromKind: "system", fromName: "gate", body: `כניסה חוזרת ממכשיר-מהימן (${device.label}) — בלי מפתח, עם הוכחת-החזקה בלבד` },
+      data: { fromKind: "system", fromName: "gate", body: `כניסה חוזרת ממכשיר-מהימן (${device.label}) — בלי מפתח, עם הוכחת-החזקה בלבד · שאר-הסשנים החיים נשללו (דלת-אחת)` },
     });
 
     return ok({
