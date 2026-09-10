@@ -14,7 +14,7 @@
  */
 import { db } from "@/lib/db";
 import { masterReady, GateError } from "@/lib/gate/crypto";
-import { verifyAll } from "@/lib/gate/verify";
+import { verifyAll, verifyImported, FLEET_ACCOUNTS } from "@/lib/gate/verify";
 import { steemAdapter, steemMarket, steemOpenOrders } from "@/lib/steem-server";
 import { fleetStatusCached } from "@/lib/fleet-status";
 import { saosHubCached } from "@/lib/saos-hub";
@@ -22,6 +22,7 @@ import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
+import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
@@ -771,6 +772,237 @@ export const MODULES: HarnessModule[] = [
         vault: { entries, unlocked: masterReady() },
         agents, heart,
       };
+    },
+  },
+
+  /* ═══════════════ r15 — network-presence employment (תעסוקת-רשת) ═══════════════
+   * The r14 lesson: a fleet with proven brains but thin missions idles at the
+   * exact moment the network needs it. These six modules are REAL WORK that
+   * advances the network: proving the rails live, counting our presence on
+   * them, measuring whether our voice gets heard, scanning our governance
+   * footprint, closing the imported-vault backlog, and letting agents design
+   * their own recurring patrols (operator-gated). Public data only — no key
+   * ever leaves the vault. */
+  {
+    id: "chain.pulse",
+    name: "דופק-שרשראות — הוכחת-חיים כפולה",
+    kind: "connector",
+    desc: 'הוכחת-חיים כפולה של steem/hive/blurt: לכל מסילה — דגימת ראש-שרשרת פעמיים בהפרש ~2.5 שניות; דלתא-בלוקים > 0 היא ראיה מכנית שהשרשרת מייצרת בלוקים עכשיו (לא "התחבר" — מייצרת). מדווח ראש, דלתא, עדכון-אחרון, וזמינות-עדים לפי הדינמיקה החיה. קריאה-בלבד, נתונים פומביים.',
+    args: "{}",
+    needsVault: false,
+    cacheable: false, // two samples per rail — a cache would fake the delta
+    async exec() {
+      const rails: Array<"steem" | "hive" | "blurt"> = ["steem", "hive", "blurt"];
+      const sample = (r: typeof rails[number]) => railRpc<{ head_block_number?: number; time?: string }>(r, "condenser_api.get_dynamic_global_properties", []);
+      const out: Array<{ rail: string; ok: boolean; headBefore?: number; headAfter?: number; delta?: number; nodeTime?: string; error?: string }> = [];
+      for (const r of rails) {
+        try {
+          const a = await sample(r);
+          // 4.2s between samples: all three rails produce 3s blocks — a
+          // shorter window reads healthy chains as "delta 0" about half the
+          // time, and a false "not alive" is a false claim (living-truth law)
+          await new Promise((res) => setTimeout(res, 4200));
+          const b = await sample(r);
+          const headBefore = Number(a.head_block_number) || 0;
+          const headAfter = Number(b.head_block_number) || 0;
+          out.push({ rail: r, ok: headAfter > headBefore, headBefore, headAfter, delta: headAfter - headBefore, nodeTime: b.time ?? undefined });
+        } catch (e) {
+          out.push({ rail: r, ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 160) });
+        }
+      }
+      const alive = out.filter((o) => o.ok);
+      return {
+        measuredAt: new Date().toISOString(),
+        rails: out,
+        meaning: alive.length
+          ? `חיות ${alive.length}/3 מסילות: ${alive.map((o) => `${o.rail} +${o.delta} בלוקים (ראש ${o.headAfter})`).join(" · ")}${alive.length < 3 ? ` — לא-חיה: ${out.filter((o) => !o.ok).map((o) => o.rail).join(",")}` : ""}`
+          : `אף-מסילה לא הוכיחה ייצור-בלוקים בדגימה — תעד בכנות: ${out.map((o) => o.error || o.rail).join(" | ")}`,
+      };
+    },
+  },
+  {
+    id: "fleet.presence",
+    name: "נוכחות-הצי ברשת — מפקד חי",
+    kind: "skill",
+    desc: 'מפקד-נוכחות חי של 12 חשבונות-הצי על שלוש-המסילות (steem/hive/blurt): לאילו קיימים שם, מתי נוצרו, כמה פוסטים, יתרות-נזילות, כוח-שרשרת (vesting), עוקבים, ומתי הפעילות-האחרונה. זו האמת על "איפה אנחנו ברשת" — לא מטענה, מדידה. עליה בונים: פרסום מרובה-מסילה, הערכת-השפעה, וזיהוי חשבונות-רדומים.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const rails: Array<"steem" | "hive" | "blurt"> = ["steem", "hive", "blurt"];
+      const names = [...FLEET_ACCOUNTS];
+      const per = await Promise.all(
+        rails.map(async (rail) => {
+          try {
+            const rows = await railAccounts(rail, names);
+            const found = rows.map((a) => ({
+              name: a.name,
+              created: a.created ? String(a.created).slice(0, 10) : null,
+              posts: Number(a.post_count) || 0,
+              followers: typeof a.follower_count === "number" ? a.follower_count : null,
+              liquid: a.balance ?? a.hbd_balance ?? null,
+              vesting: a.vesting_shares ?? null,
+              lastPost: a.last_post ? String(a.last_post).slice(0, 10) : null,
+            }));
+            return { rail, reachable: true, found, missing: names.filter((n) => !found.some((f) => f.name === n)) };
+          } catch (e) {
+            return { rail, reachable: false, found: [], missing: names, error: (e instanceof Error ? e.message : String(e)).slice(0, 120) };
+          }
+        }),
+      );
+      const summary = per
+        .map((p) => `${p.rail}: ${p.reachable ? `${p.found.length}/${names.length} חשבונות` : "לא-נגישה"}`)
+        .join(" · ");
+      return {
+        measuredAt: new Date().toISOString(),
+        rails: per.map((p) => ({ rail: p.rail, reachable: p.reachable, count: p.found.length, missing: p.missing, accounts: p.found.slice(0, 12) })),
+        meaning: `נוכחות-חיה — ${summary}. השווה בין-המסילות: איפה אנחנו חזקים, איפה חסרים, ומי רדום (אפס-פוסטים/לא-מאוחר-פעילות).`,
+      };
+    },
+  },
+  {
+    id: "social.engagement",
+    name: "מדידת-הד — האם הרשת שומעת אותנו",
+    kind: "connector",
+    desc: 'סגירת-הלולאה של הקול-הריבוני: הפוסטים-האחרונים של @headcorner על שלוש-המסילות — לכל אחד הצבעות-אמיתיות (net_votes), תגובות (children) ותשלום-ממתין. "פרסמנו" אינו הצלחה; "הרשת קראה והגיבה" היא. מדוד את ההד, זהה איזו מסילה קוראת אותנו, ודווח בכנות גם על אפס-הד.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const rails: Array<"steem" | "hive" | "blurt"> = ["steem", "hive", "blurt"];
+      const per = await Promise.all(
+        rails.map(async (rail) => {
+          try {
+            const posts = await railBlogPosts(rail, "headcorner", 5);
+            const measured = posts.map((p) => ({
+              permlink: String(p.permlink || "").slice(0, 80),
+              title: String(p.title || "").slice(0, 70),
+              votes: Number(p.netVotes) || 0,
+              comments: Number(p.comments) || 0,
+              payout: String(p.payout || "").slice(0, 24) || null,
+              at: p.created ? String(p.created).slice(0, 10) : null,
+            }));
+            const totalVotes = measured.reduce((s, m) => s + m.votes, 0);
+            const totalComments = measured.reduce((s, m) => s + m.comments, 0);
+            return { rail, reachable: true, posts: measured, totalVotes, totalComments };
+          } catch (e) {
+            return { rail, reachable: false, posts: [], totalVotes: 0, totalComments: 0, error: (e instanceof Error ? e.message : String(e)).slice(0, 120) };
+          }
+        }),
+      );
+      const line = per.map((p) => p.reachable ? `${p.rail}: ${p.posts.length} פוסטים · ${p.totalVotes} הצבעות · ${p.totalComments} תגובות` : `${p.rail}: לא-נגישה`).join(" · ");
+      const heard = per.some((p) => p.reachable && (p.totalVotes > 0 || p.totalComments > 0));
+      return {
+        measuredAt: new Date().toISOString(),
+        rails: per.map((p) => ({ rail: p.rail, reachable: p.reachable, posts: p.posts.slice(0, 5), totalVotes: p.totalVotes, totalComments: p.totalComments })),
+        meaning: `מדידת-הד — ${line}. ${heard ? "יש הד: זהה איזה נושא/מסילה מגיבים אליו ושמור על הקצב." : "אפס-הד נמדד — זה ממצא כן, לא כשל: דווח והציע (goal.propose) אסטרטגיית-תוכן אחרת."}`,
+      };
+    },
+  },
+  {
+    id: "governance.scan",
+    name: "סריקת-ממשל — הצבעות-עדים ונציגויות",
+    kind: "connector",
+    desc: 'טביעת-הרגל-הממשלתית של הצי: לכל חשבונות-הצי על steem/hive/blurt — למי הם מצביעים-עדים (witness_votes), האם יש נציגות (proxy שמאציל את ההצבעה), ואילו חשבונות ממשלים-בשתיקה (אף-הצבעה, אף-נציגות). הממשל הוא חצי-מהריבונות על שרשרת-גרפן; סריקה זו היא איך הצי יודע אם הוא מתאמץ בה.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const rails: Array<"steem" | "hive" | "blurt"> = ["steem", "hive", "blurt"];
+      const names = [...FLEET_ACCOUNTS];
+      const per = await Promise.all(
+        rails.map(async (rail) => {
+          try {
+            const rows = await railAccounts(rail, names);
+            const voters = rows
+              .filter((a) => Array.isArray(a.witness_votes) && a.witness_votes.length > 0)
+              .map((a) => ({ name: a.name, votes: (a.witness_votes || []).slice(0, 30) }));
+            const proxies = rows.filter((a) => typeof a.proxy === "string" && a.proxy.length > 0).map((a) => ({ name: a.name, proxy: a.proxy }));
+            return { rail, reachable: true, voters, proxies, silent: rows.filter((a) => !(Array.isArray(a.witness_votes) && a.witness_votes.length) && !a.proxy).map((a) => a.name) };
+          } catch (e) {
+            return { rail, reachable: false, voters: [], proxies: [], silent: names, error: (e instanceof Error ? e.message : String(e)).slice(0, 120) };
+          }
+        }),
+      );
+      const line = per.map((p) => p.reachable ? `${p.rail}: ${p.voters.length} מצביעים · ${p.proxies.length} נציגויות · ${p.silent.length} שותקים` : `${p.rail}: לא-נגישה`).join(" · ");
+      return {
+        measuredAt: new Date().toISOString(),
+        rails: per.map((p) => ({ rail: p.rail, reachable: p.reachable, voters: p.voters.slice(0, 12), proxies: p.proxies, silent: p.silent.slice(0, 12) })),
+        meaning: `טביעת-רגל ממשלתית — ${line}. שותקים רבים = ריבונות-חצויה: יש לנו מפתחות אבל לא משתמשים בכוח-ההצבעה. הצבעה-לעדים היא פעולת-posting (steem.interact אינה מצביעה-עדים — הצע מסלול אם הממצא דורש).`,
+      };
+    },
+  },
+  {
+    id: "vault.rescan",
+    name: "סריקת-יבוא — סגירת-תיק-הכספת",
+    kind: "actor",
+    desc: 'המשימה-שסוגרת-חורים: כל כניסות-הכספת שעדיין "imported" (חומר-ירושה שמעולם לא הוכח-חי) נסרקות מול השרשרת עצמה — אותה מכונת-אימות של הסריקה-המלאה, אותם חוקי-שימור (rotated-out לא יורד, רשת-שותקת נשאר imported בכנות). כספת-נעולה אינה כשל — המודול משיב בכנות "נעולה" והריצה מסתיימת-כן.',
+    args: "{}",
+    needsVault: false, // handles the locked vault itself — an honest answer, not an error
+    cacheable: false,
+    async exec() {
+      if (!masterReady()) {
+        return {
+          ok: false,
+          locked: true,
+          meaning: "הכספת חתומה — סריקת-יבוא נדחית בכנות. זו תשובה כנה (לא כשל): המשימה תרוץ שוב בתור-היומי שלה כשהכספת פתוחה.",
+        };
+      }
+      const r = await verifyImported();
+      return {
+        ok: true,
+        scanned: r.scanned,
+        verified: r.verified,
+        failed: r.failed,
+        stillImported: r.stillImported,
+        details: r.entries.slice(0, 30).map((v) => ({ id: v.id, liveOk: v.liveOk, detail: String(v.detail || "").slice(0, 120) })),
+        meaning: r.scanned
+          ? `סריקת-יבוא: ${r.scanned} נסרקו · ${r.verified} הוכחו-חי · ${r.failed} נכשלו-חי · ${r.stillImported} עדיין imported (רשת-שותקת — כנות). התיק-נסגר צעד-אחד.`
+          : `אפס כניסות-imported — תיק-היבוא סגור לגמרי (זו הצלחה-מלאה; אין מה לסרוק).`,
+      };
+    },
+  },
+  {
+    id: "schedule.propose",
+    name: "אדריכל-תעסוקה — הצעת-סיור קבוע",
+    kind: "actor",
+    desc: `הסוכן מעצב תעסוקה משלו: הצעה לסיור-קבוע חדש (שם, קצב daily-hourUtc או interval-everyMs, מטרה בעברית, doneMeans, תקציב 2-8). ההצעה נכנסת לפאנל יוזמות-היעד כ-hint "schedule-create" — מבני-תעסוקה הם החלטה-ריבונית: מנוע-המדיניות לעולם לא מאמץ סיור-חדש אוטומטית, רק המפעיל (אישור = יצירת-סיור אמיתית, לא ריצה). הצע רק סיורים-שתורמים-לרשת ושאתה באמת תרצה לרוץ בהם.`,
+    args: `{"label":"שם-עברי קצר","kind":"daily|interval","hourUtc":0-23 (daily)","everyMs":≥600000 (interval)","goal":"מטרת-הסיור בעברית, 20-600 תווים","doneMeans":["קריטריון-ראיה","..."],"budget":2-8,"maxPerDay":1-12}`,
+    needsVault: false,
+    cacheable: false,
+    async exec(args, ctx) {
+      const label = String(args.label || "").trim();
+      const kind = args.kind === "interval" ? "interval" : args.kind === "daily" ? "daily" : "";
+      const goal = String(args.goal || "").trim();
+      const budget = Math.min(Math.max(Number(args.budget) || 3, 2), 8);
+      const maxPerDay = Math.min(Math.max(Number(args.maxPerDay) || 4, 1), 12);
+      const hourUtc = Number.isFinite(Number(args.hourUtc)) ? Math.min(Math.max(Number(args.hourUtc), 0), 23) : null;
+      const everyMs = Number.isFinite(Number(args.everyMs)) ? Math.max(Number(args.everyMs), 600_000) : null;
+      const doneMeans = Array.isArray(args.doneMeans) ? args.doneMeans.map((d) => String(d).slice(0, 200)).filter(Boolean).slice(0, 6) : [];
+      if (label.length < 3 || label.length > 60) throw new GateError("bad-input", "דרוש label בעברית (3-60 תווים)");
+      if (!kind) throw new GateError("bad-input", 'דרוש kind "daily" או "interval"');
+      if (kind === "daily" && hourUtc === null) throw new GateError("bad-input", "daily דורש hourUtc (0-23)");
+      if (kind === "interval" && !everyMs) throw new GateError("bad-input", "interval דורש everyMs (≥ 600000)");
+      if (goal.length < 20 || goal.length > 600) throw new GateError("bad-input", "דרוש goal בעברית (20-600 תווים)");
+      if (!doneMeans.length) throw new GateError("bad-input", "דרוש doneMeans — סיור בלי שער-מעבר אינו תעסוקה");
+      const dup = await db.gateSchedule.findFirst({ where: { label } });
+      if (dup) throw new GateError("dup-schedule", `קיים כבר סיור בשם "${label}" — הצע שם-אחר`);
+      const payload = { label, kind, hourUtc: kind === "daily" ? hourUtc : null, everyMs: kind === "interval" ? everyMs : null, budget, maxPerDay, modules: null /* הסט החמוש של המציע ישלוט */ };
+      const p = await db.gateProposal.create({
+        data: {
+          agentName: ctx.agentName,
+          kind: "schedule-create",
+          goal: `הצעת-סיור קבוע חדש: "${label}" (${kind === "daily" ? `יומי @ ${hourUtc}:00 UTC` : `כל ${Math.round(everyMs! / 60_000)} דקות`}) — ${goal}`,
+          rationale: `הסוכן ${ctx.agentName} עיצב תעסוקה חוזרת לעצמו (r15 schedule.propose). אימוץ = החלטת-מפעיל בלבד; מנוע-המדיניות אינו נוגע בסוג זה.`,
+          doneMeans: JSON.stringify(doneMeans),
+          budget,
+          payload: JSON.stringify(payload),
+        },
+      });
+      await db.gateMessage.create({
+        data: { channel: "command", fromKind: "system", fromName: "harness", body: `🌸 הסוכן ${ctx.agentName} הציע סיור-קבוע חדש: "${label}" — ממתין להכרעת-המפעיל בפאנל יוזמות-היעד` },
+      }).catch(() => {});
+      return { proposalId: p.id, kind: "schedule-create", payload, meaning: "הצעת-הסיור הוגשה — רק המפעיל מאמץ תעסוקה-חוזרת (אישור ייצור אותה בפועל)" };
     },
   },
 ];

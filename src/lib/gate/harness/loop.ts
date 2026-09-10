@@ -570,7 +570,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
       `🎯 מטרה: ${run.goal}`,
     ];
     if (run.origin !== "manual") {
-      const originText = run.origin === "schedule" ? "⏰ סיור מתוכנן (לב-האוטונומיה)" : run.origin === "proposal" ? "💡 יוזמת-יעד (הסוכן הציע — הגבול אישר)" : "⚡ טריגר אירוע";
+      const originText = run.origin === "schedule" ? "⏰ סיור מתוכנן (לב-האוטונומיה)" : run.origin === "proposal" ? "💡 יוזמת-יעד (הסוכן הציע — הגבול אישר)" : run.origin === "idle" ? "🌿 תעסוקה-עצמית (הלב שיגר כשהצי פנוי)" : "⚡ טריגר אירוע";
       lines.push(`🧬 מקור: ${originText}${recovering ? " · התאוששות מקריסה" : ""}`);
     } else if (recovering) {
       lines.push("🫀 התאוששות-מקריסה — העקבות חודשו מה-DB");

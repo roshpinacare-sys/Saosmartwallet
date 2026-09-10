@@ -93,7 +93,7 @@ interface Inventory {
   // the custody banner's "awaiting operator" claim is computed from it,
   // never hardcoded (the old hardcoded "open" claim outlived its truth:
   // the r12 filing was auto-expired by policy and the page kept lying).
-  steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string } | null;
+  steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string; runId?: string | null; runStatus?: string | null } | null;
 }
 interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
@@ -119,11 +119,11 @@ interface ActionRow { id: string; agentName: string; action: string; params: str
 interface ScheduleRow { id: string; label: string; agentName: string; goal: string; kind: string; everyMs: number | null; hourUtc: number | null; budget: number; maxPerDay: number; dayCount: number; dayKey: string | null; enabled: boolean; lastRunAt: string | null; nextRunAt: string }
 interface EventRow { id: string; type: string; payload: { agent?: string; body?: string; goal?: string; gaps?: string; by?: string } | null; source: string; consumed: boolean; createdAt: string }
 interface TriggerRow { id: string; on: string; agentName: string; goalTemplate: string; budget: number; cooldownMs: number; maxPerDay: number; dayCount: number; enabled: boolean }
-interface ProposalRow { id: string; agentName: string; goal: string; rationale: string | null; doneMeans: string; budget: number; status: string; decidedBy: string | null; runId: string | null; createdAt: string; decidedAt: string | null }
+interface ProposalRow { id: string; agentName: string; goal: string; rationale: string | null; doneMeans: string; budget: number; kind?: string; status: string; decidedBy: string | null; runId: string | null; createdAt: string; decidedAt: string | null }
 interface ProposalPolicyRow { autoApprove: boolean; maxAutoPerDay: number; maxBudget: number }
 interface CheckerStatsRow { verdicts: number; firstPass: number; repairPass: number; blocked: number; errors: number }
 interface MemoryRow { id: string; key: string; kind: string; body: string; source: string; refCount: number; updatedAt: string }
-interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired?: number; marketMoves?: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
+interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired?: number; marketMoves?: number; idleFired?: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
 interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[]; proposals?: ProposalRow[]; proposalPolicy?: ProposalPolicyRow; checkerStats?: CheckerStatsRow | null }
 interface OrderRow { id: string; agentName: string; runId: string | null; op: string; account: string; spec: string; preview: string; notionalSteem: number; status: string; decidedBy: string | null; previewTxId: string | null; broadcastId: string | null; blockNum: number | null; error: string | null; createdAt: string; decidedAt: string | null }
 interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalSteem: number; maxSignedPerDay: number; pendingExpiryMs: number; defaultTtlSeconds: number }; account: string; signedToday: number; vaultOpen: boolean; error?: string }
@@ -870,7 +870,14 @@ function VaultGrid() {
                     const s = inv?.steemautoProposal;
                     if (!s) return <span className="text-zinc-400">אין כרגע הצעה פתוחה לסגירתן.</span>;
                     if (s.status === "pending") return <span className="text-amber-300">הצעה פתוחה כרגע ממתינה להכרעת-המפעיל לסגירתן (פאנל יוזמות-היעד).</span>;
-                    if (s.status === "launched") return <span className="text-emerald-300">הריצה לסגירתן חיה כרגע.</span>;
+                    if (s.status === "launched") {
+                      // gap-57 — the claim follows the RUN's real state, not the proposal's optimism
+                      if (s.runStatus === "queued" || s.runStatus === "running") return <span className="text-emerald-300">הריצה לסגירתן חיה כרגע.</span>;
+                      if (s.runStatus === "done") return <span className="text-emerald-300">הריצה הסתיימה — הדלתות נסגרו.</span>;
+                      if (s.runStatus === "blocked" || s.runStatus === "failed") return <span className="text-rose-300">הריצה נעצרה כנה (הסוכן דיווח: אין עדיין כלי-חתימה ל-account_update) — נדרש צעד-הנדסה ואישור-מפעיל חוזר.</span>;
+                      return <span className="text-emerald-300">הריצה הוזנקה על-ידי המפעיל.</span>;
+                    }
+                    if (s.status === "adopted") return <span className="text-lime-300">ההצעה אומצה כסיור-קבוע.</span>;
                     if (s.status === "rejected") return <span className="text-rose-300">המפעיל דחה את הצעת-הסגירה.</span>;
                     return <span className="text-zinc-400">ההצעה פגתה במדיניות — דורשת הגשה-מחדש.</span>;
                   })()}
@@ -1286,6 +1293,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               <span title="סיורים שהוזנקו מתוכננים">patrols {c.schedulesFired}</span>
               <span title="ריצות שהוזנקו מטריגרי-אירוע">triggers {c.triggersFired}</span>
               <span title="יוזמות-יעד שהוזנקו מהצעות סוכנים">initiatives {c.proposalsFired}</span>
+              <span className="text-lime-300/80" title="תעסוקה-עצמית: משימות-רשת קלות שהלב שיגר כשהצי פנוי לגמרה">self-employed {c.idleFired ?? 0}</span>
               <span title="פקודות-DEX ממתינות שפגו ללא הכרעה">orders-expired {c.ordersExpired ?? 0}</span>
               <span title="אזעקות-שוק שהלב הפיק על תזוזת מחיר אמתית">market-alarms {c.marketMoves ?? 0}</span>
               <span title="ריצות קרוסות שהשומר החזיר לתור">reaped {c.reaped}</span>
@@ -1376,7 +1384,8 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               {h && h.proposals && h.proposals.map((p) => (
                 <div key={p.id} className={"rounded-xl border px-3 py-2.5 " + (p.status === "pending" ? "border-amber-500/30 bg-amber-500/5" : "border-zinc-800 bg-black/40")}>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (p.status === "pending" ? "text-amber-300 border-amber-500/40" : p.status === "launched" ? "text-emerald-300 border-emerald-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{p.status}</Badge>
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (p.status === "pending" ? "text-amber-300 border-amber-500/40" : p.status === "launched" ? "text-emerald-300 border-emerald-500/40" : p.status === "adopted" ? "text-lime-300 border-lime-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{p.status}{p.kind && p.kind !== "run" ? " · סיור" : ""}</Badge>
+                    {p.kind && p.kind !== "run" && <span className="text-[9px] text-lime-300/80 shrink-0" title="הצעת-תעסוקה חוזרת — אישור ייצור סיור קבוע אמיתי">🌸 אדריכל-תעסוקה</span>}
                     <span className="text-[11px] font-mono text-zinc-400 shrink-0">{p.agentName}</span>
                     <span className="text-[10px] text-zinc-600 font-mono shrink-0" dir="ltr">budget {p.budget}</span>
                     {p.decidedBy && <span className="text-[9px] text-zinc-600 shrink-0">הוכרע ע&quot;י {p.decidedBy === "operator" ? "המפעיל" : "המדיניות"}</span>}
@@ -1836,7 +1845,7 @@ function Agents() {
                   <span className={"h-2 w-2 rounded-full shrink-0 " + (r.status === "done" ? "bg-emerald-400" : r.status === "blocked" ? "bg-amber-400" : r.status === "failed" ? "bg-rose-400" : "bg-zinc-500 animate-pulse")} aria-hidden />
                   <span className="font-mono text-xs text-zinc-300" dir="ltr">{r.agentName}</span>
                   {r.origin && r.origin !== "manual" && (
-                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (r.origin === "schedule" ? "text-sky-300 border-sky-500/40" : r.origin === "proposal" ? "text-purple-300 border-purple-500/40" : "text-amber-300 border-amber-500/40")} dir="ltr">{r.origin === "schedule" ? "⏰ סיור" : r.origin === "proposal" ? "💡 יוזמה" : "⚡ טריגר"}</Badge>
+                    <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (r.origin === "schedule" ? "text-sky-300 border-sky-500/40" : r.origin === "proposal" ? "text-purple-300 border-purple-500/40" : r.origin === "idle" ? "text-lime-300 border-lime-500/40" : "text-amber-300 border-amber-500/40")} dir="ltr">{r.origin === "schedule" ? "⏰ סיור" : r.origin === "proposal" ? "💡 יוזמה" : r.origin === "idle" ? "🌿 עצמית" : "⚡ טריגר"}</Badge>
                   )}
                   {(r.attempt ?? 0) > 1 && <Badge variant="outline" className="text-[9px] font-mono text-emerald-300 border-emerald-500/40 shrink-0" dir="ltr">🫀 התאושש</Badge>}
                   <span className="text-xs text-zinc-500 truncate max-w-[40%]">{r.goal}</span>
