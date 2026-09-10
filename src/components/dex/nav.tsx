@@ -8,7 +8,7 @@ import { useState } from 'react';
 import {
   ArrowLeftRight, CandlestickChart, Droplets, Wallet, Anchor, Coins,
   Fingerprint, Landmark, Zap, ScrollText, Settings2, LogIn, LogOut,
-  Menu, ChevronDown, Activity, Globe2,
+  Menu, ChevronDown, Activity, Globe2, DoorOpen,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
@@ -19,11 +19,12 @@ import type { StatusData } from '@/components/sv/shared';
 import type { World } from './common';
 import { fmtInt } from './common';
 
-export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'portfolio' | 'estate' | 'anchors'
+export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'portfolio' | 'estate' | 'anchors' | 'door'
   | 'vault' | 'towers' | 'ops' | 'audit' | 'settings';
 
 export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'swap', label: 'בורסה', icon: ArrowLeftRight },
+  { id: 'door', label: 'דלת-מטבעות', icon: DoorOpen },
   { id: 'pro', label: 'מסחר', icon: CandlestickChart },
   { id: 'pools', label: 'בריכות', icon: Droplets },
   { id: 'economy', label: 'כלכלה', icon: Coins },
@@ -165,7 +166,7 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
   online: boolean;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const bottomItems = EXCHANGE_NAV.filter(v => v.id !== 'anchors');
+  const bottomItems = EXCHANGE_NAV.filter(v => v.id !== 'anchors' && v.id !== 'estate' && v.id !== 'door').slice(0, 4);
 
   return (
     <>
@@ -202,15 +203,15 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
           {/* more sheet */}
           <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger className="flex flex-col items-center gap-0.5 py-1.5">
-              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
-              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
+              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate', 'door'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
+              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate', 'door'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
             </SheetTrigger>
             <SheetContent side="bottom" className="dx-card border-[color:var(--line)] rounded-t-3xl px-4 pt-3 pb-8" dir="rtl">
               <SheetHeader className="p-0 mb-2">
                 <SheetTitle className="text-sm text-[color:var(--text-1)]">כל התצוגות</SheetTitle>
               </SheetHeader>
               <div className="grid grid-cols-3 gap-2">
-                {[{ id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, { id: 'estate' as ViewId, label: 'אחוזה', icon: Globe2 }, ...PLATFORM_NAV].map(v => {
+                {[{ id: 'door' as ViewId, label: 'דלת-מטבעות', icon: DoorOpen }, { id: 'portfolio' as ViewId, label: 'תיק', icon: Wallet }, { id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, { id: 'estate' as ViewId, label: 'אחוזה', icon: Globe2 }, ...PLATFORM_NAV].map(v => {
                   const Icon = v.icon;
                   return (
                     <button key={v.id} onClick={() => { onNavigate(v.id); setMoreOpen(false); }}

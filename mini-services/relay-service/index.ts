@@ -72,13 +72,16 @@ async function guardianBoot(): Promise<void> {
     if (await portBusy(3000)) return;
     // FIX(Roast-66 · spawn-env-minimal): היה — env: {...process.env} — כל-סביבת
     // ההורה (כולל-כל-מה-שנטען-מה-.env) זלגה-לילד. Next.js טוען-את-.env-שלו-בעצמו —
-    // הילד-צריך-רק-בסיס. סודות-מפורשים-נמחקים belt&braces.
-    const childEnv: NodeJS.ProcessEnv = {};
-    for (const k of ['PATH', 'HOME', 'NODE_ENV', 'TERM', 'LANG', 'TMPDIR']) {
-      if (process.env[k]) childEnv[k] = process.env[k];
-    }
-    delete childEnv.SOVEREIGN_VAULT_SECRET;
-    delete childEnv.SOVEREIGN_RELAY_TOKEN;
+    // הילד-צריך-רק-בסיס. סודות-לא-נכללים-כלל (allow-list במקום deny-list).
+    // FIX(Task 72 · types): @types/node-חדש מחייב NODE_ENV ב-ProcessEnv.
+    const childEnv: NodeJS.ProcessEnv = {
+      NODE_ENV: process.env.NODE_ENV || "production",
+      PATH: process.env.PATH ?? "",
+      HOME: process.env.HOME ?? "",
+      TERM: process.env.TERM,
+      LANG: process.env.LANG,
+      TMPDIR: process.env.TMPDIR,
+    };
     // FIX(Roast-66 · spawn-stdio+verify): היה — stdio:'ignore' + אפס-אימות-שגר
     // (דפוס-65-b-M6-הישן: EADDRINUSE/קריסות-שגר שותקות; TOCTOU probe→bind).
     // עכשיו: stdout/stderr → קובץ-לוג (0600) + poll-אימות-עד-90ש׳ עם-פסק-כן.

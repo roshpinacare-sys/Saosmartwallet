@@ -73,7 +73,7 @@ export type LpValuation = { key: string; valueMu: number; sharePct?: number };
 
 // FIX(Roast-70 · real-assets): WBLURT (עטיפה-מגובה-1:1 ב-BLURT, roast-66) ו-LB|LA (טוקן-השקה
 // שסיים-לבריכה-חיה) היו-נכסי-מנוע-אמת אך-בלתי-נראים-ל-UI — עכשיו סחירים/מוצגים.
-export const DEX_ASSETS = ['SAOS', 'USDS', 'WSTEEM', 'ENERGY', 'WSBD', 'PHIVE', 'STEEM', 'WBLURT', 'LB|LA'] as const;
+export const DEX_ASSETS = ['SAOS', 'USDS', 'WSTEEM', 'ENERGY', 'WSBD', 'PHIVE', 'STEEM', 'WBLURT', 'LB|LA', 'WTRX', 'WSOL'] as const;
 export type DexAsset = (typeof DEX_ASSETS)[number];
 
 // deterministic token identity — pastel medallion + honest label
@@ -87,6 +87,8 @@ export const TOKEN_META: Record<string, { name: string; hue: number }> = {
   PHIVE: { name: 'pHIVE', hue: 40 },
   WBLURT: { name: 'Wrapped BLURT', hue: 210 },   // עטיפה 1:1 מגובה ב-BLURT
   'LB|LA': { name: 'Launch A', hue: 265 },       // טוקן-השקה (launchpad)
+  WTRX: { name: 'Wrapped TRX', hue: 12 },        // דלת-המטבעות: פקדות-TRX אמת (Task 72)
+  WSOL: { name: 'Wrapped SOL', hue: 160 },       // דלת-המטבעות: פקדות-SOL אמת (Task 72)
 };
 
 export function tokenColor(sym: string): string {

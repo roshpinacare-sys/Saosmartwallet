@@ -29,6 +29,7 @@ const ALLOWED = new Set([
   'program',  // POST — Task 56: מסחר-אוטומטי חסר-קיפרים (DCA + טריגרים stop/take)
   'launchpad', // POST — Task 57/58: מסילת-ההשקות (עקומה/LBP + קנייה/מכירה — רב-משתמשי)
   'cow',      // POST — Task 58: הזמנות-אצווה CoW (מחיר-אחיד · עודף-לסוחרים)
+  'door',     // POST — Task 72: דלת-המטבעות (peg-in/peg-out/open-pool/refresh-oracle — TRX/SOL)
 ]);
 
 export async function POST(req: NextRequest) {

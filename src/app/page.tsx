@@ -27,6 +27,7 @@ import { EconomyView } from '@/components/dex/economy-view';
 import { PortfolioView } from '@/components/dex/portfolio-view';
 import { EstateView } from '@/components/dex/estate-view';
 import { AnchorsView } from '@/components/dex/anchors-view';
+import { DoorView } from '@/components/dex/door-view';
 
 export default function SovereignDex() {
   const [booted, setBooted] = useState(false);
@@ -269,6 +270,13 @@ export default function SovereignDex() {
         )}
         {view === 'estate' && <EstateView />}
         {view === 'anchors' && <AnchorsView world={world} />}
+        {view === 'door' && (
+          <DoorView
+            onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }}
+            onNavigate={v => setView(v)}
+            onDone={refetchNow}
+          />
+        )}
 
         {/* platform views — the sovereign control center, dark-skinned */}
         {view === 'vault' && (
