@@ -1775,7 +1775,7 @@ function Bridge() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [live, setLive] = useState(false); // SSE connected — push beats polling
-  const endRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const r = await apiJson<{ ok: boolean; messages: Msg[] }>("/api/gate/messages");
@@ -1812,7 +1812,19 @@ function Bridge() {
       if (poll) clearInterval(poll);
     };
   }, [load]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [msgs]);
+  // Chat etiquette: follow fresh messages ONLY when the reader is already at
+  // the bottom of the bridge AND the bridge is on-screen. We scroll the INNER
+  // container (scrollTop) — which by construction can never drag the page —
+  // instead of scrollIntoView, which yanked the whole window down to §05 on
+  // every SSE push (user-reported: "הגשר כל הזמן מושך את הדף").
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || typeof window === "undefined") return;
+    const rect = vp.getBoundingClientRect();
+    const onScreen = rect.top < window.innerHeight && rect.bottom > 0;
+    const atBottom = vp.scrollHeight - vp.scrollTop - vp.clientHeight < 140;
+    if (onScreen && atBottom) vp.scrollTop = vp.scrollHeight;
+  }, [msgs]);
 
   async function send() {
     const body = input.trim();
@@ -1836,7 +1848,7 @@ function Bridge() {
               {live ? "live stream" : "polling"}
             </span>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto scroll-thin px-5 py-4">
+          <div ref={viewportRef} className="flex-1 min-h-0 overflow-y-auto scroll-thin px-5 py-4">
             <div className="space-y-3">
               {msgs.map((m) => (
                 <div key={m.id} className={"flex gap-2.5 items-start " + (m.fromKind === "operator" ? "flex-row-reverse" : "")}>
@@ -1858,7 +1870,6 @@ function Bridge() {
                 </div>
               ))}
               {msgs.length === 0 && <p className="text-sm text-zinc-500 text-center py-10">הערוץ ריק — כתוב פקודה ראשונה</p>}
-              <div ref={endRef} />
             </div>
           </div>
           <div className="border-t border-zinc-800/80 p-3.5 flex gap-2 bg-black/40">
