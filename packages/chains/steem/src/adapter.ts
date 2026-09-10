@@ -68,6 +68,15 @@ export function validateAccountName(name: string): string {
 export interface SteemAdapterOptions {
   /** JSON-RPC endpoint, e.g. https://api.steemit.com (D1 dev endpoint). */
   rpcUrl: string;
+  /**
+   * Ordered failover endpoints (roast-2026-09-10 round 3): the WRITE path was
+   * a single point of failure — one dead primary node killed every broadcast
+   * while the read rails had failover. Each rpc() call tries rpcUrl first,
+   * then every rpcUrls entry in order. Chain REJECTS (RPC error bodies) still
+   * propagate — failover is for transport failures, never for the chain's
+   * own verdict on a transaction.
+   */
+  rpcUrls?: string[];
   /** 32-byte chain id. Default: Steem mainnet (32 zero bytes). Forks MUST override. */
   chainId?: Uint8Array;
   /** Public key prefix. Default "STM" (mainnet); testnet forks use "TST". */
@@ -120,17 +129,32 @@ export class SteemAdapter implements ChainAdapter {
 
   // -- transport -----------------------------------------------------------
 
+  /** Endpoints tried in order per call (primary first). Duplicates deduped. */
+  private get endpoints(): string[] {
+    return [...new Set([this.opts.rpcUrl, ...(this.opts.rpcUrls ?? [])])];
+  }
+
   private async rpc<T>(method: string, params: unknown): Promise<T> {
-    const res = await fetch(this.opts.rpcUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-      signal: AbortSignal.timeout(this.timeoutMs),
-    });
-    if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText}`);
-    const body = (await res.json()) as { result?: T; error?: { message?: string } };
-    if (body.error) throw new Error(`RPC error: ${body.error.message ?? "unknown"}`);
-    return body.result as T;
+    let lastErr: unknown = null;
+    for (const url of this.endpoints) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+          signal: AbortSignal.timeout(this.timeoutMs),
+        });
+        if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText}`);
+        const body = (await res.json()) as { result?: T; error?: { message?: string } };
+        if (body.error) throw new Error(`RPC error: ${body.error.message ?? "unknown"}`);
+        return body.result as T;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw new Error(
+      `all ${this.endpoints.length} endpoints failed for ${method}: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+    );
   }
 
   // -- ChainAdapter: read paths ---------------------------------------------

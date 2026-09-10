@@ -137,8 +137,10 @@ export interface RailPost {
   category: string; // the root post's parent_permlink — an EDIT must preserve it
   title: string;
   created: string;
+  lastUpdate: string; // STEEM_MIN_COMMENT_EDIT_INTERVAL pacing reads this
   payout: string; // pending or claimed — whichever the chain reports
-  bodyPreview: string;
+  bodyPreview: string; // bounded preview for UI lists
+  body: string; // FULL body — the doctrine audit scans the WHOLE post, not its first 400 chars
   tags: string[];
   jsonMetadata: string;
 }
@@ -166,8 +168,10 @@ export async function railBlogPosts(rail: Rail, account: string, limit = 10): Pr
       category: String(p.category || tags[0] || ""),
       title: String(p.title || ""),
       created: String(p.created || ""),
+      lastUpdate: String(p.last_update || p.created || ""),
       payout: String(p.pending_payout_value || p.total_payout_value || "0"),
       bodyPreview: String(p.body || "").slice(0, 400),
+      body: String(p.body || ""),
       tags,
       jsonMetadata: String(p.json_metadata || "{}"),
     };
@@ -186,8 +190,10 @@ export async function railGetContent(rail: Rail, author: string, permlink: strin
     category: String((p as Record<string, string>).category || tags[0] || ""),
     title: String(p.title || ""),
     created: String(p.created || ""),
+    lastUpdate: String((p as Record<string, string>).last_update || p.created || ""),
     payout: String(p.pending_payout_value || p.total_payout_value || "0"),
-    bodyPreview: String(p.body || ""),
+    bodyPreview: String(p.body || "").slice(0, 400),
+    body: String(p.body || ""),
     tags,
     jsonMetadata: String(p.json_metadata || "{}"),
   };
@@ -246,15 +252,23 @@ export async function verifyPostingKeyOnChain(
   if (!auths.length) return { ...base, hasChainAccount: true, reason: "לחשבון אין authority-posting בכלל" };
   base.hasChainAccount = true;
   base.hasPostingAuthority = true;
-  base.chainPub = String(auths[0][0]);
-  let chain33: Uint8Array;
-  try {
-    chain33 = steemPublicKeyDecode(base.chainPub, ["STM", "TST", "HIVE", "BLURT"]);
-  } catch {
-    return { ...base, reason: `מפתח-השרשרת לא פוענח (${base.chainPub.slice(0, 10)}…)` };
+  // roast r3 (truth-gap found live): only key_auths[0] was compared — an account
+  // with SEVERAL posting keys whose vault key sits in auths[1..] was falsely
+  // reported as a mismatch, fail-closing a perfectly valid key. Compare ALL.
+  const derived = Buffer.from(derived33);
+  for (const [pub] of auths) {
+    base.chainPub = String(pub);
+    let chain33: Uint8Array;
+    try {
+      chain33 = steemPublicKeyDecode(base.chainPub, ["STM", "TST", "HIVE", "BLURT"]);
+    } catch {
+      continue; // undecodable chain entry — try the next authority key
+    }
+    if (chain33.length === 33 && Buffer.compare(Buffer.from(chain33), derived) === 0) {
+      return { ...base, match: true };
+    }
   }
-  const match = chain33.length === 33 && Buffer.compare(Buffer.from(chain33), Buffer.from(derived33)) === 0;
-  return { ...base, match };
+  return { ...base, match: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,6 +281,7 @@ let hiveBroadcastSingleton: SteemAdapter | null = null;
 function hiveAdapterOpts() {
   return {
     rpcUrl: RAIL_ENDPOINTS.hive[0],
+    rpcUrls: RAIL_ENDPOINTS.hive.slice(1), // roast r3: hive write/read path failover, same lesson as steem
     chainId: HIVE_CHAIN_ID,
     addressPrefix: "STM", // hive nodes keep the legacy STM key prefix
     requestTimeoutMs: 15_000,

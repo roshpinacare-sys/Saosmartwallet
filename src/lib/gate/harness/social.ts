@@ -29,6 +29,7 @@ import {
   railBlogPosts,
   railGetContent,
   railHealth,
+  railRpc,
   verifyPostingKeyOnChain,
   type Rail,
   type RailHealth,
@@ -232,17 +233,46 @@ export async function editPostFromAgent(input: {
   title: string;
   body: string;
   tags?: string[];
+  /**
+   * roast r3: the daily cap bounds AGENT autonomy — but feed remediation is
+   * the OPERATOR's duty, and round 2's own remediation ran into the round-2
+   * cap it had filled (8/8). The override skips ONLY the day count, requires
+   * agentName==="operator" (any other name is refused), still passes the
+   * exposure gate + chain key proof, and is recorded loudly in the audit.
+   */
+  operatorOverride?: boolean;
 }): Promise<VoiceEditResult> {
   const rail: PublishRail = input.rail === "hive" ? "hive" : "steem";
-  const editsToday = await dayCount("sovereign-voice:edit");
-  if (editsToday >= SOCIAL_RAILS.maxEditsPerDay) {
-    throw new GateError("rate-limited", `תקרת-העריכות היומית מוצו (${editsToday}/${SOCIAL_RAILS.maxEditsPerDay}) — עריכה מתוכננת, לא ריסוק-היסטוריה`);
+  if (input.operatorOverride === true && input.agentName !== "operator") {
+    throw new GateError("bad-input", "עקיפת-תקרה מותרת למפעיל בלבד (agentName=operator)");
+  }
+  if (input.operatorOverride !== true) {
+    const editsToday = await dayCount("sovereign-voice:edit");
+    if (editsToday >= SOCIAL_RAILS.maxEditsPerDay) {
+      throw new GateError("rate-limited", `תקרת-העריכות היומית מוצו (${editsToday}/${SOCIAL_RAILS.maxEditsPerDay}) — עריכה מתוכננת, לא ריסוק-היסטוריה`);
+    }
   }
   const permlink = String(input.permlink || "").trim();
   if (!/^[a-z0-9-]{1,256}$/.test(permlink)) throw new GateError("bad-input", "permlink חייב להיות [a-z0-9-]");
+  // ── chain-polite comment-edit pacing ──────────────────────────────────
+  // STEEM_MIN_COMMENT_EDIT_INTERVAL (live-learned round 2): a comment can be
+  // edited at most once per block (~3s). A retry or a fast follow-up edit of
+  // the SAME post died on the node assert — the remediation tool learned 7s
+  // pacing, but the MODULE (the editor's daily hands) never got it. Read
+  // last_update from the chain and wait out the remainder, bounded.
   const original: RailPost | null = await railGetContent(rail, COMMANDER_ACCOUNT, permlink);
   if (!original) throw new GateError("no-post", `אין פוסט @${COMMANDER_ACCOUNT}/${permlink} על ${rail} — אין מה לערוך`);
   if (original.author !== COMMANDER_ACCOUNT) throw new GateError("not-ours", "רק פוסטים של הצי נערכים");
+  const lastEditMs = Date.parse(original.lastUpdate?.endsWith("Z") || !original.lastUpdate ? original.lastUpdate || "" : `${original.lastUpdate}Z`);
+  if (Number.isFinite(lastEditMs)) {
+    const sinceEditSec = (Date.now() - lastEditMs) / 1000;
+    const EDIT_INTERVAL_SEC = 8; // ~2 blocks — the live-learned polite pace
+    if (sinceEditSec < EDIT_INTERVAL_SEC) {
+      const waitMs = Math.ceil((EDIT_INTERVAL_SEC - sinceEditSec) * 1000);
+      await socialMsg(`⏳ ${input.agentName}: השרשרת מתירה עריכת-תגובה אחת לבלוק — ממתין ${waitMs}ms לפני עריכת @${COMMANDER_ACCOUNT}/${permlink}`, { runId: input.runId });
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
   const newBody = String(input.body || "");
   if (!newBody.trim() || newBody.length > SOCIAL_RAILS.maxPostBodyChars) {
     throw new GateError("bad-input", "גוף-עריכה חייב להיות לא ריק ובתוך התקרה");
@@ -251,6 +281,15 @@ export async function editPostFromAgent(input: {
   let tags = (input.tags && input.tags.length ? input.tags : original.tags).slice(0, SOCIAL_RAILS.maxTags);
   if (!tags.length && original.category) tags = [original.category];
   if (!tags.length) throw new GateError("bad-input", "לעריכה דרושות תגיות (המקור לא כלל תגיות ואין קטגוריה שמורה)");
+  // ── no-op guard (roast r3, self-caught LIVE): re-running the remediation tool
+  // re-broadcast 6 IDENTICAL edits — a zero-delta edit is a wasted transaction
+  // and the maker never learned it. If title+body+tags are all already the
+  // chain state, refuse loudly instead of burning a block on nothing.
+  const normTags = (xs: string[]) => [...new Set(xs.map((t) => t.trim().toLowerCase()))].sort();
+  const effTitle = String(input.title || original.title).trim() || original.title;
+  if (effTitle === original.title && newBody === original.body && JSON.stringify(normTags(tags)) === JSON.stringify(normTags(original.tags))) {
+    throw new GateError("no-op-edit", `התוכן זהה למה שכבר חי בשרשרת @${COMMANDER_ACCOUNT}/${permlink} — אין צורך בשידור (עריכת-אפס מבזבזת טרנזקציה)`);
+  }
   // ── exposure policy applies to edits too (tags scanned too) ───────────
   const exposure = assertPublishable(input.title, newBody, tags);
   const built = await buildSteemPostTx(
@@ -287,6 +326,10 @@ export interface FleetContentAuditRow {
   tags: string[];
   risk: string;
   findings: Array<{ kind: string; why: string; redacted: string }>;
+  /** Findings on parts an EDIT can never change (category = parent_permlink).
+   *  Reported honestly instead of silently dropped — and NOT counted into
+   *  needsEdit, so the editor loop never thrashes on the unfixable. */
+  immutableFindings: Array<{ kind: string; why: string; redacted: string }>;
   needsEdit: boolean;
 }
 
@@ -299,9 +342,17 @@ export interface FleetContentAudit {
 /**
  * The chain-truth audit: pull each managed publishing account's blog feed
  * per rail and run the exposure scanner over every post — "מי מפרסם מה,
- * מה חייב לצאת, מה חייב עריכה". Read-only, no keys, bounded (≤10 per rail).
+ * מה חייב לצאת, מה חייב עריכה". Read-only, no keys, bounded (≤20 per rail).
+ *
+ * roast r3 (two truth-gaps found live):
+ *   · this scan saw only the FIRST 400 CHARS of each post (bodyPreview) —
+ *     Hebrew/leaks deeper in a post were invisible to the very audit that
+ *     claims "scanned". It now scans the FULL body + tags + category.
+ *   · the category (parent_permlink) is IMMUTABLE on-chain — findings there
+ *     are reported as immutableFindings (disclosed, not "fixable") so the
+ *     editor never burns its daily cap re-editing what no edit can change.
  */
-export async function auditFleetContent(limitPerRail = 10): Promise<FleetContentAudit> {
+export async function auditFleetContent(limitPerRail = 20): Promise<FleetContentAudit> {
   const rails: Array<PublishRail> = ["steem", "hive"];
   const posts: FleetContentAuditRow[] = [];
   const railStats: FleetContentAudit["rails"] = [];
@@ -310,11 +361,14 @@ export async function auditFleetContent(limitPerRail = 10): Promise<FleetContent
       const feed = await railBlogPosts(rail, COMMANDER_ACCOUNT, limitPerRail);
       let flagged = 0;
       for (const p of feed) {
-        const report = scanExposure(p.title, p.bodyPreview);
-        if (report.risk === "high") flagged++;
+        const editable = scanExposure(p.title, p.body, p.tags.join(" ")); // FULL body, tags included
+        const immutable = scanExposure(p.category); // parent_permlink — an edit can never touch it
+        const needsEdit = editable.risk === "high";
+        if (needsEdit) flagged++;
         posts.push({
           rail, permlink: p.permlink, title: p.title, created: p.created, payout: p.payout, tags: p.tags,
-          risk: report.risk, findings: report.findings, needsEdit: report.risk === "high",
+          risk: editable.risk === "high" ? "high" : immutable.risk === "high" ? "high" : editable.risk,
+          findings: editable.findings, immutableFindings: immutable.findings, needsEdit,
         });
       }
       railStats.push({ rail, ok: true, posts: feed.length, flagged });
@@ -324,7 +378,12 @@ export async function auditFleetContent(limitPerRail = 10): Promise<FleetContent
   }
   const total = posts.length;
   const flagged = posts.filter((p) => p.needsEdit).length;
-  const summary = `ביקורת-תוכן חיה: ${total} פוסטים אחרונים נסרקו על ${railStats.filter((r) => r.ok).length} מסילות, ${flagged} מדגלים לעריכה (מדיניות-חשיפה)`;
+  const immutable = posts.filter((p) => p.immutableFindings.length > 0).length;
+  const summary =
+    `ביקורת-תוכן חיה (גוף-מלא + תגיות): ${total} פוסטים אחרונים נסרקו על ${railStats.filter((r) => r.ok).length} מסילות, ` +
+    `${flagged} מדגלים לעריכה` +
+    (immutable > 0 ? ` · ${immutable} נושאים ממצא-קטגוריה בלתי-ניתן-לתיקון (parent_permlink נחרת בפרסום — מוצג בכנות, לא מזויף כ"ניתן לתיקון")` : "") +
+    " (מדיניות-חשיפה)";
   return { rails: railStats, posts, summary };
 }
 
@@ -417,6 +476,14 @@ export async function interactFromAgent(input: {
   }
   const author = String(input.author || "").trim().toLowerCase();
   if (!/^[a-z0-9.\-]{3,16}$/.test(author)) throw new GateError("bad-input", "דרוש author תקין");
+  // ── self-dealing guard (roast r3, found LIVE): the fleet's own interact run
+  // voted 500/10000 on its own just-published post (tx 048b3162…). Voting for
+  // yourself is not conviction, it is farming the reward pool with the fleet's
+  // own stake — forbidden on the agent rails. The operator's own wallet is
+  // outside this code path and stays free to vote however it chooses.
+  if (input.action === "vote" && author === COMMANDER_ACCOUNT) {
+    throw new GateError("self-vote-forbidden", "הצבעה-עצמית אסורה במסילות-הסוכנים: הצבעה היא הכרעת-קוראים, לא אמצעי-הכנסה עצמי");
+  }
   const permlink = String(input.permlink || "").trim();
   let built: SocialBuild;
   let detail = "";
@@ -457,17 +524,21 @@ export async function interactFromAgent(input: {
  */
 
 const STEEM_NODE = "https://api.steemit.com";
+void STEEM_NODE; // kept as documentation — all reads below ride the rail's failover pool
 
+/**
+ * roast r3: this used to be its own single-node fetch — a private, weaker
+ * transport parallel to the rails' failover pool. One dead primary node killed
+ * the census, the trends radar, the root-post pacing probe AND the claim path
+ * while the rail layer was designed to survive exactly that. Now every read
+ * rides the same ordered failover endpoints as everything else.
+ */
 async function steemRpc<T>(method: string, params: unknown[]): Promise<T> {
-  const res = await fetch(STEEM_NODE, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
-    signal: AbortSignal.timeout(12_000),
-  });
-  const j = (await res.json()) as { result?: T; error?: { message?: string } };
-  if (j.error) throw new GateError("rpc-error", `Steem RPC נכשל: ${j.error.message ?? "unknown"}`);
-  return j.result as T;
+  try {
+    return await railRpc<T>("steem", method, params, 12_000);
+  } catch (e) {
+    throw new GateError("rpc-error", `Steem RPC נכשל: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 interface RawAccount {
@@ -522,6 +593,7 @@ export interface FleetRewardRow {
 
 export interface FleetRewardsCensus {
   accounts: FleetRewardRow[];
+  notOnChain: string[]; // vault keys whose account does not exist on the chain — honest dead-weight report
   unclaimedCount: number;
   totalSteemEquiv: number;
   summary: string;
@@ -541,7 +613,12 @@ export async function fleetRewardsCensus(): Promise<FleetRewardsCensus> {
   const accounts = [...claimable]; // census the accounts we can act on — no dead weight
   if (accounts.length === 0) throw new GateError("vault-missing-key", "אין בכספת מפתחות-posting מאומתים על steem — אין למי לתבוע");
   const raw = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [accounts]);
-  const rows: FleetRewardRow[] = raw.map((a) => ({
+  // roast r3 truth-gap: get_accounts SILENTLY drops names that don't exist — the
+  // vault held a posting entry for @headcorner-legacy which simply vanished from
+  // every census without a word. Now the census says so out loud.
+  const returned = new Set((raw || []).map((a) => a.name));
+  const notOnChain = accounts.filter((a) => !returned.has(a));
+  const rows: FleetRewardRow[] = (raw || []).map((a) => ({
     account: a.name,
     rewardSteem: a.reward_steem_balance,
     rewardSbd: a.reward_sbd_balance,
@@ -555,14 +632,16 @@ export async function fleetRewardsCensus(): Promise<FleetRewardsCensus> {
   rows.sort((x, y) => y.steemEquiv - x.steemEquiv);
   const unclaimed = rows.filter((r) => num(r.rewardSteem) > 0 || num(r.rewardSbd) > 0 || num(r.rewardVests) > 0);
   const total = rows.reduce((acc, r) => acc + r.steemEquiv, 0);
+  const deadWeight = notOnChain.length > 0 ? ` · ⚠️ ${notOnChain.length} כניסות-כספת לחשבונות שאינם קיימים בשרשרת (${notOnChain.join(", ")}) — משקל-מת` : "";
   return {
     accounts: rows,
+    notOnChain,
     unclaimedCount: unclaimed.length,
     totalSteemEquiv: total,
     summary:
       unclaimed.length === 0
-        ? `סקר-תגמולים חי: ${rows.length} חשבונות נבדקו — אין תגמולים ממתינים לתביעה באף חשבון`
-        : `סקר-תגמולים חי: ${unclaimed.length}/${rows.length} חשבונות מחזיקים תגמולים שלא נתבעו (${total.toFixed(3)} STEEM שקול) — ${unclaimed.map((u) => u.account).join(", ")} · תביעה = claim_reward_balance חתום (steem.claim)`,
+        ? `סקר-תגמולים חי: ${rows.length} חשבונות נבדקו — אין תגמולים ממתינים לתביעה באף חשבון${deadWeight}`
+        : `סקר-תגמולים חי: ${unclaimed.length}/${rows.length} חשבונות מחזיקים תגמולים שלא נתבעו (${total.toFixed(3)} STEEM שקול) — ${unclaimed.map((u) => u.account).join(", ")} · תביעה = claim_reward_balance חתום (steem.claim)${deadWeight}`,
   };
 }
 
@@ -745,7 +824,7 @@ export async function steemTrends(): Promise<TrendsReport> {
   const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
   const candidates: TopicCandidate[] = rankedCats.map(([cat, v]) => ({
     titleIdeaEn: `${cap(cat)} in practice: what the chain's top-ranked posts this week reveal`,
-    tags: [cat, topTags[0]?.tag, topTags[1]?.tag, "howto"].filter((x): x is string => !!x).slice(0, 5),
+    tags: [...new Set([cat, topTags[0]?.tag, topTags[1]?.tag, "howto"].filter((x): x is string => !!x))].slice(0, 5),
     why: `הקטגוריה "${cat}" מופיעה ${v.n} פעמים ברשימה-החמה החיה עם ~${v.payout.toFixed(1)} SBD תשלומים-מצטברים — ביקוש מהשרשרת, לא ניחוש`,
   }));
 

@@ -16,7 +16,6 @@ import {
   serializeTransaction,
   transactionDigest,
   transactionId,
-  STEEM_CHAIN_ID,
   type SteemTransaction,
 } from "../../packages/chains/steem/src/transaction";
 import type { ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, VoteOperation } from "../../packages/chains/steem/src/operations";
@@ -55,7 +54,6 @@ export function permlinkFromTitle(title: string): string {
 }
 
 function finalize(adapter: ReturnType<typeof steemAdapter>, unsigned: UnsignedTx, ops: SteemTransaction["operations"]): SocialBuild {
-  void adapter;
   const steemTx: SteemTransaction = { refBlockNum: 0, refBlockPrefix: 0, expiration: 0, operations: ops };
   // Rebuild the real envelope fields from the adapter's metadata (fresh ref-block each call).
   const meta = unsigned.metadata as { refBlockNum: number; refBlockPrefix: number; expiration: number };
@@ -63,7 +61,13 @@ function finalize(adapter: ReturnType<typeof steemAdapter>, unsigned: UnsignedTx
   steemTx.refBlockPrefix = meta.refBlockPrefix;
   steemTx.expiration = meta.expiration;
   const serializedHex = Buffer.from(serializeTransaction(steemTx)).toString("hex");
-  const digestHex = Buffer.from(transactionDigest(steemTx, STEEM_CHAIN_ID)).toString("hex");
+  // roast r3 (evidence honesty): the digest evidence field was hardcoded to the
+  // STEEM zeros domain even for hive builds — the signing digest actually used
+  // by adapter.sign() comes from the adapter's OWN chain id. Evidence must
+  // match what is really signed, per rail. (txId is domain-independent — it
+  // hashes the serialized message only — and stays identical.)
+  const digestDomain = Buffer.from(adapter.chainId, "hex");
+  const digestHex = Buffer.from(transactionDigest(steemTx, digestDomain)).toString("hex");
   return { unsigned, serializedHex, digestHex, txId: transactionId(steemTx), byteLength: serializedHex.length / 2 };
 }
 
@@ -93,7 +97,7 @@ export async function buildSteemPostTx(
   if (!title || title.length > 256) throw new SerializationError("title required (1..256 chars)");
   const body = String(spec.body || "");
   if (body.trim().length === 0 || body.length > 20000) throw new SerializationError("body required (1..20000 chars)");
-  const tags = (spec.tags || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 5);
+  const tags = [...new Set((spec.tags || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean))].slice(0, 5);
   if (tags.length === 0) throw new SerializationError("at least one tag required");
   for (const t of tags) {
     if (!/^[a-z0-9-]{1,24}$/.test(t)) throw new SerializationError(`tag "${t.slice(0, 24)}" must match [a-z0-9-]{1,24}`);

@@ -29,6 +29,7 @@ const RPC_URLS: string[] = (
 function buildAdapter(): SteemAdapter {
   return new SteemAdapter({
     rpcUrl: RPC_URL,
+    rpcUrls: RPC_URLS, // roast r3: the read path is no longer a single point of failure either
     // allowBroadcast intentionally NOT set — fails closed (M0 gate).
     requestTimeoutMs: 15_000,
   });
@@ -53,6 +54,7 @@ export function steemBroadcastAdapter(): SteemAdapter {
   if (!broadcastSingleton) {
     broadcastSingleton = new SteemAdapter({
       rpcUrl: RPC_URL,
+      rpcUrls: RPC_URLS, // roast r3: broadcast no longer dies with one node — transport failover only (chain verdicts still propagate)
       allowBroadcast: true, // explicit opt-in — used ONLY after an operator decision
       requestTimeoutMs: 15_000,
     });
