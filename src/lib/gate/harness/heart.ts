@@ -507,24 +507,32 @@ async function stageProposals(p: HeartPulse): Promise<void> {
   });
   const pend = todayCount >= policy.maxAutoPerDay
     ? []
-    : await db.gateProposal.findMany({ where: { status: "pending" }, orderBy: { createdAt: "asc" }, take: 3 });
-  const cand = pend.find((x) => x.budget <= policy.maxBudget);
+    : await db.gateProposal.findMany({ where: { status: "pending" }, orderBy: { createdAt: "asc" }, take: 8 });
+  // gap-54 — the initiative engine used to EXECUTE a verdict on the first
+  // candidate it could not launch: an unknown agent name got auto-"expired"
+  // by policy 16 seconds after filing, which silently killed a sovereign
+  // operator-decision item (the steemauto door-closure) before the operator
+  // ever saw it. The doctrine is the opposite: the policy engine may LAUNCH
+  // what it is allowed to launch — it may never DECIDE what it cannot.
+  // Candidates it cannot launch are SKIPPED (stay pending for the operator),
+  // never stamped. An over-budget proposal is the DESIGNED sovereign gate
+  // ("a proposal asking for more steps waits for the operator") — so
+  // operator-only items should file with budget > maxBudget.
+  let cand: (typeof pend)[number] | undefined;
+  for (const x of pend) {
+    if (x.budget > policy.maxBudget) continue; // above-cap ⇒ operator-only — waits, forever if needed
+    const agent = await db.gateAgent.findFirst({ where: { name: x.agentName, active: true, autonomy: true } });
+    if (!agent) continue; // unknown/inactive agent ⇒ the operator's call — stays pending
+    const busy = await db.gateRun.count({ where: { agentName: x.agentName, status: { in: ["queued", "running"] } } });
+    if (busy > 0) continue; // idle-only — never stack a proposal on a working agent (skip, don't block the queue)
+    cand = x;
+    break;
+  }
   if (!cand) {
     p.loops.initiative = loops();
     return;
   }
   try {
-    const agent = await db.gateAgent.findFirst({ where: { name: cand.agentName, active: true, autonomy: true } });
-    if (!agent) {
-      await db.gateProposal.update({ where: { id: cand.id }, data: { status: "expired", decidedBy: "policy", decidedAt: new Date() } });
-      p.loops.initiative = loops();
-      return;
-    }
-    const busy = await db.gateRun.count({ where: { agentName: cand.agentName, status: { in: ["queued", "running"] } } });
-    if (busy > 0) {
-      p.loops.initiative = loops(); // idle-only — never stack a proposal on a working agent
-      return;
-    }
     const runId = await enqueueRun({
       agentName: cand.agentName,
       goal: cand.goal,
@@ -542,7 +550,8 @@ async function stageProposals(p: HeartPulse): Promise<void> {
     p.counters.proposalsFired++;
     p.loops.initiative = { lastAt: new Date().toISOString(), ok: true, fired: 1 };
   } catch {
-    // a broken proposal is rejected honestly, not retried forever
+    // a broken enqueue is rejected honestly, not retried forever — but only
+    // AFTER the policy engine verified it may launch this candidate at all
     await db.gateProposal.update({ where: { id: cand.id }, data: { status: "rejected", decidedBy: "policy", decidedAt: new Date() } }).catch(() => {});
     p.loops.initiative = loops();
   }
