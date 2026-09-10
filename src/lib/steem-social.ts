@@ -73,11 +73,20 @@ export interface SteemPostSpec {
   body: string;
   tags: string[]; // 1..5; tags[0] is the category (root parent_permlink)
   permlink?: string; // derived from title when omitted
+  category?: string; // PUBLISH-DESK: explicit parent_permlink for EDITs (preserve the original)
   replyTo?: { author: string; permlink: string }; // comment instead of a root post
 }
 
-/** Root post or reply (comment op) — built key-free, fresh ref-block, real txId. */
-export async function buildSteemPostTx(spec: SteemPostSpec): Promise<SocialBuild & { permlink: string; category: string }> {
+/**
+ * Root post or reply (comment op) — built key-free, fresh ref-block, real txId.
+ * `adapterOverride` lets the SAME wire-exact packer serve other graphene rails
+ * (PUBLISH-DESK: hive = SteemAdapter pointed at a hive node) — the comment op
+ * is identical on both chains; only the ref-block source and chain id differ.
+ */
+export async function buildSteemPostTx(
+  spec: SteemPostSpec,
+  adapterOverride?: ReturnType<typeof steemAdapter>,
+): Promise<SocialBuild & { permlink: string; category: string }> {
   const author = spec.author.trim().toLowerCase();
   if (!/^[a-z0-9.\-]{3,16}$/.test(author)) throw new SerializationError("author is not a valid account name");
   const title = String(spec.title || "").trim();
@@ -101,11 +110,12 @@ export async function buildSteemPostTx(spec: SteemPostSpec): Promise<SocialBuild
     permlink = assertPermlink(`re-${pa.replace(/[^a-z0-9-]/g, "")}-${Date.now().toString(36)}`.slice(0, 128), "reply permlink");
   } else {
     parentAuthor = "";
-    parentPermlink = assertPermlink(tags[0].replace(/[^a-z0-9-]/g, "") || "saos", "category");
+    const category = String(spec.category || tags[0].replace(/[^a-z0-9-]/g, "") || "saos").replace(/[^a-z0-9-]/g, "");
+    parentPermlink = assertPermlink(category || "saos", "category");
     permlink = assertPermlink(spec.permlink || permlinkFromTitle(title), "permlink");
   }
 
-  const jsonMetadata = JSON.stringify({ tags, app: "saos-gate/v1", format: "markdown" });
+  const jsonMetadata = JSON.stringify({ tags, app: "publish-desk/v1", format: "markdown" });
   const payload: CommentOperation = {
     parent_author: parentAuthor,
     parent_permlink: parentPermlink,
@@ -115,7 +125,7 @@ export async function buildSteemPostTx(spec: SteemPostSpec): Promise<SocialBuild
     body,
     json_metadata: jsonMetadata,
   };
-  const adapter = steemAdapter();
+  const adapter = adapterOverride ?? steemAdapter();
   const unsigned = await adapter.buildOperations([{ type: "comment", payload: payload as unknown as Record<string, unknown> }]);
   const ops: SteemTransaction["operations"] = [{ name: "comment", body: payload }];
   return { ...finalize(adapter, unsigned, ops), permlink, category: parentPermlink };

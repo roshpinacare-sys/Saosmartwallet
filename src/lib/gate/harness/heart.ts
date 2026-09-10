@@ -663,6 +663,54 @@ async function ensureTriggerPolicy(): Promise<void> {
       });
     }
   }
+  /* ── PUBLISH-DESK v2 — the exposure policy reaches the EXISTING schedules ──
+   * Live finding (2026-09-10): the fleet published internal protocol specs,
+   * fleet reports and infrastructure details to the public chain — 5
+   * near-duplicate posts on one account. Builder goals older than the
+   * policy are REFRESHED in place (marker-based, idempotent): publishing is
+   * now exposure-gated, audit-first, duplicate-aware. */
+  const POLICY_MARKER = "מדיניות-חשיפה";
+  const builderV2 =
+    "תור-הבונה היומי (v2): בחר שיפור אמיתי אחד לרשת ובצע אותו מקצה-לקצה. " +
+    "לפני כל פרסום: social.audit — מה כבר פורסם ומה מדוגל; אל תשכפל תוכן קיים (תוכן כפול פוגע בחשבון וב-SEO). " +
+    "מדיניות-חשיפה מוכתבת: אסור לפרסם סודות, מפתחות, נתיבים/תשתית, שמות-קוד פנימיים, תוכניות-מוצר שלא יצאו לאור ודוחות מבצעיים — הקלפים נשארים בבית; " +
+    "טיוטה חשופה תיחסם על-ידי השער — אל תנסה לעקוף, תקן והגש שוב. " +
+    "בחר אחת: (1) פרסום ערך ציבורי נקי (steem.post — rail=steem או rail=hive), (2) תיקון פוסט מדוגל (steem.edit לפי social.audit), " +
+    "(3) memory.write עם ממצא מוכח, (4) goal.propose מוצדק. אחד היטב — לא ארבעה במקרה.";
+  const staleBuilders = await db.gateSchedule.findMany({
+    where: { label: { startsWith: "builder:" }, goal: { not: { contains: POLICY_MARKER } } },
+    select: { id: true },
+  });
+  for (const s of staleBuilders) {
+    await db.gateSchedule.update({ where: { id: s.id }, data: { goal: builderV2 } }).catch(() => {});
+  }
+  /* ── the editor — one daily publishing duty, full doctrine ──
+   * The fleet must keep a PRESENCE on the networks without leaking: audit
+   * first, fix flagged content, then publish ONE clean, valuable, SEO-aware
+   * post (original Hebrew content on steem, rail of choice). Bounded 1/day. */
+  const editorLabels = new Set(
+    (await db.gateSchedule.findMany({ where: { label: { startsWith: "editor:" } }, select: { agentName: true } })).map((s) => s.agentName),
+  );
+  const editorMeans = JSON.stringify([
+    "social.audit חי נקרא (מספר פוסטים + מדוגלים) — וההחלטה עליהם נעשתה: תיקון דרך steem.edit עם txId, או נימוק מדוע לא נדרש תיקון",
+    "פרסום חי אחד נקי ממדיניות-חשיפה (steem.post עם permlink + txId אמיתיים) — או נימוק כן מדוע היום אין מה לפרסם",
+    "דוח עברית קצר לגשר-הפיקוד עם ה-permlinks וה-txIds",
+  ]);
+  if (armed.length && !editorLabels.has(armed[0].name)) {
+    await db.gateSchedule.create({
+      data: {
+        label: `editor:${armed[0].name}`,
+        agentName: armed[0].name,
+        goal:
+          "תור-העורך היומי: אתה הדובר של הרשת היום. (1) social.audit — קרא את הפיד החי של החשבונות על steem ו-hive; מה שמדוגל (סודות/שמות-קוד/דוחות פנימיים/כפילויות) — תקן דרך steem.edit בגוף ציבורי-נקי בלי פרטים פנימיים. (2) אם יש מה לומר לעולם — פרסם פוסט אחד נקי ומקורי בעברית עם ערך אמיתי (steem.post; rail=steem או rail=hive): כותרת מדויקת, פתיחה שתופסת, גוף עם מצביעות, תגיות נכונות (≤5, ממוקדות) — ולעולם בלי סודות, נתיבים, שמות-קוד או תוכניות פנימיות (מדיניות-חשיפה תחסום אותך אחרת). (3) דווח לגשר: מה סרקת, מה תיקנת, מה פרסמת — עם permlinks ו-txIds.",
+        doneMeans: editorMeans,
+        budget: 8,
+        kind: "daily",
+        hourUtc: 13, // 16:00 Israel — prime publishing hours
+        maxPerDay: 1,
+      },
+    });
+  }
   const existing = await db.gateTrigger.findMany({ where: { on: "message.mentions" }, select: { agentName: true } });
   const have = new Set(existing.map((t) => t.agentName));
   const mentionMeans = JSON.stringify([
