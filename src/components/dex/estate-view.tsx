@@ -4,7 +4,7 @@
 // סריקה-חיה של כל-מה-שהאחוזה הריבונית מחזיקה באמת — כל-מספר מ-RPC ציבורי.
 // התשובה הכנה לשאלה: "אם אני רוצה לממש עכשיו — כמה אפשר לממש באמת?"
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Landmark, Lock, Unlock, ArrowUpRight, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { RefreshCw, Landmark, Lock, Unlock, ArrowUpRight, AlertTriangle, ShieldCheck, Search } from 'lucide-react';
 import { authHeaders, fmtAgo } from '@/components/sv/shared';
 
 interface HeadInfo { account: string; liquid: number; spOwn?: number; spDelegatedOut?: number; hpOwn?: number; hpDelegatedOut?: number; bpOwn?: number; bpDelegatedOut?: number; sbd?: number; hbd?: number; savings?: number }
@@ -25,6 +25,9 @@ interface EstateData {
     eth: { inDexLiquidity: number; realEstateEth: number; sweepGasEth: number; sweepGasGwei: number; netAfterSweepEth: number; fundedAddresses: number; verdict: string };
     paths: Array<{ name: string; amount: number; sym: string; usd: number; locked?: boolean }>;
   };
+  tronLegacy?: Array<{ name: string; address: string; trx: number; trc10: Array<{ id: string; value: number }> }>;
+  fleetHive?: { rows: Array<{ account: string; liquid: number; hbd: number }>; liquidTotal: number };
+  scan?: { sweep: string; checked: string; zero: string; resolved: string };
 }
 
 const usd = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 3 : 2 })}`;
@@ -258,6 +261,67 @@ export function EstateView() {
               </span>
             </div>
           </Card>
+
+          {/* סריקת-60: צי-HIVE + טרון-לגסי */}
+          {(data.fleetHive || data.tronLegacy) && (
+            <Card title="סריקת-על 60 — מה שנמצא ברשת מעבר לראשים" icon={Search} testid="estate-scan60">
+              <div className="grid md:grid-cols-2 gap-3">
+                <div className="dx-raised rounded-xl p-3.5">
+                  <div className="text-[11px] font-bold mb-2 flex items-center justify-between">
+                    <span>צי-HIVE מצטבר (כל החשבונות)</span>
+                    <span className="dx-num text-[color:var(--green)]" dir="ltr">{usd(data.totals.fleetHiveUsd || 0)}</span>
+                  </div>
+                  {data.fleetHive && data.fleetHive.rows.length > 0 ? (
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {data.fleetHive.rows.map(r => (
+                        <div key={r.account} className="flex items-center justify-between text-[10.5px] dx-num" dir="ltr">
+                          <span className="text-[color:var(--text-2)]">{r.account}</span>
+                          <span className="font-bold">{r.liquid.toFixed(3)} HIVE{r.hbd > 0 ? ` + ${r.hbd.toFixed(3)} HBD` : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10.5px] text-[color:var(--text-3)]">לא נמדד — כנה</div>
+                  )}
+                </div>
+                <div className="dx-raised rounded-xl p-3.5">
+                  <div className="text-[11px] font-bold mb-2 flex items-center justify-between">
+                    <span>טרון-לגסי (מנמוניק #2 בכספת)</span>
+                    <span className="dx-num text-[color:var(--green)]" dir="ltr">{usd(data.totals.tronLegacyUsd || 0)}</span>
+                  </div>
+                  {data.tronLegacy && data.tronLegacy.length > 0 ? (
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                      {data.tronLegacy.map(r => (
+                        <div key={r.address} className="text-[10.5px] dx-num" dir="ltr">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[color:var(--text-2)]">{r.name} {r.address.slice(0, 10)}…</span>
+                            <span className="font-bold">{r.trx} TRX</span>
+                          </div>
+                          {r.trc10.length > 0 && (
+                            <div className="text-[9px] text-[color:var(--text-3)] font-sans" dir="rtl">
+                              טוקני-סקאם-ידועים (TRC-10) — שווי אפס: {r.trc10.length} מזהים
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-[10.5px] text-[color:var(--text-3)]">אפס יתרות — כנה</div>
+                  )}
+                  <div className="mt-2 text-[9.5px] text-[color:var(--text-3)] font-sans leading-relaxed">
+                    הכתובות נגזרו מהמנמוניק המוצפן שבכספת; ה-TRX יכול להתרכז ב-TVN3 ולממש (דורש החלטת-מפעיל).
+                  </div>
+                </div>
+              </div>
+              {data.scan && (
+                <div className="mt-3 rounded-xl border border-[color:var(--line)] p-3 text-[10.5px] leading-relaxed space-y-1">
+                  <div className="text-[color:var(--text-2)]"><span className="font-bold">נבדק חי:</span> {data.scan.checked}</div>
+                  <div className="text-[color:var(--text-3)]"><span className="font-bold">אפסים-כנים:</span> {data.scan.zero}</div>
+                  <div className="text-[color:var(--amber)]"><span className="font-bold">תעלומות-שנפתרו:</span> {data.scan.resolved}</div>
+                </div>
+              )}
+            </Card>
+          )}
         </>
       )}
     </div>

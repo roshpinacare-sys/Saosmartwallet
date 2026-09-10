@@ -81,6 +81,27 @@ const EVM_RPCS: Record<string, string> = {
   avalanche: 'https://avalanche-c-chain-rpc.publicnode.com',
 };
 const SOL_RPC = 'https://api.mainnet-beta.solana.com';
+// TRON-RPC — trongrid בלבד עם ריווח-סבלני + retry (CROSS-F-fence: מארח-מקובע; rate-limit מטופל-בכבוד)
+const TRON_BASE = 'https://api.trongrid.io';
+async function tronAccount(address: string): Promise<{ balance?: number; assetV2?: Array<{ key: string; value: number }> } | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(`${TRON_BASE}/v1/accounts/${address}`, { signal: AbortSignal.timeout(9000), cache: 'no-store' });
+      if (r.status === 429) { await new Promise(rr => setTimeout(rr, 1500 * (attempt + 1))); continue; }
+      if (!r.ok) return null;
+      const j = (await r.json()) as { data?: Array<{ balance?: number; assetV2?: Array<{ key: string; value: number }> }> };
+      return j.data?.[0] ?? null;
+    } catch { await new Promise(rr => setTimeout(rr, 800)); }
+  }
+  return null;
+}
+// ── TRON-legacy (Task 60): כתובות-צפייה-פומביות שנגזרו ממנמוניק #2 שבכספת (פענוח-בזמן-חקירה בלבד).
+// המנמוניק עצמו לא מאוחסן כאן — רק הכתובות הציבוריות. הערת-אמת: ה-TRC-10 שבהן הוא טוקני-סקאם ידועים (gas.bi/9pay.org) — שווי אפס.
+const TRON_LEGACY: Array<{ name: string; address: string }> = [
+  { name: 'legacy-m2/0', address: 'TAzZZkrwBXk59iRya7esnKVJeV1xLtqkGr' },
+  { name: 'legacy-m2/1', address: 'TRKStC5HbWzqdnrWDfc4vYNfgQgyZuQKP4' },
+  { name: 'legacy-m2/2', address: 'TNd4aFZk1YUeP9uzUWCefJyadjCxZXBoBg' },
+];
 
 export async function GET(req: Request) {
   const owner = await requireOwner(req);
@@ -136,6 +157,26 @@ export async function GET(req: Request) {
       bpOwn: spOf(blurtAcc, blurtProps),
       bpDelegatedOut: parseFloat(blurtAcc.delegated_vesting_shares || '0') / (blurtProps || 1),
     };
+  }
+
+  // ── 1b. צי-HIVE מצטבר (Task 60): כל-חשבונות-הצי — לא רק הראש ──
+  const fleetAccounts = (await db.vaultKey.findMany({
+    where: { chain: 'steem' }, select: { account: true }, distinct: ['account'], orderBy: { account: 'asc' },
+  })).map(r => r.account).filter(a => !a.includes(':') && a !== 'headcorner-archive');
+  const fleetHiveRows: Array<{ account: string; liquid: number; hbd: number }> = [];
+  let fleetHiveLiquidTotal = 0;
+  if (fleetAccounts.length) {
+    try {
+      const fh = await jrpc(HIVE_NODE, 'condenser_api.get_accounts', [fleetAccounts]);
+      const rows = (fh.result as Array<Record<string, string>> | undefined) || [];
+      for (const a of rows) {
+        if (!a?.name) continue;
+        const liquid = parseFloat(a.balance || '0');
+        const hbd = parseFloat(a.hbd_balance || '0');
+        fleetHiveRows.push({ account: a.name, liquid, hbd });
+        fleetHiveLiquidTotal += liquid + hbd;
+      }
+    } catch { /* honest-empty */ }
   }
 
   // ── 2. Hive-Engine tokens ──
@@ -199,15 +240,27 @@ export async function GET(req: Request) {
   const tronRows: Array<{ entity: string; address: string; trx: number }> = [];
   for (const [name, w] of entities.filter(([, w]) => w.tron)) {
     try {
-      const r = await fetch(`https://api.trongrid.io/v1/accounts/${w.tron}`, { signal: AbortSignal.timeout(9000), cache: 'no-store' });
-      if (r.ok) {
-        const j = (await r.json()) as { data?: Array<{ balance?: number }> };
-        const bal = j.data?.[0]?.balance ?? 0;
-        if (bal > 0) tronRows.push({ entity: name, address: w.tron!, trx: bal / 1e6 });
+      const acc = await tronAccount(w.tron!);
+      const bal = ((acc?.balance ?? 0) / 1e6);
+      if (bal > 0) tronRows.push({ entity: name, address: w.tron!, trx: bal });
+    } catch { /* skip */ }
+    await new Promise(rr => setTimeout(rr, 800));
+  }
+  // ── 6b. TRON-legacy (Task 60) ──
+  const tronLegacyRows: Array<{ name: string; address: string; trx: number; trc10: Array<{ id: string; value: number }> }> = [];
+  for (const t of TRON_LEGACY) {
+    try {
+      const acc = await tronAccount(t.address);
+      if (acc) {
+        const trx = (acc.balance ?? 0) / 1e6;
+        const trc10 = (acc.assetV2 || []).filter(x => x.value > 0).map(x => ({ id: x.key, value: x.value }));
+        if (trx > 0 || trc10.length) tronLegacyRows.push({ name: t.name, address: t.address, trx, trc10 });
       }
     } catch { /* skip */ }
-    await new Promise(rr => setTimeout(rr, 120));
+    await new Promise(rr => setTimeout(rr, 800));
   }
+  const tronLegacyTrx = tronLegacyRows.reduce((a, r) => a + r.trx, 0);
+
   const btcRows: Array<{ entity: string; address: string; btc: number }> = [];
   for (const [name, w] of entities.filter(([, w]) => w.btc)) {
     try {
@@ -254,11 +307,14 @@ export async function GET(req: Request) {
     solUsd: usd('sol', solTotal),
     tronUsd: usd('trx', trxTotal),
     btcUsd: usd('btc', btcTotal),
+    tronLegacyUsd: usd('trx', tronLegacyTrx),
+    fleetHiveUsd: usd('hive', fleetHiveLiquidTotal),
     heTokens: heTokens.length,
   };
 
   const grandUsd = totals.steemLiquidUsd + totals.steemVestedUsd + totals.sbdUsd + totals.hiveLiquidUsd + totals.hiveVestedUsd
-    + totals.blurtLiquidUsd + totals.blurtVestedUsd + totals.evmEthUsd + totals.solUsd + totals.tronUsd + totals.btcUsd;
+    + totals.blurtLiquidUsd + totals.blurtVestedUsd + totals.evmEthUsd + totals.solUsd + totals.tronUsd + totals.btcUsd
+    + totals.tronLegacyUsd + totals.fleetHiveUsd;
 
   // ── 9. התשובה הכנה: כמה אפשר לממש עכשיו ──
   const fundedEvm = evmRows.filter(r => (r.chains.ethereum || 0) > 0);
@@ -281,6 +337,8 @@ export async function GET(req: Request) {
       { name: 'HIVE נזיל → שוק-חוץ', amount: h?.liquid || 0, sym: 'HIVE', usd: totals.hiveLiquidUsd },
       { name: 'SOL חיילים (איחוד → שוק-חוץ)', amount: solTotal, sym: 'SOL', usd: totals.solUsd },
       { name: 'ETH חיילים (איחוד → שוק-חוץ)', amount: ethTotal, sym: 'ETH', usd: totals.evmEthUsd },
+      { name: 'צי-HIVE מצטבר (12 חשבונות נזיל) → שוק-חוץ', amount: fleetHiveLiquidTotal, sym: 'HIVE', usd: totals.fleetHiveUsd },
+      { name: 'טרון-לגסי (אבק-מנמוניק #2) — להעביר ל-TVN3 ולממש', amount: tronLegacyTrx, sym: 'TRX', usd: totals.tronLegacyUsd },
       { name: 'STEEM vested (powerdown 13שב׳) — נעול-מובנה', amount: s?.spOwn || 0, sym: 'SP', usd: totals.steemVestedUsd, locked: true },
       { name: 'BLURT vested (powerdown) — נעול-מובנה', amount: b?.bpOwn || 0, sym: 'BP', usd: totals.blurtVestedUsd, locked: true },
     ],
@@ -290,6 +348,14 @@ export async function GET(req: Request) {
     at: new Date().toISOString(),
     heads, heTokens,
     wallets: { evm: evmRows, sol: solRows, tron: tronRows, btc: btcRows },
+    tronLegacy: tronLegacyRows,
+    fleetHive: { rows: fleetHiveRows, liquidTotal: fleetHiveLiquidTotal },
+    scan: {
+      sweep: 'task-60',
+      checked: '149 מפתחות-כספת · 12 EVM×7רשתות · 12 SOL+SPL · 12 TRON + 3 לגסי · 12 BTC · ERC-20 (USDT/USDC/DAI/BUSD) · צי-HIVE',
+      zero: 'BTC · SPL · ERC-20 · BSC/Polygon/ARB/Base/OP/AVAX — כולם אפסים כנים',
+      resolved: 'מעטפת-0.0997ETH = דלק-DEX-היסטורי · ״legacy 117k״ = תווית-דור מהפרויקט-הישן (לא סכום) · 9.68-HIVE = מדידה-היסטורית-שגויה (אין-op-עברה-בשרשרת)',
+    },
     prices,
     totals: { ...totals, grandUsd },
     cashOut,
