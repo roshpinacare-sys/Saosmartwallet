@@ -35,9 +35,15 @@ export async function sessionFrom(req: NextRequest): Promise<{ id: string; scope
   return { id: s.id, scope: s.scope, label: s.label };
 }
 
+// FIX(Roast-64-a · F1/CRITICAL): allowlist-מפעיל — scope='owner' לבדו אינו די:
+// ה-login מעניק owner לכל-חשבון שמפתחו מתאים (כל ארנק בעולם!). עכשיו: owner אמת =
+// רק חשבון-המפעיל (env או ברירת-המחדל headcorner), מזוהה-לפי ה-label שה-login
+// יוצר: `owner:<account>`. כל-label אחר → null (fail-closed).
+export const OPERATOR_ACCOUNT = (process.env.SAOS_OPERATOR_ACCOUNT ?? "headcorner").toLowerCase();
+
 export async function requireOwner(req: NextRequest): Promise<{ id: string; scope: string; label: string } | null> {
   const s = await sessionFrom(req);
-  return s && s.scope === 'owner' ? s : null;
+  return s && s.scope === 'owner' && s.label === `owner:${OPERATOR_ACCOUNT}` ? s : null;
 }
 
 // FIX(Roast-63 · H1): ownerLock — עד-היום-הדגל-רק-הוצג-ב-UI ואף-מוטציה-לא-בדקה-אותו.

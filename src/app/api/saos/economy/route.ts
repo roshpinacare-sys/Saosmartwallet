@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { simulateEconomy, DEFAULT_ECONOMY, type EconomyInput } from "@/lib/saos/economy";
-import { forgeReceipt } from "@/lib/saos/evidence";
-import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+// FIX(Roast-64-a · F6): GET ציבורי-זה כתב EvidenceReceipt בכל-קריאה — עבירה על
+// עיקרון-הפלטפורמה "אין GET עם side-effects", זיהום שרשרת-העדויות מבקשות-קריאה,
+// ו-fork-race על prevDigest עם catch שבולע כישלון-כתיבה ומחזיר digest שמעולם
+// לא נשמר. עכשיו: חישוב-קריאה-בלבד; receipt=null + הסבר-כנה. קבלה ניתנת-ליצירה
+// רק במסלול מאומת (POST /api/saos/seal).
 
 export async function GET(req: Request) {
   try {
@@ -23,26 +27,13 @@ export async function GET(req: Request) {
 
     const result = simulateEconomy(input);
 
-    const prev = await db.evidenceReceipt.findFirst({ orderBy: { createdAt: "desc" } });
-    const receipt = await forgeReceipt(
-      "economy-sim",
-      // canonical discipline: integers only — SAOS as micro-units (×100)
-      {
-        totalPerDayMicro: Math.round(result.totalPerDay * 100),
-        retainedMicro: Math.round(result.retainedPerDay * 100),
-        flywheelPct: Math.round(input.flywheelPct)
-      },
-      prev?.digest ?? null
-    );
-    try {
-      await db.evidenceReceipt.create({
-        data: { kind: receipt.kind, digest: receipt.digest, prevDigest: receipt.prevDigest, payload: JSON.stringify(receipt.payload) }
-      });
-    } catch {
-      /* collision tolerated */
-    }
-
-    return NextResponse.json({ ok: true, input, result, receipt: receipt.digest });
+    return NextResponse.json({
+      ok: true,
+      input,
+      result,
+      receipt: null,
+      note: "read-only: GET לא כותב קבלות-עדות (אין GET עם side-effects) — קבלה נרשמת רק בפעימת-עגינה מאומתת"
+    });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "economy failed" },

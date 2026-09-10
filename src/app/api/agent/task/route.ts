@@ -32,12 +32,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'result') {
+    // FIX(Roast-64-a · F12): היה-פתוח — כל-סוכן יכול-היה לכתוב result לכל-משימה
+    // (כולל לא-שייכות-לו ולא-משויכות בכלל) ושוב-ושוב. עכשיו: רק הסוכן-שטען-את-המשימה,
+    // ומעבר-חד-פעמי claimed→done|failed (סטטוס אחר = נדחה).
     const status = body.status === 'failed' ? 'failed' : 'done';
     const t = await db.taskItem.updateMany({
-      where: { id: String(body.taskId || ''), OR: [{ assignedTo: agent.name }, { assignedTo: '' }] },
+      where: { id: String(body.taskId || ''), assignedTo: agent.name, status: 'claimed' },
       data: { status, result: String(body.result || '').slice(0, 4000) },
     });
-    if (!t.count) return NextResponse.json({ ok: false, error: 'task not found for agent' }, { status: 404 });
+    if (!t.count) return NextResponse.json({ ok: false, error: 'task not reportable: must be claimed by this agent and still unresolved' }, { status: 409 });
     await audit('task-result', `${agent.name} → ${body.taskId} = ${status}`);
     await relayBroadcast('task', { type: 'result', taskId: body.taskId, status, agent: agent.name });
     return NextResponse.json({ ok: true });

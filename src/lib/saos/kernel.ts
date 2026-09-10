@@ -1,9 +1,16 @@
 /**
  * SAOS deterministic kernel — sovereign state machine (מכונת המדינה הריבונית).
  * Ported from: steem-main `sovereign/core/kernel.cjs` — same discipline:
- *   canonical JSON, sha256 stateRoot, GAS table per op, issuer gates,
- *   hard dedupe, no float, value-preservation checked per swap.
+ *   canonical JSON, sha256 stateRoot, GAS table per op, hard dedupe,
+ *   no float, value-preservation checked per swap.
  * Rewritten in TypeScript with property-based self-test (no hidden fixtures).
+ *
+ * FIX(Roast-64-a · F5) — כנות-ממשל: "issuer" כאן הוא תווית לא-מאומתת (sim kernel —
+ * אין חתימות קריפטוגרפיות). ה-"gates" היחידים הם שערי-תפקיד (role gates):
+ * harvest (הטבעה-לאוצר) מותר ל-issuer==="treasury" בלבד; wallet מנכה מהיתרה
+ * של ה-issuer (שימור-ערך נאכף ביתרות — לא בזהות). relay/relay_ack מקושרים
+ * במונה relayOpen — אישור-בלי-פתיחה נדחה. seal חותם רק את החותמות החדשות
+ * מאז-החותם-הקודם (lastSealIndex) — אין חותם-חוזר של כל-ההיסטוריה.
  */
 
 import { canonicalize, canonicalDigest, sha256Hex } from "./canonical-json";
@@ -38,6 +45,9 @@ export interface KernelState {
   stamps: { issuer: string; nonce: string; digest: string }[];
   seals: { issuer: string; leafDigests: string[] }[];
   gasUsed: number;
+  // FIX(Roast-64-a · F5b/F5c):
+  lastSealIndex?: number; // אינדקס-החותם-הסרוק האחרון — seal חדש חותם רק מכאן
+  relayOpen?: number; // מונה-גשרים-פתוחים — relay_ack מחויב בו (קישור-ריליי)
 }
 
 export function genesisState(): KernelState {
@@ -47,7 +57,9 @@ export function genesisState(): KernelState {
     nonces: [],
     stamps: [],
     seals: [],
-    gasUsed: 0
+    gasUsed: 0,
+    lastSealIndex: 0,
+    relayOpen: 0
   };
 }
 
@@ -82,23 +94,34 @@ export function applyTx(state: KernelState, tx: KernelTx): KernelState {
       break;
     }
     case "seal": {
-      if (next.stamps.length === 0) throw new Error("seal requires stamps in batch");
-      const leafDigests = next.stamps.map((s) => s.digest);
-      next.seals = [...next.seals, { issuer: tx.issuer, leafDigests }];
+      // FIX(Roast-64-a · F5b): seal חותם רק את החותמות החדשות מאז-החותם-הקודם —
+      // כל-חותם-חוזר-של-כל-ההיסטוריה היה מנפח עלים ומכפיל עדות.
+      const fresh = next.stamps.slice(state.lastSealIndex ?? 0).map((s) => s.digest);
+      if (fresh.length === 0) throw new Error("seal requires new stamps since last seal");
+      next.seals = [...next.seals, { issuer: tx.issuer, leafDigests: fresh }];
+      next.lastSealIndex = next.stamps.length;
       break;
     }
     case "harvest": {
+      // FIX(Roast-64-a · F5a): שער-תפקיד — ההטבעה-לאוצר זמינה לאוצר-בלבד.
+      // (ה-issuer כאן תווית לא-מאומתת — זו מגבלת-תפקיד, לא אימות-זהות.)
+      if (tx.issuer !== "treasury") throw new Error("harvest rejected: issuer must be treasury (role gate)");
       // value enters the treasury (monetization inflow)
       const amount = tx.amount ?? 0;
       next.balances["treasury"] = (next.balances["treasury"] ?? 0) + amount;
       break;
     }
     case "relay": {
-      // THE-DOOR: zero-gas op — records a sponsored relay demand
+      // THE-DOOR: zero-gas op — records a sponsored relay demand, opens a relay credit
       if (!tx.to) throw new Error("relay requires destination");
+      next.relayOpen = (state.relayOpen ?? 0) + 1;
       break;
     }
     case "relay_ack": {
+      // FIX(Roast-64-a · F5c): relay_ack מקושר-לריליי — אין-פתיחה, אין-אישור.
+      const open = state.relayOpen ?? 0;
+      if (open <= 0) throw new Error("relay_ack rejected: no-open-relay");
+      next.relayOpen = open - 1;
       break;
     }
     case "wallet": {
@@ -144,7 +167,7 @@ export async function kernelSelftest(): Promise<SelftestResult> {
     { op: "stamp", issuer: "agent-1", nonce: "n1" },
     { op: "stamp", issuer: "agent-1", nonce: "n2" },
     { op: "seal", issuer: "agent-1", nonce: "n3" },
-    { op: "harvest", issuer: "grid-98", nonce: "n4", amount: 500, asset: "SAOS" },
+    { op: "harvest", issuer: "treasury", nonce: "n4", amount: 500, asset: "SAOS" }, // FIX F5a: רק-האוצר מניב
     { op: "wallet", issuer: "treasury", nonce: "n5", to: "agent-2", amount: 100 },
     { op: "relay", issuer: "agent-2", nonce: "n6", to: "steem:headcorner" },
     { op: "relay_ack", issuer: "agent-2", nonce: "n7" }
@@ -204,6 +227,49 @@ export async function kernelSelftest(): Promise<SelftestResult> {
   // 7. zero-gas door: relay + relay_ack cost nothing (fee sponsorship primitive)
   const relayGas = GAS_TABLE.relay + GAS_TABLE.relay_ack;
   add("the-door", relayGas === 0, "relay/relay_ack = 0 gas — sponsored real work");
+
+  // 8. FIX(Roast-64-a · F5a) role gate: harvest by non-treasury must throw
+  let harvestThrew = false;
+  try {
+    await replay([{ op: "harvest", issuer: "grid-98", nonce: "h1", amount: 1 }]);
+  } catch {
+    harvestThrew = true;
+  }
+  add("role-gate", harvestThrew, "harvest by non-treasury rejected (treasury-only mint)");
+
+  // 9. FIX(Roast-64-a · F5c) relay linkage: relay_ack without an open relay must throw
+  let ackThrew = false;
+  try {
+    await replay([{ op: "relay_ack", issuer: "agent-2", nonce: "r1" }]);
+  } catch {
+    ackThrew = true;
+  }
+  add("relay-linkage", ackThrew, "relay_ack without open relay rejected (no-open-relay)");
+
+  // 10. FIX(Roast-64-a · F5b) seal increments: second seal covers only new stamps
+  const twoSeals = await replay([
+    { op: "stamp", issuer: "agent-1", nonce: "s1" },
+    { op: "stamp", issuer: "agent-1", nonce: "s2" },
+    { op: "seal", issuer: "agent-1", nonce: "s3" },
+    { op: "stamp", issuer: "agent-1", nonce: "s4" },
+    { op: "seal", issuer: "agent-1", nonce: "s5" }
+  ]);
+  add(
+    "seal-increments",
+    twoSeals.state.seals[0]!.leafDigests.length === 2 &&
+      twoSeals.state.seals[1]!.leafDigests.length === 1,
+    "first seal = 2 leaves, second seal = only the 1 new stamp (no history re-seal)"
+  );
+
+  // 11. FIX(Roast-64-a · F3a) canonicalizer: bigint is rejected (no silent precision loss)
+  // (BigInt() constructors — tsconfig target is ES2017, literals unavailable)
+  let bigintThrew = false;
+  try {
+    canonicalize(BigInt(2) ** BigInt(90));
+  } catch {
+    bigintThrew = true;
+  }
+  add("canonical-bigint", bigintThrew, "2^90n rejected in canonicalizer (was 1.2379e+27)");
 
   const ok = checks.every((c) => c.pass);
   return { ok, checks, stateRoot: a.root, gasUsed: a.state.gasUsed };

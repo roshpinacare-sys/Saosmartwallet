@@ -10,7 +10,7 @@
 
 export interface ChainGate {
   network: "STEEM" | "BLURT" | "HIVE" | "TRON";
-  status: "anchored" | "pending" | "gated" | "transit";
+  status: "anchored" | "pending" | "gated" | "transit" | "failed";
   gate: string | null;
   detail: string;
   recovery: string | null;
@@ -84,8 +84,17 @@ export function anchoringMatrix(
   tronEnergy: number,
   lastStatus?: { steem?: string | null; blurt?: string | null; hive?: string | null },
 ): ChainGate[] {
-  const fromTx = (s?: string | null): "anchored" | "pending" | "gated" =>
-    s === "anchored" || s === "verified" ? "anchored" : s ? "pending" : "pending";
+  // FIX(Roast-64-a · F10): היה `s ? "pending" : "pending"` — טרנרי-מת-שכיסה
+  // כל-סטטוס (וכל-שם-"failed" הוצג-כ-pending). מיפוי-כנה:
+  // anchored|verified → anchored · failed|halted|rejected → failed · כל-השאר → pending
+  const fromTx = (s?: string | null): "anchored" | "pending" | "failed" =>
+    s === "anchored" || s === "verified"
+      ? "anchored"
+      : s === "failed" || s === "halted" || s === "rejected"
+        ? "failed"
+        : "pending";
+  const failedHive =
+    lastStatus?.hive === "failed" || lastStatus?.hive === "halted" || lastStatus?.hive === "rejected";
   const steem: ChainGate = {
     network: "STEEM",
     status: fromTx(lastStatus?.steem),
@@ -102,9 +111,11 @@ export function anchoringMatrix(
   };
   const hive: ChainGate = {
     network: "HIVE",
-    status: lastStatus?.hive === "anchored" || lastStatus?.hive === "verified"
-      ? "anchored"
-      : rcPct >= HIVE_RC_FLOOR_LIGHT ? "pending" : "gated",
+    status: failedHive
+      ? "failed"
+      : lastStatus?.hive === "anchored" || lastStatus?.hive === "verified"
+        ? "anchored"
+        : rcPct >= HIVE_RC_FLOOR_LIGHT ? "pending" : "gated",
     gate: rcPct >= HIVE_RC_FLOOR_LIGHT ? null : `rc-floor(${rcPct}%<${HIVE_RC_FLOOR_LIGHT}%)`,
     detail: "אותה משפחת Graphene — dhive raw sign, chain_id קבוע; הקוד מוכח, החסם הוא RC בלבד",
     recovery:

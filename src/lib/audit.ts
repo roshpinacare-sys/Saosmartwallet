@@ -10,7 +10,7 @@ export async function audit(action: string, detail = ''): Promise<void> {
 }
 
 export async function relayBroadcast(event: string, payload: unknown): Promise<void> {
-  // Fire-and-forget push to the relay mini-service (port 3003) for live UI updates.
+  // Fire-and-forget push to the relay mini-service (port 3004) for live UI updates.
   const token = process.env.SOVEREIGN_RELAY_TOKEN || '';
   try {
     await fetch('http://127.0.0.1:3004/emit', {

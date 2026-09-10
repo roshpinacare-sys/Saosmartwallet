@@ -1017,3 +1017,88 @@ Stage Summary:
 - **העיקרון-החדש-נאכף בקוד**: אין-GET-עם-side-effect · אין-תשלום-בלי-אימות-שרשרת-חוץ · אין-מספר-שנטען-בלי-מסלול-קוד · אין-טענת-אמת-בלי-ראיה.
 - **פתוח-להחלטת-מפעיל**: (1) purge-היסטוריית-db/custom.db-מגיט (filter-repo משנה-האשים!) (2) טעינת-BLURT-0.129-להחזרת-BACKING-VERIFIED (3) סוד-ה-ה-גיט-היסטוריה: רוטציית-SOVEREIGN_VAULT_SECRET.
 - lint/typecheck/fence/דפדפן — הכל-ירוק. שני-הריפו-נדחפים.
+---
+Task ID: 64-c
+Agent: roast-dex-external
+Task: roast audit of SAOS-DEX external-truth layer (relay/bridge/rail/truth/price-proof)
+
+Work Log:
+- נקראו במלואן: relay.ts(1098)+relay-eth+relay-sol+bridge.ts+rail.ts+truth.ts+price-proof.ts+onramp.ts+realmarket.ts + ראוטים bridge/truth/relay/realmarket/hive-rail/onramp/price-proof/fleet + kernel(wrap_mint)+chain(submitOp)+operator-auth. לא נגעתי בקוד.
+- לא הוכפלו תיקוני 61-63 (CoW/SAOS-price/verifyFarTx-basic/fence/SOL-false-alarm/GET-mint) — נחשפו השאריות-אמת מתחתיהם.
+- ליבת-הרוסט: (1) bridge משלם על קיום בלבד — אין התאמת סכום/נמען (verifyFarTx בודק status בלבד). (2) פנקס-הגשר שומר רק 200 הישנים → dedupe-proofRef נפרץ בהצפה. (3) hex64 חוסם txids-STEEM/HIVE שהם 40hex — המסילות ההן מתות. (4) TRON מסומן verified גם בלי extra_data — אין read-back. (5) verifyOnChain לא בודק מחבר — צד-ג' יכול "לאמת" stateRoot-ציבורי בעצמו. (6) SOL-height בהשוואת-substring (100 מתאים ל-1001). (7) railTick: deficit מ-RPC חי + claim קבוע + apply-אסינכרוני → double-POST מטביע WBLURT כפול. (8) פסק-דין WBLURT REAL-ACTIONABLE קבוע גם ב-BACKING-BROKEN. (9) פידים סריאליים first-wins בלי MAD חוצה-מקורות. (10) GET /onramp?force=1 ציבורי מנפץ TTL.
+- עוד: גשר-SOL מקבל confirmed (relay דורש finalized) — חלון-ריאורג; realPlaceOrder חסר אידמפוטנציה ב-timeout; onramp נופל חזרה לגורם-1e6 השגוי-ידוע; אין-תאימות spOwn בין realmarket/onramp; authorityOk fail-open+cache-לכל-החיים; תקרות-רייל מתאפסות בריסטארט; שלבי-סולם עם מספרים-קפואים תחת LIVE.
+
+Stage Summary:
+- 20 ממצאים: 4-HIGH · 9-MED · 7-LOW. כולם פערים-בין-טענת-אמת-לקוד, לא כפילויות של 63.
+- TOP1: גשר משלם-escrow על קיום-tx בלבד — אין binding של סכום/נמען → כל-tx-חוץ-קיים = 2Mµ.
+- TOP2: הטבעת-WBLURT (מסילת-האמת!) רגישה ל-double-POST ול-RPC-יחיד — הגיבוי-הכנה יכול לשבור את עצמו.
+- TOP3: "verified" בעיגונים = קיום-tx בלבד ב-TRON/SOL/ETH/STEEM — אין בדיקת מחבר; החתימה מעידה אך האימות לא מאמת זהות.
+- המלצה-ראשית: binding(amount,recipient,chain) ב-verifyFarTx + ledger-מחזורי + בדיקת-authority ב-verifyOnChain.
+---
+Task ID: 64-a
+Agent: roast-main-saos
+Task: roast audit of main repo SAOS sovereign layer (kernel/crypto/api)
+
+Work Log:
+- נקראו במלואן: kernel/canonical-json/merkle/evidence/anchor-gates/economy/findings/historic/tron-energize + keys/auth/vault/chain/siwe/audit + כל-23 הראוטים ב-/api (saos/*, vault/*, guardian, guard, audit, agent/*, dx, chat, task) + instrumentation + schema.prisma. לא נגעתי בקוד.
+- נבנה probe-הוכחה מול-המודולים-האמתיים (bun, הושמד-אחרי-הריצה): 10 מתוך 10 תרחישים-אומתו-מדיד — כולל התנגשות-מרקל CVE-2012-2459 ([A,B,C]≡[A,B,C,C] — אותו-root ואותה-הוכחת-הכלה!), bigint 2^90n → "1.2379e+27" בקנוניה, מבנה-יהלום-נפסל-כ"מעגלי", Date↔string — digest-זהה.
+- CRITICAL: requireOwner בודק scope-בלבד — ו-login מעניק scope='owner' לכל-מי-שמאים-מפתח-כלשהו-על-כל-חשבון-STEEM/HIVE/BLURT = זר-עם-ארנק-משלו שולט ב-seal/dx/guard(ownerLock!)/agent-register/verify. אין-שום-בדיקת-label/allowlist בכל-הריפו.
+- HIGH: seal נולד-מ-genesisState חדש-בכל-פעימה — אין-רצף-מדינה-בין-חותמות (stateRoot בת-סביבה); GET-י-economy/energy/שוכבים-קבלת-עדות-כל-קריאה-ציבורית (עבירה-על-העיקרון-מ-63) + swallow-כתיבה-נכשלת-עם-החזרת-digest-כאילו-נרשם; guardian POST start מציף-res.ok→ok:true-תמיד; אימות-אחרי-שגר-משליך-את-התוצאה (void dexPortBusy()); dex-bridge GET-ציבורי-משגר-תהליך+TOCTOU; כישלון-שידור-על-השרשרת-מנוהל-מראש ("advisory: אין-מפתחות") בניגוד-למציאות-המפתחות-החיים; rcPct/TRON_ENERGY מ-env מוצגים-כמדידה-חיה.
+- MED/LOW: truth-שדה-העדות-מחוץ-ל-digest (טמפר-עובר-verifyChain); fromTx-מציג-כל-סטטוס-כולל-"failed"-כ-pending; race-prevDigest-פיצול-שרשרת-עדויות; audit-ציבורי-מפריש-grandUsd-שנחסם-ב-estate; verify-all-סריאלי-ללא-תקציב; agent יכול-לכתוב-תוצאות-לכל-task; היסטורי-txRefs-חלקיים-שאינם-ניתנים-לאימות-בפועל-חרף-הטענה; comment-3003-מול-קוד-3004; NaN-ב-stamps.
+
+Stage Summary:
+- 22 ממצאים: 3-CRITICAL · 9-HIGH · 7-MED · 3-LOW. אפס-כפילויות של 61-63/64-c (שכבת-ה-main-repo לא נסרקה קודם).
+- TOP1: הסקלציה-קריטית-ב-auth (כל-מחזיק-מפתח-קריפטוגרפי-בעולם = owner-מלא על הכספת/השרשרת/הגשר) — requireOwner חייב אימות-label מול-allowlist.
+- TOP2: מרקל-ללא-הפרדת-דומיינים + שכפול-עלה-אחרון → חותם-ריבוני שאינו קושר את מספר-העלים ([A,B,C]≡[A,B,C,C] — הוכח-מדיד); וכן אין-אורך-מקדים על השרשור.
+- TOP3: "שרשרת-ריבונית" ללא-רצף-מדינה (כל-פעימה מ-genesis) + GET-ציבוריים-המזהמים-שרשרת-העדויות — ההוכחה-הציבורית מתנהגת כזבל-חישובי.
+
+---
+Task ID: 64-b
+Agent: roast-dex-engine
+Task: roast audit של מנוע-המסחר SAOS-DEX (book/amm/mm/economy/cow/triggers/router/canonical/portfolio/ale/launchpad/API)
+
+Work Log:
+- נקראו במלואם: book/amm/mm/economy/protorev/cow/triggers/router/canonical/milestone/portfolio/showcase/ale/launchpad + kernel (batch/trig_order/mint_fuel/notional) + chain.ts (buildBlock/אתחול) + ~40 ראוטי-API. לא שוכפלו ממצאי 61-63 ולא את (a)-(i) של המוביל.
+- CRITICAL: revenueCycle-שריפה (economy.ts:76-86) — pool.rb+=burnUsds בלי-חיוב-אוצר כלל → הטבעת-נזילות לבריכה מהאוויר; היומן מצהיר "USDS from fees" שקר.
+- HIGH: bookSellSim (protorev.ts:64-83) הולך-על-צד-ה-asks ומשמש-כסימולציית-הכנסות-לרגל-מכירה-לספר — הביצוע (matchBook) הולך-על-בידים → רווח-סריקה-מוגזם-שיטתית; הבאץ' מבצע-את-רגל-הבריכה-בלי-חזרה → הפסד-אוצר-אמת על-מועמד-פיקטיבי. גם edgeBidBps-בתצוגה-באותו-צד-שגוי.
+- HIGH: מחזורי-בריכות-מתים (protorev.ts:158-185): visited-מכיל-את-USDS-מההתחלה → הסגירה depth>0&&cur===start-בלתי-נגישה → "3-רגליים-USDS→a→b→USDS" פיצ'ר-מת, revAux.cycles≡0.
+- HIGH: מחיר-אירוע-הפוך-בקניות (amm.ts:130): price=out*1000/amountIn-ללא-הסתעפות-inA (בניגוד-quoteOut:50) → כל-swap-קנייה מזרים-מחיר-הפוך-ל-priceSamples→חותם-המחיר/TWAP/סולם — עדות-המחיר-הציבורית-מורעלת-בכיוון-אחד.
+- HIGH: מדדי-מצב-מודוליים (mm.ts:94-96,115): botSeedCaps/arenaRearm מחוץ-ל-DexState → restart/loadSnapshot מאפס "תקרות-לכל-חיי-התהליך" → זריעה-חוזרת-של-8M-SAOS/20M-USDS+בוטים; טענת-התקרה-שקרית-חוצה-הפעלות.
+- HIGH: CoW-שאריות (cow.ts:139-147): got=floor(matched*qty/vol) לכולם בזמן ש-alloc נותן-שארית-לאחרון → rem-עודף → fallback מבצע-נפח-מעבר-לגודל-ההזמנה (מוכר-מוכר-מלאי-מעבר-לפקודה).
+- MED: cow-fallback-מתעלם-ממחיר-הגבול (cow.ts:161-193): minOut=2%-מהציטוט-החי-ולא-מה-limit → מוכר-עם-גבול-2600-ימכר-בבריכה-ב-~2400 בלי-הפרה-מזוהה.
+- MED: vePaidMu-רפאים (economy.ts:112): מתועד-גם-כשההעברה-דולגה-בגלל-יתרה-חסרה.
+- MED: usdsPriceOf (portfolio.ts:42-53) משתמש-ב-poolMid-גולמי-על-מפתחות-ממוינים → מחיר-WSTEEM-הפוך (הבאג-ש-SETTLE-14-תיקן-ב-amm-ושכחו-כאן) → תיק-LP/שוויים-שגויים.
+- MED: mm-טייק: ה-edge-מחסר-FEE_BPS-שמעולם-לא-נגבה-בספר + fairPrice-מסתובב-50%-על-הספר-שלו-עצמו; ובוטי-רעש: נוסחת-ה-affordable-של-מכירה מחלקת-בסיס-במחיר (mm.ts:440) → צד-מכירה-מחנק-ל-~0.04%.
+- MED: canonical.ts (dex) מול canonical-json.ts (main): undefined→"null"-ונשמר, NaN/float-עוברים, אין-זיהוי-מעגלים → דיג'סטים-שונים-בין-הריפואים-על-אותו-אובייקט; merkleRoot-בלי-הפרדת-תחומים.
+- MED: showcase-B1 "מוכיח-דטרמיניזם-ביט-ביט" רק-כי-הוא-מקפיא-`at` ומריץ-applyOp-בלבד — kernel.ts:11-13 מודה-ש-journal.t=nowMs-שובר-ריפליי-ביט.
+- LOW: poolAdd-בבריכה-כמעט-ריקה (amm.ts:64-67) מזרים-A-בלי-B-עם-LP-מינ'-1 (תרומה-שקטה) · אירועי-cow_match-מזווגים-אינדקסים-לא-אמתיים (cow.ts:123-130).
+- נבדקו-ונמצאו-תקינים (בלי-דיווח): טלסקופ-נעילת-הלימיט-ב-matchBook, שחרור-maker-אחרון, trig_order↔trigTick-סימטריית-נעילה, mint_fuel-מחויב-profit+feeMeter, batch-issuer-pinned+אטומיות, ניקוי-GET-מ-side-effects-ב-truth (Roast-63).
+
+Stage Summary:
+- 16 ממצאים חדשים: 1-CRITICAL (הדפסת-נזילות-בראוטר-ההכנסות), 5-HIGH (protorev-צד-שגוי+מחזורים-מתים, מחיר-swap-הפוך-מרעיל-את-חותם-המחיר, מדדי-מודול-חוץ-מצב, CoW-ביצוע-מעבר-לגודל), 8-MED, 2-LOW.
+- שלושת-הכבדים: (1) שריפת-הראוטר-מנפחת-בריכות-מהאוויר בלי-חיוב-אוצר; (2) סימולציית-הארב-על-צד-ה-asks = רווחי-ראי-והפסדי-אמת-מיידיים; (3) מחיר-אירוע-הפוך-בקניות-מזהם-את-עדות-המחיר-הציבורית.
+- העיקרון-המוכח-שוב: כל-"רווח-מדוד" שאינו-מחויב-ביתרה — הדפסה; כל-סימולציה-שאינה-זהה-לביצוע — סתם-תיאטרון-מספרים.
+---
+Task ID: 64-e1
+Agent: fix-main-repo
+Task: תיקון ממצאי roast 64-a בריפו הראשי (owner-gate, merkle-CVE, canonical, GET-side-effects, guardian, seal-chaining)
+
+Work Log:
+- F1 auth.ts: OPERATOR_ACCOUNT (SAOS_OPERATOR_ACCOUNT|headcorner) — requireOwner דורש scope=owner וגם label=owner:<operator>; label-אחר=null (fail-closed). תואם-ל-login שיוצר owner:<account>
+- F2 merkle.ts: RFC-6962 — leaf=sha256(0x00‖leaf), node=sha256(0x01‖L‖R), root=sha256(0x02‖u32le(count)‖top); leafCount בהוכחה + verify fail-closed; verify-pack: howToVerify-חדש + legacyRootNote לשורשים-ישנים
+- F3 canonical-json.ts: bigint נדחה (היה Number() — איבוד-דיוק+סימון-מדעי); seen נשלף-אחרי-walk (יהלום-חוקי, מעגל-אמת-נדחה); Date→{"$date"} רק-תקין, invalid נדחה; נבדקו-כל-הקוראים — אף-Date לא זורם כיום
+- F4 evidence.ts: truth-בתוך-ה-preimage דרך receiptPreimage (מקור-אמת-יחיד ל-forge/verify) + DEFAULT_TRUTH; verify-pack מאמת-דרכו; DB-בלי-truth מניח NONE — קבלה-עם-truth-אחר-לא-תאומת (fail-closed)
+- F5 kernel.ts: harvest ל-treasury-בלבד + header-כנה (issuer=תווית-לא-מאומתת, gates=שערי-תפקיד); lastSealIndex (seal חותם-רק-חותמות-חדשות); relayOpen (relay_ack-ללא-פתיחה=נדחה); selftest 7→11 בדיקות — כולן-עוברות; seal-route: harvest issuer=treasury
+- F6 economy/energy GETs: אפס-כתיבה — כתיבות-EvidenceReceipt נמחקו; receipt:null+note-כנה (ה-UI צורך רק j.result/j.plan — צורת-התשובה-נשמרה)
+- F7 seal: prevRoot=stateRoot-החותם-הקודם נכנס-כעלה-chain לשורש (אין-island-roots) · קבלה-ב-$transaction-עם-קריאת-prevDigest-טרייה (fork-race-נסגר) · advisory-נגזר-חי-מנוכחות-WIF-ב-saos-dex/.env (שמות-בלבד, לא-ערכים) · rcPct/tronEnergy מתויגים static-config
+- F8 guardian: POST ok=res.ok-בכנות+lastError; ה-8s dexPortBusy-נאסף-ל-rt (launchVerified/launchVerifiedAt) וחשוף-ב-GET/POST
+- F9 dex-bridge: GET=סטטוס-קריאה-בלבד; spawn-דורש requireOwner + בדיקת-פורט-שנייה-לפני-שגר (TOCTOU-מצומצם)
+- F10 anchor-gates: fromTx — anchored|verified→anchored, failed|halted|rejected→failed, אחרת→pending; הטרנרי-המת-נמחק; failed-נוסף-ל-ChainGate.status
+- F11 audit GET: requireOwner (היה-dead-code) — אנונימי=403; ה-UI-כבר-שולח-authHeaders-וממשיך-להציג-לבעלים
+- F12 agent/task: result-רק-לסוכן-שטען (assignedTo=name + status=claimed) — מעבר-חד-פעמי claimed→done|failed
+- F13 audit.ts: הערת-הפורט-תוקנה ל-3004 (הקוד-חי-3004)
+- F14 historic.ts+towers-view: "הפנייה-חלקית — לא-ניתנת-לאימות-מלא" במקום "ניתנים-לאימות"
+
+Stage Summary:
+- כל-14-הממצאים-נסגרו; probe-חי-מול-המודולים (bun, נמחק): [A,B,C]≠[A,B,C,C], [a,bc]≠[ab,c], עלה-בודד-מגובש, הוכחות-אימות-ל-1/3/4/5-עלים, leafCount-מזויף-נדחה · 11/11-selftest · tamper-truth-שובר-verifyChain · diamond-חוקי/מעגל-נדחה
+- lint=0-errors · tsc=0 · לא-נגעתי-ב-saos-dex/page.tsx/דקס-ויו · שורשים-ישנים-ב-DB לא-יאומתו-תחת-הסכמה-החדשה (legacyRootNote-כנה — פעימה-חדשה-מייצרת-root-תקין)

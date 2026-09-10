@@ -28,10 +28,13 @@ interface GuardianRT {
   revivals: number;
   lastRevivalAt: number;
   lastError: string | null;
+  // FIX(Roast-64-a · F8): תוצאת-אימות-השגר (היה-void dexPortBusy() — נזרקה)
+  launchVerified: boolean | null;
+  launchVerifiedAt: number;
 }
 const g = globalThis as unknown as { __saosGuardian?: GuardianRT };
 function rt(): GuardianRT {
-  if (!g.__saosGuardian) g.__saosGuardian = { timer: null, lastCheck: 0, lastOk: false, revivals: 0, lastRevivalAt: 0, lastError: null };
+  if (!g.__saosGuardian) g.__saosGuardian = { timer: null, lastCheck: 0, lastOk: false, revivals: 0, lastRevivalAt: 0, lastError: null, launchVerified: null, launchVerifiedAt: 0 };
   return g.__saosGuardian;
 }
 
@@ -70,8 +73,20 @@ async function spawnDex(): Promise<boolean> {
       { detached: true, stdio: "ignore", cwd: DEX_DIR },
     );
     child.unref();
-    // אימות-לאחר-שגר: אם-הפורט-לא-עלה-תוך-~8ש׳ וגם-לא-היה-תפוס — דווח-כנה
-    setTimeout(() => { void dexPortBusy(); }, 8_000)?.unref?.();
+    // FIX(Roast-64-a · F8): אימות-לאחר-שגר — התוצאה נאספת ל-state החי (היה
+    // void dexPortBusy() שהשליך-את-התשובה) ונחשפת ב-GET/POST
+    setTimeout(() => {
+      dexPortBusy().then((up) => {
+        const r = rt();
+        r.launchVerified = up;
+        r.launchVerifiedAt = Date.now();
+        if (up) {
+          r.lastError = null;
+        } else if (!r.lastError) {
+          r.lastError = "post-launch-verification-failed (port 3010 did not come up)";
+        }
+      });
+    }, 8_000)?.unref?.();
     return true;
   } catch {
     return false;
@@ -118,6 +133,8 @@ export async function GET() {
       revivals: r.revivals,
       lastRevivalAt: r.lastRevivalAt,
       lastError: r.lastError,
+      launchVerified: r.launchVerified,
+      launchVerifiedAt: r.launchVerifiedAt,
       note: "השומר-הריבוני: שרת-הפלטפורמה-החי מקים-את-דמון-הבורסה-בכל-נפילה (guardian_boot-ממוסד)",
     },
   });
@@ -135,5 +152,18 @@ export async function POST(req: NextRequest) {
   }
   startWatchdog();
   const res = await ensureAlive();
-  return NextResponse.json({ ...res, ok: true, guardian: rt().revivals }); // FIX: ok-אחרי-...res (היה-נדרס)
+  // FIX(Roast-64-a · F8): ok אמת — היה { ...res, ok: true } שהציף כישלון-revive
+  // ב-ok:true תמיד; עכשיו ok=res.ok + lastError/launchVerified חשופים
+  const r = rt();
+  return NextResponse.json({
+    ok: res.ok,
+    revived: res.revived,
+    guardian: {
+      revivals: r.revivals,
+      lastError: r.lastError,
+      lastOk: r.lastOk,
+      launchVerified: r.launchVerified,
+      launchVerifiedAt: r.launchVerifiedAt,
+    },
+  });
 }

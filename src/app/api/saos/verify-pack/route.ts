@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { buildMerkleTree, merkleProof, verifyMerkleProof } from "@/lib/saos/merkle";
 import { canonicalDigest } from "@/lib/saos/canonical-json";
+import { receiptPreimage } from "@/lib/saos/evidence";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,11 @@ export const dynamic = "force-dynamic";
  * verify-pack — the public proof surface: latest seal → merkle tree →
  * inclusion proof for every leaf → independent verification.
  * Anyone can verify without trusting us. (steem-main verify-pack discipline)
+ *
+ * FIX(Roast-64-a · F2): ההוכחה עודכנה לסכמה-המופרדת-דומיינים (RFC-6962-style):
+ * leaf = sha256(0x00‖leaf) · node = sha256(0x01‖L‖R) · root = sha256(0x02‖u32le(count)‖top).
+ * הוכחות-שורשים-ישנות-שנחתמו-בסכמה-הקודמת לא יאומתו עוד (rootMatches=false כנה)
+ * — פעימת-עגינה חדשה מייצרת root-מאומת-תחת-הסכמה-החדשה.
  */
 export async function GET() {
   try {
@@ -39,11 +45,13 @@ export async function GET() {
     }
     const allVerified = proofs.every((p) => p.verified);
 
-    // FIX(Roast-63 · H2): אין-עוד-כתיבה-ב-GET (היה-רישום-קבלה-בכל-סקר = הצפת-שרשרת).
-    // FIX(Roast-63 · M12): במקום-זאת — **מאמתים-את-שרשרת-העדויות-עצמה** כאן
-    // (verifyChain היה-מוגדר-ומעולם-לא-נקרא — השרשרת-יכלה-להיחבל-בלי-שאף-אחד-יבחין).
-    // שחזור-ה-preimage: {kind, at, payload, prevDigest} — ה-"at" לא-נשמר-בפני-עצמו,
-    // רק-createdAt (אותו-שעון-תהליך; ms-גבולי-עלול-להחליק) → שני-candidates-כנים.
+    // FIX(Roast-63 · H2): אין-עוד-כתיבה-ב-GET (היה-רישום-קבלה-בכל-סריקה = הצפת-שרשרת).
+    // FIX(Roast-63 · M12): במקום-זאת — **מאמתים-את-שרשרת-העדויות-עצמה** כאן.
+    // FIX(Roast-64-a · F4): ה-preimage כולל את גבול-האמת (truth) — דרך receiptPreimage,
+    // מקור-האמת-היחיד של forge/verify. truth לא נשמר-ב-DB — האימות-מה-DB מניח את
+    // ברירת-המחדל-הכנה (NONE/0); קבלה-שנוצרה-עם-truth-אחר לא תעבור אימות (fail-closed).
+    // ה-"at" לא-נשמר-בפני-עצמו, רק-createdAt (אותו-שעון-תהליך; ms-גבולי-עלול-
+    // להחליק) → שני-candidates-כנים.
     const receipts = await db.evidenceReceipt.findMany({ orderBy: { createdAt: "asc" } });
     let prevDigest: string | null = null;
     let chainOk = true;
@@ -57,7 +65,7 @@ export async function GET() {
       ];
       let matched: string | null = null;
       for (const at of cands) {
-        const d = await canonicalDigest({ kind: r.kind, at, payload, prevDigest: r.prevDigest });
+        const d = await canonicalDigest(receiptPreimage({ kind: r.kind, at, payload, prevDigest: r.prevDigest }));
         if (d === r.digest) { matched = d; break; }
       }
       if (matched === null || r.prevDigest !== prevDigest) {
@@ -81,9 +89,13 @@ export async function GET() {
       proofs,
       sampleProof: await merkleProof(tree, 0),
       evidenceChain: { receipts: receipts.length, ok: chainCheck.ok, brokenAt: chainCheck.brokenAt },
+      // FIX(Roast-64-a · F2): כנות-לשורשים-ישנים — root-שנחתם-בסכמה-הקודמת לא יאומת
+      ...(rootMatches ? {} : { legacyRootNote: "root-זה נחתם בסכמה-הקודמת (ללא הפרדת-דומיינים ואיגוד-מספר-עלים) — הרץ פעימת-עגינה חדשה לשורש-מאומת-תחת-הסכמה-הנוכחית" }),
       howToVerify: [
         "קח את sampleProof.path",
-        "hash = leaf; לכל צעד: dir==='R' ? sha256(hash+sibling) : sha256(sibling+hash)",
+        "hash = sha256(0x00 || leafBytes) — עלה מגובש בהפרדת-דומיין",
+        "לכל צעד: dir==='R' ? sha256(0x01 || hash || sibling) : sha256(0x01 || sibling || hash)",
+        "בסוף: root = sha256(0x02 || uint32le(leafCount) || hash) — מספר-העלים אגוד-בשורש (anti-CVE-2012-2459)",
         "השווה ל-root — שוויון = העלה כלול בחותם, בלי לסמוך עלינו"
       ]
     });

@@ -158,7 +158,7 @@ function Watchtower({ saos, onSealed }: { saos: SaosStatus | null; onSealed: () 
       {/* historic anchors */}
       {saos && saos.historic.length > 0 && (
         <section className="sv-card p-4">
-          <TowerHeader icon={Landmark} title="עוגנים היסטוריים בשרשרת" sub="רפרנסים חיים — ניתנים לאימות בהיסטוריית הרשתות" />
+          <TowerHeader icon={Landmark} title="עוגנים היסטוריים בשרשרת" sub="הפניות-חלקיות — לא-ניתנות-לאימות-מלא בהיסטוריית הרשתות" />
           <div className="grid gap-2 sm:grid-cols-2">
             {saos.historic.map((h, i) => (
               <div key={i} className="sv-well px-3 py-2.5 flex items-center justify-between gap-2">
