@@ -464,6 +464,7 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
 
   const oracleRaw = (raw.assetPricesSummary ?? {}) as Record<string, Record<string, unknown>>;
   const oracle: SaosNetOracleQuote[] = Object.entries(oracleRaw)
+    .filter(([, q]) => q !== null && typeof q === "object") // daemon pushes null entries — never let one kill the snapshot
     .map(([asset, q]) => ({
       asset,
       // their oracle quotes are integer nano-dollars (1e9 = $1.00)
@@ -476,6 +477,7 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
 
   const wrappedRaw = (raw.wrappedSummary ?? {}) as Record<string, Record<string, unknown>>;
   const wrapped: SaosNetWrapped[] = Object.entries(wrappedRaw)
+    .filter(([, w]) => w !== null && typeof w === "object")
     .map(([asset, w]) => ({
       asset,
       supply: typeof w.supply === "number" ? w.supply : 0,
@@ -487,6 +489,7 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
   const metaRaw = (raw.assetMetaSummary ?? {}) as Record<string, Record<string, unknown>>;
   const assetMeta: SaosNetSnapshot["assetMeta"] = {};
   for (const [asset, m] of Object.entries(metaRaw)) {
+    if (m === null || typeof m !== "object") continue; // null entry — skip, never crash
     assetMeta[asset] = {
       chain: typeof m.chain === "string" ? m.chain : "—",
       contract: typeof m.contract === "string" ? m.contract : "",
@@ -497,6 +500,7 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
 
   const poolsRaw = (g.pools ?? {}) as Record<string, Record<string, unknown>>;
   const pools: SaosNetPool[] = Object.entries(poolsRaw)
+    .filter(([, p]) => p !== null && typeof p === "object")
     .map(([pair, p]) => ({
       pair,
       baseReserve: typeof p.a === "number" ? p.a : 0,
@@ -601,10 +605,12 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
       usdtTotal: num(derivativesRaw.usdtTotal),
       measuredAddresses: str(derivativesRaw.measured),
     },
-    delegations: Object.entries(delegationsRaw).map(([name, d]) => ({
-      name,
-      scopes: Array.isArray(d.scopes) ? (d.scopes as string[]) : [],
-    })),
+    delegations: Object.entries(delegationsRaw)
+      .filter(([, d]) => d !== null && typeof d === "object")
+      .map(([name, d]) => ({
+        name,
+        scopes: Array.isArray(d.scopes) ? (d.scopes as string[]) : [],
+      })),
   };
 }
 

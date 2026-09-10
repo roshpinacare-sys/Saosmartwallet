@@ -108,8 +108,20 @@ export interface LimitOrderCreateOperation {
   expiration: number;
 }
 
-export type SteemOperationBody = TransferOperation | LimitOrderCreateOperation | LimitOrderCancelOperation;
-export type SteemOperationName = "transfer" | "limit_order_create" | "limit_order_cancel";
+export type SteemOperationBody =
+  | TransferOperation
+  | LimitOrderCreateOperation
+  | LimitOrderCancelOperation
+  | VoteOperation
+  | CommentOperation
+  | CustomJsonOperation;
+export type SteemOperationName =
+  | "transfer"
+  | "limit_order_create"
+  | "limit_order_cancel"
+  | "vote"
+  | "comment"
+  | "custom_json";
 
 /**
  * Internal-market order cancel (M3+ DEX lifecycle closure). Cancels the
@@ -130,6 +142,45 @@ export interface LimitOrderCancelOperation {
   owner: string;
   /** The caller-chosen order id from the original limit_order_create. */
   orderid: number;
+}
+
+/**
+ * Content vote (SOVEREIGN-VOICE). `weight` is a SIGNED int16 in [-10000,
+ * 10000] (10000 = 100% upvote, -10000 = 100% flag); wire: two's-complement
+ * u16 LE. zero-weight = clear-vote (removes an existing vote).
+ */
+export interface VoteOperation {
+  voter: string;
+  author: string;
+  permlink: string;
+  weight: number; // int16, -10000..10000
+}
+
+/**
+ * Content publication (article/comment). A root post has parent_author ""
+ * and parent_permlink = the post's category (first tag). The permlink must
+ * be lowercase [a-z0-9-] (the chain lowercases and rejects otherwise).
+ */
+export interface CommentOperation {
+  parent_author: string; // "" for a root post
+  parent_permlink: string; // category for a root post, permlink for a reply
+  author: string;
+  permlink: string;
+  title: string;
+  body: string;
+  json_metadata: string; // stringified JSON ({tags:[…], app:…})
+}
+
+/**
+ * Generic JSON operation on the posting authority (follow / reblog /
+ * witness-vote …). `id` is the plugin identifier ("follow", "reblog"),
+ * `json` the stringified payload. Wire: two vector<string> + two strings.
+ */
+export interface CustomJsonOperation {
+  required_auths: string[]; // active-authority signers (we always keep this empty)
+  required_posting_auths: string[]; // posting-authority signers (the agent's hands)
+  id: string; // ≤ 32 chars, [a-z0-9._-]
+  json: string; // stringified JSON, ≤ 8192 bytes on the chain
 }
 
 export function packOperation(w: ByteWriter, name: SteemOperationName, body: SteemOperationBody): void {
@@ -159,6 +210,39 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
       w.varint(OP_IDS.limit_order_cancel);
       w.string(c.owner);
       w.u32(c.orderid); // uint32 LE — oracle-verified 2026-09-08 (see type doc)
+      return;
+    }
+    case "vote": {
+      const v = body as VoteOperation;
+      w.varint(OP_IDS.vote);
+      w.string(v.voter);
+      w.string(v.author);
+      w.string(v.permlink);
+      // int16 LE in two's complement — fc::raw packs int16 as u16 bits.
+      w.u16(v.weight < 0 ? v.weight + 0x10000 : v.weight);
+      return;
+    }
+    case "comment": {
+      const c = body as CommentOperation;
+      w.varint(OP_IDS.comment);
+      w.string(c.parent_author);
+      w.string(c.parent_permlink);
+      w.string(c.author);
+      w.string(c.permlink);
+      w.string(c.title);
+      w.string(c.body);
+      w.string(c.json_metadata);
+      return;
+    }
+    case "custom_json": {
+      const j = body as CustomJsonOperation;
+      w.varint(OP_IDS.custom_json);
+      w.varint(j.required_auths.length);
+      for (const a of j.required_auths) w.string(a);
+      w.varint(j.required_posting_auths.length);
+      for (const a of j.required_posting_auths) w.string(a);
+      w.string(j.id);
+      w.string(j.json);
       return;
     }
     default: {
@@ -203,8 +287,37 @@ export function unpackOperation(r: ByteReader): UnpackedOperation {
     const orderid = r.u32();
     return { id, name: "limit_order_cancel", body: { owner, orderid } };
   }
+  if (id === OP_IDS.vote) {
+    const voter = r.string();
+    const author = r.string();
+    const permlink = r.string();
+    const raw = r.u16();
+    const weight = raw >= 0x8000 ? raw - 0x10000 : raw; // two's complement back to int16
+    return { id, name: "vote", body: { voter, author, permlink, weight } };
+  }
+  if (id === OP_IDS.comment) {
+    const parent_author = r.string();
+    const parent_permlink = r.string();
+    const author = r.string();
+    const permlink = r.string();
+    const title = r.string();
+    const body = r.string();
+    const json_metadata = r.string();
+    return { id, name: "comment", body: { parent_author, parent_permlink, author, permlink, title, body, json_metadata } };
+  }
+  if (id === OP_IDS.custom_json) {
+    const nAuths = r.varint();
+    const required_auths: string[] = [];
+    for (let k = 0; k < nAuths; k++) required_auths.push(r.string());
+    const nPosting = r.varint();
+    const required_posting_auths: string[] = [];
+    for (let k = 0; k < nPosting; k++) required_posting_auths.push(r.string());
+    const jsonId = r.string();
+    const json = r.string();
+    return { id, name: "custom_json", body: { required_auths, required_posting_auths, id: jsonId, json } };
+  }
   throw new Error(
-    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5) and "limit_order_cancel" (6); ` +
+    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5), "limit_order_cancel" (6), "vote" (0), "comment" (1) and "custom_json" (18); ` +
       `extend packOperation/unpackOperation before parsing other op types`,
   );
 }

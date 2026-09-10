@@ -21,6 +21,7 @@ import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
+import { publishPostFromAgent, interactFromAgent, SOCIAL_RAILS } from "./social";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
@@ -466,6 +467,53 @@ export const MODULES: HarnessModule[] = [
     async exec() {
       const rows = await steemOpenOrders("headcorner");
       return { count: rows.length, orders: rows, account: "headcorner" };
+    },
+  },
+  {
+    id: "steem.post",
+    name: "קול-ריבוני — פרסום",
+    kind: "actor",
+    desc: `פרסום פוסט/תגובה אמיתי בשרשרת מ-@headcorner (authority-posting — לעולם לא נוגע בכספים). הכספת חותמת ישר: זו היד האוטונומית שלך, במסילות ${SOCIAL_RAILS.maxPostsPerDay} פרסומים/יום לצי. פרסם ערך אמיתי — דוח-צי, ממצא, ניתוח — לא רעש. מוחזר permlink + txId אמיתיים.`,
+    args: `{"title":"string","body":"markdown ≤20000","tags":["≤5, [a-z0-9-]"],"replyTo":{"author":"…","permlink":"…"} (optional — comment)}`,
+    needsVault: true,
+    cacheable: false,
+    async exec(args, ctx) {
+      const title = String(args.title || "").trim();
+      if (!title) throw new GateError("bad-input", "דרוש params.title");
+      const body = String(args.body || "").trim();
+      if (!body) throw new GateError("bad-input", "דרוש params.body (markdown)");
+      const tags = Array.isArray(args.tags) ? args.tags.map((t) => String(t)) : [];
+      if (!tags.length) throw new GateError("bad-input", 'דרוש params.tags (מערך, למשל ["saos","steem"])');
+      let replyTo: { author: string; permlink: string } | undefined;
+      if (args.replyTo && typeof args.replyTo === "object") {
+        const rt = args.replyTo as { author?: unknown; permlink?: unknown };
+        if (typeof rt.author === "string" && typeof rt.permlink === "string") replyTo = { author: rt.author, permlink: rt.permlink };
+      }
+      const r = await publishPostFromAgent({ agentName: ctx.agentName, runId: ctx.runId, title, body, tags, replyTo });
+      return { ...r, meaning: `פורסם חי בשרשרת — ${r.url}` };
+    },
+  },
+  {
+    id: "steem.interact",
+    name: "קול-ריבוני — אינטראקציה",
+    kind: "actor",
+    desc: `הצבעה / מעקב / reblog אמיתי מ-@headcorner (authority-posting). מסילות: ${SOCIAL_RAILS.maxInteractionsPerDay} אינטראקציות/יום, הצבעה ≤${SOCIAL_RAILS.maxVoteWeight}/10000 (~20%) — הצבע מתוך שיקול-דעת על תוכן שאכן שווה, לעולם לא ספאם. דרוש permlink אמיתי (מצא אותו קודם). txId אמיתי מוחזר.`,
+    args: `{"action":"vote|follow|reblog","author":"account","permlink":"string (vote/reblog)","weight":"1..${SOCIAL_RAILS.maxVoteWeight} (vote, ברירת-מחדל ${SOCIAL_RAILS.maxVoteWeight})"}`,
+    needsVault: true,
+    cacheable: false,
+    async exec(args, ctx) {
+      const action = String(args.action || "");
+      if (!["vote", "follow", "reblog"].includes(action)) throw new GateError("bad-input", 'דרוש params.action ("vote"|"follow"|"reblog")');
+      const r = await interactFromAgent({
+        agentName: ctx.agentName,
+        runId: ctx.runId,
+        action: action as "vote" | "follow" | "reblog",
+        author: String(args.author || ""),
+        permlink: String(args.permlink || ""),
+        weight: Number(args.weight) || undefined,
+        unfollow: args.unfollow === true,
+      });
+      return { ...r, meaning: `פעולה חיה בשרשרת — ${r.detail}` };
     },
   },
   {
