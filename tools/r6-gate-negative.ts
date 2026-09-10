@@ -21,7 +21,11 @@ const CASES: Case[] = [
   { name: "codename-tag", title: "Weekly Network Update", body: "A clean English post body about the network.", tags: ["blockchain", "saos"], expect: "block" },
   { name: "codename-body", title: "Weekly Network Update", body: "The SAOS fleet continues building on the network.", expect: "block" },
   { name: "solicitation", title: "Join Our Wallet Program", body: "Send STEEM to our wallet address with a memo to join the program today.", expect: "block" },
-  { name: "wif-key", title: "Dev Note", body: "here is a key 5Kb8kLf9zgWQnogidDA76MzPL6TsZZY36hWXMssSzNydYXYB9KF for testing", expect: "block" },
+  // ROAST r7: the negative test used to embed a famous public example WIF —
+  // a doctrine violation inside the gate's own test (and it made the
+  // "grep 5[HJK] = zero" audit claim false). The vector is now generated at
+  // runtime: WIF-shaped base58 that trips the same scanner pattern.
+  { name: "wif-key", title: "Dev Note", body: `here is a key 5K${[...Array(49)].map(() => "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"[Math.floor(Math.random() * 58)]).join("")} for testing`, expect: "block" },
   { name: "clean-english", title: "Weekly Network Update", body: "The fleet published its weekly English digest and cleaned the feed.", tags: ["blockchain", "community", "update"], expect: "pass" },
 ];
 

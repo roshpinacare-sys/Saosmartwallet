@@ -92,7 +92,11 @@ async function enqueueRun(opts: {
   const run = await db.gateRun.create({
     data: {
       agentName: agent.name,
-      goal: opts.goal.slice(0, 600),
+      // ROAST r7: the editor-v4 goal is ~950 chars — the flat 600 clamp cut it
+      // mid-instruction ("(3) chat.report…" invisible), so the brain ran a
+      // goal it never fully read. Operator-curated schedule goals get a wider
+      // lane; trigger/proposal goals stay bounded.
+      goal: opts.goal.slice(0, opts.origin === "schedule" ? 1200 : 600),
       doneMeans: JSON.stringify(opts.doneMeans.filter((d) => typeof d === "string" && d.trim()).slice(0, 8)),
       modules: JSON.stringify(modules),
       brain,
@@ -192,12 +196,34 @@ async function stageSchedules(p: HeartPulse): Promise<void> {
           p.counters.schedulesDeferred++;
           continue;
         }
+        // ROAST r7 — EARLY-fire clamp: r5 only blocked LATE fires. If the row
+        // came due BEFORE today's window (legacy boot rows, or a crash between
+        // enqueue and update), the negative (now − win) sailed through and the
+        // order fired hours early, burning the day's quota. A daily order may
+        // only EVER fire inside [win, win + grace] — hold it at the window.
+        if (now < win.getTime()) {
+          await db.gateSchedule.update({
+            where: { id: s.id },
+            data: { nextRunAt: win, dayKey: dk, dayCount: count },
+          });
+          p.counters.schedulesDeferred++;
+          continue;
+        }
       }
       if (count >= s.maxPerDay) {
-        // cap reached — honestly push to tomorrow-ish (next interval), no silent lies
+        // cap reached — honestly push to TOMORROW'S WINDOW (r7: now+24h drifted
+        // dailies off-window — the burn at 01:54Z proved the drift is real),
+        // no silent lies
+        let nextCap = new Date(now + Math.max(s.everyMs || MIN_SCHEDULE_EVERY_MS, MIN_SCHEDULE_EVERY_MS));
+        if (s.kind === "daily" && typeof s.hourUtc === "number") {
+          const d = new Date();
+          d.setUTCHours(s.hourUtc, 0, 0, 0);
+          if (d.getTime() <= now) d.setUTCDate(d.getUTCDate() + 1);
+          nextCap = d;
+        }
         await db.gateSchedule.update({
           where: { id: s.id },
-          data: { nextRunAt: new Date(now + (s.kind === "daily" ? DAY_MS : Math.max(s.everyMs || MIN_SCHEDULE_EVERY_MS, MIN_SCHEDULE_EVERY_MS))), dayKey: dk, dayCount: count },
+          data: { nextRunAt: nextCap, dayKey: dk, dayCount: count },
         });
         continue;
       }
@@ -239,12 +265,22 @@ async function stageSchedules(p: HeartPulse): Promise<void> {
       });
       p.counters.schedulesFired++;
       fired++;
-    } catch {
+    } catch (e) {
       // a broken schedule must not stall the fleet — push it one cadence away
+      // (r7: dailies go to their NEXT WINDOW, not now+cadence off-window)
+      const msg = e instanceof Error ? e.message : String(e);
+      const fallEvery = Math.max(s.everyMs || MIN_SCHEDULE_EVERY_MS, MIN_SCHEDULE_EVERY_MS);
+      let fallNext = new Date(now + fallEvery);
+      if (s.kind === "daily" && typeof s.hourUtc === "number") {
+        const d = new Date();
+        d.setUTCHours(s.hourUtc, 0, 0, 0);
+        if (d.getTime() <= now) d.setUTCDate(d.getUTCDate() + 1);
+        fallNext = d;
+      }
       await db.gateSchedule.update({
         where: { id: s.id },
-        data: { nextRunAt: new Date(now + Math.max(s.everyMs || MIN_SCHEDULE_EVERY_MS, MIN_SCHEDULE_EVERY_MS)) },
-      }).catch(() => {});
+        data: { nextRunAt: fallNext },
+      }).catch(() => { console.error("[heart] schedule fall-behind failed:", msg); });
     }
   }
   p.loops.scheduler = { lastAt: new Date().toISOString(), ok: true, fired };

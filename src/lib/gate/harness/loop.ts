@@ -560,8 +560,17 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     steps.push({ i: steps.length + 1, side: "maker", ok: false, error: msg, at: new Date().toISOString() });
+    // ROAST r7: a failed run used to die MUTE — error set, report empty. The
+    // bridge and the operator read the REPORT, not the error column; a failed
+    // run must confess in Hebrew what it was trying to do and where it fell.
     await saveRun(runId, {
-      status: "failed", steps, error: msg, finishedAt: new Date(),
+      status: "failed", steps,
+      error: msg,
+      report:
+        `🛑 הריצה נפלה לפני סיום (לא באשמת המודולים — בסביבה או בפרוטוקול): ${msg.slice(0, 300)}. ` +
+        `מטרה: ${String(run.goal).slice(0, 200)}. צעדים שהושלמו: ${steps.filter((s) => s.side === "maker" && s.ok).length}. ` +
+        `זו כשל-כנה — אין דוח-תוצרים כי העבודה לא הושלמה.`,
+      finishedAt: new Date(),
       durationMs: Date.now() - startedAt,
       tokens: usageKnown ? { prompt: tokPrompt, completion: tokCompletion } : null,
     });

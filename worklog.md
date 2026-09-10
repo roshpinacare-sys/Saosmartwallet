@@ -1350,3 +1350,24 @@ Stage Summary:
 - הפער השלישי נחשף: לא "מה יוצא" ולא "מה טוענים" — אלא "מה בכלל סורקים". השרשרת צעקה את שם-הקוד 2,400 פעמים ביום במישור שאף כלי לא הקשיב, והשער שחוסם דליפות היה עיוור לדפוס-הפיתוי של התקרית-הגדולה עצמה.
 - המצב החי: עיניים למישור-ה-custom_json (101/101 מדווח), שער 8/8, שלוש נקודות-קצה נעולות עם הוכחות-401/400, tsc-0 אמתי, פיד נקי, רמדיאציות מחזיקות, הלב מרפא את עצמו מול הסביבה.
 - קבצים: src/lib/gate/harness/{social,exposure}.ts · src/app/api/gate/lock/route.ts · src/app/api/developer/{keys,usage}/route.ts · tools/{r6-chain-truth,r6-anchor-probe,r6-db-truth,r6-endpoint-matrix,r6-gate-negative,r6-customjson-live}.ts · tools/{chain-health-check,roast3-full-history-scan}.ts (module-scope) · docs/roast-audit.md · worklog.md.
+
+---
+Task ID: 23
+Agent: Z.ai Code (main)
+Task: ROAST r7 — "תמשיך": הראונד שראונד 6 דחה למחר — העורך רץ חי לראשונה, 4 פערי-אמת חדשים נחשפו ותוקנו, מישור-מאומת + fuzz בפעם-הראשונה, ודחיפה.
+
+Work Log:
+- סנכרון-מצב: HEAD היה 1 מעל origin (קומיט-UUID של db-snapshot) + db מלוכלך; r6 דחוף (52f6254). נבנו tools/r7-{db,chain}-truth.ts.
+- אמת-שרשרת: פיד נקי (4 פוסטים היום, אפס-ניתן-לעריכה; 2 הדוגלים = parent_permlink `saos` שנחרת בפרסום) · census 0/11 · headcorner 0.670 STEEM + 8.645M VESTS · ETH/SOL 12+12 ארנקים נמדדו חי (אחד SOL=0, אחד ETH נשחק ב-gas — עדות-שימוש, לא בעיה) · custom_json 101/101 codename (קצב חוץ ~1/7 בלוקים). 4 באגים בכלי-הביקורת עצמו נחשפו ותוקנו (category-scan, history-limit-200, שמות-chain, rc-parse).
+- אמת-DB: העורך v4 מעולם לא רץ בחלונו — המכסה נשרפה 01:54Z על קוד-ישן; הסייר 3 ריצות-חי תקינות (12:43/13:13/13:43); 0 תקועות; המפעיל נכנס 13:28 במפתח-חי.
+- **הריצה-החיה הראשונה של העורך** (tools/r7-editor-live.ts): blocked אחרי 45 שניות — וחשפה את הממצא-העל: RESULT_CLAMP=1400 זרק את עדות-הפוסט-המדוגל בטרם הגיעה למוח → המוח המציא permlinks ושרף תקציב. הריצה-השנייה מתה 429; השלישית הוכיחה את הווידוי-הכן.
+- תיקוני-קוד: modules.ts social.audit מוביל ב-flaggedPosts/immutablePosts קומפקטי · heart.ts goal-clamp 1200 ל-schedule (החוזה נחתך ב-600!) · loop.ts ריצה-כושלת מקבלת דוח-וידוי עברית (לא עוד דוח-ריק) · brain.ts סולם 3×6s/15s/30s בשני הנתיבים · heart.ts grace-window v2: חסימת-ירי-מוקדם + cap/catch לחלון-המחר האמיתי.
+- מישור-מאומת (ראשון בתולדות ה-roast): tools/r7-{auth-plane,live-suite}.ts — סשן-מקומי בלי-master: קונסולה 200, כל ה-APIs 200, reveal בלי-master 400 fail-closed; fuzz 6/6 → 400 כנים אפס-500; סגירות-r6 מחזיקות (lock=400, devKeys=401, devUsage=401); הסשן נשלף בסוף.
+- פער 26: טענת-r5 "grep WIF=אפס" הייתה שקרית מול קבצי-r5/r6 עצמם → אפס-literals (env + וקטור-רנדומלי); כעת ה-grep הדוקטרינרי אמתי-ריק.
+- סביבה: תהליך-dev-server נהרג שקט 5× (SIGKILL לקבוצה, אין exit-code) — אומת מחדש; tools/dev-watchdog.sh נוסד; zai-quota 429 מיידי שעות — הריצה-עד-done של העורך ממתינה לחלון (מחר 13:00, מוגן v2).
+- דפדפן: נעילה 129,855 תווים, אפס-גלילה-אופקית, scrollY=0, footer טבעי, מובייל 390px תקין, אפס-שגיאות · tsc 0 אמתי · lint 0 · docs/roast-audit.md ראונד 7.
+
+Stage Summary:
+- הפער-הרביעי נחתך: לא מה יוצא / מה טוענים / מה סורקים — אלא מה מגיע בפועל למוח-שמחליט. clamp שזורק עדות = עיוורון; חוזה חתוך = חוזה שלא נכתב; כישלון בלי דוח = כישלון שלא קרה. המערכת מדווחת עכשיו את כישלונותיה בעברית מלאה — בלי דוח-ריק אחד.
+- נותר-פתוח-כן: ריצת-עורך done-מלאה בחלון חי (תלוי-zai-quota — סביבתי); מישור-custom_json נשאר דליפת-חוץ מתועדת; hive נשארת נעולה כלכלית.
+- קבצים: src/lib/gate/harness/{modules,heart,brain,loop}.ts · tools/{r7-db-truth,r7-chain-truth,r7-editor-live,r7-auth-plane,r7-live-suite,dev-watchdog.sh,r5-db-truth,r6-gate-negative}.ts · docs/roast-audit.md · worklog.md · db/custom.db.
