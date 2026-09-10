@@ -133,6 +133,7 @@ async function signAndBroadcast(
 }
 
 export interface VoicePostResult {
+  rail?: string; // "steem" | "hive" — the SOVEREIGN-VOICE lane this went out on
   permlink: string;
   category: string;
   txId: string;
@@ -609,7 +610,10 @@ export async function fleetRewardsCensus(): Promise<FleetRewardsCensus> {
     where: { chain: "steem", role: "posting", status: "verified" },
     select: { account: true },
   });
-  const claimable = new Set(vaultRows.map((r) => r.account));
+  // ROAST r4: VaultEntry.account is nullable in the schema — a null-account
+  // row in the claimable set poisoned the census types (string|null flowing
+  // into get_accounts). Null-account entries are counted as dead weight.
+  const claimable = new Set(vaultRows.map((r) => r.account).filter((a): a is string => Boolean(a)));
   const accounts = [...claimable]; // census the accounts we can act on — no dead weight
   if (accounts.length === 0) throw new GateError("vault-missing-key", "אין בכספת מפתחות-posting מאומתים על steem — אין למי לתבוע");
   const raw = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [accounts]);

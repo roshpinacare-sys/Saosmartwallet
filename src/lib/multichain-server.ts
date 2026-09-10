@@ -25,12 +25,15 @@ import { formatEther } from "ethers";
 const MAX_WALLETS = 16; // fleet cap — bounded pass, never stampede the RPC
 
 async function walletRows(chain: string): Promise<Array<{ account: string; pub: string }>> {
-  return db.vaultEntry.findMany({
+  const rows = await db.vaultEntry.findMany({
     where: { chain, role: "wallet", status: { not: "rotated-out" } },
     select: { account: true, pub: true },
     orderBy: { account: "asc" },
     take: MAX_WALLETS,
   });
+  // ROAST r4: schema nullability must not leak into the eyes — an entry with
+  // no account/pub is simply not a wallet row; drop it here, fail nowhere.
+  return rows.filter((r): r is { account: string; pub: string } => r.account !== null && r.pub !== null);
 }
 
 export interface ChainWalletEye {

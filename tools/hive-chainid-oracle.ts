@@ -88,7 +88,7 @@ async function main(): Promise<void> {
       refBlockNum: Number(tx.ref_block_num),
       refBlockPrefix: Number(tx.ref_block_prefix),
       expiration: toUnix(String(tx.expiration)),
-      operations: ((tx.operations as Array<[string, Record<string, unknown>]>)).map(([name, body]) => ({ name, body })) as SteemTransaction["operations"],
+      operations: ((tx.operations as Array<[string, Record<string, unknown>]>)).map(([name, body]) => ({ name, body })) as unknown as SteemTransaction["operations"],
     };
     const sig65 = new Uint8Array(Buffer.from(String((tx.signatures as string[])[0]), "hex"));
     for (const cand of candidates) {

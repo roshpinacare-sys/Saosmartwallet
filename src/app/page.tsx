@@ -99,7 +99,10 @@ interface ModuleDef { id: string; name: string; kind: "skill" | "connector" | "a
 interface TraceStep { i: number; side: "maker" | "checker"; thought?: string; tool?: string; args?: Record<string, unknown>; ok?: boolean; result?: unknown; error?: string; ms?: number; cached?: boolean; rescued?: boolean; repair?: boolean; at: string }
 interface CheckerVerdict { done: boolean; checks: { criterion: string; pass: boolean; evidence: string }[]; gaps: string; notes: string }
 interface RunRow { id: string; agentName: string; goal: string; brain: string; checker: string; budget: number; status: string; createdAt: string; finishedAt: string | null; report?: string | null; makerSteps?: number; durationMs?: number | null; tokens?: string | null; origin?: string; attempt?: number; meta?: string | null }
-interface RunDetail extends RunRow {
+// ROAST r4: RunDetail no longer extends RunRow blindly — the detail API parses
+// `tokens` into an object while the list API ships the raw DB string, so the
+// old interface-extension was a live type contradiction.
+interface RunDetail extends Omit<RunRow, "tokens"> {
   doneMeans: string[]; modules: string[];
   steps: TraceStep[]; verdict: CheckerVerdict | null; error?: string | null;
   lessons?: string[]; durationMs?: number | null; tokens?: { prompt: number; completion: number } | null;
@@ -124,7 +127,7 @@ interface KeyReport {
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
   pubs: string[];
 }
-interface Ep { method: "GET" | "POST"; path: string; desc: string; auth: "public" | "operator"; body?: string }
+interface Ep { method: "GET" | "POST" | "PATCH" | "PUT"; path: string; desc: string; auth: "public" | "operator"; body?: string }
 
 const ENDPOINTS: Ep[] = [
   { method: "GET", path: "/api/gate/status", desc: "מצב-השער הריבוני", auth: "public" },

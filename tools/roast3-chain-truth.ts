@@ -94,7 +94,10 @@ async function main(): Promise<void> {
       ...scan("category", "category", p.category || ""),
       ...scan("meta", "json_metadata", p.json_metadata || ""),
     ];
-    const votedSelf = (p.active_votes || []).some((v: Record<string, unknown>) => v.voter === "headcorner");
+    // active_votes arrives as an array but the loose Record<string,string> RPC
+    // type hides it — treat it as unknown and re-narrow (ROAST r4 type hygiene).
+    const votesRaw: unknown = p.active_votes;
+    const votedSelf = Array.isArray(votesRaw) && (votesRaw as Array<Record<string, unknown>>).some((v) => v.voter === "headcorner");
     if (votedSelf) selfVoted.push(p.permlink);
     console.log(
       `  ${p.permlink.slice(0, 60)} · created=${p.created} · payout=${p.pending_payout_value || p.total_payout_value} · chars=${(p.body || "").length} · tags=[${(metaTags || []).join(",")}] · selfVote=${votedSelf ? "YES" : "no"}${violations.length ? `\n    ❌ VIOLATIONS: ${violations.join(" | ")}` : " · ✅ clean"}`,

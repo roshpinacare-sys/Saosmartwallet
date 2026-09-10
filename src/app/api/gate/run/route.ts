@@ -109,7 +109,9 @@ export async function GET(req: Request) {
     const runs = await db.gateRun.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
 
     // real efficiency per agent — measured, not vibes
-    interface AgentStat { agent: string; runs: number; done: number; blocked: number; failed: number; avgSteps: number; avgMs: number | null }
+    // ROAST r4: the accumulator is a plain number (avgMs starts at 0); the
+    // null appears only in the OUTPUT row when an agent has no timed runs.
+    interface AgentStat { agent: string; runs: number; done: number; blocked: number; failed: number; avgSteps: number; avgMs: number }
     const stats: Record<string, AgentStat> = {};
     const lean = runs.map((r) => {
       let makerSteps = 0;

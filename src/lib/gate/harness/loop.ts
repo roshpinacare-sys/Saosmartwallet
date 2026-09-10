@@ -178,7 +178,7 @@ function ratchetedTranscript(steps: TraceStep[], recentFull = 2): string {
  * Persist-and-continue helper — external state is written BEFORE the next step runs.
  * A live run renews its lease on every save (heartbeat); a terminal save clears it.
  */
-async function saveRun(id: string, data: { status?: string; steps?: TraceStep[]; verdict?: CheckerVerdict | null; report?: string | null; error?: string | null; finishedAt?: Date | null; durationMs?: number | null; tokens?: string | null }) {
+async function saveRun(id: string, data: { status?: string; steps?: TraceStep[]; verdict?: CheckerVerdict | null; report?: string | null; error?: string | null; finishedAt?: Date | null; durationMs?: number | null; tokens?: { prompt: number; completion: number } | null }) {
   const terminal = data.status !== undefined && ["done", "blocked", "failed"].includes(data.status);
   await db.gateRun.update({
     where: { id },
@@ -314,6 +314,10 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
   }
   const run = await db.gateRun.findUnique({ where: { id: runId } });
   if (!run || run.status !== "running") return;
+  // ROAST r4: a non-null alias for closures below — TS narrowing of `run`
+  // does not survive into `makerTurn`/`execModule` closures, and "it compiles
+  // anyway" was hiding a real null-hole at the heart of the loop.
+  const rec = run;
   const attempt = run.attempt;
   if (attempt > run.maxAttempts) {
     await db.gateRun.update({
@@ -362,7 +366,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     /** One maker turn (brain call), with the free protocol-rescue. Returns null after unrecoverable garbage. */
     async function makerTurn(userContent: string): Promise<{ call: MakerCall | null; rescued: boolean }> {
       const base: ChatMsg[] = [
-        { role: "system", content: makerSystemPrompt(run.goal, doneMeans, modules, lessons, fleetFacts) },
+        { role: "system", content: makerSystemPrompt(rec.goal, doneMeans, modules, lessons, fleetFacts) },
         { role: "user", content: userContent },
       ];
       const reply = await brainChat(makerSpec, base, { maxTokens: 800, temperature: 0.2 });
@@ -417,7 +421,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
         return { finished: false, report: null };
       }
 
-      const out = await execModule(tool, call.args || {}, { agentName: run.agentName, runId }, toolCache);
+      const out = await execModule(tool, call.args || {}, { agentName: rec.agentName, runId }, toolCache);
       steps.push({
         i, side: "maker", thought: call.thought, tool, args: call.args,
         ok: out.ok, result: out.ok ? clampResult(out.result) : out.result,

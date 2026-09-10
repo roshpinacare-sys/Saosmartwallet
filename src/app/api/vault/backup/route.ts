@@ -11,6 +11,13 @@
  *
  * SECURITY: passwords/shards travel in the request body only, are consumed
  * by the engine, and are never logged or echoed.
+ *
+ * ROAST r4: the docstring CLAIMED "requires an UNLOCKED session" while the
+ * route verified NOTHING. Two live holes: (a) POST hands the FULL vault state
+ * sealed under the CALLER's password — an unauthenticated attacker picks the
+ * password and gets the ciphertext of everything; (b) PUT overwrites the live
+ * vault state (restore path). Both are now gated behind the sovereign
+ * operator session, fail-closed, BEFORE any state work.
  */
 
 import { NextResponse } from "next/server";
@@ -25,10 +32,18 @@ import type {
   RestoreBackupResponse,
   Share,
 } from "@/lib/vault-contracts";
+import { requireOperator } from "@/lib/gate/session";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Fail-closed operator gate — ROAST r4: full-state export checked nothing.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
+
   let body: CreateBackupRequest;
   try {
     body = (await req.json()) as CreateBackupRequest;
@@ -68,6 +83,13 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  // Fail-closed operator gate — ROAST r4: state-overwriting restore checked nothing.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
+
   let body: RestoreBackupRequest;
   try {
     body = (await req.json()) as RestoreBackupRequest;

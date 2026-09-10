@@ -5,12 +5,19 @@
  *       (static rules live in code and cannot be edited, only satisfied).
  * PUT — replaces the dynamic/contextual/composite rule data (unlocked
  *       session required) and audits policy_updated.
+ *
+ * ROAST r4: the docstring CLAIMED "unlocked session required" while the route
+ * itself verified NOTHING — an unauthenticated caller could rewrite the whole
+ * policy rule set the moment the vault exists. Mutations are now gated behind
+ * the sovereign operator session (same gate as the fleet's reveal/run),
+ * fail-closed: no session ⇒ 401 BEFORE any vault work.
  */
 
 import { NextResponse } from "next/server";
 
 import { STATIC_RULES, VaultError, getVaultRuntime, getInstanceId, mapVaultError } from "@/lib/vault-runtime";
 import type { PolicyResponse, PolicyRuleSet, UpdatePolicyRequest, UpdatePolicyResponse } from "@/lib/vault-contracts";
+import { requireOperator } from "@/lib/gate/session";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +42,13 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  // Fail-closed operator gate — ROAST r4: this route checked nothing at all.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
+
   let body: UpdatePolicyRequest;
   try {
     body = (await req.json()) as UpdatePolicyRequest;
