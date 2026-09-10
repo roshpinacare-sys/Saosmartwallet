@@ -92,3 +92,5 @@ async function main() {
 }
 
 main().catch((e) => { console.error("PROOF FAILED:", e instanceof Error ? e.message : e); process.exit(1); });
+
+export {};

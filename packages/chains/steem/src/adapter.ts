@@ -27,7 +27,8 @@ import {
 } from "../../chain-adapter";
 import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
-import type { ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemOperationName, VoteOperation } from "./operations";
+import type { AccountUpdateOperation, ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemAuthority, SteemOperationName, VoteOperation } from "./operations";
+import { graphenePubToRaw33 } from "./operations";
 import {
   STEEM_CHAIN_ID,
   SIGNATURE_SIZE,
@@ -311,6 +312,67 @@ export class SteemAdapter implements ChainAdapter {
     if (steem.amount + sbd.amount + vests.amount <= 0n) throw new SerializationError("cannot claim a total of 0 (chain refuses) — read the live pending rewards first");
   }
 
+  /**
+   * account_update validation — the SOVEREIGN-HAND gate for the one op that
+   * moves keys. Structural truth only (no authority logic here): the operator
+   * plane (src/lib/gate/rotation.ts) owns the WHO-and-WHY; the adapter owns
+   * the IS-THIS-A-VALID-OP.
+   */
+  private validateAccountUpdatePayload(p: Record<string, unknown>): void {
+    if (typeof p.account !== "string") throw new SerializationError("account_update requires string account");
+    validateAccountName(p.account);
+    const auth = (label: string, a: unknown): SteemAuthority | undefined => {
+      if (a === undefined || a === null) return undefined;
+      const x = a as SteemAuthority;
+      if (typeof x.weight_threshold !== "number" || !Number.isInteger(x.weight_threshold) || x.weight_threshold < 0) {
+        throw new SerializationError(`account_update ${label}: weight_threshold must be a non-negative integer`);
+      }
+      if (!Array.isArray(x.account_auths) || !Array.isArray(x.key_auths)) {
+        throw new SerializationError(`account_update ${label}: account_auths/key_auths arrays required`);
+      }
+      for (const pair of x.account_auths) {
+        if (!Array.isArray(pair) && typeof pair !== "object") throw new SerializationError(`account_update ${label}: bad account_auths entry`);
+        const acct = Array.isArray(pair) ? pair[0] : (pair as { account: string }).account;
+        const w = Array.isArray(pair) ? pair[1] : (pair as { weight: number }).weight;
+        if (typeof acct !== "string") throw new SerializationError(`account_update ${label}: account_auths needs an account name`);
+        validateAccountName(acct);
+        if (typeof w !== "number" || !Number.isInteger(w) || w <= 0 || w > 0xffff) throw new SerializationError(`account_update ${label}: weight must be 1..65535`);
+      }
+      for (const pair of x.key_auths) {
+        const pub = Array.isArray(pair) ? pair[0] : (pair as { pub: string }).pub;
+        const w = Array.isArray(pair) ? pair[1] : (pair as { weight: number }).weight;
+        if (typeof pub !== "string") throw new SerializationError(`account_update ${label}: key_auths needs a public key string`);
+        try { graphenePubToRaw33(pub); } catch { throw new SerializationError(`account_update ${label}: malformed public key`); }
+        if (typeof w !== "number" || !Number.isInteger(w) || w <= 0 || w > 0xffff) throw new SerializationError(`account_update ${label}: weight must be 1..65535`);
+      }
+      if (x.account_auths.length + x.key_auths.length === 0) {
+        throw new SerializationError(`account_update ${label}: an authority must hold at least one auth (refusing to brick the account)`);
+      }
+      return {
+        weight_threshold: x.weight_threshold,
+        account_auths: x.account_auths.map((pair) => Array.isArray(pair)
+          ? { account: String(pair[0]), weight: Number(pair[1]) }
+          : { account: String((pair as { account: string }).account), weight: Number((pair as { weight: number }).weight) }),
+        key_auths: x.key_auths.map((pair) => Array.isArray(pair)
+          ? { pub: String(pair[0]), weight: Number(pair[1]) }
+          : { pub: String((pair as { pub: string }).pub), weight: Number((pair as { weight: number }).weight) }),
+      };
+    };
+    const owner = auth("owner", p.owner);
+    const active = auth("active", p.active);
+    const posting = auth("posting", p.posting);
+    if (!owner && !active && !posting && p.memo_key === undefined) {
+      throw new SerializationError("account_update must change at least one authority or the memo key");
+    }
+    if (p.memo_key !== undefined && p.memo_key !== null) {
+      if (typeof p.memo_key !== "string") throw new SerializationError("account_update: memo_key must be a public key string");
+      try { graphenePubToRaw33(p.memo_key); } catch { throw new SerializationError("account_update: malformed memo_key public key"); }
+    }
+    if (p.json_metadata !== undefined && typeof p.json_metadata !== "string") {
+      throw new SerializationError("account_update: json_metadata must be a string");
+    }
+  }
+
   /** Permlink rules: lowercase [a-z0-9-], 1..512 — the chain rejects anything else. */
   private static validatePermlink(permlink: unknown, field: string): string {
     if (typeof permlink !== "string" || permlink.length === 0 || permlink.length > 512) {
@@ -413,9 +475,11 @@ export class SteemAdapter implements ChainAdapter {
         this.validateCustomJsonPayload(op.payload);
       } else if (op.type === "claim_reward_balance") {
         this.validateClaimRewardPayload(op.payload);
+      } else if (op.type === "account_update") {
+        this.validateAccountUpdatePayload(op.payload);
       } else {
         throw new SerializationError(
-          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, vote, comment, custom_json, claim_reward_balance)`,
+          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, vote, comment, custom_json, claim_reward_balance, account_update)`,
         );
       }
     }
@@ -532,6 +596,39 @@ export class SteemAdapter implements ChainAdapter {
         reward_vests: parseAsset(p.reward_vests),
       };
       return { name: "claim_reward_balance", body };
+    }
+    if (op.type === "account_update") {
+      this.validateAccountUpdatePayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as {
+        account: string;
+        owner?: SteemAuthority;
+        active?: SteemAuthority;
+        posting?: SteemAuthority;
+        memo_key?: string;
+        json_metadata?: string;
+      };
+      const auth = (label: string, a: unknown): SteemAuthority | undefined => {
+        if (a === undefined || a === null) return undefined;
+        const x = a as SteemAuthority;
+        return {
+          weight_threshold: Number(x.weight_threshold),
+          account_auths: x.account_auths.map((pair) => Array.isArray(pair)
+            ? { account: String(pair[0]), weight: Number(pair[1]) }
+            : { account: String((pair as { account: string }).account), weight: Number((pair as { weight: number }).weight) }),
+          key_auths: x.key_auths.map((pair) => Array.isArray(pair)
+            ? { pub: String(pair[0]), weight: Number(pair[1]) }
+            : { pub: String((pair as { pub: string }).pub), weight: Number((pair as { weight: number }).weight) }),
+        };
+      };
+      const body: AccountUpdateOperation = {
+        account: p.account,
+        owner: auth("owner", p.owner),
+        active: auth("active", p.active),
+        posting: auth("posting", p.posting),
+        memo_key: p.memo_key ?? undefined,
+        json_metadata: p.json_metadata ?? "",
+      };
+      return { name: "account_update", body };
     }
     throw new SerializationError(`operation "${op.type}" cannot be signed (unsupported)`);
   }

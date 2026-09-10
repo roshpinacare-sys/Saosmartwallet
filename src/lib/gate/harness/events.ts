@@ -14,7 +14,8 @@ export type GateEventType =
   | "run.blocked" // a run finished blocked — payload {agent, goal, gaps}
   | "run.failed" // a run crashed — payload {agent, goal, gaps:""}
   | "run.done" // a run passed the gate — payload {agent, goal}
-  | "market.move"; // the heart watched the real DEX price cross a threshold — payload {price, prev, pct}
+  | "market.move" // the heart watched the real DEX price cross a threshold — payload {price, prev, pct}
+  | "rotation"; // the sovereign account_update plane moved (or imported) keys — payload {kind, account?, txId?, sealed?}
 
 /** Write one stimulus. Never throws — an event must never break its emitter. */
 export async function emitEvent(type: GateEventType, payload: Record<string, unknown>, source: string): Promise<void> {

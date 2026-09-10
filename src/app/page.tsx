@@ -94,6 +94,8 @@ interface Inventory {
   // never hardcoded (the old hardcoded "open" claim outlived its truth:
   // the r12 filing was auto-expired by policy and the page kept lying).
   steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string; runId?: string | null; runStatus?: string | null } | null;
+  // r16 — rotation plane readiness, computed live by the API (never stored)
+  rotation?: { targets: Array<{ account: string; hasOwnerKey: boolean; hasP5Root: boolean; ready: boolean }>; readyCount: number } | null;
 }
 interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
@@ -762,6 +764,131 @@ function Connections() {
 
 /* ══════════════════════════ 02 · the vault ══════════════════════════ */
 
+/* ═════════════════ r16 — SOVEREIGN ROTATION PANEL (gap-58) ═════════════════
+   "לחבר את כולם": the operator pastes each account's current owner key →
+   live-verified against the chain in the same call → sealed → and rotation
+   (account_update) sets all four steem authorities to the D1 roots the vault
+   already holds (unified with hive+blurt). Operator-only plane — agents have
+   no path here. Every verdict is the chain's answer, never an assumption. */
+function RotationPanel({ inv, onDone }: { inv: Inventory | null; onDone: () => void }) {
+  const rot = inv?.rotation || null;
+  const [paste, setPaste] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [verdicts, setVerdicts] = useState<Array<{ account: string; ok: boolean; detail: string }> | null>(null);
+  const [rotated, setRotated] = useState<Record<string, { txId: string; verified: boolean; detail: string }>>({});
+  const targets = rot?.targets || [];
+
+  const doImport = async () => {
+    const items = paste.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((line) => {
+      const m = /^([a-z0-9.\-]+)[=:\s]+(\S+)$/i.exec(line);
+      return m ? { account: m[1].toLowerCase(), wif: m[2] } : null;
+    }).filter(Boolean) as Array<{ account: string; wif: string }>;
+    if (!items.length) { toast.error("הדבק שורות בפורמט: חשבון=מפתח-owner"); return; }
+    setBusy("import");
+    try {
+      const res = await apiJson<{ ok: boolean; verdicts: Array<{ account: string; ok: boolean; detail: string }>; sealed: number }>(
+        "/api/gate/rotation",
+        { method: "POST", body: JSON.stringify({ action: "import", items }) },
+      );
+      if (res?.ok) {
+        setVerdicts(res.verdicts || []);
+        toast.success(`ייבוא הושלם — ${res.sealed || 0} מפתחות נאטמו (כל אימות מול השרשרת)`);
+        onDone();
+      } else toast.error("הייבוא נכשל — בדוק את ההרשאות");
+    } catch { toast.error("שגיאת רשת בייבוא"); }
+    setBusy(null);
+  };
+
+  const doRotate = async (account: string) => {
+    if (!window.confirm(`לחתום ולשדר account_update עבור ${account}? כל ארבעת ה-authorities יוצבו לשורשי-D1 (account_auths נשמרים). זו פעולת-שרשרת שלא ניתן לבטל.`)) return;
+    setBusy(account);
+    try {
+      const res = await apiJson<{ ok: boolean; txId?: string; verified?: boolean; detail?: string; error?: string }>(
+        "/api/gate/rotation",
+        { method: "POST", body: JSON.stringify({ action: "rotate", account }) },
+      );
+      if (res?.ok && res.txId) {
+        setRotated((s) => ({ ...s, [account]: { txId: res.txId || "", verified: Boolean(res.verified), detail: res.detail || "" } }));
+        toast.success(res.verified ? `${account}: אומת live — כל ארבעת ה-authorities נושאים את שורשי-D1` : `${account}: שודר (${(res.txId || "").slice(0, 12)}…) — האימות-חי יושלם בסריקה`);
+        onDone();
+      } else toast.error(res?.error || `הרוטציה של ${account} נכשלה`);
+    } catch { toast.error(`שגיאת רשת ברוטציה של ${account}`); }
+    setBusy(null);
+  };
+
+  if (!rot) return null;
+  return (
+    <motion.div {...rise} className="mb-5">
+      <GlowCard className="p-4 border-lime-500/30 bg-lime-500/5">
+        <div className="flex items-start gap-3">
+          <KeyRound className="h-5 w-5 text-lime-400 shrink-0 mt-0.5" aria-hidden />
+          <div className="text-sm leading-relaxed w-full">
+            <p className="font-semibold text-lime-300">חיבור-steem — מישור הרוטציה הריבוני (רק-מפעיל)</p>
+            <p className="text-zinc-400 mt-1">
+              הכספת חותמת רק כאן, בהחלטה-מפורשת שלך. שורשי-D1 כבר נאטמו והוכחו חי על hive+blurt — הרוטציה מאחדת את steem על אותו שורש.
+              חשבונות-מוכנים: <b className="text-lime-300">{rot.readyCount}/{targets.length}</b>.
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-h-40 overflow-y-auto scroll-thin">
+              {targets.map((t) => (
+                <div key={t.account} className="flex items-center gap-2 text-[12px] px-2 py-1.5 rounded-md bg-zinc-950/60 border border-zinc-800/80">
+                  <span className="font-mono text-zinc-300">{t.account}</span>
+                  <span className={"text-[10px] " + (t.hasOwnerKey ? "text-emerald-400" : "text-zinc-600")}>owner{t.hasOwnerKey ? "✓" : "✗"}</span>
+                  <span className={"text-[10px] " + (t.hasP5Root ? "text-emerald-400" : "text-zinc-600")}>P5{t.hasP5Root ? "✓" : "✗"}</span>
+                  {rotated[t.account] ? (
+                    <span className={"text-[10px] ml-auto " + (rotated[t.account].verified ? "text-emerald-300" : "text-amber-300")}>
+                      {rotated[t.account].verified ? "אומת" : "שודר"}
+                    </span>
+                  ) : (
+                    <Button size="sm" variant="outline" disabled={!t.ready || busy !== null} onClick={() => doRotate(t.account)}
+                      className="ml-auto h-6 px-2 text-[10px] border-lime-500/40 text-lime-300 hover:bg-lime-500/10">
+                      {busy === t.account ? <Loader2 className="h-3 w-3 animate-spin" /> : "התחל רוטציה"}
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3">
+              <Textarea value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} dir="ltr"
+                placeholder={"cashmachine=5J...…\nharan=5K...…  (owner WIF per line — verified live before sealing)"}
+                className="bg-zinc-950/80 border-zinc-800 font-mono text-[11px]" aria-label="הדבקת מפתחי-owner" />
+              <div className="flex items-center gap-2 mt-2">
+                <Button size="sm" variant="outline" disabled={busy !== null || !paste.trim()} onClick={doImport}
+                  className="gap-1.5 border-lime-500/40 text-lime-300 hover:bg-lime-500/10">
+                  {busy === "import" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />}
+                  אמת-חי ואטום
+                </Button>
+                <span className="text-[11px] text-zinc-500">מפתח שאינו ב-authority ה-owner החי — נדחה ולא נאטם (fail-closed).</span>
+              </div>
+            </div>
+            {verdicts && (
+              <div className="mt-3 max-h-36 overflow-y-auto scroll-thin divide-y divide-zinc-800/60 border border-zinc-800/60 rounded-md">
+                {verdicts.map((v, i) => (
+                  <div key={i} className="flex items-start gap-2 px-2.5 py-1.5 text-[12px]">
+                    {v.ok ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 mt-0.5 shrink-0" /> : <XCircle className="h-3.5 w-3.5 text-rose-400 mt-0.5 shrink-0" />}
+                    <span className="font-mono text-zinc-300">{v.account}</span>
+                    <span className={v.ok ? "text-zinc-400" : "text-rose-300/90"}>{v.detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {Object.values(rotated).length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {Object.entries(rotated).map(([acct, r]) => (
+                  <div key={acct} className="text-[12px] px-2.5 py-1.5 rounded-md bg-zinc-950/60 border border-zinc-800/80">
+                    <span className="font-mono text-zinc-300">{acct}</span>
+                    {" — "}tx <span className="font-mono text-[10px] text-emerald-300/90" dir="ltr">{r.txId.slice(0, 18)}…</span>
+                    {" · "}<span className={r.verified ? "text-emerald-300" : "text-amber-300"}>{r.detail}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </GlowCard>
+    </motion.div>
+  );
+}
+
 function VaultGrid() {
   const [inv, setInv] = useState<Inventory | null>(null);
   const [loading, setLoading] = useState(true);
@@ -856,12 +983,12 @@ function VaultGrid() {
                 <p className="font-semibold text-amber-300">שליטת-תגמולים — האמת החיה פר-חייל ({controlMatrix.length} נבדקו on-chain)</p>
                 <p className="text-zinc-400 mt-1">
                   <b className="text-emerald-400">{controlMatrix.length - steemOrphans.length}/{controlMatrix.length}</b> חיילים נשלטים מלא גם על steem.
-                  <b className="text-amber-300"> {steemOrphans.length}</b> נותרו בלי owner/active/posting חי על steem —
-                  רוטציית 2026-09-08T21:33Z הציבה מפתחות שאינם נגזרים מסיסמאות-האב, והמפתחות-החיים אצל המפעיל:
+                  <b className="text-amber-300"> {steemOrphans.length}</b> נותרו בלי owner/active/posting חי על steem.
+                  r16 — אמת-השרשרת (פער-59): הרוטציה החוץ-מערכתית של 2026-09-08T21:33Z (ynet: 09-04) סובבה <b className="text-amber-300">owner בלבד</b> — chain-proven (last_owner_update; last_active/last_post_update = 1970). המפתחות-החיים החדשים נמסרו למפעיל בצ'אט ולא נשמרו באף מקור; active/posting/memo של החיילים הם מפתחות-יצירה מ-2018 שמעולם לא היו בידינו:
                   <span className="font-mono text-[11px] text-amber-200/90" dir="ltr"> {steemOrphans.map((r) => r.name).join(", ")}</span>.
                 </p>
                 <p className="text-zinc-400 mt-1">
-                  r12 — סיסמאות-האב (P5) של <b className="text-emerald-400">11 חשבונות</b> נאטמו בכספת והוכחו חי מול השרשרת: הן גוזרות
+                  r16 — סיסמאות-האב (P5) של <b className="text-emerald-400">12 חשבונות</b> נאטמו בכספת והוכחו חי מול השרשרת (כולל שורש-headcorner מ-upload/הד.txt — השרשרת עצמה הוכיחה 4/4 על blurt): הן גוזרות
                   בדיוק את ה-authorities הנוכחיים על <b className="text-emerald-400">hive</b>{" "}
                   ({steemOrphans.filter((r) => r.rails.includes("hive")).length}) ועל <b className="text-emerald-400">blurt</b>{" "}
                   ({steemOrphans.filter((r) => r.rails.includes("blurt")).length}) — וכולל <b className="text-emerald-400">ynet@blurt: שליטה מלאה owner+active+posting+memo</b>{" "}
@@ -881,6 +1008,16 @@ function VaultGrid() {
                     if (s.status === "rejected") return <span className="text-rose-300">המפעיל דחה את הצעת-הסגירה.</span>;
                     return <span className="text-zinc-400">ההצעה פגתה במדיניות — דורשת הגשה-מחדש.</span>;
                   })()}
+                  {(() => {
+                    // r16 — the rotation plane line: computed from the API's live readiness
+                    const rot = inv?.rotation;
+                    if (!rot) return null;
+                    return (
+                      <span className="block mt-1">
+                        <b className="text-lime-300">מישור-רוטציית account_update חי (פער-58):</b> הדבקת מפתחי-owner של החיילים → אימות-חי → חתימה ושידור שמציב את שורשי-D1 בכל ארבעת ה-authorities — steem מתאחד עם hive+blurt על אותו שורש. מוכן-מכנית עכשיו: <b className="text-lime-300">{rot.readyCount}/{rot.targets.length}</b> ({rot.targets.filter((t) => t.ready).map((t) => t.account).join(", ") || "—"}) · הדבקת-מפתחות ורוטציה בפאנל "חיבור-steem" למטה.
+                      </span>
+                    );
+ })()}
                   עוגן-סופי על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">saos.vault.anchor.v1 · block 109465716 · tx 95a33fcb…</span>
                 </p>
               </div>
@@ -889,7 +1026,9 @@ function VaultGrid() {
         </motion.div>
       )}
 
-      {loading && entries.length === 0 ? (
+      <RotationPanel inv={inv} onDone={() => refresh()} />
+
+            {loading && entries.length === 0 ? (
         <GlowCard className="p-12 flex items-center justify-center gap-2 text-zinc-500 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" /> מאמת {entries.length || ""} סודות מול השרשרות…
         </GlowCard>
