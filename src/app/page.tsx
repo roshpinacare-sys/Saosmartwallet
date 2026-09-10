@@ -25,7 +25,7 @@ import {
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
-  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain, Hand, Radio,
+  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain, Hand, Radio, Activity,
 } from "lucide-react";
 
 /* ══════════════════════════ auth plumbing ══════════════════════════ */
@@ -79,6 +79,13 @@ interface GateStatus {
   unlockedAt: string | null; keySeals: number;
   session: { kind: string; name: string; scopes: string[] } | null;
   counts: { vaultEntries: number; activeAgents: number; messages: number };
+  // r18 — fleet employment health, live from /api/gate/status (aggregated 24h)
+  employment?: {
+    runs24h: number; done: number; blocked: number; failed: number; running: number;
+    doneRate: number | null;
+    blockedTaxonomy: { fair: number; vaultLocked: number; rate429: number; watchdog: number; other: number };
+    idleRuns24h: number; agentsActive: number;
+  } | null;
 }
 interface Entry {
   id: string; kind: string; chain: string | null; account: string | null;
@@ -1283,6 +1290,50 @@ function TraceStepView({ s }: { s: TraceStep }) {
 
 const HEART_TICK_MS_CLIENT = 20000;
 
+/* ══════════════════════════ employment strip (r18) ══════════════════════════ */
+
+/** Fleet employment health — live from /api/gate/status (aggregated 24h,
+ *  public data only). Not a claim: done/blocked/failed are measured, and the
+ *  blocked taxonomy says WHY (fair-block = the checker said no; vault-locked;
+ *  429 rate window; watchdog). A hardcoded version of this died once already
+ *  (gap-54) — this one is computed every render. */
+function EmploymentStrip() {
+  const [emp, setEmp] = useState<GateStatus["employment"] | null>(null);
+  useEffect(() => {
+    let dead = false;
+    apiJson<GateStatus>("/api/gate/status")
+      .then((s) => { if (!dead) setEmp(s?.employment ?? null); })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, []);
+  if (!emp || emp.runs24h === 0) return null;
+  const rate = emp.doneRate;
+  const rateColor = rate === null ? "text-zinc-500" : rate >= 70 ? "text-emerald-400" : rate >= 40 ? "text-amber-400" : "text-rose-400";
+  const t = emp.blockedTaxonomy;
+  const taxTotal = t.fair + t.vaultLocked + t.rate429 + t.watchdog + t.other;
+  return (
+    <div className="mt-1 rounded-xl border border-zinc-800 bg-black/30 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+        <p className="text-[11px] text-zinc-400 flex items-center gap-1.5"><Activity className="h-3.5 w-3.5 text-lime-300" /> תעסוקת-הצי · 24h</p>
+        <span className={"font-mono text-xs font-bold " + rateColor}>{rate === null ? "–" : `${rate}%`} הצלחה</span>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap font-mono text-[10px]" dir="ltr">
+        <span className="rounded-md border border-emerald-500/30 text-emerald-300 px-1.5 py-0.5">done {emp.done}</span>
+        <span className="rounded-md border border-zinc-700 text-zinc-300 px-1.5 py-0.5">blocked {emp.blocked}</span>
+        <span className="rounded-md border border-rose-500/30 text-rose-300 px-1.5 py-0.5">failed {emp.failed}</span>
+        <span className="rounded-md border border-zinc-800 text-zinc-400 px-1.5 py-0.5">running {emp.running}</span>
+        <span className="rounded-md border border-lime-500/30 text-lime-300 px-1.5 py-0.5">idle {emp.idleRuns24h}</span>
+      </div>
+      {taxTotal > 0 && (
+        <p className="mt-1.5 text-[10px] text-zinc-500 leading-relaxed">
+          חסימות וכשלים לפי סיבה (חי): <span className="font-mono text-zinc-400" dir="ltr">fair {t.fair} · vault-locked {t.vaultLocked} · 429 {t.rate429} · watchdog {t.watchdog} · other {t.other}</span>
+          {" "}— {t.vaultLocked > 0 ? "ריצות שמתו על כספת-נעולה כנות-אך-מיותרות: הנפילה-ל-zai מזעירה אותן" : "אין-מיתות-כספת-נעולה — הנפילה-ל-zai עובדת"}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   const [h, setH] = useState<HeartData | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1437,6 +1488,8 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
           )}
           {h?.pulse?.error && <span className="text-rose-300" dir="ltr">⚠ {h.pulse.error}</span>}
         </div>
+
+        <EmploymentStrip />
 
         {/* schedules + form */}
         <div className="grid gap-4 lg:grid-cols-2">
