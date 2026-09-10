@@ -794,8 +794,15 @@ export const MODULES: HarnessModule[] = [
     async exec() {
       const rails: Array<"steem" | "hive" | "blurt"> = ["steem", "hive", "blurt"];
       const sample = (r: typeof rails[number]) => railRpc<{ head_block_number?: number; time?: string }>(r, "condenser_api.get_dynamic_global_properties", []);
-      const out: Array<{ rail: string; ok: boolean; headBefore?: number; headAfter?: number; delta?: number; nodeTime?: string; error?: string }> = [];
+      const out: Array<{ rail: string; ok: boolean; retried?: boolean; headBefore?: number; headAfter?: number; delta?: number; nodeTime?: string; error?: string }> = [];
+      // One honest retry per rail: a transient node window (live-proven r18 —
+      // a "Bad Cast" burst on every rail at once, gone minutes later) must not
+      // turn into a false "chain not alive" claim (living-truth law).
       for (const r of rails) {
+        let retried = false;
+        let headBefore = 0;
+        let headAfter = 0;
+        let nodeTime: string | undefined;
         try {
           const a = await sample(r);
           // 4.2s between samples: all three rails produce 3s blocks — a
@@ -803,12 +810,25 @@ export const MODULES: HarnessModule[] = [
           // time, and a false "not alive" is a false claim (living-truth law)
           await new Promise((res) => setTimeout(res, 4200));
           const b = await sample(r);
-          const headBefore = Number(a.head_block_number) || 0;
-          const headAfter = Number(b.head_block_number) || 0;
-          out.push({ rail: r, ok: headAfter > headBefore, headBefore, headAfter, delta: headAfter - headBefore, nodeTime: b.time ?? undefined });
-        } catch (e) {
-          out.push({ rail: r, ok: false, error: (e instanceof Error ? e.message : String(e)).slice(0, 160) });
+          headBefore = Number(a.head_block_number) || 0;
+          headAfter = Number(b.head_block_number) || 0;
+          nodeTime = b.time ?? undefined;
+        } catch {
+          retried = true;
+          await new Promise((res) => setTimeout(res, 2500));
+          try {
+            const a = await sample(r);
+            await new Promise((res) => setTimeout(res, 4200));
+            const b = await sample(r);
+            headBefore = Number(a.head_block_number) || 0;
+            headAfter = Number(b.head_block_number) || 0;
+            nodeTime = b.time ?? undefined;
+          } catch (e2) {
+            out.push({ rail: r, ok: false, retried, error: (e2 instanceof Error ? e2.message : String(e2)).slice(0, 160) });
+            continue;
+          }
         }
+        out.push({ rail: r, ok: headAfter > headBefore, retried, headBefore, headAfter, delta: headAfter - headBefore, nodeTime });
       }
       const alive = out.filter((o) => o.ok);
       return {
@@ -816,7 +836,7 @@ export const MODULES: HarnessModule[] = [
         rails: out,
         meaning: alive.length
           ? `חיות ${alive.length}/3 מסילות: ${alive.map((o) => `${o.rail} +${o.delta} בלוקים (ראש ${o.headAfter})`).join(" · ")}${alive.length < 3 ? ` — לא-חיה: ${out.filter((o) => !o.ok).map((o) => o.rail).join(",")}` : ""}`
-          : `אף-מסילה לא הוכיחה ייצור-בלוקים בדגימה — תעד בכנות: ${out.map((o) => o.error || o.rail).join(" | ")}`,
+          : `אף-מסילה לא הוכיחה ייצור-בלוקים בדגימה — תעד בכנות: ${out.map((o) => o.rail).join(" | ")}`,
       };
     },
   },
@@ -853,10 +873,29 @@ export const MODULES: HarnessModule[] = [
       const summary = per
         .map((p) => `${p.rail}: ${p.reachable ? `${p.found.length}/${names.length} חשבונות` : "לא-נגישה"}`)
         .join(" · ");
+      // r18: the run trace is CLAMPED to 1400 chars for the checker's context
+      // — the old shape (12 accounts × 7 fields × 3 rails, accounts first)
+      // pushed hive/blurt past the clamp, so the checker honestly saw "only
+      // steem data" and blocked a truthful measurement. Summary rides FIRST;
+      // per-account detail is compact so all three rails survive the clamp.
       return {
         measuredAt: new Date().toISOString(),
-        rails: per.map((p) => ({ rail: p.rail, reachable: p.reachable, count: p.found.length, missing: p.missing, accounts: p.found.slice(0, 12) })),
         meaning: `נוכחות-חיה — ${summary}. השווה בין-המסילות: איפה אנחנו חזקים, איפה חסרים, ומי רדום (אפס-פוסטים/לא-מאוחר-פעילות).`,
+        rails: per.map((p) => ({
+          rail: p.rail,
+          reachable: p.reachable,
+          count: p.found.length,
+          missing: p.missing.slice(0, 4),
+          error: (p as { error?: string }).error,
+          // RESULT_CLAMP is 1400 chars — 3 accounts × 4 fields × 3 rails fits
+          // inside it with the summary; the counts carry the full truth.
+          accounts: p.found.slice(0, 3).map((a) => ({
+            name: a.name,
+            posts: a.posts,
+            followers: a.followers,
+            lastPost: a.lastPost,
+          })),
+        })),
       };
     },
   },
