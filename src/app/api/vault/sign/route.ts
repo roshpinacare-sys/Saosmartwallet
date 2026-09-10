@@ -23,9 +23,20 @@ import { buildSteemOrderTx } from "@/lib/steem-order";
 import { VaultError, buildSteemLimitOrderOp, getVaultRuntime, mapVaultError } from "@/lib/vault-runtime";
 import type { SignOrderRequest, SignOrderResponse } from "@/lib/vault-contracts";
 
+import { requireOperator } from "@/lib/gate/session";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Fail-closed operator gate — ROAST r5: "unlocked vault" is NOT an identity.
+  // While the operator works the vault is open; an anonymous caller must never
+  // be able to sign, broadcast, or mutate policy through it.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
+
   let body: SignOrderRequest;
   try {
     body = (await req.json()) as SignOrderRequest;

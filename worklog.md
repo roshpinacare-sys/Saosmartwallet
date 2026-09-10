@@ -1308,3 +1308,23 @@ Stage Summary:
 - הפער העמוק הפעם לא היה בין "המערכת לרשת" אלא בין "המערכת לטענות-על-עצמה": מסמכי-עדות נכתבו לפני הקוד (סכימה "קפואה" שהמודלים שלה מעולם לא נכתבו), ו-lint-0 סינן את הראיה האמתית (tsc).
 - המצב החי: כל נתיבי-הכספת fail-closed; מסוף-המפתח אמתי מקצה-לקצה; נתיב-ה-claim מאומת בייט-מול-בייט; אפס דליפת-מפתחות; הפיד נקי עם 6 immutable כנים; hive נעולה כלכלית (RC) — מדווח בכנות.
 - קבצים: prisma/schema.prisma (6 מודלים חדשים) · src/app/api/vault/{policy,networks,backup,lock}/route.ts · src/app/page.tsx · src/app/api/gate/run/route.ts · src/lib/gate/harness/{loop,social,modules}.ts · src/lib/gate/key-id.ts · src/lib/steem-social.ts · src/lib/multichain-server.ts · tsconfig.json · tools/{roast4-crypto-verify.ts,roast3-chain-truth.ts,hive-chainid-oracle.ts} · docs/roast-audit.md · worklog.md · db/custom.db.
+---
+Task ID: 21
+Agent: Z.ai Code (main)
+Task: DEEP-ROAST-AUDIT r5 — "תבדוק שוב ותוודא הכל יותר לעומק ממה שעשית ותתקן יותר טוב ודחוף": הפעם הביקורת עצמה על שולחן-הניתוח — סורקים, דוחות, חוזים, וזהות-השער.
+
+Work Log:
+- אמת-DB (tools/r5-db-truth.ts — קריאה-בלבד): `strings db/custom.db` הדגיל WIF לכאורי ×2 → נחשפו שני אורקלים-שקרים בכלי-שלי עצמו: (1) regex גולמי מתאים גוף מפתח-ציבורי אחרי STM; (2) bs58-v6 Uint8Array חסר-`.equals` — הזריקה-בשקט סיווגה הכל invalid. **ה-pathology ש-r4 תיעד נכתבה מחדש בכלי-הביקורת באותו-יום.** אחרי-תיקון האורקל (checksum-גרפין RIPEMD160(payload) לפאבליקים מול SHA256² ל-WIF): 97 כניסות-כספת — כל pub תקין, כל encPriv הקס-טהור (AES-GCM), אפס חומר-פרטי ב-426 הודעות ובכל הטבלאות, WIF-ה-dev-faucet נעדר מה-DB.
+- פער 15: נתיבי-vault-M3 (`sign`, `sign-cancel`, `soldiers`, `keys` POST+DELETE) פעלו על `ensureUnlocked()` בלבד — "כספת-פתוחה" אינה זהות; בזמן-עבודת-המפעיל קורא אנונימי יכול היה לחתום/לשדר/לשנות-soldiers. גודרו `requireOperator()` fail-closed; הוכחה חיה: 5×401 אנונימי, עם-טוקן → 400 VALIDATION (ה-UI לא נשבר).
+- פער 16: "tsc 0" של r4 היה שקרי — `git stash` + tsc על HEAD חשף 6 שגיאות ב-`tools/roast4-crypto-verify.ts` (bun רץ בלי-typecheck). תוקן; tsc 0 אמתי.
+- פער 17: חוזה-הסייר-התקופתי סותר את עצמו (goal: "שורה-אחת" vs doneMeans: "נתונים אמיתיים") → הבודק הטיל מטבע על עבודה-זהה (06:52 done / 06:21 blocked). תיקון מבני בקוד-הזריעה ובשורות-DB חיות: הדוח-חייב לשאת שני מספרים-חיים (ספירת-סודות + בלוק-חי).
+- פער 18: boot-catch-up ירה כל סדרי-היום ב-00:21–00:27 (לא בשעתם) וצרך את מכסת-היום — החלון-האמיתי בוטל בשקט. תיקון ב-heart.ts: חלון-חסד 2h לסדרי-יום — חלון-שעבר נדחה למחרת בלי לצרוך מכסה.
+- WIF-מקודד ב-`tools/roast4-crypto-verify.ts` (וקטור-פומבי, אך הפרת תורת-אפס-WIF + רעש-סריקה) → הוחלף במפתח-אפמרלי מוטמע בזמן-ריצה; הרצה חיה: roundtrip תקין + claim-builder ביט-זהה (72B). `git grep '5[HJK]…'` על הקוד = אפס.
+- אמת-שרשרת חיה: census 0 ממתינים/11 חשבונות; headcorner 0.670 STEEM + 8.645M VESTS; ההפרות-היחידות בפיד = 6 ה-immutable המתועדות; תגיות-הפוסט-החדש אומתו get_content (`hive-129948` מלא — ה-`ive-…` היה פסאודו-תצוגה של הכלי).
+- זיכויים: upload/ לא-מעוקב; אין .env/מפתחות מעוקבים; קבצים-קפואים נקיים; daily-06:00 ירה היום 06:00:06 מדויק; דפדפן — 122K תווים, אין-גלילה-אופקית (דסקטופ+390px), footer gap=0, scrollY=0 יציב תחת-SSE, אפס שגיאות.
+- הירייה-הראשונה של הסייר עם החוזה-החדש (07:23) קרסה פעמיים על אפס-צעדים — ה-watchdog כשל אותה **בכנות מלאה** ("הוחזרה לתור ונכשלה בכנות") — הריפוי-העצמי מול הסביבה-הרוצחת עבד כמתוכנן; החוזה-החדש ייבחן בירייה-הבאה (07:53).
+
+Stage Summary:
+- ראונד 5 לא רדף אחרי המערכת — רדף אחרי הביקורת עצמה, ומצא שהיא משקרת באותן דרכים שהיא באה לחשוף: סורק-regex, אורקל-checksum, Uint8Array.equals, דוח-tsc-0 כוזב, חוזה-סותר-עצמו, ו-catch-up שרומס דוקטרינה. המערכת-עצמה יצאה נקייה יותר מהסורקים שלה.
+- המצב החי: כל נתיבי-הכספת דורשים זהות (לא רק מצב); אפס חומר-מפתח בריפו וב-DB; tsc 0 אמתי; הלב יורק בזמן ונכשל בכנות כשהסביבה מנשנשת.
+- קבצים: src/app/api/vault/{sign,sign-cancel,soldiers,keys}/route.ts · src/lib/gate/harness/heart.ts · tools/{r5-db-truth,r5-heart-truth,r5-blocked-truth,roast4-crypto-verify}.ts · docs/roast-audit.md · worklog.md · db/custom.db.

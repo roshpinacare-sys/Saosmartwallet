@@ -15,6 +15,8 @@ import { VaultError, VaultKeys, derivePrivateKey, getVaultRuntime, getInstanceId
 import type { EncryptedKey, ImportKeyResponse, KeyListResponse, NetworkId, RevokeKeyResponse } from "@/lib/vault-contracts";
 import type { KeyRole } from "@/lib/vault-runtime";
 
+import { requireOperator } from "@/lib/gate/session";
+
 export const dynamic = "force-dynamic";
 
 const NETWORK_IDS: ReadonlySet<string> = new Set(["steem", "hive", "tron", "blurt", "saos-net", "ethereum", "solana"]);
@@ -69,6 +71,15 @@ interface ImportBody {
 }
 
 export async function POST(req: Request) {
+  // Fail-closed operator gate — ROAST r5: "unlocked vault" is NOT an identity.
+  // While the operator works the vault is open; an anonymous caller must never
+  // be able to sign, broadcast, or mutate policy through it.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
+
   let body: ImportBody;
   try {
     body = (await req.json()) as ImportBody;
@@ -148,6 +159,13 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  // Fail-closed operator gate — ROAST r5: revocation mutates the vault; the
+  // step-up password below is a second factor, not a substitute for identity.
+  const gate = await requireOperator().then(
+    () => null,
+    (e: Error) => NextResponse.json({ ok: false, error: e.message }, { status: 401, headers: { "Cache-Control": "no-store" } }),
+  );
+  if (gate) return gate;
   try {
     // keyId rides in the query string; the step-up password travels in the
     // request BODY only — never in a URL (URLs land in proxy/access logs).
