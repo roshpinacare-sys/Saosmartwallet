@@ -22,6 +22,7 @@ import { steemBroadcastAdapter } from "@/lib/steem-server";
 import { buildSteemPostTx, buildSteemVoteTx, buildSteemFollowTx, buildSteemReblogTx, buildSteemClaimTx, type SocialBuild } from "@/lib/steem-social";
 import { PrivateKey } from "../../../../packages/crypto/src/index";
 import { toSigningKey, COMMANDER_ACCOUNT } from "./orders";
+import { renewLease } from "./lease";
 import { assertPublishable, scanExposure } from "./exposure";
 import {
   hiveBroadcastAdapter,
@@ -177,7 +178,16 @@ export async function publishPostFromAgent(input: {
         `⏳ ${input.agentName}: השרשרת דורשת הפרש של 5 דקות בין פוסטי-שורש — ממתין ${waitSec} שניות לפני שידור "${input.title.slice(0, 60)}"`,
         { runId: input.runId },
       );
-      await new Promise((resolve) => setTimeout(resolve, (waitSec + 2) * 1000));
+      // Sleep in ≤120s chunks, renewing the run lease between chunks —
+      // LEASE_MS is 180s; one long sleep would let the lease lapse mid-wait
+      // and the reaper would reap a perfectly healthy, chain-polite run.
+      let leftMs = (waitSec + 2) * 1000;
+      while (leftMs > 0) {
+        const chunk = Math.min(leftMs, 120_000);
+        await new Promise((resolve) => setTimeout(resolve, chunk));
+        leftMs -= chunk;
+        if (leftMs > 0 && input.runId) await renewLease(input.runId).catch(() => {});
+      }
     }
   }
   const built = await buildSteemPostTx(
