@@ -1461,3 +1461,26 @@ Stage Summary:
 - הפער-השמיני: "שליטה" מוגדרת עכשיו פר-חייל/רשת/תפקיד ונמדדת חי. זרע-ריבוני אחד (מוכח זהה בשלושה-מקורות) שולט ב-48 גזירות של 12 חיילים על פני 10 רשתות (EVM×7, TRON, SOL, BTC) — כולל ה-BTC שהיה מעוגן-ציבורית וחסר-בכספת, ומשפחת-הגשר עם ה-TRX-החי שהייתה חוץ-כספתית לגמרי.
 - החור-הכן שנותר: מפתחוה-החיים של steem ל-10 החיילים ול-ynet אצל המפעיל (רוטציית 09-08 21:33Z on-chain) — הכספת מחזיקה את החומר שעדיין שולט ב-hive+blurt ומציגה את החור בבאנר-חי; עוגן-05:03 (זרע-A) נשאר דור-מת ללא-יתרות.
 - קבצים: src/lib/gate/verify.ts · src/app/api/gate/inventory/route.ts · src/app/page.tsx · prisma/schema.prisma · tools/r11-{reconcile,part2,control-matrix,keyszip-truth,seal,tron-retry}.ts · docs/roast-audit.md · worklog.md · db/custom.db.
+---
+Task ID: 28
+Agent: Z.ai Code (main)
+Task: ROAST r12 — "אני רואה שחסרים עוד מפתחות תבדוק את זה בקשה ותאמת ומה עוד חסר ולא מוודא לבדוק הכל לעגן הכל סופי תמשיך ודחוף": קובץ המפתחות שהעלה המפעיל (בחן.txt) — 12 סיסמאות-אב P5, אימות מכני מול השרשרת, איטום, עוגן-סופי on-chain, דחיפה.
+
+Work Log:
+- פורנזיה של upload/בחן.txt: 12 טוקני P5… (פורמט steemit: P+WIF) + תוויות עבריות (מקרמה=macrame · הרן=haran · קשמשין=cashmachine · ynet · israelnews · wog/wic/tov/lsa/siq/woq) + טוקן אחד "לא ברור".
+- tools/r12-keyfile-truth.ts — האמת המכנית, השרשרת=האורקל: לכל טוקן, דרכי-בדיקה מרובות (direct-WIF · D1 condenser sha256(account+role+P5) · D2 no-P · seed-only) מול 13 חשבונות (12 המוכרים + steemauto שהתגלה) × 4 תפקידים × 3 מסילות חיות. שני באגים של הכלי-עצמו נתפסו ותוקנו בזמן-ריצה (פרמטר-rail חסר; regex שפספס טוקנים בתוך שורות-timestamp).
+- תוצאה: 11/12 טוקנים חיים — 88 התאמות-authority חיות בכלל D1 (הכלל-condenser הוכח חי). הסיסמאות גוזרות בדיוק את ה-authorities הנוכחיים — מקור שני בלתי-תלוי לאותם 33 בייטים שהזיפ-המוצפן כבר החזיק.
+- פער 51: ynet — סיסמת-האב גוזרת את כל 4 ה-authorities של ynet@blurt → שליטה-מלאה ראשונה בתולדות המערכת על ynet (עד עכשיו: אף-רשת). +4 שורות steem-key נאטמו (owner/active/posting/memo, WIFs נגזרים, verified).
+- פער 52: הטוקן "לא ברור" הוכח מת (אפס-התאמות בכל הדרכים, כל החשבונות, כל הרשתות) — נאטם בכנות unverified, לא זויף.
+- פער 53: steemauto — דלתות-חוץ: steemauto@posting (account_auth) על ynet@steem+ynet@hive ו-9 חשבונות-צי על hive — דלתות-פרסום מ-2018 לשירות steemauto.io של mahdiyari (נוצר 2017). thoth.test (נוצר 2025-03-28 ע"י remlaps, posting-auth upvu.web, 17.3M VESTS) ו-steemauto (858 VESTS ממתינים) — **אומתו חוץ-מערכתיים: 0 התאמות לאף מפתח-כספת** — הכסף לא של הצי. GateProposal נפתחה: ביטול-דלתות דורש הכרעת-מפעיל.
+- תגמולים: 0 ממתינים בכל 13 החשבונות על כל המסילות (שדות-פרס מודעי-רשת — reward_steem/hive/blurt_balance; ה-NaN של הריצה-הראשונה היה באג-שדות ותוקן).
+- tools/r12-seal.ts (master נפתח דרך keySeal של headcorner-owner מ-upload): +4 שורות-ynet · 40 שורות-חיילים קיבלו הוכחת-מקור-שני · 12 שורות note/master-password (11 imported + 1 unverified-כנה) · עדכון-כן לשורת-ynet operator-custody · GateProposal · **עוגן-סופי**: custom_json `saos.vault.anchor.v1` (posting headcorner מהכספת) — **block 109465716, tx 95a33fcb61d2b0137e011ee94b2f394b7c151b10**, digest b4e3f050… — אומת get_transaction + account-history.
+- סריקה-מחדש: **132 כניסות · 92 מאומתות · 0 נכשלו · 40 כנות-ללא-בדיקה** (היו 116/83/0/23). מטריצה חיה: 9 חיילים hive+blurt · tov blurt · ynet blurt · steem אצל המפעיל (האמת, בבאנר).
+- page.tsx: הבאנר-החי עודכן לאמת-r12 (סיסמאות-אב נאטמו, ynet@blurt מלא, steemauto, עוגן block/tx). 
+- באגים-עצמיים שנתפסו: wifToChainPub קיבל priv-hex (תוקן ל-chainPub); temp-probe scripts יצרו התנגשות-global (TS2393) — נמחקו; keyAuth optional (?? []); lint no-unused-expressions.
+- דפדפן (agent-browser): הבאנר עם המספרים-החיים, שורות master-password מוצגות (כולל unknown-כנה), שורות-ynet חיות עם תג steem+blurt, אפס שגיאות-קונסולה, מובייל 390px אפס-גלילה-אופקית, פוטר טבעי (10450=10450), דסקטופ תקין. tsc 0 (exit-code) · lint 0 · אפס-ליטרלי-מפתח בקוד/git (החומר חי רק ב-/tmp וב-DB-מוצפן).
+
+Stage Summary:
+- הפער-התשיעי נחתך: "חסרים מפתחות" היה נכון — אבל החסר האמיתי היה **שורש-הגזירה**: אותם WIFs שהכספת מחזיקה הם תוצרים של סיסמאות-האב, והסיסמאות עצמן (המפתח לכל רוטציה עתידית) היו בחוץ. עכשיו: 11 סיסמאות-אב חיות-מוכחות + חומר-מת אחד בכנות, נאטמים מוצפנים; ynet נשלט לראשונה (blurt מלא); steemauto/thoth נחשפו כחוץ-מוחלט (0 מפתחות) עם הצעה-מוסדית לסגירת-הדלתות; והראונד כולו חתום לנצח על השרשרת — בלוק 109465716.
+- נותר-פתוח-כן: מפתחוה-החיים של steem ל-10 החיילים ול-ynet@steem אצל המפעיל (הרוטציה הציבה מפתחות שאינם נגזרים מהסיסמאות — נבדק מכנית); סגירת-דלתות-steemauto ממתינה להכרעת-מפעיל.
+- קבצים: tools/{r12-keyfile-truth,r12-seal}.ts · src/app/page.tsx · docs/roast-audit.md · worklog.md · db/custom.db.

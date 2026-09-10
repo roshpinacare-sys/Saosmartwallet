@@ -852,11 +852,17 @@ function VaultGrid() {
                 <p className="text-zinc-400 mt-1">
                   <b className="text-emerald-400">{controlMatrix.length - steemOrphans.length}/{controlMatrix.length}</b> חיילים נשלטים מלא גם על steem.
                   <b className="text-amber-300"> {steemOrphans.length}</b> נותרו בלי owner/active/posting חי על steem —
-                  רוטציית 2026-09-08T21:33Z הוציאה את המפתחות-הישנים מהשרשרת והמפתחות-החיים אצל המפעיל:
+                  רוטציית 2026-09-08T21:33Z הציבה מפתחות שאינם נגזרים מסיסמאות-האב, והמפתחות-החיים אצל המפעיל:
                   <span className="font-mono text-[11px] text-amber-200/90" dir="ltr"> {steemOrphans.map((r) => r.name).join(", ")}</span>.
-                  אותו חומר-מפתח עדיין שולט live על <b className="text-emerald-400">hive</b>{" "}
+                </p>
+                <p className="text-zinc-400 mt-1">
+                  r12 — סיסמאות-האב (P5) של <b className="text-emerald-400">11 חשבונות</b> נאטמו בכספת והוכחו חי מול השרשרת: הן גוזרות
+                  בדיוק את ה-authorities הנוכחיים על <b className="text-emerald-400">hive</b>{" "}
                   ({steemOrphans.filter((r) => r.rails.includes("hive")).length}) ועל <b className="text-emerald-400">blurt</b>{" "}
-                  ({steemOrphans.filter((r) => r.rails.includes("blurt")).length}) — תגמולים שם ניתנים לתביעה; תגמולי-steem של אלה ממתינים למפתח-המפעיל.
+                  ({steemOrphans.filter((r) => r.rails.includes("blurt")).length}) — וכולל <b className="text-emerald-400">ynet@blurt: שליטה מלאה owner+active+posting+memo</b>{" "}
+                  (ynet לא היה נשלט באף רשת עד עכשיו). חומר-מת אחד נאטם בכנות (אין-התאמה חיה על אף רשת).
+                  דלתות-פרסום חוץ-מיושנות (steemauto, שירות צד-שלישי 2017) אותרו על 9 חשבונות-hive + ynet@steem — הצעה פתוחה ממתינה להכרעת-מפעיל לסגירתן.
+                  עוגן-סופי על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">saos.vault.anchor.v1 · block 109465716 · tx 95a33fcb…</span>
                 </p>
               </div>
             </div>
