@@ -151,6 +151,7 @@ export interface RotationTarget {
   hasP5Root: boolean; // a sealed P5 master-password row exists (the D1 root)
   ready: boolean;
   activePlane: "none" | "ready" | "done"; // r17: the working-plane custody state
+  rotated: boolean; // r19: the LIVE owner authority already IS the D1 root (unified era)
 }
 
 /** gap-60: a row is only trusted when its sealed WIF reproduces its own pub. */
@@ -164,13 +165,14 @@ async function rowMaterialOk(row: { encPriv: string; privIv: string; privTag: st
 }
 
 /** Snapshot: which accounts CAN be rotated mechanically right now. */
-export async function rotationStatus(): Promise<{ targets: RotationTarget[]; readyCount: number; activePlaneReady: number; activePlaneDone: number }> {
+export async function rotationStatus(): Promise<{ targets: RotationTarget[]; readyCount: number; rotatedCount: number; activePlaneReady: number; activePlaneDone: number }> {
   const live = await steemRpc<any[]>("condenser_api.get_accounts", [ROTATION_ACCOUNTS as unknown as string[]]);
   const liveBy = new Map((live || []).map((a) => [String(a.name), a]));
   const ownerRows = await db.vaultEntry.findMany({ where: { kind: "steem-key", chain: "steem", role: "owner" } });
   const activeRows = await db.vaultEntry.findMany({ where: { kind: "steem-key", chain: "steem", role: "active" } });
   const p5Rows = await db.vaultEntry.findMany({ where: { kind: "note", role: "master-password" } });
   const targets: RotationTarget[] = [];
+  let rotatedCount = 0;
   for (const name of ROTATION_ACCOUNTS) {
     const acct = liveBy.get(name);
     if (!acct) continue; // not on chain — skip honestly
@@ -179,6 +181,19 @@ export async function rotationStatus(): Promise<{ targets: RotationTarget[]; rea
     // gap-60: readiness demands the row's SEALED MATERIAL to be its pub (not just the pub field)
     const hasOwnerKey = Boolean(ownerRow) && (await rowMaterialOk(ownerRow!));
     const hasP5Root = p5Rows.some((r) => r.account === name);
+
+    // r19 — is the live owner authority ALREADY the D1 root? (the unified era —
+    // the banner must describe the era the chain is actually in, never a stored one)
+    let rotated = false;
+    let d1Owner: string | null = null;
+    const p5rowForD1 = p5Rows.find((r) => r.account === name);
+    if (p5rowForD1) {
+      try {
+        d1Owner = pubWireToRaw(wifToChainPub(privHexToWif(deriveRolePrivHex(name, "owner", openSecret(p5rowForD1)))));
+        rotated = Boolean(d1Owner) && liveOwner.includes(d1Owner);
+      } catch { rotated = false; }
+    }
+    if (rotated) rotatedCount++;
 
     // r17 — active plane: is the live active authority OURS (sealed, consistent) or already the D1 root?
     let activePlane: RotationTarget["activePlane"] = "none";
@@ -192,11 +207,12 @@ export async function rotationStatus(): Promise<{ targets: RotationTarget[]; rea
         if (actRow && (await rowMaterialOk(actRow))) activePlane = "ready";
       }
     }
-    targets.push({ account: name, hasOwnerKey, hasP5Root, ready: hasOwnerKey && hasP5Root, activePlane });
+    targets.push({ account: name, hasOwnerKey, hasP5Root, ready: hasOwnerKey && hasP5Root, activePlane, rotated });
   }
   return {
     targets,
     readyCount: targets.filter((t) => t.ready).length,
+    rotatedCount,
     activePlaneReady: targets.filter((t) => t.activePlane === "ready").length,
     activePlaneDone: targets.filter((t) => t.activePlane === "done").length,
   };

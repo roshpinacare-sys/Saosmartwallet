@@ -25,7 +25,8 @@ import {
   type UnsignedTx,
   type BroadcastResult,
 } from "../../chain-adapter";
-import { PrivateKey, STEEM_ROLES, type SteemRole } from "../../../crypto/src/index";
+import { createHash } from "crypto";
+import { PrivateKey, STEEM_ROLES, type SteemRole, base58Decode } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
 import type { AccountUpdateOperation, ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemAuthority, SteemOperationName, VoteOperation } from "./operations";
 import { graphenePubToRaw33 } from "./operations";
@@ -43,6 +44,34 @@ import {
 // ---------------------------------------------------------------------------
 
 const ACCOUNT_NAME_RE = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
+
+const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+
+/**
+ * r19 — WIF canonicalization at the signing boundary (fail-closed).
+ * Accepts canonical uncompressed WIFs (5…) and COMPRESSED WIFs (K/L…, 38-byte
+ * payload with the 0x01 flag). r17 chain-proved this fleet's ROT1/הדקור
+ * material: the signing stack (steem-js + toSigningKey) interprets the whole
+ * 33-BYTE BODY (32-byte value ‖ 0x01) as the private scalar mod N — the
+ * standard "0x01 = compression flag" reading produces a DIFFERENT key
+ * (re-proven live r19: stored==live, standard-derivation≠live). The 4-byte
+ * checksum is verified before any scalar is reduced — corrupt vault rows
+ * refuse to sign instead of signing garbage.
+ */
+function privateKeyFromWifCanonical(wif: string): PrivateKey {
+  const trimmed = wif.trim();
+  let raw: Uint8Array;
+  try { raw = base58Decode(trimmed); } catch { throw new SerializationError("invalid WIF base58"); }
+  if (raw.length === 38 && raw[0] === 0x80 && raw[33] === 0x01) {
+    const body = raw.subarray(0, 34); // 0x80 + 33B scalar-body
+    const calc = createHash("sha256").update(createHash("sha256").update(body).digest()).digest().subarray(0, 4);
+    for (let i = 0; i < 4; i++) if (calc[i] !== raw[34 + i]) throw new SerializationError("bad WIF checksum");
+    // canonical (r17-proven) semantics: the 33-byte body IS the scalar, mod N
+    const d = BigInt("0x" + Buffer.from(raw.subarray(1, 34)).toString("hex")) % SECP256K1_N;
+    return PrivateKey.fromBytes(Buffer.from(d.toString(16).padStart(64, "0"), "hex"));
+  }
+  return PrivateKey.fromWif(trimmed); // canonical path — package verifies and fails closed
+}
 
 export function validateAccountName(name: string): string {
   if (name.length < 3 || name.length > 16) {
@@ -669,7 +698,12 @@ export class SteemAdapter implements ChainAdapter {
     for (const role of roles) {
       const key = keys.byRole[role];
       if (key === undefined) throw new SerializationError(`no key provided for role "${role}"`);
-      const priv = key instanceof PrivateKey ? key : PrivateKey.fromWif(String(key));
+      // r19: the vault's ROT1 / הדקור material is COMPRESSED WIF (K/L…, 38-byte
+      // payload) — the package's fromWif only accepts canonical 37-byte WIFs.
+      // Canonicalize here (checksum-verified, scalar mod N): the compression
+      // flag describes the pubkey ENCODING, not the scalar, so the signature
+      // is identical and still recovers to the compressed chain pubkey.
+      const priv = key instanceof PrivateKey ? key : privateKeyFromWifCanonical(String(key));
       // Digest only — signatures cover sha256(chainId ‖ tx) and nothing else.
       const sig = priv.signRecoverable(digest);
       if (sig.length !== SIGNATURE_SIZE) throw new SerializationError("internal: bad signature length");

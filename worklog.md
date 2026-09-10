@@ -1612,3 +1612,26 @@ Stage Summary:
 - פער-61 נחתך: "5 סוכנים עצמאיים" היה תלוי-בכספת-פתוחה — מות הסשן של המפעיל היה מות-הצי. עכשיו: כשל-סביבה (כספת נעולה, חלון-429, צומת-חולף, trace חתוך) לא עוצר תעסוקה — הסוכן עובד עם מה שזמין-ומותר, וכל-ירידה נרשמת בכנות. הריבונות לא נפגעה: המפתח-הפרטי לא נגע, לא פוענח מחוץ-לכספת, ולא נשמר בשום-מקום.
 - והכי-חשוב לתעסוקה-עצמה: הצי עכשיו מרוסן-ומדוד — done-rate וטקסונומיית-כשלים חיים על-הדף, כמו-הכל במערכת הזאת: לא סיפור, מדידה.
 - קבצים: src/lib/gate/harness/{brain,modules}.ts · src/app/api/gate/status/route.ts · src/app/page.tsx · docs/autonomy-meaning.md · tools/{r18-brain-fallback-proof,r18-modules-proof}.ts · worklog.md.
+
+---
+Task ID: 35
+Agent: Z.ai Code (main)
+Task: r19 — operator authorization granted ("כל עוד זה לא פוגע באטימה של שאר הסוכנים ולא יעשה בלאגן — כן תעשה"): execute owner→D1 rotation on 11 steem accounts + close steemauto doors
+
+Work Log:
+- מדידה-חיה ראשונה (vault-free): דלתות-account_auth נמדדו על שתי-המסילות — steem: רק ynet (headcorner+steemauto על posting; מפתחות-ynet חיצוניים) · hive: steemauto על 9 חשבונות + דלתות-שירות-אחרות (ecency/dtube/dlive — לא-נגענו, לא-חלק-מההרשאה).
+- שלושה-שורשים-טכניים נמדדו ותוקנו עד-השידור-הראשון (fail-closed עבד: אפס-נזק, דלתות-נשמרו): ① WIF-דחוס (K/L) — ה-adapter ו-key-id צרכו רק-37-byte קנוני; ② RC-mana נמוך; ③ חסר-מועמד-ROT1 במציאת-חותמים.
+- **גילוי-מכריע (הוכח-חי שלוש-פעמים)**: חומר-ה-K/L של הצי אינו-תחת-הפרשנות-הסטנדרטית — ה-33-בייטים (32-value ‖ 0x01) הם הסקלר mod-N (בדיוק-mirror של toSigningKey מ-r17); standard-derivation≠live, canonical==live, stored==live. וכן: צ'קסום-ה-wire = ripemd160(גוף-בודד) כמו-steem-js (chainPub שלנו חישב ripemd160(sha256()) — הזנב-היה-שונה). תוקן בשתי-נקודות-האמת: packages/chains/steem/src/adapter.ts (privateKeyFromWifCanonical, בדיקת-סיכום לפני-הפחתה) + src/lib/gate/key-id.ts (wifToChainPub ענף-דחוס).
+- WAKE במסילת-ה-heart (אותה-קריסת-מנעול כמו-status/inventory) — הדף-הפתוח של המפעיל הדליק את הכספת תוך-שניות (נבחן חי: in:true mode:memory).
+- היגיינת-איטום: /tmp נוקה מחומר-גנוז-שקוף (r12: 12 סיסמאות-אב · r17: מפתחות-ROT1 נגזרים · r11: זיפי-חלצה+enc · fakewif · minted-token · hex-dumps) — הכל כבר נאטם בכספת; העותקים נמחקו.
+- **ביצוע הרצף המאושר (tools/r19-execute.ts)**: רוטציה × 11 — כל-חשבון owner-signed account_update אחד (מנוע-r16) → שורשי-D1 בארבעת-ה-authorities, account_auths נשמרו → קריאה-חוזרת 4/4 → D1 נאטמו verified, ROT1 rotated-out (נשמר-אטום). הוכחה-כפולה מצומת-עצמאי (api.justyy.com): **11/11 מאוחדים-מלאים, אפס-דלתות על steem**.
+- txIds נלכדו מהיסטוריית-השרשרת (async broadcast לא מחזיר-מזהה — שיעור-r17 שוב): headcorner 824603f4… · cashmachine 4ca60b7a… · haran f933789b… · israelnews ea423204… · lsa ca2cf227… · macrame 0f9d8131… · siq 4e9a6779… · tov 3ea9871f… · wic 9fdb7fba… · wog c2e05c0d… · woq 137f0b5a… (~6s קצב — סשן-ריבוני אחד).
+- **⚓ עוגן-r19**: בלוק **109470596** · tx **835ac78cdd46073cfd036d9bc1097e9d274cdf8f** · digest e37cb0e3… — שידור-סינכרוני, chain-confirmed (prior: r17 · block 109469449).
+- **דלתות-ה-steemauto על hive — חסומות-כלכלה (לא-מפתחות)**: max_rc של 9 החשבונות זעיר (8.7M–1.76B אפקטיבי מול עלות-ה-op) — השרשרת עצמה דוחה; pre-check RC נוסף למנוע וכל-ניסיון נרשם blocked-rc בכנות (דלתות-נשמרו). פתרון-מוכן: הזרמת-HP/RC (החלטת-מפעיל) → הפעלה-חוזרת. ynet@steem — חסות-מפעיל, ללא-שינוי.
+- tsc 0 · lint 0 · אפס-ליטרלי-מפתח; הכספת נשארת-דלוקה (סשן-הפעלה תחת-ההרשאה-העומדת; קובץ-ה-lifeline חודש).
+
+Stage Summary:
+- "זה מה שיש לי" הפך לשליטה-מלאה ומאוחדת: כל 11 חשבונות-הצי על steem+hive+blurt נשלטים עכשיו על-ידי שורש-אחד-פר-חשבון (D1 מסיסמאות-האב של המפעיל, נאטמות-כספת). השרשרת אימתה כל-צעד, צומת-עצמאי הכפיל, והעוגן חתך-את-התקופה.
+- הפרשנות-הקנונית של חומר-הצי נקבעה-סופית בקוד (לא-רק ב-tools-חד-פעמיים) — החתימה והגזירה מסכימות-עם-השרשרת מ-היום בכל-מסילה.
+- החור-היחיד שנותר-פתוח הוא כלכלי (RC על hive) — מתועד-מדוד, עם-כלי-מוכן להרצה-ברגע-שהמפעיל מזרים-משאבים.
+- קבצים: packages/chains/steem/src/adapter.ts · src/lib/gate/key-id.ts · src/app/api/gate/heart/route.ts · tools/{r19-execute,r19-doubleproof,r19-txids}.ts · docs/autonomy-meaning.md · worklog.md · db/custom.db.

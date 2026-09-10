@@ -94,7 +94,7 @@ interface Entry {
 }
 interface Inventory {
   ok: boolean; locked: boolean; entries: Entry[];
-  summary?: { total: number; verified: number; failed: number; noLive: number; rails: Record<string, number> };
+  summary?: { total: number; verified: number; failed: number; rotatedOut?: number; noLive: number; rails: Record<string, number> };
   chains?: { steemOk: boolean; hiveOk: boolean; blurtOk: boolean; githubOk: boolean | null };
   // r13 gap-54 — the LIVE status of the steemauto door-closure proposal;
   // the custody banner's "awaiting operator" claim is computed from it,
@@ -102,7 +102,7 @@ interface Inventory {
   // the r12 filing was auto-expired by policy and the page kept lying).
   steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string; runId?: string | null; runStatus?: string | null } | null;
   // r16 — rotation plane readiness, computed live by the API (never stored)
-  rotation?: { targets: Array<{ account: string; hasOwnerKey: boolean; hasP5Root: boolean; ready: boolean }>; readyCount: number } | null;
+  rotation?: { targets: Array<{ account: string; hasOwnerKey: boolean; hasP5Root: boolean; ready: boolean; rotated?: boolean }>; readyCount: number; rotatedCount?: number } | null;
 }
 interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
@@ -758,7 +758,17 @@ function Connections() {
       {summary && (
         <motion.p {...rise} className="mt-4 font-mono text-xs text-zinc-500">
           אימות-חי אחרון: <b className="text-emerald-400">{summary.verified}</b> עברו ·{" "}
-          {summary.failed > 0 ? <span className="text-rose-400">{summary.failed} נכשלו</span> : <span className="text-zinc-600">0 נכשלו</span>} ·{" "}
+          {(() => {
+            // r19 — rotated-out rows are history by design (their keys left the
+            // chain on purpose); counting them as "failures" was a living lie
+            const realFailed = summary.failed - (summary.rotatedOut ?? 0);
+            return (
+              <>
+                {realFailed > 0 ? <span className="text-rose-400">{realFailed} נכשלו</span> : <span className="text-zinc-600">0 נכשלו</span>}
+                {(summary.rotatedOut ?? 0) > 0 && <span className="text-zinc-500"> · {summary.rotatedOut} rotated-out (היסטוריה-מכוונת)</span>}
+              </>
+            );
+          })()}{" "}
           {summary.noLive} ללא-בדיקה-אפשרית
           {summary.rails && (
             <> · סמכויות-חיה: steem {summary.rails.steem ?? 0} · hive {summary.rails.hive ?? 0} · blurt {summary.rails.blurt ?? 0} · ETH {summary.rails.ethereum ?? 0} · TRX {summary.rails.tron ?? 0} · SOL {summary.rails.solana ?? 0} · BTC {summary.rails.bitcoin ?? 0}</>
@@ -989,40 +999,52 @@ function VaultGrid() {
               <div className="text-sm leading-relaxed">
                 <p className="font-semibold text-amber-300">שליטת-הרשת — האמת החיה ({controlMatrix.length} נבדקו on-chain)</p>
                 <p className="text-zinc-400 mt-1">
-                  <b className="text-emerald-400">r17 — האמת המדודה (chain-proven):</b> הצי על steem מאוחד תחת גזירת-ROT1 מזרע-האם SAOS-ROT1 (מקור: קובץ-השחזור שלך, הד.txt — החיווט הוכח מכנית והשרשרת אישרה 44/48 authorities חיים):
-                  סבב-הרוטציה הושלם על-ידי הקומנד-סנטר היום (owner+active+posting+memo × 11 חשבונות), והכספת אטמה כל מפתח-חי עם אימות-חי באותה-קריאה ({steemOrphans.filter((r) => r.name !== "ynet").length} חיילים נשלטים מהכספת).
-                  <b className="text-amber-300"> החריג היחיד: ynet</b> — המפתחות-החיים שלו (FULL-4 מ-09-04, op 9defc295…) אצל המפעיל:
-                  <span className="font-mono text-[11px] text-amber-200/90" dir="ltr"> {steemOrphans.map((r) => r.name).join(", ")}</span>.
+                  <b className="text-emerald-400">r19 — האמת המדודה (chain-proven, חי-מה-API):</b>{" "}
+                  {(() => {
+                    // gap-54 doctrine: the banner describes the era the CHAIN is in —
+                    // computed live from rotationStatus's rotated flags, never a stored era
+                    const rot = inv?.rotation;
+                    const rotatedCount = rot?.rotatedCount ?? rot?.targets.filter((t) => t.rotated).length ?? 0;
+                    if (rotatedCount >= 11) return (
+                      <>
+                        הצי מאוחד על שורש-אחד: <b className="text-lime-300">11/11 חשבונות-steem נושאים שורשי-D1 בכל-ארבעת-ה-authorities</b> (owner+active+posting+memo — רוטציה מאושרת-שרשרת, double-proven מצומת-עצמאי); ועל hive ו-blurt השורש זהה מאז-r12.
+                        <b className="text-amber-300"> החריג היחיד: ynet@steem</b> — המפתחות-החיים שלו (FULL-4 מ-09-04) אצל המפעיל.
+                      </>
+                    );
+                    if (rotatedCount > 0) return (
+                      <>מעבר-עידנים בעיצומו: <b className="text-lime-300">{rotatedCount}/11</b> מאוחדים-על-D1, היתר עוד-על-גזירת-ROT1 — האמת-החיה מהשרשרת, לא-זיכרון.</>
+                    );
+                    return <>הצי על steem תחת גזירת-ROT1 (עידן-r17) — הרוטציה-ל-D1 טרם-בוצעה.</>;
+                  })()}
                 </p>
                 <p className="text-zinc-400 mt-1">
-                  על <b className="text-emerald-400">hive</b>: 9 חשבונות תחת שורשי-D1(P5) + tov/headcorner תחת גזירת-ROT1 — ועל <b className="text-emerald-400">blurt</b>: 12/12 תחת שורשי-D1(P5)
-                  (כולל ynet@blurt: שליטה מלאה). 12 סיסמאות-אב P5 נאטמות (אחת מתה בכנות) + זרע-האם SAOS-ROT1 נאטם — שני-שורשי-הגזירה בכספת, כל-החומר-החי ניתן-לניהול.
-                  דלתות-פרסום חוץ-מיושנות (steemauto, שירות צד-שלישי 2017) אותרו על 9 חשבונות-hive + ynet@steem — {(() => {
+                  דלתות-פרסום חוץ-מיושנות (steemauto, שירות צד-שלישי 2017) נמדדו חי: על steem — רק ynet (חסות-מפעיל); על hive — 9 חשבונות: {(() => {
                     const s = inv?.steemautoProposal;
                     if (!s) return <span className="text-zinc-400">אין כרגע הצעה פתוחה לסגירתן.</span>;
-                    if (s.status === "pending") return <span className="text-amber-300">הצעה פתוחה כרגע ממתינה להכרעת-המפעיל לסגירתן (פאנל יוזמות-היעד).</span>;
+                    if (s.status === "pending") return <span className="text-amber-300">המשאבים (HP/RC) חסרים בחשבונות-היעד — השרשרת עצמה דוחה (r19, מדוד): נדרשת הזרמת-משאבים ואז הפעלה-חוזרת של הסגירה (הכלי מוכן, fail-closed).</span>;
                     if (s.status === "launched") {
                       // gap-57 — the claim follows the RUN's real state, not the proposal's optimism
                       if (s.runStatus === "queued" || s.runStatus === "running") return <span className="text-emerald-300">הריצה לסגירתן חיה כרגע.</span>;
                       if (s.runStatus === "done") return <span className="text-emerald-300">הריצה הסתיימה — הדלתות נסגרו.</span>;
-                      if (s.runStatus === "blocked" || s.runStatus === "failed") return <span className="text-rose-300">הריצה נעצרה כנה (הסוכן דיווח: אין עדיין כלי-חתימה ל-account_update) — נדרש צעד-הנדסה ואישור-מפעיל חוזר.</span>;
+                      if (s.runStatus === "blocked" || s.runStatus === "failed") return <span className="text-rose-300">הריצה נעצרה כנה — הכלים קיימים (r19); החסם-הנוכחי: משאבי-RC בחשבונות-היעד (נדרשת הזרמה).</span>;
                       return <span className="text-emerald-300">הריצה הוזנקה על-ידי המפעיל.</span>;
                     }
                     if (s.status === "adopted") return <span className="text-lime-300">ההצעה אומצה כסיור-קבוע.</span>;
-                    if (s.status === "rejected") return <span className="text-rose-300">המפעיל דחה את הצעת-הסגירה.</span>;
+                    if (s.status === "rejected") return <span className="text-rose-300">המפעיל דחה את צעת-הסגירה.</span>;
                     return <span className="text-zinc-400">ההצעה פגתה במדיניות — דורשת הגשה-מחדש.</span>;
                   })()}
                   {(() => {
-                    // r17 — the rotation plane line: computed from the API's live readiness
+                    // r19 — the rotation plane reports its state live (the era is decided)
                     const rot = inv?.rotation;
                     if (!rot) return null;
+                    const rotatedCount = rot.rotatedCount ?? rot.targets.filter((t) => t.rotated).length;
                     return (
                       <span className="block mt-1">
-                        <b className="text-lime-300">מישור-רוטציית account_update (רק-מפעיל):</b> הכספת מחזיקה עכשיו את המפתחות-החיים של הצי (גזירת-ROT1, אומתו-חי) — רוטציית-owner לשורשי-D1 (איחוד מלא עם hive+blurt) אפשרית מכנית עבור <b className="text-lime-300">{rot.readyCount}/{rot.targets.length}</b> חשבונות ({rot.targets.filter((t) => t.ready).map((t) => t.account).join(", ") || "—"}) — ההחלטה שלך בלבד, בפאנל "חיבור-steem" למטה. ⚓ האטימה-r17: בלוק 109469449 (קודמת: r12 · 109465716).
+                        <b className="text-lime-300">מישור-רוטציית account_update (רק-מפעיל):</b> הרוטציה לשורשי-D1 <b className="text-lime-300">בוצעה ואומתה-שרשרת ({rotatedCount}/11)</b> — המפתחות-החיים הם עכשיו שורשי-D1 הנאטמים; אין-צורך ברוטציה-נוספת. ה-ROT1 ומפתחות-2018 מוגדרים rotated-out (היסטוריה-אטומה, נשמרת). ⚓ האטימה-r19: בלוק 109470596 · tx 835ac78c… (קודמות: r17 · 109469449 · r12 · 109465716).
                       </span>
                     );
- })()}
-                  עוגני-האמת על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">r17 · block 109469449 · tx d4b33aa3… (prior: r12 · block 109465716 · tx 95a33fcb…)</span>
+                  })()}
+                  עוגני-האמת על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">r19 · block 109470596 · tx 835ac78c… (prior: r17 · block 109469449 · tx d4b33aa3… · r12 · block 109465716 · tx 95a33fcb…)</span>
                 </p>
               </div>
             </div>
