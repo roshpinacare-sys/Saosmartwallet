@@ -337,7 +337,25 @@ export interface FleetContentAuditRow {
 export interface FleetContentAudit {
   rails: Array<{ rail: PublishRail; ok: boolean; posts: number; flagged: number; error?: string }>;
   posts: FleetContentAuditRow[];
+  /** roast r6: the custom_json plane — the audit surface NO previous round
+   *  ever scanned. Live proof: `saos-dex.anchor.v1` + bare `saos` ids carry
+   *  the codename + protocol structure on-chain continuously (one op/block
+   *  from external legacy infra), while every round claimed the feed clean.
+   *  custom_json is immutable and broadcast from outside this codebase —
+   *  reported honestly, never counted into needsEdit (no edit can touch it). */
+  customJson?: CustomJsonStreamAudit;
   summary: string;
+}
+
+export interface CustomJsonStreamAudit {
+  account: string;
+  windowOps: number;
+  spanFrom: string | null;
+  spanTo: string | null;
+  byId: Record<string, number>;
+  codenameOps: number;
+  protocolLeakIds: string[];
+  originNote: string;
 }
 
 /**
@@ -377,15 +395,79 @@ export async function auditFleetContent(limitPerRail = 20): Promise<FleetContent
       railStats.push({ rail, ok: false, posts: 0, flagged: 0, error: e instanceof Error ? e.message : String(e) });
     }
   }
+  // roast r6 — the third plane: custom_json ops. Blog scans (r2–r5) never
+  // looked here; the chain carried (and still carries) the codename in public
+  // protocol ids at one-op-per-block cadence. The audit must SEE it.
+  let customJson: CustomJsonStreamAudit | undefined;
+  try {
+    customJson = await auditCustomJsonStream();
+  } catch (e) {
+    customJson = {
+      account: COMMANDER_ACCOUNT, windowOps: 0, spanFrom: null, spanTo: null,
+      byId: {}, codenameOps: 0, protocolLeakIds: [],
+      originNote: `סריקת ה-custom_json נכשלה: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
   const total = posts.length;
   const flagged = posts.filter((p) => p.needsEdit).length;
   const immutable = posts.filter((p) => p.immutableFindings.length > 0).length;
+  const cjLeak = customJson.protocolLeakIds.length > 0
+    ? ` · ⚠ מישור-custom_json: ${customJson.codenameOps}/${customJson.windowOps} פעולות בחלון נושאות שם-קוד/פרוטוקול פומבי (${customJson.protocolLeakIds.slice(0, 3).join(", ")}) — משודר מתשתית-חוץ, בלתי-ניתן לעריכה על-השרשרת`
+    : "";
   const summary =
-    `ביקורת-תוכן חיה (גוף-מלא + תגיות): ${total} פוסטים אחרונים נסרקו על ${railStats.filter((r) => r.ok).length} מסילות, ` +
+    `ביקורת-תוכן חיה (גוף-מלא + תגיות + custom_json): ${total} פוסטים אחרונים נסרקו על ${railStats.filter((r) => r.ok).length} מסילות, ` +
     `${flagged} מדגלים לעריכה` +
     (immutable > 0 ? ` · ${immutable} נושאים ממצא-קטגוריה בלתי-ניתן-לתיקון (parent_permlink נחרת בפרסום — מוצג בכנות, לא מזויף כ"ניתן לתיקון")` : "") +
+    cjLeak +
     " (מדיניות-חשיפה)";
-  return { rails: railStats, posts, summary };
+  return { rails: railStats, posts, customJson, summary };
+}
+
+/**
+ * roast r6 — the custom_json stream audit (READ-ONLY, bounded).
+ * Examines the commander's latest on-chain custom_json ops and reports the
+ * PUBLIC protocol surface: which ids exist, how often, and whether the
+ * codename leaks in an id or payload. This plane was invisible to rounds
+ * r2–r5 (they scanned blog posts only) while external legacy infra (relay
+ * daemon, outside this repo) sealed checkpoints under `saos-dex.anchor.v1`
+ * and bare `saos` ids at ~1 op/block. custom_json ops are immutable on-chain
+ * and we do not control the broadcaster from this copy — the honest output is
+ * visibility + disclosure, never a fake "fixed".
+ */
+export async function auditCustomJsonStream(account: string = COMMANDER_ACCOUNT, windowOps = 100): Promise<CustomJsonStreamAudit> {
+  const rows = await steemRpc<Array<[number, { timestamp: string; op: [string, { id?: string; json?: string }] }]>>(
+    "condenser_api.get_account_history",
+    [account, -1, Math.min(Math.max(windowOps, 1), 100)],
+  );
+  const byId: Record<string, number> = {};
+  let codenameOps = 0;
+  const leakIds = new Set<string>();
+  let spanFrom: string | null = null;
+  let spanTo: string | null = null;
+  for (const [, trace] of rows) {
+    const [type, val] = trace.op;
+    if (type !== "custom_json") continue;
+    const id = String(val.id || "");
+    byId[id] = (byId[id] || 0) + 1;
+    const payload = String(val.json || "");
+    if (/saos/i.test(id) || /saos/i.test(payload)) {
+      codenameOps++;
+      leakIds.add(id);
+    }
+    const ts = trace.timestamp;
+    if (!spanFrom || ts < spanFrom) spanFrom = ts;
+    if (!spanTo || ts > spanTo) spanTo = ts;
+  }
+  return {
+    account,
+    windowOps: rows.length,
+    spanFrom,
+    spanTo,
+    byId,
+    codenameOps,
+    protocolLeakIds: [...leakIds],
+    originNote: "משודר מתשתית-legacy חוץ-לריפו (relay daemon) — custom_json בלתי-ניתן לעריכה על-השרשרת; הביקורת החיה רואה אותו עכשיו",
+  };
 }
 
 export interface RailsOverview {

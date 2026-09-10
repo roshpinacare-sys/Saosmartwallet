@@ -1328,3 +1328,25 @@ Stage Summary:
 - ראונד 5 לא רדף אחרי המערכת — רדף אחרי הביקורת עצמה, ומצא שהיא משקרת באותן דרכים שהיא באה לחשוף: סורק-regex, אורקל-checksum, Uint8Array.equals, דוח-tsc-0 כוזב, חוזה-סותר-עצמו, ו-catch-up שרומס דוקטרינה. המערכת-עצמה יצאה נקייה יותר מהסורקים שלה.
 - המצב החי: כל נתיבי-הכספת דורשים זהות (לא רק מצב); אפס חומר-מפתח בריפו וב-DB; tsc 0 אמתי; הלב יורק בזמן ונכשל בכנות כשהסביבה מנשנשת.
 - קבצים: src/app/api/vault/{sign,sign-cancel,soldiers,keys}/route.ts · src/lib/gate/harness/heart.ts · tools/{r5-db-truth,r5-heart-truth,r5-blocked-truth,roast4-crypto-verify}.ts · docs/roast-audit.md · worklog.md · db/custom.db.
+
+---
+Task ID: 22
+Agent: Z.ai Code (main)
+Task: ROAST r6 — "ווודא שאתה בקומיט האחרון תמשיך": סנכרון ל-a4bf725, ואז הראונד העמוק ביותר עד כה — מישור-ה-custom_json, מטריצת-הרשאות מלאה חיה, והוכחה-נגדית של שער-החשיפה; תיקון-הכל עם הוכחות, דחיפה.
+
+Work Log:
+- סנכרון-אמת: HEAD היה 5 קומיטים מאחור (r2–r5 חיו על origin בלבד; לוקאל רץ על קוד-FLEET-MIND עם לב-חי בחלון 07:34–08:46Z!) → reset מדויק ל-a4bf725, גיבוי-DB, אתחול, db:push, הכספת שלמה (97 כניסות), הלב קם והחזיר ריצה-קרוסה בעצמו ב-13:01.
+- אמת-שרשרת (tools/r6-chain-truth.ts): פיד נקי בחלון-הקוד-הישן (אפס פרסומים אחרי 03:34Z) · 6 הרמדיאציות מחזיקות · census 0/11 · יתרות תואמות-r5 · 6 ה-immutable בדיוק.
+- ממצא-העל (tools/r6-anchor-probe.ts): 101/101 פעולות custom_json נושאות שם-קוד — `saos-dex.anchor.v1` (92) + `saos` חשוף (9), אחת-לבלוק, רציף מ-2026-09-08, מתשתית-חוץ (relay daemon — אין תהליך כאן, .grid98-lab ריק). אף סריקה ב-r2–r5 לא הביטה במישור זה.
+- תיקון-העיניים: `auditCustomJsonStream()` נכנס ל-auditFleetContent (social.ts) — census מזהים + זיהוי-שם-קוד + originNote; הוכחה חיה 101/101; מוצג בכנות כ-bimutable/חוץ, מחוץ ל-needsEdit.
+- פער 19: tsc אמתי עם exit-code (לא pipe) חשף 2 שגיאות-גלובליים (chain-health-check + roast3-full-history-scan מאז r3) — "tsc 0 מלא" של r5 לא החזיק; תוקן module-scope; tsc 0 אמתי.
+- פער 20 (tools/r6-endpoint-matrix.ts — 91 probes חיים/65 routes): gate/lock נעל אנונימית (200, מחיקת-מאסטר+סשן = DoS) → requireOperator, מוכח 400 operator-only · developer/keys GET + usage GET אנונימיים (דליפת שמות/prefix/usage) → requireAdmin, מוכח 401×2 · זיכויים מרוקנים: vault-login (step-up), messages, grid98-bench, bootstrap, SSE (401), לוחות-ציבוריים.
+- פער 21 (tools/r6-gate-negative.ts): 8 מקרים-אדיברסריים דרך assertPublishable האמתי → 7/8; פיתוי-מטבעות ("Send STEEM to our wallet with a memo") עבר חופשי — הדפוס של תקרית-r2 מעולם לא נהיה חוק → חוק `solicitation` (HIGH) → 8/8; וצמצום-רעש: ממצא-אחד-לכל-כיתה.
+- אמת-DB (tools/r6-db-truth.ts): arsenal 5×30, תור-עורך v4 נכון ב-DB (social.audit→steem.edit→chat.report; הכלי-שלי ערבב תוויות — תוקן בו), 0 תקועות, 14 schedules; פתוח-כנה: מכסות-היום נשרפו ע"י catch-up טרום-r5 → הוולידציה-המלאה של חלונות-r5 = מחר.
+- דפדפן: מסך-נעילה אנונימי נקי (דסקטופ+390px), אפס שגיאות, fail-closed ב-UI, פוטר נמדד בשלושת-המקרים (gap=0/דחיפה-טבעית/מובייל); הקונסולה-המלאה לא נבדקה (אפס שינויי-UI, אין סשן כאן — הגבול הנכון).
+- lint 0 · tsc 0 (אמתי) · docs/roast-audit.md ראונד 6.
+
+Stage Summary:
+- הפער השלישי נחשף: לא "מה יוצא" ולא "מה טוענים" — אלא "מה בכלל סורקים". השרשרת צעקה את שם-הקוד 2,400 פעמים ביום במישור שאף כלי לא הקשיב, והשער שחוסם דליפות היה עיוור לדפוס-הפיתוי של התקרית-הגדולה עצמה.
+- המצב החי: עיניים למישור-ה-custom_json (101/101 מדווח), שער 8/8, שלוש נקודות-קצה נעולות עם הוכחות-401/400, tsc-0 אמתי, פיד נקי, רמדיאציות מחזיקות, הלב מרפא את עצמו מול הסביבה.
+- קבצים: src/lib/gate/harness/{social,exposure}.ts · src/app/api/gate/lock/route.ts · src/app/api/developer/{keys,usage}/route.ts · tools/{r6-chain-truth,r6-anchor-probe,r6-db-truth,r6-endpoint-matrix,r6-gate-negative,r6-customjson-live}.ts · tools/{chain-health-check,roast3-full-history-scan}.ts (module-scope) · docs/roast-audit.md · worklog.md.

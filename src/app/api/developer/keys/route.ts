@@ -7,12 +7,12 @@ import { db } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 /**
- * Developer key console — MUTATING routes are admin-gated (Model 1 W1 gap
- * closed): POST/DELETE require `Authorization: Bearer <admin token>` (the
- * bootstrap-once credential or env SAOS_ADMIN_TOKEN). GET stays open —
- * prefixes and usage counters only, no secrets.
+ * Developer key console — ALL routes admin-gated (Model 1 W1 gap closed;
+ * roast r6 closed the last two: GET /keys and GET /usage answered ANONYMOUSLY,
+ * leaking internal key names/prefixes/activity — internal vocabulary is not
+ * a secret-free zone, it is exactly the leak class the codename doctrine
+ * forbids; the documented "GET stays open" decision of r4 is REVOKED here).
  *
- * GET    → list keys with honest usage counters (calls today / total)
  * POST   { name }  → create; the plaintext key is returned EXACTLY ONCE
  * DELETE ?id=      → revoke (soft: stays for usage history, blocks product calls)
  */
@@ -33,7 +33,9 @@ function startOfUtcDay(): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const adminGate = await requireAdmin(req);
+  if (adminGate) return adminGate;
   const rows = await db.apiKey.findMany({
     orderBy: { createdAt: "desc" },
     include: { records: { select: { createdAt: true } } },
