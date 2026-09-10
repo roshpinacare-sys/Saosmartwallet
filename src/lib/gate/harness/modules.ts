@@ -21,7 +21,7 @@ import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
-import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, SOCIAL_RAILS } from "./social";
+import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
@@ -596,6 +596,19 @@ export const MODULES: HarnessModule[] = [
         ...r,
         meaning: `תביעה חיה בשרשרת: @${r.account} קיבל ${r.claimed.steem} + ${r.claimed.sbd} + ${r.claimed.vests} — txId ${r.txId}${r.verified ? " · אומת חי (הממתינים אופסו)" : ""}`,
       };
+    },
+  },
+  {
+    id: "steem.trends",
+    name: "מכ\"ם-נושאים — מה הרשת קוראת עכשיו",
+    kind: "connector",
+    desc: 'אינטליגנציה-מערכתית חיה מהשרשרת עצמה: תגיות-חמות לפי תשלומים אמיתיים (get_trending_tags), דיונים-חמים לפי מעורבות (get_discussions_by_trending), ומהם — מועמדויות-נושא באנגלית לפרסום היומי, נגזרות מהביקוש-החי ולא מניחוש. קרא את זה לפני שאתה כותב משהו לרשת — הערך של פוסט נמדד בקוראים, והקוראים נמדדים בשרשרת. קריאה-בלבד, נתונים פומביים.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const t = await steemTrends();
+      return { ...t, meaning: t.summary };
     },
   },
   {

@@ -164,6 +164,22 @@ export async function publishPostFromAgent(input: {
   // ── exposure policy: the cards stay home ──────────────────────────────
   const exposure = assertPublishable(input.title, body);
   const tags = (input.tags || []).slice(0, SOCIAL_RAILS.maxTags);
+  // ── chain-polite root-post pacing ─────────────────────────────────────
+  // The chain itself enforces STEEM_MIN_ROOT_COMMENT_INTERVAL: a root post
+  // is allowed only once every 5 minutes per account (live-learned 2026-09-10:
+  // three broadcasts in a row died on the exact node assert). Instead of
+  // burning the maker's budget on doomed retries, the module READS
+  // last_root_post from the chain and waits out the remainder itself.
+  if (!input.replyTo) {
+    const waitSec = await steemRootPostWaitSec();
+    if (waitSec > 0) {
+      await socialMsg(
+        `⏳ ${input.agentName}: השרשרת דורשת הפרש של 5 דקות בין פוסטי-שורש — ממתין ${waitSec} שניות לפני שידור "${input.title.slice(0, 60)}"`,
+        { runId: input.runId },
+      );
+      await new Promise((resolve) => setTimeout(resolve, (waitSec + 2) * 1000));
+    }
+  }
   const built = await buildSteemPostTx(
     { author: COMMANDER_ACCOUNT, title: input.title, body, tags, replyTo: input.replyTo },
     rail === "hive" ? hiveBroadcastAdapter() : undefined, // build ref-block FROM the rail we broadcast to
@@ -453,10 +469,33 @@ interface RawAccount {
   balance: string;
   sbd_balance: string;
   vesting_shares: string;
+  last_root_post?: string;
 }
 
 function num(s: string): number {
   return parseFloat(String(s).split(" ")[0]) || 0;
+}
+
+/**
+ * How many seconds until the chain will accept this account's next ROOT post
+ * (STEEM_MIN_ROOT_COMMENT_INTERVAL = 5 min). Reads last_root_post live from
+ * the chain; 0 = free to broadcast. Probe failure → 0 (let the chain itself
+ * judge — the honest path, never a fake success).
+ */
+const STEEM_ROOT_POST_INTERVAL_SEC = 300;
+async function steemRootPostWaitSec(): Promise<number> {
+  try {
+    const [raw] = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [[COMMANDER_ACCOUNT]]);
+    const stamp = raw?.last_root_post;
+    if (!stamp) return 0;
+    const last = Date.parse(stamp.endsWith("Z") ? stamp : `${stamp}Z`);
+    if (!Number.isFinite(last)) return 0;
+    const elapsed = (Date.now() - last) / 1000;
+    if (elapsed >= STEEM_ROOT_POST_INTERVAL_SEC) return 0;
+    return Math.min(Math.ceil(STEEM_ROOT_POST_INTERVAL_SEC - elapsed), 330);
+  } catch {
+    return 0;
+  }
 }
 
 export interface FleetRewardRow {
@@ -599,4 +638,112 @@ export async function claimRewardsFromAgent(input: {
     await socialMsg(`❌ תביעת-תגמולים של @${account} נכשלה: ${msg} — נרשם בכנות`, {}).catch(() => {});
     throw new GateError("broadcast-failed", `התביעה נכשלה: ${msg}`);
   }
+}
+
+/* ═══ TOPIC RADAR (steem.trends) — what the network actually reads, live ═══
+ * The builders used to write blind — topics picked by feel, not demand.
+ * The radar reads the chain's OWN demand signal: trending tags by payout,
+ * hot discussions by engagement — and derives editorial candidates from it.
+ * Value for the network = content the audience demonstrably reads.
+ * Read-only, public data, no vault. Everything traceable to a live call. */
+
+interface RawTrendingTag {
+  name: string;
+  total_payouts: string;
+  top_posts: string;
+}
+interface RawDiscussion {
+  title: string;
+  author: string;
+  permlink: string;
+  category: string;
+  total_payout_value: string;
+  pending_payout_value: string;
+  children: number;
+  created: string;
+}
+
+export interface TrendingTagRow {
+  tag: string;
+  payoutSteem: number;
+  posts: number;
+}
+export interface HotDiscussionRow {
+  title: string;
+  author: string;
+  permlink: string;
+  category: string;
+  payoutSteem: number;
+  comments: number;
+  ageHours: number;
+}
+export interface TopicCandidate {
+  titleIdeaEn: string;
+  tags: string[];
+  why: string;
+}
+export interface TrendsReport {
+  generatedAt: string;
+  topTags: TrendingTagRow[];
+  hot: HotDiscussionRow[];
+  candidates: TopicCandidate[];
+  summary: string;
+}
+
+function assetNum(v: string): number {
+  const n = parseFloat(String(v ?? "0"));
+  return Number.isFinite(n) ? n : 0;
+}
+
+export async function steemTrends(): Promise<TrendsReport> {
+  const [rawTags, rawHot] = await Promise.all([
+    steemRpc<RawTrendingTag[]>("condenser_api.get_trending_tags", [null, 40]),
+    steemRpc<RawDiscussion[]>("condenser_api.get_discussions_by_trending", [{ limit: 25 }]),
+  ]);
+
+  const topTags: TrendingTagRow[] = (rawTags || [])
+    .filter((t) => t && t.name)
+    .map((t) => ({ tag: t.name, payoutSteem: assetNum(t.total_payouts), posts: parseInt(t.top_posts || "0", 10) || 0 }))
+    .sort((a, b) => b.payoutSteem - a.payoutSteem)
+    .slice(0, 12);
+
+  const now = Date.now();
+  const hot: HotDiscussionRow[] = (rawHot || [])
+    .filter((d) => d && d.author && d.permlink)
+    .map((d) => ({
+      title: (d.title || "(no title)").slice(0, 90),
+      author: d.author,
+      permlink: d.permlink,
+      category: d.category || "steem",
+      payoutSteem: assetNum(d.total_payout_value) + assetNum(d.pending_payout_value),
+      comments: d.children || 0,
+      ageHours: Math.max(0, Math.round(((now - new Date(d.created + "Z").getTime()) / 3_600_000) * 10) / 10),
+    }))
+    .sort((a, b) => b.payoutSteem - a.payoutSteem)
+    .slice(0, 10);
+
+  // candidates — derived from the LIVE scan only, never invented:
+  // the chain's hottest categories, ranked by real payout mass.
+  const catMass = new Map<string, { n: number; payout: number }>();
+  for (const d of hot) {
+    const e = catMass.get(d.category) || { n: 0, payout: 0 };
+    e.n += 1;
+    e.payout += d.payoutSteem;
+    catMass.set(d.category, e);
+  }
+  const rankedCats = [...catMass.entries()].sort((a, b) => b[1].payout - a[1].payout).slice(0, 5);
+  const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+  const candidates: TopicCandidate[] = rankedCats.map(([cat, v]) => ({
+    titleIdeaEn: `${cap(cat)} in practice: what the chain's top-ranked posts this week reveal`,
+    tags: [cat, topTags[0]?.tag, topTags[1]?.tag, "howto"].filter((x): x is string => !!x).slice(0, 5),
+    why: `הקטגוריה "${cat}" מופיעה ${v.n} פעמים ברשימה-החמה החיה עם ~${v.payout.toFixed(1)} SBD תשלומים-מצטברים — ביקוש מהשרשרת, לא ניחוש`,
+  }));
+
+  const hottest = hot[0];
+  const summary =
+    `מכ"ם-נושאים חי מהשרשרת: ${topTags.length} תגיות-חמות (ראשונה: ${topTags[0]?.tag || "—"} עם ~${topTags[0]?.payoutSteem.toFixed(1) ?? "—"} SBD), ` +
+    `${hot.length} דיונים-חמים${hottest ? ` (החם ביותר: "${hottest.title}" של @${hottest.author}, ${hottest.comments} תגובות)` : ""}. ` +
+    `${candidates.length} מועמדויות-נושא נגזרו מהביקוש-החי — הבונים כותבים מה שהרשת קוראת באמת, באנגלית (ניתוב-שפה).`;
+
+  return { generatedAt: new Date().toISOString(), topTags, hot, candidates, summary };
 }
