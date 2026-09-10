@@ -1,4 +1,5 @@
 /**
+export {}; // module scope — global-script tools collide on rpc/main (tsc TS2393, roast r6)
  * ROAST round 3 — FULL history doctrine scan (READ-ONLY).
  * Paginates the ENTIRE blog feed of @headcorner on steem AND hive and runs
  * the doctrine scan on every post's FULL body — quantifying the real scale

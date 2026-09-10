@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+export {}; // module scope — global-script tools collide on rpc/main (tsc TS2393, roast r6)
 /**
  * Saosmartwallet — Chain Health Check
  * ===================================

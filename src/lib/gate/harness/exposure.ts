@@ -141,6 +141,19 @@ const RULES: Rule[] = [
     why: "תוכניות-מוצר שלא יצאו לאור — לא מפרסמים מה לא יצא",
   },
 
+  // ── solicitation (roast r6: the gate never learned its own worst incident) ─
+  // The r2 incident — posts inviting strangers to send STEEM with a memo —
+  // was remediated BY HAND, but no rule was added: the gate kept publishing
+  // the exact pattern that read as an investment pitch to every passer-by.
+  // Now it is a rule: any "send/transfer/deposit <coin> … wallet/memo/address"
+  // phrasing is HIGH and blocked in autonomous publishing.
+  {
+    kind: "solicitation",
+    pattern: /\b(?:send|sending|transfer|transferring|deposit|depositing|contribute|contributing|donate|donating)\s+(?:me\s+|us\s+|to\s+our\s+|directly\s+)?(?:\d+(?:\.\d+)?\s+)?(?:STEEM|SBD|HIVE|HBD|TRX|USDT|ETH|SOL|BTC|BNB)\b[^.?!]{0,140}\b(?:memo|wallet|address|account)\b/i,
+    severity: "high",
+    why: "נראה כפיתוי-העברת-מטבעות (לשלוח מטבע לארנק/מזכר) — דפוס שנקרא כמו בקשת-השקעה מכל קורא; אסור בפרסום-אוטונומי (המפעיל בלבד מכריע עניינים כאלה)",
+  },
+
   // ── addresses (public but not for casual doxxing) ───────────────────────
   {
     kind: "evm-address",
@@ -158,7 +171,10 @@ const RULES: Rule[] = [
 
 const REDACT = (s: string) => `${s.slice(0, 6)}…(${s.length} chars)`;
 
-/** Scan text for exposure risks. Findings are redacted — secrets never echo. */
+/** Scan text for exposure risks. Findings are redacted — secrets never echo.
+ *  roast r6: one finding PER KIND (first redacted sample kept) — 16 identical
+ *  rows for one Hebrew sentence is noise, not evidence; the maker reads the
+ *  report, so the report shows each violation class exactly once. */
 export function scanExposure(...parts: Array<string | undefined | null>): ExposureReport {
   const text = parts.filter((p) => typeof p === "string" && p.length).join("\n");
   const findings: ExposureFinding[] = [];
@@ -172,7 +188,9 @@ export function scanExposure(...parts: Array<string | undefined | null>): Exposu
       const key = `${rule.kind}:${m[0]}`;
       if (!seen.has(key)) {
         seen.add(key);
-        findings.push({ kind: rule.kind, why: rule.why, redacted: REDACT(m[0]) });
+        if (!findings.some((f) => f.kind === rule.kind)) {
+          findings.push({ kind: rule.kind, why: rule.why, redacted: REDACT(m[0]) });
+        }
       }
       if (rule.severity === "high") risk = "high";
       else if (rule.severity === "medium" && risk !== "high") risk = "medium";
