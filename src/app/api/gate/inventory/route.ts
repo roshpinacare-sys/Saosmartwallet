@@ -3,6 +3,7 @@ import { masterReady, setMaster } from "@/lib/gate/crypto";
 import { requireOperator, openSessionMaster } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { verifyAll } from "@/lib/gate/verify";
+import { rotationStatus } from "@/lib/gate/rotation";
 
 export const runtime = "nodejs";
 
@@ -55,7 +56,12 @@ export async function GET() {
     if (steemauto?.runId) {
       steemautoRunStatus = await db.gateRun.findUnique({ where: { id: steemauto.runId }, select: { status: true } }).then((r) => r?.status ?? null);
     }
-    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto ? { ...steemauto, runStatus: steemautoRunStatus } : null });
+    // r16 — the rotation plane's readiness, computed live (sealed owner keys ×
+    // sealed P5 roots vs the CURRENT chain authorities). The custody banner and
+    // the rotation panel render from this — never from stored assumptions.
+    let rotation: Awaited<ReturnType<typeof rotationStatus>> | null = null;
+    try { rotation = await rotationStatus(); } catch { rotation = null; }
+    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto ? { ...steemauto, runStatus: steemautoRunStatus } : null, rotation });
   } catch (e) {
     return fail(e);
   }

@@ -26,7 +26,10 @@
  * serializer.ts evidence notes.
  */
 
-import { ByteReader, ByteWriter, type Asset, packAsset, unpackAsset } from "./serializer";
+import { ByteReader, ByteWriter, SerializationError, type Asset, packAsset, unpackAsset } from "./serializer";
+import bs58 from "bs58";
+import { ripemd160 } from "@noble/hashes/legacy.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 /**
  * Standard Steem operation ids — LEGACY GRAPHENE WIRE TAGS, oracle-proven.
@@ -146,7 +149,8 @@ export type SteemOperationBody =
   | VoteOperation
   | CommentOperation
   | CustomJsonOperation
-  | ClaimRewardBalanceOperation;
+  | ClaimRewardBalanceOperation
+  | AccountUpdateOperation;
 export type SteemOperationName =
   | "transfer"
   | "limit_order_create"
@@ -154,7 +158,88 @@ export type SteemOperationName =
   | "vote"
   | "comment"
   | "custom_json"
-  | "claim_reward_balance";
+  | "claim_reward_balance"
+  | "account_update";
+
+/**
+ * Graphene authority (steemd `authority` struct) — the SOVEREIGN-HAND rotation
+ * plane's currency. Wire layout (fc::raw):
+ *   weight_threshold : u32 LE
+ *   account_auths    : varint count + [varint-string account + u16 weight]*
+ *   key_auths        : varint count + [33-byte compressed pubkey + u16 weight]*
+ * (public_key_type serializes as the RAW 33-byte compressed key — the 4-byte
+ *  checksum exists only in the "STM…" string representation.)
+ */
+export interface SteemAuthority {
+  weight_threshold: number;
+  account_auths: Array<{ account: string; weight: number }>;
+  key_auths: Array<{ pub: string; weight: number }>; // "STM…" string form
+}
+
+/**
+ * account_update (op id 10) — the ONLY op that can move an account's keys.
+ * SOVEREIGN-HAND contract: building this op is mechanical; the vault signs
+ * and broadcasts ONLY on an explicit operator decision (never agent hands).
+ * Wire layout (fc::raw, legacy optional = 1 flag byte then the value):
+ *   account      : varint-string
+ *   owner        : optional<authority>
+ *   active       : optional<authority>
+ *   posting      : optional<authority>
+ *   memo_key     : public_key_type — ALWAYS 33 raw bytes, NO flag byte
+ *                  (node-oracle-proven 2026-09-10: present → the raw key;
+ *                   absent → 33 zero bytes; null → server-side assert error.
+ *                   ⚠ broadcasting zeros would NULL the account's memo key —
+ *                   the rotation plane must always set a real memo key.)
+ *   json_metadata: varint-string
+ * Oracle: bit-exact against the node's own serializer
+ * (condenser_api.get_transaction_hex) — tools/r16-oracle-account-update.ts.
+ */
+export interface AccountUpdateOperation {
+  account: string;
+  owner?: SteemAuthority;
+  active?: SteemAuthority;
+  posting?: SteemAuthority;
+  memo_key?: string; // "STM…" string form; omit → flag 0 (unchanged)
+  json_metadata: string;
+}
+
+/** raw 33-byte compressed graphene key → canonical "STM…" string (bs58check with the 4-byte ripemd160(sha256(…)) trailer). */
+export function grapheneRaw33ToString(raw33: Uint8Array): string {
+  const chk = ripemd160(sha256(raw33)).slice(0, 4);
+  return "STM" + bs58.encode(Buffer.concat([Buffer.from(raw33), Buffer.from(chk)]));
+}
+
+/** "STM…"/"HIVE…"/"BLT…" graphene pub string → raw 33-byte compressed key. */
+export function graphenePubToRaw33(pub: string): Uint8Array {
+  const m = /^(?:STM|HIVE|BLT|TST)([1-9A-HJ-NP-Za-km-z]+)$/.exec(pub);
+  if (!m) throw new SerializationError(`not a graphene public key: ${pub.slice(0, 12)}…`);
+  const raw = bs58.decode(m[1]);
+  if (raw.length !== 37) throw new SerializationError(`graphene pub payload must be 37 bytes, got ${raw.length}`);
+  return raw.slice(0, 33);
+}
+
+function packAuthority(w: ByteWriter, a: SteemAuthority): void {
+  w.u32(a.weight_threshold);
+  w.varint(a.account_auths.length);
+  for (const p of a.account_auths) {
+    w.string(p.account);
+    w.u16(p.weight);
+  }
+  w.varint(a.key_auths.length);
+  for (const k of a.key_auths) {
+    w.bytes(graphenePubToRaw33(k.pub));
+    w.u16(k.weight);
+  }
+}
+
+function packOptionalAuthority(w: ByteWriter, a?: SteemAuthority): void {
+  if (!a) {
+    w.u8(0);
+    return;
+  }
+  w.u8(1);
+  packAuthority(w, a);
+}
 
 /**
  * Internal-market order cancel (M3+ DEX lifecycle closure). Cancels the
@@ -288,6 +373,22 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
       packAsset(w, c.reward_vests);
       return;
     }
+    case "account_update": {
+      const a = body as AccountUpdateOperation;
+      w.varint(OP_IDS.account_update);
+      w.string(a.account);
+      packOptionalAuthority(w, a.owner);
+      packOptionalAuthority(w, a.active);
+      packOptionalAuthority(w, a.posting);
+      if (a.memo_key) {
+        // node-oracle quirk: memo_key has NO optional flag — always 33 raw bytes
+        w.bytes(graphenePubToRaw33(a.memo_key));
+      } else {
+        w.bytes(new Uint8Array(33)); // null key — ⚠ rotation always sets a real memo
+      }
+      w.string(a.json_metadata ?? "");
+      return;
+    }
     default: {
       // Exhaustiveness guard — TypeScript rejects unhandled names at compile time.
       const _never: never = name;
@@ -366,8 +467,38 @@ export function unpackOperation(r: ByteReader): UnpackedOperation {
     const reward_vests = unpackAsset(r);
     return { id, name: "claim_reward_balance", body: { account, reward_steem, reward_sbd, reward_vests } };
   }
+  if (id === OP_IDS.account_update) {
+    const account = r.string();
+    const readAuth = (): SteemAuthority => ({
+      weight_threshold: r.u32(),
+      account_auths: Array.from({ length: r.varint() }, () => ({ account: r.string(), weight: r.u16() })),
+      key_auths: Array.from({ length: r.varint() }, () => ({
+        pub: grapheneRaw33ToString(r.bytes(33)),
+        weight: r.u16(),
+      })),
+    });
+    const readOpt = (): SteemAuthority | undefined => (r.u8() === 1 ? readAuth() : undefined);
+    const owner = readOpt();
+    const active = readOpt();
+    const posting = readOpt();
+    const memoRaw = r.bytes(33);
+    const memoKey = memoRaw.some((b) => b !== 0) ? grapheneRaw33ToString(memoRaw) : undefined;
+    const json_metadata = r.string();
+    return {
+      id,
+      name: "account_update",
+      body: {
+        account,
+        owner,
+        active,
+        posting,
+        memo_key: memoKey,
+        json_metadata,
+      },
+    };
+  }
   throw new Error(
-    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5), "limit_order_cancel" (6), "vote" (0), "comment" (1), "custom_json" (18) and "claim_reward_balance" (40); ` +
+    `unsupported operation id ${id} — deserializer implements "transfer" (2), "limit_order_create" (5), "limit_order_cancel" (6), "vote" (0), "comment" (1), "custom_json" (18), "claim_reward_balance" (40) and "account_update" (10); ` +
       `extend packOperation/unpackOperation before parsing other op types`,
   );
 }

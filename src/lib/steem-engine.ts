@@ -20,3 +20,6 @@ export {
   type LimitOrderCreateOperation,
   type LimitOrderCancelOperation,
 } from "../../packages/chains/steem/src/operations";
+
+export { deserializeTransaction } from "../../packages/chains/steem/src/transaction";
+export { OP_IDS as STEEM_OP_IDS, type SteemAuthority, type AccountUpdateOperation, graphenePubToRaw33, grapheneRaw33ToString } from "../../packages/chains/steem/src/operations";
