@@ -2,12 +2,12 @@ import { db } from "@/lib/db";
 import { masterReady, setMaster } from "@/lib/gate/crypto";
 import { requireOperator, openSessionMaster } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
-import { importOwnerKeys, rotationStatus, previewRotation, executeRotation } from "@/lib/gate/rotation";
+import { importOwnerKeys, rotationStatus, previewRotation, executeRotation, executeActivePlaneRotation } from "@/lib/gate/rotation";
 
 export const runtime = "nodejs";
 
-/** POST /api/gate/rotation — operator-only SOVEREIGN-HAND plane (gap-58, r16).
- *  actions: "status" | "import" | "preview" | "rotate"
+/** POST /api/gate/rotation — operator-only SOVEREIGN-HAND plane (gap-58, r16 · r17).
+ *  actions: "status" | "import" | "preview" | "rotate" | "rotate-active"
  *  The vault signs the one op that moves keys (account_update) ONLY on this
  *  explicit operator call; agents never reach here. */
 export async function POST(req: Request) {
@@ -40,6 +40,12 @@ export async function POST(req: Request) {
       const account = String(body.account || "").trim().toLowerCase();
       if (!account) return fail(new Error("נדרש account"));
       const r = await executeRotation(account);
+      return ok(r);
+    }
+    if (action === "rotate-active") {
+      const account = String(body.account || "").trim().toLowerCase();
+      if (!account) return fail(new Error("נדרש account"));
+      const r = await executeActivePlaneRotation(account);
       return ok(r);
     }
     return fail(new Error(`פעולה לא מוכרת: ${action}`));

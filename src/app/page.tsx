@@ -980,19 +980,16 @@ function VaultGrid() {
             <div className="flex items-start gap-3">
               <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" aria-hidden />
               <div className="text-sm leading-relaxed">
-                <p className="font-semibold text-amber-300">שליטת-תגמולים — האמת החיה פר-חייל ({controlMatrix.length} נבדקו on-chain)</p>
+                <p className="font-semibold text-amber-300">שליטת-הרשת — האמת החיה ({controlMatrix.length} נבדקו on-chain)</p>
                 <p className="text-zinc-400 mt-1">
-                  <b className="text-emerald-400">{controlMatrix.length - steemOrphans.length}/{controlMatrix.length}</b> חיילים נשלטים מלא גם על steem.
-                  <b className="text-amber-300"> {steemOrphans.length}</b> נותרו בלי owner/active/posting חי על steem.
-                  r16 — אמת-השרשרת (פער-59): הרוטציה החוץ-מערכתית של 2026-09-08T21:33Z (ynet: 09-04) סובבה <b className="text-amber-300">owner בלבד</b> — chain-proven (last_owner_update; last_active/last_post_update = 1970). המפתחות-החיים החדשים נמסרו למפעיל בצ'אט ולא נשמרו באף מקור; active/posting/memo של החיילים הם מפתחות-יצירה מ-2018 שמעולם לא היו בידינו:
+                  <b className="text-emerald-400">r17 — האמת המדודה (chain-proven):</b> הצי על steem מאוחד תחת גזירת-ROT1 מזרע-האם SAOS-ROT1 (מקור: קובץ-השחזור שלך, הד.txt — החיווט הוכח מכנית והשרשרת אישרה 44/48 authorities חיים):
+                  סבב-הרוטציה הושלם על-ידי הקומנד-סנטר היום (owner+active+posting+memo × 11 חשבונות), והכספת אטמה כל מפתח-חי עם אימות-חי באותה-קריאה ({steemOrphans.filter((r) => r.name !== "ynet").length} חיילים נשלטים מהכספת).
+                  <b className="text-amber-300"> החריג היחיד: ynet</b> — המפתחות-החיים שלו (FULL-4 מ-09-04, op 9defc295…) אצל המפעיל:
                   <span className="font-mono text-[11px] text-amber-200/90" dir="ltr"> {steemOrphans.map((r) => r.name).join(", ")}</span>.
                 </p>
                 <p className="text-zinc-400 mt-1">
-                  r16 — סיסמאות-האב (P5) של <b className="text-emerald-400">12 חשבונות</b> נאטמו בכספת והוכחו חי מול השרשרת (כולל שורש-headcorner מ-upload/הד.txt — השרשרת עצמה הוכיחה 4/4 על blurt): הן גוזרות
-                  בדיוק את ה-authorities הנוכחיים על <b className="text-emerald-400">hive</b>{" "}
-                  ({steemOrphans.filter((r) => r.rails.includes("hive")).length}) ועל <b className="text-emerald-400">blurt</b>{" "}
-                  ({steemOrphans.filter((r) => r.rails.includes("blurt")).length}) — וכולל <b className="text-emerald-400">ynet@blurt: שליטה מלאה owner+active+posting+memo</b>{" "}
-                  (ynet לא היה נשלט באף רשת עד עכשיו). חומר-מת אחד נאטם בכנות (אין-התאמה חיה על אף רשת).
+                  על <b className="text-emerald-400">hive</b>: 9 חשבונות תחת שורשי-D1(P5) + tov/headcorner תחת גזירת-ROT1 — ועל <b className="text-emerald-400">blurt</b>: 12/12 תחת שורשי-D1(P5)
+                  (כולל ynet@blurt: שליטה מלאה). 12 סיסמאות-אב P5 נאטמות (אחת מתה בכנות) + זרע-האם SAOS-ROT1 נאטם — שני-שורשי-הגזירה בכספת, כל-החומר-החי ניתן-לניהול.
                   דלתות-פרסום חוץ-מיושנות (steemauto, שירות צד-שלישי 2017) אותרו על 9 חשבונות-hive + ynet@steem — {(() => {
                     const s = inv?.steemautoProposal;
                     if (!s) return <span className="text-zinc-400">אין כרגע הצעה פתוחה לסגירתן.</span>;
@@ -1009,16 +1006,16 @@ function VaultGrid() {
                     return <span className="text-zinc-400">ההצעה פגתה במדיניות — דורשת הגשה-מחדש.</span>;
                   })()}
                   {(() => {
-                    // r16 — the rotation plane line: computed from the API's live readiness
+                    // r17 — the rotation plane line: computed from the API's live readiness
                     const rot = inv?.rotation;
                     if (!rot) return null;
                     return (
                       <span className="block mt-1">
-                        <b className="text-lime-300">מישור-רוטציית account_update חי (פער-58):</b> הדבקת מפתחי-owner של החיילים → אימות-חי → חתימה ושידור שמציב את שורשי-D1 בכל ארבעת ה-authorities — steem מתאחד עם hive+blurt על אותו שורש. מוכן-מכנית עכשיו: <b className="text-lime-300">{rot.readyCount}/{rot.targets.length}</b> ({rot.targets.filter((t) => t.ready).map((t) => t.account).join(", ") || "—"}) · הדבקת-מפתחות ורוטציה בפאנל "חיבור-steem" למטה.
+                        <b className="text-lime-300">מישור-רוטציית account_update (רק-מפעיל):</b> הכספת מחזיקה עכשיו את המפתחות-החיים של הצי (גזירת-ROT1, אומתו-חי) — רוטציית-owner לשורשי-D1 (איחוד מלא עם hive+blurt) אפשרית מכנית עבור <b className="text-lime-300">{rot.readyCount}/{rot.targets.length}</b> חשבונות ({rot.targets.filter((t) => t.ready).map((t) => t.account).join(", ") || "—"}) — ההחלטה שלך בלבד, בפאנל "חיבור-steem" למטה. ⚓ האטימה-r17: בלוק 109469449 (קודמת: r12 · 109465716).
                       </span>
                     );
  })()}
-                  עוגן-סופי על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">saos.vault.anchor.v1 · block 109465716 · tx 95a33fcb…</span>
+                  עוגני-האמת על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">r17 · block 109469449 · tx d4b33aa3… (prior: r12 · block 109465716 · tx 95a33fcb…)</span>
                 </p>
               </div>
             </div>
