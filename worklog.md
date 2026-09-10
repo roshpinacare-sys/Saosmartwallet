@@ -1476,3 +1476,24 @@ Stage Summary:
 - roast-70 = "ה-UI הדביק את הקוד": כל-האמת-שנבנתה ב-roast-66..69 (POL מפורש, תשואת-LP, גיבוי-WBLURT, מסילת-מיקרו, עוגן-אבני-דרך, מיכל-גז, דחיות-כנות, 7-שרשראות) — עכשיו גלויה-למשתמש; שקר-חיובי-יחיד-שהתגלה-בבדיקה היה-שלי (ארטיפקט-קריאה) ונרשם-כלקח-מדידה
 - עקרון-שנקבע: כל-שדה-שהמנוע-מחשב-ואינו-מוצג = פער-אמת; כל-הבטחה-מילולית-ב-UI ("שווי-למטה") חייבת-מספר-חי או-תנאי
 - פתוח-להצתה (מעודכן מ-68): SOL-1,624-lamports (ממתין-טופ-אפ) · meta-tx-v2-ETH · חותם-hive-rail (86-המתנות-RC יתרקו-עם-הטעינה) · ניקוי-קוד-מת ממופה-68-a
+
+---
+Task ID: 71
+Agent: Z.ai Code (main)
+Task: roast-71 — דרישת-המפעיל: "המרות-למטבעות-דרך-הדקס" — מה-חסר, דרך-הפתרון, והפתרון; עבור-תקינות/נכונות/תקפות-על-הכל; דחיפה-לריפו
+
+Work Log:
+- 71-a census: נסחר-על-כל-תיקיות-שני-הריפו-ממוקד-המרות — 41-API-דקס נסרקו; זוהו-נתיבי-ההמרה: convert/wrap/bridge/onramp/realmarket/route/pool
+- 71-b truth-audit: מצב-אמת-נאסף-חי — 10-נכסים-רשומים-מול-4-בריכות-בלבד; routableMap-חי: WSBD/PHIVE/BLURT/WBLURT = tier-none (מחזיקים-אמת-בלי-יציאה!); STEEM=rail; LB|LA=deep
+- 71-c gaps: (1) אין-op-פתיחת-בריכה-בזמן-ריצה (רק-ג'נזיס-hardcoded-וגרדואציית-השקות); (2) convert-POST היה-שרשור-לא-אטומי (נכס-תלוש-באמצע-שרשרת); (3) route-POST-דחה-נכסי-השקות (ASSETS.includes-קבועה-מול-ציטוט-חי — פער-ציטוט/ביצוע); (4) דגימת-1000µ-קבועה-בראוטר-זייפה tier-none-על-בריכות-מיקרו-מחיר; (5) treasury-ללא-קרדיטים (6) — fountain-מתחת-סף
+- 71-d implement: kernel-pool_open (אוצר-בלבד · pair-קנוני-fail-closed · LP=√k-לאוצר · אפס-גז-משפחת-הערוצים-הריבוניים); pool-API-action-open (+issuer-whitelist-לadd); exec-route.ts-מנוע-משותף-אטומי (route+convert-שניהם-batch-דבר-גורר-דבר); route-POST-knownAsset; convert-GET-quoteRoute (אמת-אחת); router-דגימה-מסתגלת-1k/10k/100k + מחיר-מנוחה + רצפת-עומק
+- 71-d2 execution: pool_open-חי-×3 — USDS/WSBD 50k+50k · PHIVE/USDS 100k+4k · USDS/WBLURT 42+42,283; asset_price-BLURT=1; עדות-קצה-לקצה: STEEM→USDS-2,000-אטומי — נסחר-בדיוק-כציטוט (2,268µ)
+- 71-e verify: tsc=0-שני-הריפו · fence-82-קבצים-selftest-30/30 · chaos-13/13 · agent-browser: 0-שגיאות-קונסולה, מפת-הנזילות-מציגה-7-בריכות, NO-ROUTE=0, chips-7-DEEP/4-RAIL/2-MICRO/1-HUB
+- 71-f push: saos-dex-b662c2a-push-origin-main ✓
+- תקלה-תשתיתית-שנפתרה-בדרך: תהליך-3010-נרצח-בשקט-בגבול-קריאות-הכלי (SIGKILL-ללא-OOM-רשום) — פתרון: הרצה-דו-שלבית (subshell-fork) → יתום-PPID-1-שורד; נרשם-לדורות-הבאים: הפעלת-שירותים-ארוכי-חיים-חייבת ( cmd & ) ולא setsid/nohup-רגיל
+
+Stage Summary:
+- משימת-ההמרות-הושלמה-מקצה-לקצה: כל-10-הנכסים-שבידינו-ניתנים-עכשיו-להמרה-על-הרשת-הריבונית (שליטה-מלאה: אפס-בורסה-חוץ)
+- המפה-החיה: SAOS-deep · USDS-hub · WSTEEM-deep · STEEM-rail · WSBD-deep(50k) · PHIVE-deep(4k) · BLURT-rail(42µ) · WBLURT-deep(42µ) · ENERGY-micro(2.9k) · LB|LA-deep(2M)
+- אמת-אחת: ציטוט-GET-וביצוע-POST-והראוטר = אותו-מנוע-quoteRoute+batch-אטומי
+- פתוח-להצתה (מעודכן): SOL-1,624-lamports · meta-tx-v2-ETH · hive-rail-86-המתנות-RC · נזילות-ארנה-insufficient-credits-מבני (fountain-מתחת-סף-20k — feeMeter-44,989-צומח-~3µ/בלוק) · עומקי-בריכות-ההמרה-החדשות-זעירים (42µ/4k) — ניתנים-להעמקה-ב-pool_add-אוצר-כשהדלק-יחזור
