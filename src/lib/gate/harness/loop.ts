@@ -34,7 +34,7 @@
  */
 import { db } from "@/lib/db";
 import { GateError } from "@/lib/gate/crypto";
-import { brainChat, parseBrain, type ChatMsg } from "./brain";
+import { brainChat, parseBrain, pickCheckerBrain, type ChatMsg } from "./brain";
 import { getModule, modulesForPrompt, type ModuleCtx } from "./modules";
 import { workerId, claimRun, stillMine, renewLease, LEASE_MS, LEASE_CLEAR } from "./lease";
 import { emitEvent } from "./events";
@@ -374,7 +374,41 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
   await db.gateAgent.updateMany({ where: { name: run.agentName }, data: { lastSeenAt: new Date() } });
 
   try {
-    const makerSpec = parseBrain(run.brain);
+    // r14 — brain failover on recovery: a run that crashed once usually died
+    // to its brain's ENVIRONMENT, not its plan (proven live: the zai:default
+    // fleet starved on sustained 429 windows — 18 failed — while nvidia
+    // delivered 37 done; and a re-queued anchor-agent run died to the SAME
+    // 429 wall on attempt 2 — retrying on the starved brain is deterministic
+    // failure). A recovered run (attempt ≥ 2) now flips its maker to a
+    // different brain by a deterministic map, recomputes the checker when the
+    // stored one would collide with the effective maker (generator/evaluator
+    // separation must survive the switch), and records the switch honestly in
+    // meta + a lesson that rides into the maker's own prompt.
+    const baseSpec = parseBrain(run.brain);
+    const FAILOVER_MAKER: Record<string, string> = {
+      "zai:default": "nvidia:openai/gpt-oss-20b",
+      "nvidia:openai/gpt-oss-20b": "nvidia:deepseek-ai/deepseek-v4-flash-0731",
+      "nvidia:deepseek-ai/deepseek-v4-flash-0731": "nvidia:openai/gpt-oss-20b",
+    };
+    let makerSpec: ReturnType<typeof parseBrain> = baseSpec;
+    let checkerSpec = run.checker;
+    let brainFailoverNote: string | null = null;
+    if (recovering) {
+      const fromKey = `${baseSpec.provider}:${baseSpec.model}`;
+      const to = FAILOVER_MAKER[fromKey];
+      if (to && to !== fromKey) {
+        makerSpec = parseBrain(to);
+        const cb = parseBrain(run.checker);
+        if (cb.provider === makerSpec.provider && cb.model === makerSpec.model) {
+          checkerSpec = pickCheckerBrain(to);
+        }
+        const fromMeta = (() => { try { return JSON.parse(run.meta || "{}") as Record<string, unknown>; } catch { return {} as Record<string, unknown>; } })();
+        fromMeta.brainFailover = { from: fromKey, to, attempt };
+        await db.gateRun.update({ where: { id: runId }, data: { meta: JSON.stringify(fromMeta), checker: checkerSpec } }).catch(() => {});
+        lessons.push(`brain-failover: attempt ${attempt} runs on ${to} instead of ${fromKey} — the original brain failed in its environment (usually a sustained 429 window), not in its plan`);
+        brainFailoverNote = `🧠 החלפת-מוח (failover): attempt ${attempt} רץ על ${to} במקום ${fromKey} — המוח-המקורי נכשל בסביבתו, לא בתוכנית`;
+      }
+    }
 
     /** One maker turn (brain call), with the free protocol-rescue. Returns null after unrecoverable garbage. */
     async function makerTurn(userContent: string): Promise<{ call: MakerCall | null; rescued: boolean }> {
@@ -485,7 +519,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     /* ── independent verdict (ALWAYS — the maker can't grade itself) ── */
     let verdict: CheckerVerdict | null = null;
     try {
-      verdict = await runChecker({ checkerSpec: run.checker, goal: run.goal, doneMeans, steps });
+      verdict = await runChecker({ checkerSpec, goal: run.goal, doneMeans, steps });
       steps.push({ i: steps.length + 1, side: "checker", ok: verdict.done, result: verdict, at: new Date().toISOString() });
       await saveRun(runId, { steps, verdict });
     } catch (e) {
@@ -511,7 +545,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
       }
       if (leaseLost) return;
       try {
-        const verdict2 = await runChecker({ checkerSpec: run.checker, goal: run.goal, doneMeans, steps });
+        const verdict2 = await runChecker({ checkerSpec, goal: run.goal, doneMeans, steps });
         steps.push({ i: steps.length + 1, side: "checker", ok: verdict2.done, result: verdict2, at: new Date().toISOString() });
         verdict = verdict2;
         await saveRun(runId, { steps, verdict });
@@ -541,7 +575,8 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     } else if (recovering) {
       lines.push("🫀 התאוששות-מקריסה — העקבות חודשו מה-DB");
     }
-    lines.push(`⚖️ פסיקת בודק עצמאי (${run.checker}): ${verdict ? (verdict.done ? "עבר את שער-המעבר — כל הקריטריונים הוכחו" : "לא הוכח — פתוח") : "הבודק לא ענה"}`);
+    if (brainFailoverNote) lines.push(brainFailoverNote);
+    lines.push(`⚖️ פסיקת בודק עצמאי (${checkerSpec}): ${verdict ? (verdict.done ? "עבר את שער-המעבר — כל הקריטריונים הוכחו" : "לא הוכח — פתוח") : "הבודק לא ענה"}`);
     if (verdict?.checks?.length) {
       lines.push(...verdict.checks.map((c) => `${c.pass ? "✅" : "❌"} ${c.criterion}${c.evidence ? " — " + c.evidence.slice(0, 160) : ""}`));
     }
