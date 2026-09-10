@@ -1437,3 +1437,27 @@ Stage Summary:
 - הפער-השביעי נחתך: "מחובר להכל" שאל שתי רשתות בסקריפט שלא היה מסוגל מבנית לזהות התאמה בשלישית. האמת הייתה על השרשרות — 44 מפתחות שלטו על blurt והכספת סימנה אותם unverified.
 - המצב החי: כל שלוש מסילות-הגרפן חיות ומאומתות מול עצמן (בייטים, לא תוויות); מסילת-פרסום שלישית פתוחה fail-closed; EVM/TRON/SOL עם עדות-רשת אמיתית; הסוויפ לא ממציא כשלים (0 נכשלו); 83/97 מאומתות עם עדות-שרשרת, 14 כנות "ללא בדיקה".
 - קבצים: src/lib/gate/{verify,key-id}.ts · src/lib/social/rails-server.ts · src/lib/gate/harness/social.ts · src/app/api/gate/inventory/route.ts · src/app/page.tsx · src/lib/eco-registry.ts · docs/{roast-audit,publishing-network}.md · tools/r10-{vault-truth,crosschain-authority,blurt-digest-oracle,blurt-wire-check,steem-control,final-truth,api-sweep}.ts · worklog.md.
+
+---
+Task ID: 27
+Agent: Z.ai Code (main)
+Task: ROAST r11 — "בחן את הזיפ של steem בתיקית-הזיפים בגיטהאב · אתר את ארנקי-הטרון של החיילים · צריך להיות להם גם SOL/ETH ועוד · תבדוק מה לא הוכנס וקיים · לוודא שליטת-תגמולים על כל החשבונות · למי חסר owner אמיתי · תמשיך ודחוף · תאתר עוד ממצאים"
+
+Work Log:
+- הורד `steem-main (1).zip` (24.4MB) מ-repo Project-files; חולץ ונסרק פורנזית (sovereign/node, agent/, .zscripts).
+- אותר MASTER-KEYS-RECOVERY-2026-09-09.md ב-/tmp (שרד את הנפילה) — פוענח מבנה §1–8.
+- אותר KEYS-ZIP-2026-09-10.zip.enc ב-repo steem; sha256 מאומתים (241bbb5c/b85b544d); פוענח דרך סיסמת-המשמורת ב-recovery-meta.json לפי הוראת-המפעיל; חולץ ל-/tmp בלבד (אף-דבר לא נכנס ל-git).
+- tools/r11-reconcile.ts: זרע §3 גוזר 12/12 את §4 ואת הכספת (EVM/TRON/SOL) ו-0/12 את המניפסט-המעוגן-הישן; מנמוניק #2 פוגע ב-6 כתובות-הגשר; pk↔addr 24/24.
+- tools/r11-part2.ts + חיפוש-בינארי בבלוקים: **העוגן-החי ב-block 109370910 (2026-09-07T12:02, digest 4442c2b9…) הוא גזירת-הזרע-הנוכחי כולל BTC** — הזהות-הציבורית תואמת-שליטה; עוגן-05:03 הוא דור-מת.
+- tools/r11-control-matrix.ts: מטריצת-סמכויות steem חיה — headcorner מלא 4/4; 10 החיילים + ynet **אפס-התאמה**; יתרות-חי לכל משפחות-הארנקים (TRON/ETH/SOL/BTC + גשר + sov-doors + הדור-הישן).
+- tools/r11-keyszip-truth.ts: vault.json של KEYS-ZIP == אותו חומר-מפתח — שולט live ב-hive (9 חיילים × 4) וב-blurt (10 × 4, כולל tov), לא ב-steem; ynet/headcorner ריקים בו; registry-KEYS-ZIP = הרישום-הפרטי החי (12×4+pks, בלי pks-BTC — באג-ידוע של הזיפ).
+- tools/r11-seal.ts: פתיחת-master דרך keySeal חי (owner key של headcorner, מ-upload בזמן-ריצה); וידוא זרע-כספת==זרע-KEYS-ZIP; איטום +12 btc-key, +6 tron-bridge, הערות-משמורת ל-40 שורות-חיילים, שורת-ynet honest-null, ואימות-חי של 10 טרון-חיילים (tov/wog הושלמו ב-r11-tron-retry).
+- verify.ts: מסילת-BTC מלאה (P2WPKH bech32 BIP-173 — התיקון-המכני: hrp-expand HIGH-0-LOW; האורקל: האנקודר-של-הזיפ נתן את הכתובות-המאומתות) + probe mempool.space→blockstream + טיפול operator-custody (null-כן, לא "failed").
+- inventory/route.ts: bitcoin ב-summary; page.tsx: **באנר-שליטת-תגמולים חי פר-חייל** (0/11 steem · hive 9 · blurt 10 — מחושב מהסריקה, לא מטענה), שורת-rails עם BTC, ShieldAlert.
+- סכימה: הערות-kind/chain/role/status עודכנו לתיעוד האמת (btc-key, bitcoin, bridge-*, operator-custody).
+- דפדפן: 116 כניסות, 0 נכשלו, באנר חי, מסנן bitcoin(12), מובייל 390px אפס-גלילה, פוטר טבעי, אפס שגיאות. tsc 0 · lint 0.
+
+Stage Summary:
+- הפער-השמיני: "שליטה" מוגדרת עכשיו פר-חייל/רשת/תפקיד ונמדדת חי. זרע-ריבוני אחד (מוכח זהה בשלושה-מקורות) שולט ב-48 גזירות של 12 חיילים על פני 10 רשתות (EVM×7, TRON, SOL, BTC) — כולל ה-BTC שהיה מעוגן-ציבורית וחסר-בכספת, ומשפחת-הגשר עם ה-TRX-החי שהייתה חוץ-כספתית לגמרי.
+- החור-הכן שנותר: מפתחוה-החיים של steem ל-10 החיילים ול-ynet אצל המפעיל (רוטציית 09-08 21:33Z on-chain) — הכספת מחזיקה את החומר שעדיין שולט ב-hive+blurt ומציגה את החור בבאנר-חי; עוגן-05:03 (זרע-A) נשאר דור-מת ללא-יתרות.
+- קבצים: src/lib/gate/verify.ts · src/app/api/gate/inventory/route.ts · src/app/page.tsx · prisma/schema.prisma · tools/r11-{reconcile,part2,control-matrix,keyszip-truth,seal,tron-retry}.ts · docs/roast-audit.md · worklog.md · db/custom.db.

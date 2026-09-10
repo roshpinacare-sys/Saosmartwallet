@@ -27,15 +27,15 @@ model GateConfig {
 // Every secret/key lives here ENCRYPTED. priv bytes never leave server unencrypted.
 model VaultEntry {
   id         String    @id @default(cuid())
-  kind       String // steem-key | evm-key | tron-key | sol-key | mnemonic | token | note
-  chain      String? // steem | hive | ethereum | tron | solana | github | infra
-  account    String? // headcorner, cashmachine, ...
-  role       String? // owner | active | posting | memo | wallet | infrastructure
+  kind       String // steem-key | evm-key | tron-key | sol-key | btc-key | mnemonic | token | note
+  chain      String? // steem | hive | blurt | ethereum | tron | solana | bitcoin | github | infra | sovereign
+  account    String? // headcorner, cashmachine, ..., tron-bridge
+  role       String? // owner | active | posting | memo | wallet | bridge-sender | bridge-relay | bridge-squad-2..5 | infrastructure
   pub        String? // derived public key / address (not secret)
   encPriv    String // hex — AES-256-GCM(private material, masterKey)
   privIv     String // hex
   privTag    String // hex
-  status     String // verified | rotated-out | unverifiable | imported
+  status     String // verified | rotated-out | unverified | unverifiable | imported | operator-custody
   verifyNote String?
   source     String? // upload-file | agent-env | vault-json | operator-input | registry
   verifiedAt DateTime?
