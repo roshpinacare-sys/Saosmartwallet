@@ -29,6 +29,7 @@ import { db } from "@/lib/db";
 import { masterReady } from "@/lib/gate/crypto";
 import { processRun, buildLessons } from "./loop";
 import { parseBrain, pickCheckerBrain } from "./brain";
+import { revokeDeviceRows, DEVICE_WARN_DAYS } from "@/lib/gate/device";
 import { workerId, claimRun, LEASE_MS } from "./lease";
 import { expireStaleOrders } from "./orders";
 import { steemMarket } from "@/lib/steem-server";
@@ -57,6 +58,9 @@ interface HeartPulse {
   // which code the heart actually executes, right now.
   boot?: { pid: number; bootedAt: string; codeSha: string };
   counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number };
+  // ROAST r9 gap-37 — the heart now SEES the trust surface it manages:
+  // live trusted devices, ones nearing expiry, and what hygiene did this beat.
+  devices?: { live: number; expiringSoon: number; reaped: number; warned: number };
   loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>;
   error?: string;
 }
@@ -199,6 +203,78 @@ async function stageReap(p: HeartPulse): Promise<void> {
 
 function dayKeyNow(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/* ══════════════════ device hygiene — the trust surface manages itself (r9) ══════════════════
+ *
+ * gap-30: expired devices used to sit in the DB forever as "פעילים" — counted
+ * by the UI, rejected by deviceMaster, never cleaned. gap-34: the 90-day
+ * contract expired silently — no warning, no renewal nudge. Now every beat:
+ *   1. REAP expired devices → revoked + SCRUBBED (ciphertext leaves the DB)
+ *   2. WARN ≤7 days before expiry → once per device per day (GateState watermark)
+ * Bounded, fail-closed, Hebrew-confessing — like every heart stage.
+ */
+const DEVICE_HYGIENE_KEY = "device-hygiene";
+
+export async function runDeviceHygiene(): Promise<{ reaped: number; warned: number; live: number; expiringSoon: number }> {
+  const now = new Date();
+  // 1. reap expired — the same scrub path the API uses (inert by data, not flag)
+  const expired = await db.gateDevice.findMany({
+    where: { revoked: false, expiresAt: { lt: now } },
+    select: { id: true, label: true },
+    take: 20,
+  });
+  let reaped = 0;
+  for (const d of expired) {
+    const r = await revokeDeviceRows({ id: d.id }, null, "פג-תוקף — נגרע אוטומטית עם הצופן");
+    reaped += r.devices;
+  }
+
+  // 2. warn before expiry — one message per device per day, bounded
+  const horizon = new Date(now.getTime() + DEVICE_WARN_DAYS * 86_400_000);
+  const expiring = await db.gateDevice.findMany({
+    where: { revoked: false, encMaster: { not: null }, expiresAt: { gte: now, lte: horizon } },
+    select: { id: true, label: true, expiresAt: true },
+    orderBy: { expiresAt: "asc" },
+    take: 20,
+  });
+  let warned = 0;
+  if (expiring.length) {
+    const stateRow = await db.gateState.findUnique({ where: { key: DEVICE_HYGIENE_KEY } });
+    let marks: Record<string, string> = {};
+    try { marks = stateRow ? (JSON.parse(stateRow.value) as Record<string, string>) : {}; } catch { marks = {}; }
+    let dirty = false;
+    for (const d of expiring) {
+      const last = marks[d.id] ? Date.parse(marks[d.id]) : 0;
+      if (now.getTime() - last < 86_400_000) continue; // one nudge per day
+      const days = Math.max(0, Math.ceil((d.expiresAt.getTime() - now.getTime()) / 86_400_000));
+      await db.gateMessage.create({
+        data: { channel: "command", fromKind: "system", fromName: "harness", body: `⏳ מכשיר-מהימן "${d.label}" יפוג בעוד ${days} יום/ימים — היכנס בו וחמש מכשיר חדש (רוטציה), או שלול אם אינו בשימוש` },
+      }).catch(() => {});
+      marks[d.id] = now.toISOString();
+      dirty = true;
+      warned++;
+    }
+    if (dirty) {
+      const value = JSON.stringify(marks);
+      await db.gateState.upsert({ where: { key: DEVICE_HYGIENE_KEY }, create: { key: DEVICE_HYGIENE_KEY, value }, update: { value } });
+    }
+  }
+
+  const live = await db.gateDevice.count({ where: { revoked: false, encMaster: { not: null }, expiresAt: { gt: now } } });
+  const expiringSoon = await db.gateDevice.count({ where: { revoked: false, encMaster: { not: null }, expiresAt: { gte: now, lte: horizon } } });
+  return { reaped, warned, live, expiringSoon };
+}
+
+async function stageDeviceHygiene(p: HeartPulse): Promise<void> {
+  const r = await runDeviceHygiene();
+  p.devices = { live: r.live, expiringSoon: r.expiringSoon, reaped: (p.devices?.reaped ?? 0) + r.reaped, warned: (p.devices?.warned ?? 0) + r.warned };
+  if (r.reaped > 0) {
+    p.loops.hygiene = { lastAt: new Date().toISOString(), ok: true, fired: r.reaped };
+    await db.gateMessage.create({
+      data: { channel: "command", fromKind: "system", fromName: "harness", body: `🧹 היגיינת-מכשירים: ${r.reaped} מכשירים פגי-תוקף נשללו והצופנים שלהם נמחקו מה-DB` },
+    }).catch(() => {});
+  }
 }
 
 async function stageSchedules(p: HeartPulse): Promise<void> {
@@ -660,6 +736,7 @@ export async function tickOnce(): Promise<HeartPulse> {
       await ensureTriggerPolicy().catch((e) => { console.error("[heart] ensureTriggerPolicy failed:", e?.message ?? e); /* policy sync must never stall the beat */ });
       const stages: [string, () => Promise<void>][] = [
         ["reaper", () => stageReap(p)],
+        ["hygiene", () => stageDeviceHygiene(p)],
         ["scheduler", () => stageSchedules(p)],
         ["triggers", () => stageTriggers(p)],
         ["initiative", () => stageProposals(p)],

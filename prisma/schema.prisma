@@ -54,6 +54,10 @@ model GateSession {
   scopes     String // JSON array of account@chain scopes
   encMaster  String? // JSON {ct,iv,tag} — the master key sealed under scrypt(token, sealSalt): lets the session itself re-open the vault (view keys) even after a server restart, without ever storing the token
   sealSalt   String? // hex — per-session salt for the token-derived KEK
+  // ROAST r9 gap-33: sessions minted by a device login used to be orphans —
+  // revoking the device left the doors it opened alive for up to 30 days.
+  // viaDevice links a session to its origin device so revocation closes them.
+  viaDevice  String? // GateDevice.id — set when the session was minted via a trusted-device login
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
   expiresAt  DateTime
@@ -179,8 +183,11 @@ model GateDevice {
   id         String   @id @default(cuid())
   label      String // human-readable ("Chrome · Android")
   tokenHash  String   @unique // sha256 of the device token — raw token never stored server-side
-  encMaster  String // JSON Seal — master key sealed under scrypt(deviceToken, deviceSalt)
-  deviceSalt String // hex — per-device salt for the token-derived KEK
+  // ROAST r9 gap-31: revocation used to keep the sealed master in the DB and
+  // rely on a boolean flag — "inert" was one UPDATE away from alive. Now a
+  // revoke SCRUBS the ciphertext + salt to null: inert by data, not by flag.
+  encMaster  String? // JSON Seal — master key sealed under scrypt(deviceToken, deviceSalt); null after revoke (scrubbed)
+  deviceSalt String? // hex — per-device salt for the token-derived KEK; null after revoke (scrubbed)
   createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
   expiresAt  DateTime

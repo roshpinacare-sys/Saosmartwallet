@@ -1392,3 +1392,24 @@ Work Log:
 Stage Summary:
 - הפער-החמישי נחתך: מה מגיע למוח (r7) → מה בכלל רץ עכשיו (r8). שלושה נתיבי-מוות-אילמים סגורים (catch פנימי r7 · reaper מותש r8 · watchdog-לולאה r8), האורקל-השקרן תוקן, והדופק נושא את זהות-הקוד-החיה שלו. ביקורת שבודקת את עצמה: כלי-האמת של r5/r7 נתפסו שוקרים גם הפעם — ותוקנו בראיה-חיה.
 - קבצים: src/lib/gate/harness/{heart,loop}.ts · tools/{r5-db-truth,r8-quota-probe}.ts · docs/roast-audit.md · worklog.md · db/custom.db.
+
+---
+Task ID: 25
+Agent: Z.ai Code (main)
+Task: ROAST r9 — "בבחן את כל הטענות שלך בדף מכשירים": ביקורת-אדיברסרית של מישור-המכשירים, קטלוג 9 סתירות (30–38), הפיכת המישור לאוטונומי-מנהל-עצמו, דחיפה.
+
+Work Log:
+- פורנזיה חיה (tools/r9-device-probe.ts): 7 שורות GateDevice — השורה-השלולה qtc1mlt7 עדיין נשאה encMaster=210ch (הוכחת-פער 31); 3 סשנים חיים בלי קשר-מוצא למכשיר (פער 33); 6 מכשירים חיים למפעיל יחיד בלי תקרה (פער 35); שכפולי-זהות 3×Edge/3×Chrome (פער 34).
+- מיגרציית-סכימה: GateDevice.encMaster/deviceSalt → nullable (שטיפה=מחיקה פיזית); GateSession.viaDevice (קישור סשן→מכשיר); db:push.
+- device.ts נכתב מחדש: revokeDeviceRows (נתיב-שלילה אחד: revoke+scrub+סגירת-סשנים-דרך-המכשיר עם שמירת-הקורא, הודעת-גשר כנה), armDevice עם רוטציה-במקום (טוקן-חי → אותה שורה, טוקן חדש, 90 יום), enforceDeviceCap (DEVICE_MAX_LIVE=10, גריעת-הוותיק), nextEvictionCandidate (קריאה-בלבד להוכחה), deviceMaster null-safe.
+- נתיבים: device/route (GET כנות: live/daysLeft/liveCount/expiringSoon/cap; POST רוטציה; DELETE מרכזי) · device/login (viaDevice + חשיפת-דלת-אחת) · device/forget (scrub) · reset (scrub בשחזור-חירום) · session.ts (createSession viaDevice + currentSessionTokenHash).
+- heart.ts: שלב-`hygiene` בכל פעימה — גריעת-פגי-תוקף (scrub) + התראה 7 ימים לפני פקיעה (מודעה-אחת-ליום, watermark ב-GateState) + מוני-מכשירים בדופק (gap 37); runDeviceHygiene מיוצא להוכחה.
+- page.tsx: ספירת-חיים כנה, באג'י "פג-תוקף — ייגרע" / "יפוג בעוד X יום" / "נשלל · צופן נמחק", כפתור "חמש מכשיר זה מחדש" (רוטציה), פסקת-אבטחה כנה (מחיקת-צופן, סגירת-דלתות, השער-הפתוח כמישור-נפרד), תיקון קוד-המת 38 (deviceRejected) + טוסט-וידוי לדחיית-מכשיר בכל מסך.
+- סביבה: ה-reaper הרג את השרת + ה-watchdog פעמיים בזמן העבודה; הודלק מחדש — והלב החי החדש (pid 11442) הריץ את ההיגיינה בעצמו (לקח r8 מיושם); הכלי מחכה לשרת (waitServer).
+- tools/r9-device-truth.ts: 9/9 הוכחות ✅ עם אפס-נזק-צד (חתימת-שורות לפני/אחר); רמדיאציה-היסטורית שטפה את השורה-השלולה הישנה; גבול-כן מוצהר (device/login לא API-חי — revokeOtherSessions גלובלי; viaDevice הוכח ברמת-DB).
+- דפדפן (agent-browser): סעיף 08 "7 מכשירים פעילים" כנה, טוסט-הדחייה נצפה חי (טוקן-מזויף → 400 → טוסט), אפס שגיאות, פוטר טבעי gap=0, מובייל 390px אפס-גלילה-אופקית. tsc 0 · lint 0 · docs/roast-audit.md ראונד 9.
+
+Stage Summary:
+- הפער-השישי נחתך: המערכת טענה שהיא מנהלת אמון — ולא ניהלה אפילו את הזיכרון שלו. פגי-תוקף נספרו "פעילים", שלילה הייתה דגל (הצופן נשאר ב-DB), הדלתות שמכשיר פתח נשארו פתוחות 30 יום, החוזה פג בשקט, והאזהרה היחידה הייתה קוד-מת שהשער-הפתוח בלע.
+- עכשיו מישור-המכשירים חי בתוך הלב: גורע פגי-תוקף עם הצופן, מתריע 7 ימים מראש, מגביל את משטח-האמון ב-10, חודש ברוטציה במקום שכפול, סוגר דלתות בשלילה (ומשאיר את המפעיל בפנים), ומדווח על עצמו בדופק החי.
+- קבצים: prisma/schema.prisma · src/lib/gate/{device,session}.ts · src/lib/gate/harness/heart.ts · src/app/api/gate/device/{route,login,forget}.ts · src/app/api/gate/reset/route.ts · src/app/page.tsx · tools/{r9-device-probe,r9-device-truth}.ts · docs/roast-audit.md · worklog.md · db/custom.db.

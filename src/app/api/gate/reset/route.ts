@@ -79,8 +79,10 @@ export async function POST(req: Request) {
     // ── 4. swap the vault contents atomically ─────────────────────────────
     await db.$transaction(async (tx) => {
       await tx.vaultEntry.deleteMany();
-      // a NEW master invalidates every trusted device's sealed copy — revoke them all
-      await tx.gateDevice.updateMany({ where: { revoked: false }, data: { revoked: true } });
+      // a NEW master invalidates every trusted device's sealed copy — revoke
+      // them all. ROAST r9 gap-31: revocation SCRUBS the ciphertext + salt —
+      // the old sealed masters physically leave the DB, not just a flag.
+      await tx.gateDevice.updateMany({ where: { revoked: false }, data: { revoked: true, encMaster: null, deviceSalt: null } });
       await tx.gateConfig.update({
         where: { id: "gate" },
         data: {

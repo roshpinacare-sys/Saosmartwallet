@@ -22,7 +22,7 @@ export interface SessionInfo {
   canOpenMaster: boolean; // session carries a sealed master (or one is in memory)
 }
 
-export async function createSession(kind: string, name: string, scopes: string[], master?: Buffer): Promise<string> {
+export async function createSession(kind: string, name: string, scopes: string[], master?: Buffer, viaDevice?: string): Promise<string> {
   const token = randomToken(32);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 3600 * 1000);
   let encMaster: string | null = null;
@@ -33,7 +33,9 @@ export async function createSession(kind: string, name: string, scopes: string[]
     encMaster = JSON.stringify(s);
   }
   await db.gateSession.create({
-    data: { tokenHash: sha256hex(token), kind, name, scopes: JSON.stringify(scopes), encMaster, sealSalt, expiresAt },
+    // ROAST r9 gap-33: the session remembers WHICH device minted it, so that
+    // revoking that device can close the doors it opened (bounded, disclosed).
+    data: { tokenHash: sha256hex(token), kind, name, scopes: JSON.stringify(scopes), encMaster, sealSalt, viaDevice: viaDevice || null, expiresAt },
   });
   const jar = await cookies();
   jar.set(GATE_COOKIE, token, {
@@ -113,6 +115,17 @@ export async function requireOperator(): Promise<SessionInfo> {
   const s = await getSession();
   if (!s || s.kind !== "operator") throw new GateError("operator-only", "פעולה זו מותרת למפעיל-מחובר בלבד");
   return s;
+}
+
+/**
+ * ROAST r9 — the CURRENT caller's token hash (or null outside a request).
+ * Device revocation keeps the operator's own session alive (he is the one
+ * holding the console) while killing the sessions minted via the revoked
+ * device from OTHER browsers — the stolen-laptop door closes, his stays open.
+ */
+export async function currentSessionTokenHash(): Promise<string | null> {
+  const token = await currentToken();
+  return token ? sha256hex(token) : null;
 }
 
 export async function revokeSession() {
