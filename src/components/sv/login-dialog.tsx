@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LogIn, Eye, EyeOff, ShieldCheck, Wallet, PenLine, ArrowRight } from 'lucide-react';
+import { LogIn, Eye, EyeOff, ShieldCheck, Wallet, KeyRound, ArrowRight } from 'lucide-react';
 
 export interface ChallengeT { nonce: string; message: string; digest: string }
 
@@ -68,9 +68,11 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
 
         {step === 'connect' ? (
           <div className="space-y-4" data-testid="connect-step">
+            {/* FIX(Roast-65-e4 · F6): כנות-מלאה — הוכחת-החזקה מול-סמכויות-השרשרת, אין-חתימה-קריפטוגרפית;
+                תוקן-גם-המשפט-המשובש-הכפול שהיה-כאן */}
             <p className="text-[12px] text-[color:var(--text-2)] leading-relaxed">
-              התחברות-מאומתת אל הטוקן שלנו: השרת מנפיק אתגר-התחברות חד-פעמי, והמפתח שלך מאומת מול הסמכויות על השרשרת
-              חד-פעמי, אתה מאשר אותו עם המפתח, והסשן <span className="text-[color:var(--text-1)] font-semibold">נשאר מחובר 30 יום</span> (דו-נשא: cookie מאובטח + Bearer).
+              התחברות-מאומתת: השרת מנפיק אתגר-התחברות חד-פעמי, והמפתח שלך מאומת מול הסמכויות על-השרשרת
+              (הוכחת-החזקה — אין-חתימה). אחרי-האימות נפתח סשן ש<span className="text-[color:var(--text-1)] font-semibold">נשאר מחובר 30 יום</span> (דו-נשא: cookie מאובטח + Bearer).
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -109,13 +111,15 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
           <div className="space-y-4" data-testid="sign-step">
             <div className="rounded-xl border border-[color:var(--line)] bg-black/30 p-3 max-h-40 overflow-y-auto" data-testid="challenge-box">
               <div className="flex items-center gap-1.5 text-[10px] text-[color:var(--text-3)] mb-2">
-                <PenLine className="w-3 h-3" /> אתגר-התחברות · nonce חד-פעמי
+                {/* FIX(Roast-65-e4 · F6): אין-חתימה — הסרת-אייקון-PenLine (תיאטרון-חתימה) */}
+                <KeyRound className="w-3 h-3" /> אתגר-התחברות · nonce חד-פעמי
                 <span className="dx-num text-[color:var(--text-3)]" dir="ltr">{challenge?.digest.slice(0, 16)}…</span>
               </div>
               <pre className="text-[10.5px] leading-relaxed text-[color:var(--text-2)] whitespace-pre-wrap font-data" dir="rtl">{challenge?.message}</pre>
             </div>
             <div className="space-y-1.5">
-              <label className="label-caps" htmlFor="login-wif">מפתח-פרטי (WIF) — כדי לאשר את האתגר</label>
+              {/* FIX(Roast-65-e4 · F6): ה-WIF אינו "מאשר-את-האתגר" (אין-חתימה) — הוא מאומת מול-הסמכויות */}
+              <label className="label-caps" htmlFor="login-wif">מפתח-פרטי (WIF) — מאומת מול סמכויות-השרשרת (אין-חתימה)</label>
               <div className="relative">
                 <Input id="login-wif" type={showWif ? 'text' : 'password'} value={wif} onChange={e => setWif(e.target.value)} placeholder="5K... / L... / K..." className="dx-input font-data h-10 pl-10" dir="ltr" data-testid="connect-wif" />
                 <button type="button" onClick={() => setShowWif(!showWif)} className="absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--text-3)] hover:text-[color:var(--text-1)]" aria-label={showWif ? 'הסתר מפתח' : 'הצג מפתח'}>

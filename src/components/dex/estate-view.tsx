@@ -116,9 +116,12 @@ export function EstateView() {
               <div className="text-[12px] font-bold mb-2">איתריום — תשובה ישירה</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-3">
                 <div className="dx-raised rounded-lg p-2.5">
+                  {/* FIX(Roast-65-e4 · F16): הנזילות-מהשדה-החי inDexLiquidity — לא-עוד "0 ETH" מקודד */}
                   <div className="text-[9.5px] text-[color:var(--text-3)]">נזילות-ETH בתוך ה-DEX</div>
-                  <div className="dx-num font-bold text-[color:var(--red)]">0 ETH</div>
-                  <div className="text-[9px] text-[color:var(--text-3)]">אין שוק-ETH — כנות מלאה</div>
+                  <div className={`dx-num font-bold ${data.cashOut.eth.inDexLiquidity > 0 ? 'text-[color:var(--amber)]' : 'text-[color:var(--red)]'}`}>
+                    {data.cashOut.eth.inDexLiquidity.toPrecision(3)} ETH
+                  </div>
+                  <div className="text-[9px] text-[color:var(--text-3)]">{data.cashOut.eth.inDexLiquidity > 0 ? 'נזילות-ETH חיה בבריכות-הדקס' : 'אין שוק-ETH — כנות מלאה'}</div>
                 </div>
                 <div className="dx-raised rounded-lg p-2.5">
                   <div className="text-[9.5px] text-[color:var(--text-3)]">ETH אמיתי באחוזה</div>
@@ -258,8 +261,9 @@ export function EstateView() {
             </div>
             <div className="mt-3 flex items-start gap-2 text-[10.5px] text-[color:var(--text-3)] leading-relaxed">
               <ArrowUpRight className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[color:var(--amber)]" />
+              {/* FIX(Roast-65-e4 · F16): הוסרה תגית-העבודה-הפנימית "FIX(Roast-63):" שדלפה לטקסט-משתמש */}
               <span>
-                FIX(Roast-63): המפתחות-הפרטיים נשמרים-מוצפנים-בכספת-וכתובות-הארנקים-נגזרות-מהם-בעת-הסריקה (נגזרת-כתובת = בעלות-מוכחת מבלי-לחשוף-מפתח); טענת-"אימות-חתימה-מלא" לא-נכללת-כאן-יותר כי-אין-לה-מסלול-קוד-בריפו-זה.
+                המפתחות-הפרטיים נשמרים-מוצפנים-בכספת-וכתובות-הארנקים-נגזרות-מהם-בעת-הסריקה (נגזרת-כתובת = בעלות-מוכחת מבלי-לחשוף-מפתח); טענת-"אימות-חתימה-מלא" לא-נכללת-כאן-יותר כי-אין-לה-מסלול-קוד-בריפו-זה.
                 מסילות-העיגון של Solana ו-Ethereum כבר חיות על ארנק-cashmachine.
               </span>
             </div>

@@ -14,10 +14,10 @@ import { getToken } from '@/components/sv/shared';
 import { Input } from '@/components/ui/input';
 import {
   type World, type RouteQuote, TOKEN_META, TokenMedallion, DEX_ASSETS,
-  fmtMu, fmtPrice, fmtBps, dxPost, routeQuote, walletBal, MU,
+  fmtMu, fmtPrice, fmtBps, dxPost, routeQuote, walletBal, usePoll, StaleChip, MU,
 } from './common';
 
-type CtaState = 'empty' | 'no-route' | 'review' | 'submitting' | 'queued' | 'error';
+type CtaState = 'empty' | 'no-route' | 'quoting' | 'review' | 'submitting' | 'queued' | 'error';
 
 const SLIP_PRESETS = [
   { label: 'אוטומטי', value: 0.5 },
@@ -54,13 +54,15 @@ export function SwapView({ world, online, onNeedAuth }: {
   const balOut = world ? walletBal(world, 'operator', assetOut) : 0;
 
   // ── live quote (GET, read-only) — כל-ה-setState אחרי מיקרו-משימה ──
+  // FIX(Roast-65-e4 · F5): ביטול-ציטוט בשינוי-סכום/נכס — הציטוט-הישן נמחק מיד, ה-CTA ננעל
+  // על "מחשב מסלול…" עד-שמתקבל-ציטוט-חדש (לא-עוד minOut של סכום-קודם על-המסך).
   useEffect(() => {
     let alive = true;
     const run = async () => {
       await Promise.resolve();
       if (!alive) return;
-      if (!amountMu || assetIn === assetOut) { setQuote(null); setQuoting(false); return; }
-      setQuoting(true);
+      if (!amountMu || assetIn === assetOut) { setQuote(null); setQuoting(false); setCta('empty'); setReviewOpen(false); return; }
+      setQuote(null); setQuoting(true); setCta('quoting'); setReviewOpen(false);
       const j = await routeQuote(assetIn, assetOut, amountMu);
       if (!alive) return;
       setQuoting(false);
@@ -92,7 +94,19 @@ export function SwapView({ world, online, onNeedAuth }: {
     return (1 - outPerIn / midRatio) * 100;
   }, [quote, amountMu, world, outPerIn]);
 
-  const feeMu = quote ? Math.floor(quote.amountOutMu * 0.003) : 0;
+  // FIX(Roast-65-e4 · F4): עמלה-אמת-מהמסלול — feeBps לכל-רגל-בריכה (מהציטוט כשהשרת מספק,
+  // אחרת מהבריכות-החיות ב-/state); בלי-נתון → '—'. הוסרה הטענה-הקבועה 30bps/0.30%.
+  const feeText = useMemo(() => {
+    if (!quote) return null;
+    const parts: string[] = [];
+    for (const leg of quote.legs) {
+      if (leg.kind !== 'pool') continue;
+      const bps = leg.feeBps ?? world?.pools.find(p => p.key === leg.venue.slice(5))?.feeBps;
+      if (bps == null) return null; // כנות: אין-נתון-עמלה → '—'
+      parts.push(`≈${fmtMu(Math.floor((leg.inMu * bps) / 10000))} ${leg.from} (${(bps / 100).toFixed(2)}%)`);
+    }
+    return parts.length ? parts.join(' + ') : null;
+  }, [quote, world]);
 
   function flip() {
     setAssetIn(assetOut); setAssetOut(assetIn); setAmountStr('');
@@ -104,6 +118,8 @@ export function SwapView({ world, online, onNeedAuth }: {
   }
 
   async function doConfirm() {
+    // FIX(Roast-65-e4 · F5): אישור-רק-על-ציטוט-חי-עדכני — אין-שליחת-minOut של ציטוט-ישן
+    if (!quote || quoting) return;
     setReviewOpen(false);
     setCta('submitting'); setErrNote('');
     const payload = smartRoute
@@ -114,7 +130,8 @@ export function SwapView({ world, online, onNeedAuth }: {
       : await dxPost('swap', { pair: `${assetIn}/${assetOut}`, assetIn, amount: amountMu, minOut: minOutMu });
     if (j.ok) {
       setCta('queued'); setLastQueuedAt(Date.now());
-      setTimeout(() => setCta('review'), 6000);
+      // FIX(Roast-65-e4 · F5): ההשבה-לאחר-6ש׳ לא תדרוס מצב-חדש (למשל quoting בעקבות-שינוי-סכום)
+      setTimeout(() => setCta(c => (c === 'queued' ? 'review' : c)), 6000);
     } else {
       setCta('error');
       setErrNote(
@@ -139,6 +156,7 @@ export function SwapView({ world, online, onNeedAuth }: {
   const ctaLabel: Record<CtaState, string> = {
     empty: 'הזן סכום',
     'no-route': 'אין נזילות לזוג הזה',
+    quoting: 'מחשב מסלול…',
     review: 'סקירת החלפה',
     submitting: 'שולח…',
     queued: 'הוגש — ייכלל בבלוק הבא',
@@ -269,11 +287,12 @@ export function SwapView({ world, online, onNeedAuth }: {
             </div>
             <div className="dx-detail flex items-center justify-between">
               <span className="text-[color:var(--text-2)] flex items-center gap-1">
-                עמלת רשת (30bps)
+                {/* FIX(Roast-65-e4 · F4): עמלה-אמת-מהמסלול — התווית-הקבועה "30bps" הוסרה */}
+                עמלות-בריכות במסלול
                 <Info className="w-3 h-3" />
               </span>
               <span className="dx-num text-[color:var(--text-1)]">
-                ≈{fmtMu(feeMu)} {assetOut} <span className="text-[color:var(--text-3)]">(70% LP · 30% אוצר)</span>
+                {feeText ?? '—'} {feeText && <span className="text-[color:var(--text-3)]">(70% LP · 30% אוצר)</span>}
               </span>
             </div>
             <div className="dx-detail flex items-center justify-between">
@@ -371,7 +390,8 @@ export function SwapView({ world, online, onNeedAuth }: {
                 </button>
               </div>
               <p className="text-[11px] text-[color:var(--text-2)] mt-2 leading-relaxed">
-                מסלול-חכם: הראוטר מפרק לרגליים ומבצע הכל-או-כלום עם minOut לכל-רגל. בריכה ישירה: סוואג' יחיד בבריכת 30bps.
+                {/* FIX(Roast-65-e4 · F4): הוסרה הטענה-הקבועה "בריכת 30bps" — העמלה-דינמית */}
+                מסלול-חכם: הראוטר מפרק לרגליים ומבצע הכל-או-כלום עם minOut לכל-רגל. בריכה ישירה: סוואג' יחיד בבריכה — העמלה-הדינמית-חי מוצגת-בכרטיס-ההחלפה.
               </p>
             </div>
           </div>
@@ -434,8 +454,9 @@ export function SwapView({ world, online, onNeedAuth }: {
             <div className="dx-detail flex justify-between"><span className="text-[color:var(--text-2)]">מסלול</span><span className="dx-num">{quote?.legs.length} רגליים · {smartRoute ? 'ראוטר אטומי' : 'בריכה ישירה'}</span></div>
             <div className="dx-detail flex justify-between"><span className="text-[color:var(--text-2)]">אחריות</span><span>minOut fail-closed — נדחה אם המחיר זז</span></div>
           </div>
-          <button onClick={doConfirm} className="dx-cta w-full h-12 text-[15px]" data-testid="swap-confirm">
-            אישור החלפה
+          {/* FIX(Roast-65-e4 · F5): האישור-פעיל רק עם ציטוט-חי-עדכני */}
+          <button onClick={doConfirm} disabled={!quote || quoting} className="dx-cta w-full h-12 text-[15px] disabled:opacity-50" data-testid="swap-confirm">
+            {quoting ? 'מחשב מסלול…' : 'אישור החלפה'}
           </button>
         </DialogContent>
       </Dialog>
@@ -482,20 +503,15 @@ function CowPanel({ world, onNeedAuth, defaultBase, defaultQuote, defaultPrice }
     if (!priceTouched && defaultPrice > 0) setPriceStr(String(defaultPrice));
   }
 
-  useEffect(() => {
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/cow', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        const j = (await r.json()) as CowData;
-        if (!stop && j.ok) setCow(j);
-      } catch { /* offline */ }
-      if (!stop) timer = setTimeout(poll, 3000);
-    };
-    poll();
-    return () => { stop = true; clearTimeout(timer); };
-  }, []);
+  // FIX(Roast-65-e4 · F7): לולאת-CoW (3ש׳) דרך-usePoll — השהיה-בהסתרת-טאב + backoff-jitter + חיווי-נתונים-ישנים
+  const cowStale = usePoll(async () => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/cow', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const j = (await r.json()) as CowData;
+      if (j.ok) { setCow(j); return true; }
+      return false;
+    } catch { return false; }
+  }, 3000);
 
   // FIX(Roast-63 · M4): הקלט-ביחידות-תצוגה → מומר-ל-µ (היה-נבלע-כµ-גולמי: הקלדת-2.5-שלחה-2µ)
   const priceMu = Math.floor((parseFloat(priceStr) || 0) * MU);
@@ -536,6 +552,7 @@ function CowPanel({ world, onNeedAuth, defaultBase, defaultQuote, defaultPrice }
 
       {/* form */}
       <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-3 mb-3">
+        {cowStale && <StaleChip className="mb-2" />}
         <div className="flex gap-1.5 mb-2" role="group" aria-label="צד ההזמנה">
           <button onClick={() => setSide('buy')} className={`h-8 px-3 rounded-lg text-[11px] font-bold ${side === 'buy' ? 'bg-[color:var(--green)]/20 text-[color:var(--green)] border border-[color:var(--green)]/40' : 'text-[color:var(--text-3)] border border-[color:var(--line)]'}`} data-testid="cow-side-buy">קנייה</button>
           <button onClick={() => setSide('sell')} className={`h-8 px-3 rounded-lg text-[11px] font-bold ${side === 'sell' ? 'bg-[color:var(--red)]/20 text-[color:var(--red)] border border-[color:var(--red)]/40' : 'text-[color:var(--text-3)] border border-[color:var(--line)]'}`} data-testid="cow-side-sell">מכירה</button>

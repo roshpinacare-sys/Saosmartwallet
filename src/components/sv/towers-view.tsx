@@ -107,7 +107,11 @@ function Watchtower({ saos, onSealed }: { saos: SaosStatus | null; onSealed: () 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* kernel selftest */}
         <section className="sv-card p-4">
-          <TowerHeader icon={ShieldCheck} title="בדיקת-עצמי של הגרעין" sub="7 בדיקות-תכונה: דטרמיניזם · GAS · dedupe · שימור-ערך · fail-closed" />
+          {/* FIX(Roast-65-e4 · F3): המספר והרשימה חיים-מה-API (kernel.checks) — לא-עוד "7 בדיקות" מקודד */}
+          <TowerHeader icon={ShieldCheck} title="בדיקת-עצמי של הגרעין"
+            sub={kernel
+              ? `${kernel.checks.length} בדיקות-תכונה: ${kernel.checks.map(c => c.name).join(' · ')}`
+              : 'רשימת-הבדיקות-נטענת-מה-API — הרץ selftest לספירה ולתוצאות-חי'} />
           <button onClick={runKernel} disabled={kernelBusy} className="h-9 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-[12px] font-bold transition-colors inline-flex items-center gap-2">
             {kernelBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
             {kernelBusy ? 'מריץ...' : 'הרץ selftest'}

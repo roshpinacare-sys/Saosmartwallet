@@ -19,7 +19,7 @@ import { SettingsView } from '@/components/sv/settings-view';
 import { getToken, storeToken, authHeaders, fmtAgo } from '@/components/sv/shared';
 import type { StatusData, ChatMsg, TaskT, AuditRow, SaosStatus } from '@/components/sv/shared';
 import { TopNav, MobileNav, type ViewId } from '@/components/dex/nav';
-import { useDexWorld, fmtInt } from '@/components/dex/common';
+import { useDexWorld, usePoll, StaleChip, fmtInt } from '@/components/dex/common';
 import { SwapView } from '@/components/dex/swap-view';
 import { ProView } from '@/components/dex/pro-view';
 import { PoolsView } from '@/components/dex/pools-view';
@@ -54,8 +54,9 @@ export default function SovereignDex() {
     try {
       const r = await fetch('/api/saos/status', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) setSaos(j);
-    } catch { /* offline */ }
+      if (j.ok) { setSaos(j); return true; }
+      return false;
+    } catch { return false; }
   }, []);
 
   // Personal system: everything is readable WITHOUT login; mutations need a
@@ -67,10 +68,12 @@ export default function SovereignDex() {
     return true;
   }, []);
 
-  const refresh = useCallback(async () => {
+  // FIX(Roast-65-e4 · F7): הלולאות המחזוריות עברו ל-usePoll — השהיה-בהסתרת-טאב, backoff-עם-jitter,
+  // ושבב "נתונים-ישנים" במקום catch-שקט. הפונקציות עצמן נשארות-זמינות לאירועי-socket ולפעולות-משתמש.
+  const refresh = useCallback(async (): Promise<boolean> => {
     try {
       const r = await fetch('/api/vault/status', { cache: 'no-store', headers: authHeaders() });
-      if (!r.ok) { setBooted(true); return; }
+      if (!r.ok) { setBooted(true); return false; }
       const j = await r.json();
       if (j.ok) {
         setStatus(j);
@@ -81,23 +84,27 @@ export default function SovereignDex() {
           setLoginMsg({ ok: false, text: 'תוקף החיבור פג או בוטל — התחבר שוב עם כל מפתח. הכספת נשמרת מוצפנת ושלמה.' });
           setLoginOpen(true);
         }
+        return true;
       }
-    } catch { /* offline */ }
-    setBooted(true);
+      return false;
+    } catch { return false; }
+    finally { setBooted(true); }
   }, []);
 
-  const refreshChat = useCallback(async () => {
+  const refreshChat = useCallback(async (): Promise<boolean> => {
     try {
       const r = await fetch('/api/chat', { cache: 'no-store', headers: authHeaders() });
-      if (r.ok) { const j = await r.json(); if (j.ok) setMessages(j.messages); }
-    } catch { /* */ }
+      if (r.ok) { const j = await r.json(); if (j.ok) { setMessages(j.messages); return true; } }
+      return false;
+    } catch { return false; }
   }, []);
 
-  const refreshTasks = useCallback(async () => {
+  const refreshTasks = useCallback(async (): Promise<boolean> => {
     try {
       const r = await fetch('/api/task', { cache: 'no-store', headers: authHeaders() });
-      if (r.ok) { const j = await r.json(); if (j.ok) setTasks(j.tasks); }
-    } catch { /* */ }
+      if (r.ok) { const j = await r.json(); if (j.ok) { setTasks(j.tasks); return true; } }
+      return false;
+    } catch { return false; }
   }, []);
 
   const refreshAudit = useCallback(async () => {
@@ -109,24 +116,31 @@ export default function SovereignDex() {
 
   // boot + socket + intervals
   useEffect(() => {
-    const boot = setTimeout(() => { refresh(); refreshChat(); refreshTasks(); refreshAudit(); refreshSaos(); }, 0);
+    // FIX(Roast-65-e4 · F7): הרענונים-המדוגמים (vault/chat/task) רצים-דרך-usePoll; כאן נשארים רק החד-פעמיים
+    const boot = setTimeout(() => { refreshAudit(); refreshSaos(); }, 0);
     const sock = io('/?XTransformPort=3003', { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 8, timeout: 8000 });
     sock.on('connect', () => setRelay(true));
     sock.on('disconnect', () => setRelay(false));
     sock.on('chat', (m: ChatMsg) => setMessages(prev => (prev.some(x => x.id === m.id) ? prev : [...prev, m])));
-    sock.on('vault', () => refresh());
-    sock.on('task', () => refreshTasks());
-    sock.on('agent', () => refresh());
-    sock.on('guard', () => refresh());
+    sock.on('vault', () => void refresh());
+    sock.on('task', () => void refreshTasks());
+    sock.on('agent', () => void refresh());
+    sock.on('guard', () => void refresh());
     return () => { clearTimeout(boot); sock.close(); };
   }, [refresh, refreshTasks, refreshSaos]);
 
+  // FIX(Roast-65-e4 · F7): 3-לולאות-הסקירה (8ש׳) — usePoll: השהיה-בטאב-נסתר + backoff + stale-chip.
+  // הקריאות-המיידיות-באבחתה מגיעות-מה-tick-הראשון של-usePoll; ה-boot-טיימאאוט משאיר רק את refreshAudit/refreshSaos.
+  const vaultStale = usePoll(refresh, 8000);
+  const chatStale = usePoll(refreshChat, 8000);
+  const tasksStale = usePoll(refreshTasks, 8000);
+  const pollStale = vaultStale || chatStale || tasksStale;
+
   useEffect(() => {
     if (!authed) return;
-    const t = setInterval(() => { refresh(); refreshChat(); refreshTasks(); }, 8000);
-    const v = setInterval(() => { fetch('/api/vault/verify', { method: 'POST', headers: authHeaders() }).then(() => refresh()).catch(() => { }); }, 300000);
-    return () => { clearInterval(t); clearInterval(v); };
-  }, [authed, refresh, refreshChat, refreshTasks]);
+    const v = setInterval(() => { fetch('/api/vault/verify', { method: 'POST', headers: authHeaders() }).then(() => void refresh()).catch(() => { }); }, 300000);
+    return () => { clearInterval(v); };
+  }, [authed, refresh]);
 
   // ── actions ──
   async function doLogin(account: string, chain: string, wif: string, nonce: string) {
@@ -180,16 +194,30 @@ export default function SovereignDex() {
     await refresh();
   }
 
-  async function sendChat(content: string) {
-    if (needAuth()) return;
-    await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ content }) });
-    refreshChat();
+  // FIX(Roast-65-e4 · F18): sendChat/createTask מדווחים-כישלון (false) — OpsView שומר-את-הקלט
+  // ומציג-שגיאה במקום לבלוע-את-הכשל ולנקות-קלט בכל-מקרה.
+  async function sendChat(content: string): Promise<boolean> {
+    if (needAuth()) return false;
+    try {
+      const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ content }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { await refreshChat(); return true; }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
-  async function createTask(title: string, assignedTo: string) {
-    if (needAuth()) return;
-    await fetch('/api/task', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title, assignedTo }) });
-    refreshTasks();
+  async function createTask(title: string, assignedTo: string): Promise<boolean> {
+    if (needAuth()) return false;
+    try {
+      const r = await fetch('/api/task', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ title, assignedTo }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) { await refreshTasks(); return true; }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   async function registerAgent(name: string, caps: string) {
@@ -215,6 +243,13 @@ export default function SovereignDex() {
     <div className="flex-1 flex flex-col min-h-screen">
       <TopNav view={view} onNavigate={setView} status={status} world={world} online={online} relay={relay} authed={authed}
         onLogin={() => { setLoginMsg(null); setLoginOpen(true); }} onLogout={doLogout} />
+
+      {/* FIX(Roast-65-e4 · F7): חיווי-כן כשלולאות-הסקירה נכשלו — הנתונים-על-המסך ישנים */}
+      {pollStale && (
+        <div className="mx-auto w-full max-w-[1400px] px-3 md:px-6 pt-2">
+          <StaleChip show />
+        </div>
+      )}
 
       <main key={view} className="flex-1 w-full max-w-[1400px] mx-auto px-3 md:px-6 pt-14 md:pt-6 pb-24 md:pb-8 animate-rise">
         {view === 'swap' && (

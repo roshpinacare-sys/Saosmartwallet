@@ -1,10 +1,14 @@
-// Vault status — full control matrix (public keys only, never plaintext)
-// + live on-chain balances for every chain account (cached, stale-while-revalidate).
-// READ is public (personal system — the owner wanted no entrance blocker);
-// every MUTATION stays owner-session protected.
+// Vault status — TWO-TIER by auth (FIX Roast-65-b · M4):
+//  · anonymous → minimal {ok, me:null, counts-only} — אפס מטריצת-מפתחות (byAccount),
+//    אפס fingerprints, אפס יתרות-חיות, אפס רוסטר-סוכנים, אפס ספירת-סשנים.
+//    היה: חבילת-recon שלמה לתוקף אנונימי (65-b MED-4).
+//  · owner (requireOwner) → המטריצה-המלאה + יתרות-חיות (מפתחות-ציבוריים בלבד,
+//    לעולם לא plaintext). ה-shape לא שונה עבור ה-UI המחובר — page.tsx שולח
+//    authHeaders() ו-vault-view/ops-view/settings-view קוראים את התגובה המאומתת.
+// כל MUTATION נשאר owner-session protected.
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { sessionFrom } from '@/lib/auth';
+import { sessionFrom, requireOwner } from '@/lib/auth';
 import { getAccount } from '@/lib/chain';
 
 const BAL_TTL_MS = 180_000; // refresh balances at most every 3 minutes
@@ -27,6 +31,32 @@ async function refreshBalances(accounts: string[]): Promise<void> {
 export async function GET(req: NextRequest) {
   const session = await sessionFrom(req);
   if (session && session.scope !== 'owner') return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 });
+
+  // FIX(Roast-65-b · M4): fail-closed — המטריצה-המלאה רק מאחורי requireOwner
+  // (לא מספיק session.scope='owner' — requireOwner מאמת גם את זהות-המפעיל).
+  const owner = await requireOwner(req);
+
+  if (!owner) {
+    // אנונימי/טוקן-פג: ספירות-בלבד + מכלים-ריקים. המכלים-הריקים נשמרים בשביל
+    // תאימות-shape מלאה ל-UI (ops-view קורא status?.agents.filter, settings-view
+    // קורא status?.guard.ownerLock) — אפס-מידע, בלי לשבור רינדור אנונימי.
+    const keys = await db.vaultKey.findMany({ select: { account: true, verified: true } });
+    return NextResponse.json({
+      ok: true,
+      me: null,
+      totals: {
+        keys: keys.length,
+        verified: keys.filter(k => k.verified).length,
+        accounts: new Set(keys.map(k => k.account)).size,
+      },
+      byAccount: {}, // ריק — אין מלאי-מפתחות לאנונימי
+      balances: {}, // ריק — אין יתרות-חיות לאנונימי
+      guard: { ownerLock: true, note: '', updatedAt: null }, // תצוגת-ברירת-מחדל fail-closed
+      agents: [], // ריק — אין רוסטר-סוכנים לאנונימי
+      sessions: null, // ספירת-סשנים = recon — לא נחשפת
+      tasksOpen: null,
+    });
+  }
 
   const keys = await db.vaultKey.findMany({ orderBy: [{ account: 'asc' }, { chain: 'asc' }, { role: 'asc' }] });
   const guard = await db.guardState.findUnique({ where: { id: 'singleton' } });

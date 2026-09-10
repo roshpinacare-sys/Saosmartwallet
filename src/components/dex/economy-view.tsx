@@ -3,14 +3,14 @@
 // ─── EconomyView — הכלכלה המטורפת: veSAOS · Revenue-Router · Bonds · עמלים-דינמיים
 // כל-הנתונים חיים מהמנוע: /saos-dex/api/dex/economy · מוטציות דרך /api/dx (economy)
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Lock, Flame, Vote, TrendingDown, Percent, Clock, Wallet,
   ShieldCheck, Sparkles, Loader2, Bot, Sprout, Repeat, BarChart3, Landmark,
   BadgeCheck, Link2, Layers, Globe, Scale, Rocket, Crosshair,
 } from 'lucide-react';
 import { authHeaders } from '@/components/sv/shared';
-import { fmtInt } from './common';
+import { fmtInt, usePoll, StaleChip } from './common';
 
 interface EconomyData {
   ok: boolean;
@@ -126,104 +126,64 @@ export function EconomyView({ onNeedAuth, onDone }: {
   const [newTicker, setNewTicker] = useState('');
   const [newName, setNewName] = useState('');
   const [newMode, setNewMode] = useState<'curve' | 'lbp'>('curve');
-  const aliveRef = useRef(true);
 
-  useEffect(() => {
-    aliveRef.current = true;
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/economy', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        const j = (await r.json()) as EconomyData;
-        if (aliveRef.current && j.ok) setEco(j);
-      } catch { /* offline */ }
-      if (aliveRef.current && !stop) timer = setTimeout(poll, 3000);
-    };
-    poll();
-    return () => { aliveRef.current = false; stop = true; clearTimeout(timer); };
-  }, []);
+  // ── FIX(Roast-65-e4 · F7): 6-לולאות-הסקירה עברו ל-usePoll משותף — השהיה-בהסתרת-טאב,
+  // backoff-עם-jitter בכישלון, ושבב "נתונים-ישנים" במקום catch-שקט (היה ≈88-req/min + נתון-ישן-שנראה-חי).
+  const ecoStale = usePoll(useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/economy', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const j = (await r.json()) as EconomyData;
+      if (j.ok) { setEco(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []), 3000);
 
-  // ── ALE · מנוע-הנזילות-האוטונומית (Task 55) — דוח-חי כל-3ש'
-  useEffect(() => {
-    aliveRef.current = true;
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/ale', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        const j = (await r.json()) as AleData;
-        if (aliveRef.current && j.ok) setAle(j);
-      } catch { /* offline */ }
-      if (aliveRef.current && !stop) timer = setTimeout(poll, 3000);
-    };
-    poll();
-    return () => { stop = true; clearTimeout(timer); };
-  }, []);
+  const aleStale = usePoll(useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/ale', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const j = (await r.json()) as AleData;
+      if (j.ok) { setAle(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []), 3000);
 
-  // ── השוואה-חיה מול-העולם — העמודה-שלנו-חיה, המתחרים-עובדות-מתועדות (כל-15ש')
-  useEffect(() => {
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/compare', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        const j = (await r.json()) as CompareData;
-        if (!stop && j.ok) setCmp(j);
-      } catch { /* offline */ }
-      if (!stop) timer = setTimeout(poll, 15000);
-    };
-    poll();
-    return () => { stop = true; clearTimeout(timer); };
-  }, []);
+  const cmpStale = usePoll(useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/compare', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const j = (await r.json()) as CompareData;
+      if (j.ok) { setCmp(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []), 15000);
 
-  // ── מנוע-הוכחת-המחיר (Task 56) — שרשרת-הנגזרת + הצלבת-שווקים + אוצר-אמת (כל-15ש')
-  useEffect(() => {
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/price-proof', { cache: 'no-store', signal: AbortSignal.timeout(15000) });
-        const j = (await r.json()) as ProofData;
-        if (!stop && j.ok) setProof(j);
-      } catch { /* offline */ }
-      if (!stop) timer = setTimeout(poll, 15000);
-    };
-    poll();
-    return () => { stop = true; clearTimeout(timer); };
-  }, []);
+  const proofStale = usePoll(useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/price-proof', { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+      const j = (await r.json()) as ProofData;
+      if (j.ok) { setProof(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []), 15000);
 
-  // ── מסילת-ההשקות (Task 57) — השקות-חיות על-העקומה (כל-3ש')
-  useEffect(() => {
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/launchpad', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        const j = (await r.json()) as LpadData;
-        if (!stop && j.ok) setLpad(j);
-      } catch { /* offline */ }
-      if (!stop) timer = setTimeout(poll, 3000);
-    };
-    poll();
-    return () => { stop = true; clearTimeout(timer); };
-  }, []);
+  const lpadStale = usePoll(useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/launchpad', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const j = (await r.json()) as LpadData;
+      if (j.ok) { setLpad(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []), 3000);
 
-  // ── ProtoRev — הארביטראז'-הפנימי (כל-3ש')
-  useEffect(() => {
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const r = await fetch('/saos-dex/api/dex/protorev', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        const j = (await r.json()) as PrvData;
-        if (!stop && j.ok) setPrv(j);
-      } catch { /* offline */ }
-      if (!stop) timer = setTimeout(poll, 3000);
-    };
-    poll();
-    return () => { stop = true; clearTimeout(timer); };
-  }, []);
+  const prvStale = usePoll(useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/saos-dex/api/dex/protorev', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      const j = (await r.json()) as PrvData;
+      if (j.ok) { setPrv(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []), 3000);
+
+  const pollStale = ecoStale || aleStale || cmpStale || proofStale || lpadStale || prvStale;
 
   const mutate = useCallback(async (payload: Record<string, unknown>, tag: string) => {
     if (!onNeedAuth()) return;
@@ -271,6 +231,8 @@ export function EconomyView({ onNeedAuth, onDone }: {
 
   return (
     <div className="space-y-5" data-testid="economy-view">
+      {/* FIX(Roast-65-e4 · F7): חיווי-כן כשאחת מ-6-לולאות-הסקירה נכשלה — הנתונים-על-המסך ישנים */}
+      <StaleChip show={pollStale} />
       {/* hero */}
       <div className="dx-card p-5 md:p-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
@@ -828,6 +790,13 @@ function LaunchpadPanel({ lpad, prv, newTicker, setNewTicker, newName, setNewNam
   const launches = lpad?.launches ?? [];
   const liveLaunches = launches.filter(l => !l.graduated);
   const gradLaunches = launches.filter(l => l.graduated);
+  // FIX(Roast-65-e4 · F14): היצע-ההשקה נגזר-מהמדיניות-החיה (minSupplyMu, חסום-למקס);
+  // ברירת-המחדל-הקודמת (200K טוקן) נשארת-רק-כשהמדיניות-חסרה.
+  const launchSupplyMu = (() => {
+    const pol = lpad?.policy;
+    if (pol && pol.minSupplyMu > 0) return Math.min(pol.minSupplyMu, pol.maxSupplyMu > 0 ? pol.maxSupplyMu : pol.minSupplyMu);
+    return 200_000_000;
+  })();
   return (
     <section className="dx-card p-5" data-testid="launchpad-panel">
       <header className="flex items-start justify-between flex-wrap gap-3 mb-4">
@@ -860,7 +829,7 @@ function LaunchpadPanel({ lpad, prv, newTicker, setNewTicker, newName, setNewNam
             <button onClick={() => setNewMode('lbp')} className={`h-10 px-3 text-[11px] font-semibold transition-colors border-s border-[color:var(--line)] ${newMode === 'lbp' ? 'bg-[color:var(--pink)]/20 text-[color:var(--pink)]' : 'text-[color:var(--text-3)] hover:text-[color:var(--text-1)]'}`} data-testid="mode-lbp">LBP</button>
           </div>
           <button
-            onClick={() => mutateLaunch({ action: 'create', ticker: newTicker, name: newName || newTicker, mode: newMode, supply: 200_000_000 }, 'lcreate')}
+            onClick={() => mutateLaunch({ action: 'create', ticker: newTicker, name: newName || newTicker, mode: newMode, supply: launchSupplyMu }, 'lcreate')}
             disabled={busy !== null || newTicker.length < 2}
             className="dx-cta h-10 px-4 text-[12px] flex items-center gap-1.5"
             data-testid="launch-create-btn"
@@ -869,7 +838,8 @@ function LaunchpadPanel({ lpad, prv, newTicker, setNewTicker, newName, setNewNam
           </button>
         </div>
         <div className="text-[9.5px] text-[color:var(--text-3)] mt-2">
-          היצע-200K טוקן · מחיר-פתיחה-שטוח · {newMode === 'lbp' ? `דצ'י-אוקציה ${lpad?.policy.lbpBlocks ?? 1200} בלוקים` : 'עקומה-עולה-עד-הסף'} · היוצר מקבל {lpad?.policy.creatorPct ?? 40}% מהעמלה-חי
+          {/* FIX(Roast-65-e4 · F14): ההיצע קשור-למדיניות-המסילה (minSupplyMu/maxSupplyMu); ברירת-המחדל רק-כשאין-מדיניות */}
+          היצע-השקה: {fmtInt(Math.floor(launchSupplyMu / 1000))} טוקן{lpad?.policy ? ` (לפי-מדיניות-המסילה: ${fmtInt(Math.floor(lpad.policy.minSupplyMu / 1000))}–${fmtInt(Math.floor(lpad.policy.maxSupplyMu / 1000))})` : ' (ברירת-מחדל — מדיניות-המסילה טרם-נטענה)'} · מחיר-פתיחה-שטוח · {newMode === 'lbp' ? `דצ'י-אוקציה ${lpad?.policy.lbpBlocks ?? 1200} בלוקים` : 'עקומה-עולה-עד-הסף'} · היוצר מקבל {lpad?.policy.creatorPct ?? 40}% מהעמלה-חי
         </div>
       </div>
 
@@ -900,7 +870,8 @@ function LaunchpadPanel({ lpad, prv, newTicker, setNewTicker, newName, setNewNam
             </div>
             <div className="flex justify-between text-[9.5px] text-[color:var(--text-3)] mb-2.5">
               <span dir="ltr">{(l.gradPctBps / 100).toFixed(1)}% לסף-ההגירה ({fmtInt(l.gradTargetMu)}µ)</span>
-              <span dir="ltr">מחזור: {fmtInt(l.circulatingMu * (l.priceMu / 1000))}µ</span>
+              {/* FIX(Roast-65-e4 · F15): זהו שווי-שוק (circulating×price), לא מחזור */}
+              <span dir="ltr">שווי-שוק: {fmtInt(l.circulatingMu * (l.priceMu / 1000))}µ</span>
             </div>
             {/* קנייה/מכירה-מהירה */}
             <div className="flex gap-2 flex-wrap">
@@ -961,8 +932,9 @@ function LaunchpadPanel({ lpad, prv, newTicker, setNewTicker, newName, setNewNam
               <span className="dx-num font-semibold" dir="ltr">{s.key}</span>
               <span className="flex items-center gap-3 dx-num" dir="ltr">
                 <span className="text-[color:var(--text-3)]">mid {(s.midMu / 1000).toFixed(4)}</span>
-                <span>bid {s.bidMu !== null ? `${s.edgeBidBps !== null && s.edgeBidBps > 0 ? '+' : ''}${s.edgeBidBps}bps` : '—'}</span>
-                <span>ask {s.askMu !== null ? `${s.edgeAskBps !== null && s.edgeAskBps < 0 ? '' : '+'}${s.edgeAskBps}bps` : '—'}</span>
+                {/* FIX(Roast-65-e4 · F13): אדges-null מוצגים '—' — לא-עוד "nullbps" כש-edge חסר-אך-צד-קיים */}
+                <span>bid {s.bidMu !== null && s.edgeBidBps != null ? `${s.edgeBidBps > 0 ? '+' : ''}${s.edgeBidBps}bps` : '—'}</span>
+                <span>ask {s.askMu !== null && s.edgeAskBps != null ? `${s.edgeAskBps < 0 ? '' : '+'}${s.edgeAskBps}bps` : '—'}</span>
                 {s.actionable && <span className="text-[color:var(--green)] font-bold">● ציד-חי</span>}
               </span>
             </div>

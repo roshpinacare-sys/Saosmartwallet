@@ -83,7 +83,8 @@ export function AnchorsView({ world }: { world: World | null }) {
             עיגון-רשת חי
           </h2>
           <p className="text-xs text-[color:var(--text-2)] mt-0.5">
-            כל חותם-מרקל של השרשרת הריבונית נעגן בשרשראות-ציבור עם txid ואימות-קריאה-חוזרת
+            {/* FIX(Roast-65-e4 · F9): כנות — העיגון-חי רק בשרשראות-שקו-ההגנה-שלהן-פתוח; השאר מוצגות-כמושהה/מושבת */}
+            כל-חותם-מרקל נעגן בשרשראות שקו-ההגנה-שלהן-פתוח — עם txid ואימות-קריאה-חוזרת; השרשראות-המושההות-או-המושבתות מוצגות-כאלה
           </p>
         </div>
         <button onClick={() => load()} className="dx-ghost h-9 px-4 text-xs flex items-center gap-1.5">
@@ -94,7 +95,10 @@ export function AnchorsView({ world }: { world: World | null }) {
       {/* relay chains */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3" data-testid="relay-chains">
         {chains.map(([name, c]) => {
-          const live = c.enabled && c.status !== 'disabled';
+          // FIX(Roast-65-e4 · F9): תג-"חי" אמת — נגזר גם-משובר-המעגל ומ-lastError, לא-רק-מ-enabled.
+          // נפילות-כנות: אין-נתון-שובר → השובר-לא-חוסם; אין-status → לא-חוסם.
+          const breakerOpen = c.breaker ? c.breaker.state !== 'closed' : false;
+          const live = c.enabled && c.status !== 'disabled' && !breakerOpen && !c.lastError;
           const exp = EXPLORERS[name];
           return (
             <div key={name} className="dx-card p-4" data-testid={`relay-${name}`}>
@@ -102,7 +106,7 @@ export function AnchorsView({ world }: { world: World | null }) {
                 <span className="font-bold text-sm uppercase dx-num" dir="ltr">{name}</span>
                 <span className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full ${live ? 'bg-[color:var(--green-soft)] text-[color:var(--green)]' : 'bg-[color:var(--amber-soft)] text-[color:var(--amber)]'}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${live ? 'bg-[color:var(--green)] pulse-ring' : 'bg-[color:var(--amber)]'}`} />
-                  {c.enabled ? 'חי' : 'מושבת'}
+                  {live ? 'חי' : c.enabled ? 'מושהה' : 'מושבת'}
                 </span>
               </div>
               <div className="dx-raised p-2.5 mt-3 space-y-1.5 text-[11px]">

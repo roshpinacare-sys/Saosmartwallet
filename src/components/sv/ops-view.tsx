@@ -17,9 +17,11 @@ export function OpsView({ status, authed, messages, onSend, tasks, onCreateTask,
   status: StatusData | null;
   authed: boolean;
   messages: ChatMsg[];
-  onSend: (content: string) => void;
+  // FIX(Roast-65-e4 · F18): onSend/onCreateTask מחזירים Promise<boolean> — false על-כישלון;
+  // הקלט-אינו-נמחק על-כישלון ומוצגת-שגיאה (לא-עוד בליעה-שקטה של כשל-רשת).
+  onSend: (content: string) => Promise<boolean>;
   tasks: TaskT[];
-  onCreateTask: (title: string, assignedTo: string) => void;
+  onCreateTask: (title: string, assignedTo: string) => Promise<boolean>;
   onRegisterAgent: (name: string, caps: string) => void;
 }) {
   const [chatInput, setChatInput] = useState('');
@@ -27,7 +29,27 @@ export function OpsView({ status, authed, messages, onSend, tasks, onCreateTask,
   const [taskAgent, setTaskAgent] = useState('any');
   const [agentName, setAgentName] = useState('');
   const [agentCaps, setAgentCaps] = useState('chat,task');
+  const [chatErr, setChatErr] = useState<string | null>(null);
+  const [taskErr, setTaskErr] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const submitChat = async () => {
+    const text = chatInput.trim();
+    if (!text) return;
+    setChatErr(null);
+    const ok = await onSend(text);
+    if (ok) setChatInput('');
+    else setChatErr('השליחה נכשלה — ההודעה נשמרה בשדה, נסה שוב');
+  };
+
+  const submitTask = async () => {
+    const title = taskTitle.trim();
+    if (!title) return;
+    setTaskErr(null);
+    const ok = await onCreateTask(title, taskAgent === 'any' ? '' : taskAgent);
+    if (ok) setTaskTitle('');
+    else setTaskErr('השיוך נכשל — המשימה נשמרה בשדה, נסה שוב');
+  };
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
 
@@ -68,22 +90,25 @@ export function OpsView({ status, authed, messages, onSend, tasks, onCreateTask,
               <div ref={chatEndRef} />
             </div>
           </ScrollArea>
-          <div className="p-3 border-t border-[#eeeeea] flex gap-2">
-            <Input
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              placeholder={authed ? 'כתוב לסוכנים...' : 'התחבר כדי לכתוב — הצפייה פתוחה תמיד'}
-              className="bg-white border-[#e0e0da] h-10 text-[13px]"
-              onKeyDown={e => { if (e.key === 'Enter' && chatInput.trim()) { onSend(chatInput.trim()); setChatInput(''); } }}
-            />
-            <button
-              onClick={() => { if (chatInput.trim()) { onSend(chatInput.trim()); setChatInput(''); } }}
-              disabled={!chatInput.trim()}
-              aria-label="שלח הודעה"
-              className="w-10 h-10 shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white flex items-center justify-center transition-colors shadow-[0_2px_8px_-2px_rgba(5,150,105,0.4)]"
-            >
-              <Send className="w-4 h-4 -scale-x-100" />
-            </button>
+          <div className="p-3 border-t border-[#eeeeea]">
+            <div className="flex gap-2">
+              <Input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                placeholder={authed ? 'כתוב לסוכנים...' : 'התחבר כדי לכתוב — הצפייה פתוחה תמיד'}
+                className="bg-white border-[#e0e0da] h-10 text-[13px]"
+                onKeyDown={e => { if (e.key === 'Enter' && chatInput.trim()) void submitChat(); }}
+              />
+              <button
+                onClick={() => void submitChat()}
+                disabled={!chatInput.trim()}
+                aria-label="שלח הודעה"
+                className="w-10 h-10 shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white flex items-center justify-center transition-colors shadow-[0_2px_8px_-2px_rgba(5,150,105,0.4)]"
+              >
+                <Send className="w-4 h-4 -scale-x-100" />
+              </button>
+            </div>
+            {chatErr && <div className="mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-1.5" role="alert">{chatErr}</div>}
           </div>
         </section>
 
@@ -164,21 +189,22 @@ curl -X POST <origin>/api/agent/task \\
               onChange={e => setTaskTitle(e.target.value)}
               placeholder="משימה חדשה..."
               className="bg-white border-[#e0e0da] h-9 flex-1 min-w-44 text-[13px]"
-              onKeyDown={e => { if (e.key === 'Enter' && taskTitle.trim()) { onCreateTask(taskTitle.trim(), taskAgent === 'any' ? '' : taskAgent); setTaskTitle(''); } }}
+              onKeyDown={e => { if (e.key === 'Enter' && taskTitle.trim()) void submitTask(); }}
             />
             <Select value={taskAgent} onValueChange={setTaskAgent}>
-              <SelectTrigger className="w-40 bg-white border-[#e0e0da] h-9 text-[12px]"><SelectValue placeholder="סוכן" /></SelectTrigger>
+              <SelectTrigger className="w-40 bg-white border-[#e0e0da] h-9 text-[12px]" aria-label="שיוך לסוכן"><SelectValue placeholder="סוכן" /></SelectTrigger>
               <SelectContent className="bg-white border-[#e8e8e3]">
                 <SelectItem value="any">פתוח לכולם</SelectItem>
                 {status?.agents.map(a => <SelectItem key={a.name} value={a.name}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <button
-              onClick={() => { if (taskTitle.trim()) { onCreateTask(taskTitle.trim(), taskAgent === 'any' ? '' : taskAgent); setTaskTitle(''); } }}
+              onClick={() => void submitTask()}
               disabled={!taskTitle.trim()}
               className="h-9 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-[12px] font-bold transition-colors"
             >שייך</button>
           </div>
+          {taskErr && <div className="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-1.5" role="alert">{taskErr}</div>}
           <ScrollArea className="max-h-56">
             <div className="space-y-1.5">
               {tasks.map(t => (

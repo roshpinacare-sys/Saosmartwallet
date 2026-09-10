@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createChart, AreaSeries, type IChartApi, type ISeriesApi, type UTCTimestamp } from 'lightweight-charts';
 import { Loader2, X, Activity, Swords, Bot, Zap, Timer } from 'lucide-react';
-import { TokenMedallion, fmtMu, fmtPrice, fmtInt, dxPost, type World, type Market, MU } from './common';
+import { TokenMedallion, fmtMu, fmtPrice, fmtInt, dxPost, usePoll, StaleChip, type World, type Market, MU } from './common';
 
 type Side = 'buy' | 'sell';
 type OrderKind = 'limit' | 'market';
@@ -35,19 +35,17 @@ export function ProView({ world, online, onNeedAuth }: {
   // מחיר-אפקטיבי לטופס — קלט-המשתמש, ואחרת השער-החי (גזירה בלי effect)
   const effectivePrice = priceStr || (market ? String(market.fair / MU) : '');
 
-  const refreshOrders = useCallback(async () => {
+  const refreshOrders = useCallback(async (): Promise<boolean> => {
     try {
       const r = await fetch('/saos-dex/api/dex/my-orders', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) setMyOrders(j.orders || []);
-    } catch { /* */ }
+      if (j.ok) { setMyOrders(j.orders || []); return true; }
+      return false;
+    } catch { return false; }
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(refreshOrders, 0);
-    const i = setInterval(refreshOrders, 6000);
-    return () => { clearTimeout(t); clearInterval(i); };
-  }, [refreshOrders]);
+  // FIX(Roast-65-e4 · F7): לולאת-הפקודות (6ש׳) — השהיה-בהסתרת-טאב + backoff + חיווי-נתונים-ישנים
+  const ordersStale = usePoll(refreshOrders, 6000);
 
   // לימיט-מחיר מאותחל לשער החי בכל החלפת זוג — בלי effect: גזירה ב-render
   // דרך value-המחושב (priceStr ריק ⇒ מוצג השער) ובזמן-הקלדה priceStr שולט.
@@ -168,6 +166,8 @@ export function ProView({ world, online, onNeedAuth }: {
         {/* open orders */}
         <div className="dx-card p-4" data-testid="my-orders">
           <div className="text-[11px] label-caps mb-2">ההזמנות שלי ({myOrders.length})</div>
+          {/* FIX(Roast-65-e4 · F7): חיווי-נתונים-ישנים כשהרענון-נכשל */}
+          <StaleChip show={ordersStale} className="mb-2" />
           {myOrders.length === 0 && <p className="text-xs text-[color:var(--text-3)] py-3 text-center">אין הזמנות פתוחות</p>}
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {myOrders.map(o => (
@@ -343,7 +343,8 @@ function ArenaPanel({ world }: { world: World | null }) {
         ))}
       </div>
       <p className="text-[10px] text-[color:var(--text-3)] mt-2 leading-relaxed">
-        ארבעה חיילים עושים שוק אמיתי בספר — {arena.params.spreadBps}bps עם requote {arena.params.requoteBps}bps
+        {/* FIX(Roast-65-e4 · F8): המספר-חי מ-arena.soldiers.length + תווית-כנה (הארנה = סים) */}
+        ארנה-פנימית (סים) — מספקת-נזילות לספר-הסים · {arena.soldiers.length} חיילים · {arena.params.spreadBps}bps{arena.params.requoteBps != null ? ` · requote ${arena.params.requoteBps}bps` : ''}
       </p>
     </div>
   );
@@ -378,15 +379,13 @@ function AutoTradePanel({ market, onNeedAuth }: { market?: Market; onNeedAuth: (
     try {
       const r = await fetch('/saos-dex/api/dex/program', { cache: 'no-store' });
       const j = await r.json();
-      if (j.ok) { setDcaRows(j.dca || []); setTrigRows(j.trig || []); }
-    } catch { /* */ }
+      if (j.ok) { setDcaRows(j.dca || []); setTrigRows(j.trig || []); return true; }
+      return false;
+    } catch { return false; }
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(refresh, 0);
-    const i = setInterval(refresh, 6000);
-    return () => { clearTimeout(t); clearInterval(i); };
-  }, [refresh]);
+  // FIX(Roast-65-e4 · F7): לולאת-התוכניות (6ש׳) — השהיה-בהסתרת-טאב + backoff + חיווי-נתונים-ישנים
+  const programStale = usePoll(refresh, 6000);
 
   async function submit(op: string, payload: Record<string, unknown>) {
     setBusy(true); setNote(null);
@@ -409,6 +408,8 @@ function AutoTradePanel({ market, onNeedAuth }: { market?: Market; onNeedAuth: (
       <div className="text-[11px] label-caps mb-2 flex items-center gap-1.5">
         <Bot className="w-3 h-3 text-[color:var(--pink)]" /> מסחר-אוטומטי · חסר-קיפרים
       </div>
+      {/* FIX(Roast-65-e4 · F7): חיווי-נתונים-ישנים כשהרענון-נכשל */}
+      <StaleChip show={programStale} className="mb-2" />
       <div className="grid grid-cols-2 gap-1 p-1 rounded-full dx-chip mb-3">
         {(['dca', 'trig'] as const).map(k => (
           <button key={k} onClick={() => setTab(k)}

@@ -50,7 +50,11 @@ export async function POST(req: NextRequest) {
     } catch {
       // no body — defaults
     }
-    const stampCount = Math.min(24, Math.max(3, Number(body.stamps ?? 6)));
+    // FIX(Roast-65 · stamps-NaN): Number("abc")=NaN היה עובר Math.max/Math.min
+    // ומניב stampCount=NaN → 0-חותמות → כשל-"seal requires new stamps" מבלבל.
+    // עכשיו: שלם-בטוח-בלבד — זבל-קלט נופל-לברירת-המחדל 6 (fail-closed-וכנה).
+    const rawStamps = Number(body.stamps ?? 6);
+    const stampCount = Number.isSafeInteger(rawStamps) && rawStamps >= 3 ? Math.min(24, rawStamps) : 6;
 
     // 1. kernel batch — FIX(Roast-64-a · F5a): harvest חייב issuer=treasury (שער-התפקיד)
     const txs: KernelTx[] = [];

@@ -9,7 +9,17 @@ import { RefreshCw, Search, ChevronDown, Archive, Lock } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { CHAIN_KEYS, CHAIN_META, BalLine, RoleChip } from './shared';
-import type { StatusData, ChainId } from './shared';
+import type { StatusData, ChainId, RoleKey } from './shared';
+
+// FIX(Roast-65-e4 · F2): אותו-חישוב-שליטה-מלאה-פר-חשבון (משמש גם את ספירת-ה-header):
+// תג "בשליטה מלאה" ניתן רק כשיש-מפתחות-שרשרת וכל-מפתחות-השרשרת-הקיימים מאומתים-חי.
+function acctFullyControlled(chains: Record<string, RoleKey>): boolean {
+  return (
+    Object.keys(chains).length > 0 &&
+    CHAIN_KEYS.some(c => Object.keys(chains).some(k => k.startsWith(`${c}:`))) &&
+    CHAIN_KEYS.every(c => Object.entries(chains).filter(([k]) => k.startsWith(`${c}:`)).every(([, k]) => k.verified))
+  );
+}
 
 type ChainFilter = 'all' | ChainId;
 
@@ -30,11 +40,7 @@ export function VaultView({ status, verifying, onVerifyAll }: {
   const chainVisible = (key: string) => filter === 'all' || key.startsWith(`${filter}:`);
 
   const filtered = chainAccounts.filter(([a]) => match(a));
-  const fullyControlled = filtered.filter(([, chains]) =>
-    CHAIN_KEYS.some(c => Object.keys(chains).some(k => k.startsWith(`${c}:`))) &&
-    CHAIN_KEYS.every(c => Object.entries(chains).filter(([k]) => k.startsWith(`${c}:`)).every(([, k]) => k.verified)) &&
-    Object.keys(chains).length > 0
-  ).length;
+  const fullyControlled = filtered.filter(([, chains]) => acctFullyControlled(chains)).length;
 
   return (
     <div className="space-y-4">
@@ -43,7 +49,8 @@ export function VaultView({ status, verifying, onVerifyAll }: {
         <div>
           <h1 className="text-[22px] font-bold tracking-tight leading-tight text-zinc-900">כספת המפתחות</h1>
           <p className="text-[12px] text-zinc-500 mt-0.5">
-            מטריצת שליטה חיה · {status?.totals.accounts} ישויות · {status?.totals.verified} מאומתות-חי מול השרשרת · אימות-אוטומטי כל 5 דק׳
+            {/* FIX(Roast-65-e4 · F10): כנות — האימות-האוטומטי רץ-רק בעת-חיבור; תמיד-אפשר-לחיצה-ידנית */}
+            מטריצת שליטה חיה · {status?.totals.accounts} ישויות · {status?.totals.verified} מאומתות-חי מול השרשרת · אימות-חי בעת-חיבור (כל-5-דק׳) — או לחיצה-ידנית
           </p>
         </div>
         <button onClick={onVerifyAll} disabled={verifying} className="h-9 px-3.5 rounded-lg border border-[#e0e0da] bg-white hover:bg-zinc-50 text-[12px] text-zinc-700 transition-colors inline-flex items-center gap-2 disabled:opacity-50 shadow-[0_1px_2px_rgba(24,24,27,0.04)]">
@@ -79,9 +86,16 @@ export function VaultView({ status, verifying, onVerifyAll }: {
           <div key={acct} className="sv-card p-4">
             <div className="flex items-center justify-between mb-2.5">
               <span className="font-data font-semibold text-[13px] text-zinc-900" dir="ltr">{acct}</span>
-              <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-                <Lock className="w-2.5 h-2.5" />בשליטה מלאה
-              </span>
+              {/* FIX(Roast-65-e4 · F2): התג-נגזר-מה-verified בפועל — לא-עוד "בשליטה מלאה" קבוע לכל-כרטיס */}
+              {acctFullyControlled(chains) ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                  <Lock className="w-2.5 h-2.5" />בשליטה מלאה
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                  <Lock className="w-2.5 h-2.5" />שליטה חלקית
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-1">
               {(['steem', 'hive', 'blurt'] as const).map(c => ['owner', 'active', 'posting', 'memo'].map(r => {

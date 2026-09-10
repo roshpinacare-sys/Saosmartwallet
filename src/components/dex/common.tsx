@@ -19,6 +19,8 @@ export type Market = {
 export type Pool = {
   key: string; a: string; b: string; ra: number; rb: number; lp: number;
   mid: number; swaps: number; feeAccruedTreasury: number; k: number;
+  // FIX(Roast-65-e4 · F4): עמלת-הבריכה-החיה (bps) — אופציונלי עד-שהשרת-מספק; ה-UI מציג '—' כשחסר
+  feeBps?: number;
 };
 export type Wallet = { name: string; credits: number; balances: Record<string, number>; locked: Record<string, number> };
 export type Soldier = { name: string; saos: number; usds: number; equity: number; pnl: number; liveQuotes: number; locked: Record<string, number> };
@@ -49,7 +51,8 @@ export type World = {
   tick: number;
 };
 
-export type RouteLeg = { kind: 'pool' | 'wrap'; venue: string; from: string; to: string; inMu: number; outMu: number; priceMu: number };
+// FIX(Roast-65-e4 · F4): feeBps-פר-רגל — משמש-להצגת-עמלה-אמת בסוואפ כשהשרת מספק אותה
+export type RouteLeg = { kind: 'pool' | 'wrap'; venue: string; from: string; to: string; inMu: number; outMu: number; priceMu: number; feeBps?: number };
 export type RouteQuote = {
   amountOutMu: number; effPriceMu: number; legs: RouteLeg[];
   alternatives: Array<{ amountOutMu: number; path: string[] }>;
@@ -157,6 +160,56 @@ export function useDexWorld() {
   }, []);
 
   return { world, online, refetchNow };
+}
+
+// ── FIX(Roast-65-e4 · F7): לולאת-סקירה-מכובדת ──
+// השהיה-בהסתרת-טאב (visibilitychange) · backoff-אקספוננציאלי-עם-jitter בכישלון ·
+// ודגל "נתונים-ישנים" במקום catch-שקט — הנתון-הישן נשאר-אך-מסומן-ככזה.
+// ה-fetcher מחזיר true רק-על-קבלת-נתון-תקין; ה-hook מסמן stale רק-אחרי-הצלחה-ראשונה.
+export function usePoll(fetcher: () => Promise<boolean>, periodMs: number): boolean {
+  const [stale, setStale] = useState(false);
+  const fRef = useRef(fetcher);
+  useEffect(() => { fRef.current = fetcher; });
+  useEffect(() => {
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let backoff = 1;
+    let everOk = false;
+    const tick = async () => {
+      if (!alive) return;
+      let hidden = false;
+      try { hidden = document.visibilityState === 'hidden'; } catch { /* no DOM */ }
+      if (hidden) { timer = setTimeout(tick, periodMs); return; }
+      let ok = false;
+      try { ok = await fRef.current(); } catch { ok = false; }
+      if (!alive) return;
+      if (ok) { everOk = true; setStale(false); }
+      else if (everOk) setStale(true);
+      const delay = ok ? periodMs : Math.min(periodMs * 2 ** backoff, 60_000) + Math.floor(Math.random() * 1_000);
+      backoff = ok ? 1 : Math.min(backoff + 1, 5);
+      timer = setTimeout(tick, delay);
+    };
+    const onVis = () => {
+      let visible = false;
+      try { visible = document.visibilityState === 'visible'; } catch { /* no DOM */ }
+      if (visible && alive) { clearTimeout(timer); void tick(); }
+    };
+    void tick();
+    document.addEventListener('visibilitychange', onVis);
+    return () => { alive = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVis); };
+  }, [periodMs]);
+  return stale;
+}
+
+// FIX(Roast-65-e4 · F7): שבב-"נתונים-ישנים" — חיווי-כן כשהרענון-נכשל והמסך מציג מדידה-קודמת
+export function StaleChip({ show = true, className = '' }: { show?: boolean; className?: string }) {
+  if (!show) return null;
+  return (
+    <span role="status" data-testid="stale-chip" className={`inline-flex items-center gap-1.5 rounded-full border border-[color:var(--amber)]/40 bg-[color:var(--amber-soft)] px-2.5 py-1 text-[10.5px] font-semibold text-[color:var(--amber)] ${className}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--amber)]" aria-hidden />
+      נתונים-ישנים — הרענון נכשל, מוצגת-המדידה-האחרונה
+    </span>
+  );
 }
 
 // ── wallet balance helper ──

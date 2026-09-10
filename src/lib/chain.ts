@@ -81,7 +81,10 @@ export interface VerifyResult {
 
 // Full live check: WIF → pub → on-chain authorities.
 // Hive keeps the legacy STM prefix; BLURT uses BLT (same key body).
-export async function verifyWif(wif: string, account: string, chain: Chain, pubOverride?: string): Promise<{ pub: string; result: VerifyResult }> {
+// FIX(Roast-65 · acct-cache): אפשרות-להעביר-חשבון-שנשלף-כבר (מטמון-פר-בקשה) —
+// verify-all על-148-מפתחות-חולק-חשבונות; בלי-זה כל-מפתח-שילם-RPC-משלו (עד-15ש׳
+// timeout-לכל-אחד) — אותה-ראיה-נשלפת-פעם-אחת, נבדקת-לוקאלית-לשאר.
+export async function verifyWif(wif: string, account: string, chain: Chain, pubOverride?: string, acctOverride?: AccountAuths | null): Promise<{ pub: string; result: VerifyResult }> {
   const { wifToPublic } = await import('./keys');
   let pub = '';
   try {
@@ -89,7 +92,7 @@ export async function verifyWif(wif: string, account: string, chain: Chain, pubO
   } catch (e) {
     return { pub: '', result: { ok: false, account, chain, roles: [], error: 'invalid WIF: ' + String(e).slice(0, 80) } };
   }
-  const acct = await getAccount(chain, account);
+  const acct = acctOverride !== undefined ? acctOverride : await getAccount(chain, account);
   if (!acct) return { pub, result: { ok: false, account, chain, roles: [], error: `account ${account} not found on ${chain}` } };
   const roles = rolesForPub(acct, pub);
   if (roles.length === 0) {

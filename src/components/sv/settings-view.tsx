@@ -93,7 +93,8 @@ export function SettingsView({ status, authed, verifying, onToggleLock, onVerify
             <div className="flex-1">
               <h2 className="text-[14px] font-bold text-zinc-900">מדיניות אימות-מפתחות</h2>
               <ul className="text-[12px] text-zinc-500 mt-2 space-y-1.5 leading-relaxed">
-                <li className="flex gap-2"><span className="text-emerald-600">•</span>אימות-חי אוטומטי מול השרשרת כל 5 דקות</li>
+                {/* FIX(Roast-65-e4 · F10): כנות — האימות-האוטומטי רץ-רק בעת-חיבור; תמיד-אפשר-לחיצה-ידנית */}
+                <li className="flex gap-2"><span className="text-emerald-600">•</span>אימות-חי בעת-חיבור (כל-5-דק׳) — או לחיצה-ידנית</li>
                 <li className="flex gap-2"><span className="text-emerald-600">•</span>WIF מומר למפתח-ציבורי ומושווה מול authorities על-השרשרת — לעולם לא נסרקת היסטוריה</li>
                 <li className="flex gap-2"><span className="text-emerald-600">•</span>החומר נשמר AES-256-GCM בכספת מקומית; ב-DB יש רק fingerprint</li>
               </ul>

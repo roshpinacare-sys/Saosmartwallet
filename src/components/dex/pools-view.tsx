@@ -1,13 +1,16 @@
 'use client';
 
-// ─── בריכות · Pools — נזילות AMM עם ניהול-עמדות ────────────────────────────
-// x·y=k שלמים · עמלת 30bps (70% LP · 30% אוצר) · add פרופורציונלי ·
+// ─── בריכות · Pools — נזילות AMM עם ניהול-עמדות ────────────────────────
+// x·y=k שלמים · עמלה-דינמית (feeBps-חי-מה-API, 70% LP · 30% אוצר) · add פרופורציונלי ·
 // remove pro-rata · עמדות-ה-LP שלי מהארנק החי.
 
 import { useState } from 'react';
 import { Droplets, Loader2, Plus, Minus, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TokenMedallion, fmtMu, fmtPrice, fmtInt, dxPost, walletBal, type World, type Pool, MU } from './common';
+
+// FIX(Roast-65-e4 · F4): עמלה-חי-מה-API — feeBps-פר-בריכה; בלי-נתון → '—' (אין-עוד 0.30% מקודד)
+const feeLabel = (p?: Pool | null): string => p?.feeBps != null ? `${(p.feeBps / 100).toFixed(2)}%` : '—';
 
 export function PoolsView({ world, onNeedAuth, onDone }: {
   world: World | null; onNeedAuth: () => void; onDone: () => void;
@@ -41,7 +44,7 @@ export function PoolsView({ world, onNeedAuth, onDone }: {
         {myPositions.length === 0 ? (
           <div className="dx-card p-8 text-center">
             <p className="text-sm text-[color:var(--text-2)]">אין לך עדיין עמדות נזילות</p>
-            <p className="text-xs text-[color:var(--text-3)] mt-1">הצטרף לבריכה למטה — העמלות זורמות 70/30 לספקי-הנזילות</p>
+            <p className="text-xs text-[color:var(--text-3)] mt-1">הצטרף לבריכה למטה — העמלות זורמות 70/30 לספקי-הנזילות (השיעור-החי מוצג-על-כל-בריכה)</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -57,7 +60,7 @@ export function PoolsView({ world, onNeedAuth, onDone }: {
                       </span>
                       <span className="font-semibold dx-num text-sm">{p.key}</span>
                     </div>
-                    <span className="dx-chip px-2.5 py-1 text-[10px] font-semibold">0.30%</span>
+                    <span className="dx-chip px-2.5 py-1 text-[10px] font-semibold" title="עמלת-הבריכה-החיה (feeBps מה-API)">{feeLabel(p.pool)}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
                     <div className="dx-raised p-2.5">
@@ -86,7 +89,7 @@ export function PoolsView({ world, onNeedAuth, onDone }: {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">בריכות נזילות ({totalPoolValue})</h2>
-          <span className="text-[11px] text-[color:var(--text-3)]">AMM שלמים · x·y=k · עמלה 30bps</span>
+          <span className="text-[11px] text-[color:var(--text-3)]">AMM שלמים · x·y=k · עמלה-דינמית-חי (feeBps)</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="pool-list">
           {pools.map(p => {
@@ -106,7 +109,8 @@ export function PoolsView({ world, onNeedAuth, onDone }: {
                       </div>
                     </div>
                   </div>
-                  <span className="dx-chip px-2.5 py-1 text-[10px] font-semibold">0.30%</span>
+                  {/* FIX(Roast-65-e4 · F4): עמלה-חי-מה-API עם נפילה-כנה ל-'—' */}
+                  <span className="dx-chip px-2.5 py-1 text-[10px] font-semibold" title="עמלת-הבריכה-החיה (feeBps מה-API)">{feeLabel(p)}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   <div className="dx-raised p-2">
@@ -211,7 +215,8 @@ function AddLiquidityModal({ pool, world, onClose, onNeedAuth, onDone }: {
         </div>
         <p className="text-[10px] text-[color:var(--text-3)] flex items-start gap-1.5 leading-relaxed">
           <Info className="w-3 h-3 mt-0.5 shrink-0" />
-          הנזילות נכנסת פרופורציונלית ליחס הבריכה החי. מתחיל לקבל 70% מהעמלות של 30bps מהסוואג' הבא.
+          {/* FIX(Roast-65-e4 · F4): הוסרה הטענה-הקבועה "עמלות של 30bps" */}
+          הנזילות נכנסת פרופורציונלית ליחס הבריכה החי. מתחיל לקבל 70% מהעמלות של הסוואג' הבא (השיעור-החי מוצג-בתג-הבריכה).
         </p>
         <button
           onClick={submit} disabled={busy || amountA <= 0 || amountA > balA}

@@ -101,6 +101,9 @@ model EvidenceReceipt {
   createdAt  DateTime    @default(now())
 
   @@index([kind])
+  // FIX(Roast-65-b · M10): verify-pack טוען-הכל-ממוין לפי-createdAt בכל-איטום
+  // ו-seal קורא-tip — סריקה-מלאה-ומיון-בכל-פעם בלי-אינדקס.
+  @@index([createdAt])
 }
 
 // ─── Research verdict ledger (פסק-הדין של המחקר) ─────────────────────────────

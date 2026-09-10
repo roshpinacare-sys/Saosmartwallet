@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { agentFrom } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
+import { scrub } from '@/lib/secret-scrub';
 
 export async function GET(req: NextRequest) {
   const agent = await agentFrom(req);
@@ -36,9 +37,10 @@ export async function POST(req: NextRequest) {
     // (כולל לא-שייכות-לו ולא-משויכות בכלל) ושוב-ושוב. עכשיו: רק הסוכן-שטען-את-המשימה,
     // ומעבר-חד-פעמי claimed→done|failed (סטטוס אחר = נדחה).
     const status = body.status === 'failed' ? 'failed' : 'done';
+    // FIX(Roast-65-b · M11): TaskItem.result = שדה-טקסט-חופשי — סריקת-סודות לפני-הכתיבה
     const t = await db.taskItem.updateMany({
       where: { id: String(body.taskId || ''), assignedTo: agent.name, status: 'claimed' },
-      data: { status, result: String(body.result || '').slice(0, 4000) },
+      data: { status, result: scrub(String(body.result || '').slice(0, 4000)) },
     });
     if (!t.count) return NextResponse.json({ ok: false, error: 'task not reportable: must be claimed by this agent and still unresolved' }, { status: 409 });
     await audit('task-result', `${agent.name} → ${body.taskId} = ${status}`);
