@@ -9,13 +9,22 @@ try { fs.writeFileSync('/tmp/relay-hot-probe', new Date().toISOString()) } catch
 import { Server } from 'socket.io';
 
 // Load project root .env (mini-service has its own cwd)
+// FIX(Roast-66 · env-allowlist-parity): היה — טעינת-**כל**-ה-.env ל-process.env של
+// התהליך-הזה, כולל SOVEREIGN_VAULT_SECRET (מפתח-ה-AES של-הכספת!) — הפרה-ישירה
+// של-הצהרת-65-b-M5 ("רק-למותר") שכן-כאן-נשכחה. עכשיו: allowlist-דני-ברירת-מחדל —
+// רק-מה-שהתהליך-באמת-צורך (SOVEREIGN_RELAY_TOKEN). וגם-פרסר-קצת-מודע-יותר (מרכאות/הערות).
 if (!process.env.SOVEREIGN_RELAY_TOKEN) {
   try {
     // FIX(Roast-63): import.meta.dir הוא-Bun-בלבד — cast-מפורש (tsc-נקי)
     const bunMeta = import.meta as unknown as { dir: string };
+    const ALLOWED = new Set(['SOVEREIGN_RELAY_TOKEN']);
     for (const line of fs.readFileSync(path.join(bunMeta.dir, '../../.env'), 'utf8').split('\n')) {
-      const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-      if (m && m[1] && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+      const raw = line.trim();
+      if (!raw || raw.startsWith('#')) continue;
+      const m = raw.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (!m || !m[1]) continue;
+      const v = m[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)$/, '$1');
+      if (m[1] && ALLOWED.has(m[1]) && !process.env[m[1]]) process.env[m[1]] = v;
     }
   } catch { /* .env optional */ }
 }
@@ -61,14 +70,40 @@ function portBusy(port: number): Promise<boolean> {
 async function guardianBoot(): Promise<void> {
   try {
     if (await portBusy(3000)) return;
+    // FIX(Roast-66 · spawn-env-minimal): היה — env: {...process.env} — כל-סביבת
+    // ההורה (כולל-כל-מה-שנטען-מה-.env) זלגה-לילד. Next.js טוען-את-.env-שלו-בעצמו —
+    // הילד-צריך-רק-בסיס. סודות-מפורשים-נמחקים belt&braces.
+    const childEnv: NodeJS.ProcessEnv = {};
+    for (const k of ['PATH', 'HOME', 'NODE_ENV', 'TERM', 'LANG', 'TMPDIR']) {
+      if (process.env[k]) childEnv[k] = process.env[k];
+    }
+    delete childEnv.SOVEREIGN_VAULT_SECRET;
+    delete childEnv.SOVEREIGN_RELAY_TOKEN;
+    // FIX(Roast-66 · spawn-stdio+verify): היה — stdio:'ignore' + אפס-אימות-שגר
+    // (דפוס-65-b-M6-הישן: EADDRINUSE/קריסות-שגר שותקות; TOCTOU probe→bind).
+    // עכשיו: stdout/stderr → קובץ-לוג (0600) + poll-אימות-עד-90ש׳ עם-פסק-כן.
+    let logFd: number;
+    try { logFd = fs.openSync('/home/z/my-project/guardian-spawn.log', 'a', 0o600); }
+    catch { logFd = fs.openSync('/dev/null', 'a'); }
     const child = spawnChild('bun', ['run', 'dev'], {
       cwd: '/home/z/my-project',
-      env: { ...process.env },
-      stdio: 'ignore',
+      env: childEnv,
+      stdio: ['ignore', logFd, logFd],
     });
     child.unref();
     child.on('error', (e: Error) => console.log('[guardian] spawn error:', e.message));
     console.log('[guardian] main platform spawning on :3000 (pid', child.pid + ')');
+    void (async () => {
+      for (let i = 0; i < 45; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        if (child.killed) return;
+        if (await portBusy(3000)) {
+          console.log(`[guardian] launch-verified: main platform responding on :3000 (after ~${(i + 1) * 2}s)`);
+          return;
+        }
+      }
+      console.log('[guardian] launch-verification FAILED: port 3000 did not come up in 90s — inspect /home/z/my-project/guardian-spawn.log');
+    })();
   } catch (e) {
     console.log('[guardian] boot skipped:', e instanceof Error ? e.message : e);
   }
