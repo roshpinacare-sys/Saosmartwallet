@@ -111,3 +111,5 @@ main().catch((e) => {
   console.error("scan failed:", e);
   process.exitCode = 1;
 });
+
+export {};
