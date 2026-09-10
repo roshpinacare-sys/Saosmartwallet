@@ -33,6 +33,14 @@ export const FLEET_ACCOUNTS = [
 
 const STEEM_NODE = "https://api.steemit.com";
 const HIVE_NODE = "https://api.hive.blog";
+const BLURT_NODE = "https://blurt-rpc.saboin.com"; // r10: live-verified + chain-id oracle-proven 2026-09-10
+
+/** r10: per-rail failover pools (live-verified endpoints only, same rule as rails-server). */
+const RAIL_NODES: Record<string, string[]> = {
+  steem: [STEEM_NODE, "https://api.justyy.com", "https://api.steemitdev.com"],
+  hive: [HIVE_NODE, "https://api.deathwing.me", "https://api.openhive.network"],
+  blurt: [BLURT_NODE],
+};
 
 export type KeyKind =
   | "steem-wif" | "evm-key" | "hex-priv" | "mnemonic"
@@ -114,41 +122,75 @@ export interface ChainAuthorityMap {
   map: Map<string, KeyControl[]>;
   steemOk: boolean;
   hiveOk: boolean;
+  blurtOk: boolean;
 }
 
-/** Live authority map (pub → controls) for every known fleet account, both chains. */
+/** Decodes a graphene wire pub (STM/HIVE/BLT/TST prefix) to its raw 33 bytes, hex. */
+function pub33Hex(pub: string): string | null {
+  const m = /^(STM|HIVE|BLT|TST)([1-9A-HJ-NP-Za-km-z]+)$/.exec(pub);
+  if (!m) return null;
+  try {
+    const raw = Buffer.from(bs58.decode(m[2]));
+    if (raw.length < 33) return null;
+    return raw.subarray(0, 33).toString("hex");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Live authority map (raw-33-byte pub → controls) for every known fleet
+ * account, on ALL THREE graphene rails (steem + hive + blurt).
+ *
+ * r10: blurt joins the map, and the map key is now the RAW 33-byte hex —
+ * the same key material appears as STM… on steem/hive and BLT… on blurt;
+ * a string-level match could never cross the prefix, which is exactly how
+ * the vault's hive/blurt control was rendered invisible ("unverified").
+ * Each rail fails over its own verified endpoint pool — one slow node must
+ * not blind the whole plane (live-learned mid-r10: a hive hiccup mass-demoted
+ * 40 provable keys to "failed" — the sweep manufacturing its own alarm).
+ */
 export async function fetchChainAuthorityMap(): Promise<ChainAuthorityMap> {
   const map = new Map<string, KeyControl[]>();
   const push = (chain: string, account: string, role: string, pub: string) => {
     if (!pub) return;
-    const arr = map.get(pub) || [];
+    const raw = pub33Hex(pub);
+    if (!raw) return;
+    const arr = map.get(raw) || [];
     arr.push({ chain, account, role, pub });
-    map.set(pub, arr);
+    map.set(raw, arr);
   };
-  let steemOk = false;
-  let hiveOk = false;
-  async function node(node: string, chain: string, setOk: (v: boolean) => void) {
-    try {
-      const r = await fetch(node, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_accounts", params: [FLEET_ACCOUNTS], id: 1 }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const j = await r.json();
-      for (const a of j.result || []) {
-        for (const role of ["owner", "active", "posting"] as const) {
-          for (const [pub] of a[role]?.key_auths || []) push(chain, a.name, role, pub);
+  const ok = { steem: false, hive: false, blurt: false };
+  await Promise.all(
+    Object.entries(RAIL_NODES).map(async ([chain, nodes]) => {
+      for (const node of nodes) {
+        // two polite attempts per node — one transient timeout must not blind a rail
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
+            const r = await fetch(node, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_accounts", params: [FLEET_ACCOUNTS], id: 1 }),
+              signal: AbortSignal.timeout(15000),
+            });
+            const j = await r.json();
+            for (const a of j.result || []) {
+              for (const role of ["owner", "active", "posting"] as const) {
+                for (const [pub] of a[role]?.key_auths || []) push(chain, a.name, role, pub);
+              }
+              push(chain, a.name, "memo", a.memo_key);
+            }
+            ok[chain as keyof typeof ok] = true;
+            return; // this rail answered — done
+          } catch {
+            /* retry, then the next endpoint of this rail */
+          }
         }
-        push(chain, a.name, "memo", a.memo_key);
       }
-      setOk(true);
-    } catch {
-      setOk(false);
-    }
-  }
-  await Promise.all([node(STEEM_NODE, "steem", (v) => (steemOk = v)), node(HIVE_NODE, "hive", (v) => (hiveOk = v))]);
-  return { map, steemOk, hiveOk };
+    }),
+  );
+  return { map, steemOk: ok.steem, hiveOk: ok.hive, blurtOk: ok.blurt };
 }
 
 function classify(raw: string): KeyKind {
@@ -176,16 +218,17 @@ export async function identifyKey(raw: string): Promise<KeyIdReport> {
   }
 
   if (kind === "steem-wif") {
-    report.label = "מפתח פרטי STEEM/HIVE (WIF)";
+    report.label = "מפתח פרטי STEEM/HIVE/BLURT (WIF)";
     const pub = wifToChainPub(s);
     report.pubs.push(pub);
-    const { map, steemOk, hiveOk } = await fetchChainAuthorityMap();
-    report.liveChecked = steemOk || hiveOk;
-    report.controls = map.get(pub) || [];
+    const { map, steemOk, hiveOk, blurtOk } = await fetchChainAuthorityMap();
+    report.liveChecked = steemOk || hiveOk || blurtOk;
+    report.controls = map.get(pub33Hex(pub) || "") || [];
     if (report.liveChecked && !report.controls.length)
-      notes.push("המפתח תקין קריפטוגרפית אך אינו מחזיק authority באף חשבון-מוכר ברשתות שנבדקו");
+      notes.push("המפתח תקין קריפטוגרפית אך אינו מחזיק authority באף חשבון-מוכר ברשתות שנבדקו (steem/hive/blurt)");
     if (!steemOk) notes.push("steem node לא נענה");
     if (!hiveOk) notes.push("hive node לא נענה");
+    if (!blurtOk) notes.push("blurt node לא נענה");
     return report;
   }
 
@@ -200,7 +243,8 @@ export async function identifyKey(raw: string): Promise<KeyIdReport> {
     const { map, steemOk } = await fetchChainAuthorityMap();
     report.liveChecked = steemOk;
     for (const p of pubs) {
-      for (const c of map.get(p) || []) report.controls.push(c);
+      const raw = /^(STM|HIVE|BLT|TST)/.test(p) ? pub33Hex(p) : p.toLowerCase();
+      for (const c of map.get(raw || "") || []) report.controls.push(c);
     }
     if (!report.controls.length) notes.push("נגזרו כתובות EVM+TRON — אין authority-steem למפתח (תקין לארנקי-צי)");
     return report;

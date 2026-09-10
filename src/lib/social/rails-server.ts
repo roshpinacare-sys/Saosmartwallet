@@ -6,17 +6,19 @@
  *   · endpoint pool (only LIVE-VERIFIED endpoints are ever hardcoded —
  *     the repo rule: "never hardcode unverified endpoints")
  *   · chain id (signing digest domain): steem mainnet = 32 zero bytes;
- *     hive mainnet = 32 zero bytes too (dhive's hardcoded default — the
- *     id every mainstream hive client signs with; empirically re-proven on
- *     every broadcast we make). blurt: no verified endpoint from this
- *     infra yet → read rail reports honestly, broadcast rail stays
- *     fail-closed until an endpoint AND a vault key both exist.
- *   · asset naming (STEEM/SBD vs HIVE/HBD)
+ *     hive mainnet = beeab0de… (signature-oracle-proven); blurt mainnet =
+ *     cd8d90f2… (signature-oracle-proven 2026-09-10, r10 — the same day its
+ *     endpoint fleet came back to life via blurt-rpc.saboin.com).
+ *   · asset naming (STEEM/SBD vs HIVE/HBD vs BLURT/BBD)
+ *   · wire key prefix (STM for steem/hive, BLT for blurt)
  *
  * Key sovereignty: verifyPostingKeyOnChain() proves a vault WIF controls an
  * account by comparing the DERIVED public key against the account's own
- * on-chain posting authority — pure crypto + a public read, no broadcast,
- * no assumption. This is the fail-closed gate before every hive broadcast.
+ * on-chain authority — pure crypto + a public read, no broadcast,
+ * no assumption. This is the fail-closed gate before every hive/blurt
+ * broadcast. (r10 fix: the prefix list here MUST include "BLT" — it never
+ * did, so a blurt authority key was silently undecodable and every blurt
+ * match was falsely reported as a mismatch.)
  */
 import { SteemAdapter } from "../../../packages/chains/steem/src/adapter";
 import { PrivateKey, steemPublicKeyDecode, steemPublicKeyEncode } from "../../../packages/crypto/src/index";
@@ -38,16 +40,30 @@ export const HIVE_CHAIN_ID = new Uint8Array(
   Buffer.from("beeab0de00000000000000000000000000000000000000000000000000000000", "hex"),
 );
 
+/**
+ * Blurt mainnet signing domain — LIVE-ORACLE-PROVEN 2026-09-10 (r10), not
+ * assumed: rebuilding real blurt txs from the node's own wire bytes, the
+ * on-chain signatures recover to the signers' authority keys ONLY under
+ * cd8d90f2… (tools/r10-blurt-digest-oracle.ts — 3/3 matched; zeros/hive/
+ * blurtpy-testnet candidates all 0/3). Matches @beblurt/dblurt's
+ * DEFAULT_CHAIN_ID. NOTE blurt's config.hpp default (fc::sha256() = zeros)
+ * is overridden by the deployed genesis — zeros was falsified live.
+ */
+export const BLURT_CHAIN_ID = new Uint8Array(
+  Buffer.from("cd8d90f29ae273abec3eaa7731e25934c63eb654d55080caff2ebb7f5df6381f", "hex"),
+);
+
 /** Endpoint pools — every entry live-verified before it entered this file. */
 export const RAIL_ENDPOINTS: Record<Rail, string[]> = {
   // verified live 2026-09-08..09 (see src/lib/steem-server.ts notes)
   steem: ["https://api.steemit.com", "https://api.justyy.com", "https://api.steemitdev.com"],
   // verified live 2026-09-10: all three answered condenser_api.get_dynamic_global_properties
   hive: ["https://api.hive.blog", "https://api.deathwing.me", "https://api.openhive.network"],
-  // probed live 2026-09-10: rpc.blurt.world / blurt-rpc.saladjon.com / rpc.blurt.buzz /
-  // blurt.lexai.host — ALL unreachable from this infra. No endpoint is trusted →
-  // the blurt rail stays honest-disabled until an operator supplies a verified one.
-  blurt: [],
+  // probed live 2026-09-10 (r10): the fleet of dead endpoints from 09-10 morning
+  // (rpc.blurt.world / rpc.blurt.buzz / blurt.lexai.host / saladjon — DNS-dead) is
+  // gone; blurt-rpc.saboin.com answered condenser_api live and its chain id was
+  // proven by the signature oracle. Verified again right now before entering here.
+  blurt: ["https://blurt-rpc.saboin.com"],
 };
 
 export const RAIL_ASSETS: Record<Rail, { liquid: string; debt: string }> = {
@@ -260,7 +276,7 @@ export async function verifyPostingKeyOnChain(
     base.chainPub = String(pub);
     let chain33: Uint8Array;
     try {
-      chain33 = steemPublicKeyDecode(base.chainPub, ["STM", "TST", "HIVE", "BLURT"]);
+      chain33 = steemPublicKeyDecode(base.chainPub, ["STM", "TST", "HIVE", "BLURT", "BLT"]);
     } catch {
       continue; // undecodable chain entry — try the next authority key
     }
@@ -269,6 +285,39 @@ export async function verifyPostingKeyOnChain(
     }
   }
   return { ...base, match: false };
+}
+
+// ---------------------------------------------------------------------------
+// Blurt write path — SAME wire-exact engine, the blurt chain domain (r10)
+// ---------------------------------------------------------------------------
+
+let blurtReadSingleton: SteemAdapter | null = null;
+let blurtBroadcastSingleton: SteemAdapter | null = null;
+
+function blurtAdapterOpts() {
+  return {
+    rpcUrl: RAIL_ENDPOINTS.blurt[0],
+    rpcUrls: RAIL_ENDPOINTS.blurt.slice(1),
+    chainId: BLURT_CHAIN_ID,
+    addressPrefix: "BLT", // blurt keys carry the BLT prefix on the wire
+    requestTimeoutMs: 15_000,
+  } as const;
+}
+
+/** Blurt read adapter — broadcast-disabled, fail-closed by construction. */
+export function blurtAdapter(): SteemAdapter {
+  if (!blurtReadSingleton) blurtReadSingleton = new SteemAdapter({ ...blurtAdapterOpts() });
+  return blurtReadSingleton;
+}
+
+/**
+ * Blurt write path — explicit broadcast opt-in, used ONLY by the gate's
+ * sovereign-voice signing pipeline after verifyPostingKeyOnChain("blurt", …)
+ * passed. The chain id is oracle-proven (BLURT_CHAIN_ID), not assumed.
+ */
+export function blurtBroadcastAdapter(): SteemAdapter {
+  if (!blurtBroadcastSingleton) blurtBroadcastSingleton = new SteemAdapter({ ...blurtAdapterOpts(), allowBroadcast: true });
+  return blurtBroadcastSingleton;
 }
 
 // ---------------------------------------------------------------------------
