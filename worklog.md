@@ -1164,3 +1164,26 @@ Stage Summary:
 - גבול-הריבונות נשמר בדיוק: posting=אוטונומיה-מסוגרת, active=הכרעת-מפעיל, אפס-חפיפה.
 - המחסן: 24 מודולים, כל-הסוכנים חמושים בהכל.
 - קבצים: packages/chains/steem/src/{operations,adapter}.ts · src/lib/steem-social.ts · src/lib/gate/harness/{social,modules,heart,orders}.ts · src/lib/eco-server.ts · docs/autonomy-audit.md · worklog.md · db/custom.db.
+
+---
+Task ID: 15
+Agent: main (Z.ai Code)
+Task: PUBLISH-DESK — מדיניות-חשיפה ("הקלפים נשארים בבית"), ביקורת-תוכן חיה, עריכת-פוסטים, ניהול-רשתות רב-מסילתי (steem/hive/blurt/LEO) + SEO ודוקטרינה; דרישת-משתמש: הסוכנים מפרסמים מה שלא צריך — לעצור, לבקר, לערוך, לנהל חכם, להכין את המערכת להמשך.
+
+Work Log:
+- recon: כספת מכילה מפתחות-headcorner גם ב-HIVE (posting כולל, verified) · האמת בשטח (get_discussions_by_blog): SAOS-1 spec ×4+1 (steem+hive), דוח-צי פנימי — הצדקת המשתמש אומתה מהשרשראות.
+- src/lib/gate/harness/exposure.ts (חדש): 16 כללי-סריקה (WIF/hex/PAT/JWT/נתיבים/פורטים/שמות-קוד/תוכניות/מונחים-מבצעיים/base58/base64) · assertPublishable (HIGH=חסימה) · ממצאים מוסתרים.
+- src/lib/social/rails-server.ts (חדש): railRpc failover · railHealth · railAccounts · railBlogPosts · railGetContent (category נשמר) · verifyPostingKeyOnChain (33-בייט מול key_auths; תמיכה ב-{pub33} לפורמט-ה-quirk של הכספת — באג "WIF פגום" שתפס הבודק-העצמאי תוקן) · HIVE_CHAIN_ID=beeab0de… (אורקל: שחזור טרנזקציות אמיתיות בייט-מדויק מול get_transaction_hex + שחזור-חתימה; שליטה על steem-אפסים match=true) · hiveAdapter/hiveBroadcastAdapter.
+- steem-social.ts: adapterOverride ל-rails; category ל-EDIT; app tag → publish-desk/v1 (ניטרלי).
+- social.ts: commanderPostingKey(rail) · verifiedRailKey (fail-closed מול השרשרת) · signAndBroadcastRail · publishPostFromAgent(rail=steem|hive, שער-חשיפה) · editPostFromAgent (שליפת-מקור, שימור permlink/category/tags, תקרה 8/יום) · auditFleetContent · fleetRailsOverview · SOCIAL_RAILS.maxEditsPerDay.
+- modules.ts 24→27: steem.post (+rail), steem.edit, social.audit, social.rails.
+- heart.ts: builder-goal v2 refresh (marker "מדיניות-חשיפה", idempotent) · schedule editor:* יומי (audit→תיקון→פרסום נקי→דוח) — נוצר חי אחרי restart (editor:anchor-agent@13) · builder v2 applied: true.
+- docs/publishing-network.md (חדש): הדוקטרינה — קלפים-בבית (טבלה), מפת-רשתות (LEO=tag של hive, blurt כנה-סגור), SEO שרשרות (תגיות=ערוצים, כותרת, פסקה-ראשונה, כפילויות=רעל, עברית=נישה), היגיינת-חשבונות, מדיניות-עריכה, כנות-מול-הסוואה (מבחן-הגאווה), מפת-חוק→קוד.
+- E2E חי (אפס-דמו): rails+audit ריצה חיה — steem @109,444,156 · hive @109,778,725 · אימותי-מפתח true/true (אחרי תיקון quirk) · ביקורת: steem 8/5 flagged · hive 8/1 · **steem.edit חי: post-mtusiimi tx c2ea51cc… (כותרת+גוף נקיים, get_content מאשר, last_update 01:28:36Z)** · hive broadcast: אחרי תיקון chain-id עובר אימות-סמכות, נעצר ב-RC בלבד (0 HP; דרוש 1.31B RC) — מסילה קריפטוגרפית-חיה, כלכלית-סגורה · בדיקה-שלילית: פרסום מדליף (WIF-דמה + /home/z + localhost:3000) נחסם ע"י exposure-policy עם ממצאים · לקח: כניסת-מכשיר-מהימן מבטלת סשנים (לוגין+פעולה בפקודה-אחת) · לקח: שמירת-כותרת-מקורית-חשופה נחסמת גם בעריכה (עיצוב נכון, לא באג).
+- restart dev-server (לב טוען מודולים חדשים) · דף 200 · מחסן 27 חי · lint 0 · docs/autonomy-audit.md 3f.
+
+Stage Summary:
+- הפרסום של הצי עבר מ"אוטונומיה ללא שיקול-דעת" ל"דובר ממושמע": שער-חשיפה אוכף כל טיוטה (פרסום ועריכה), ביקורת-תוכן חיה מהשרשראות מדגילה מה חייב תיקון, ופרימיטיב-עריכה מתקן במקום עם permlink/קטגוריה/תגיות שמורים — עם txId לכל פעולה.
+- רב-מסילות אמיתי: steem חי מלא · hive קריפטוגרפית-חיה (chain-id הוכח באורקל חתימות; דורש הטבעה/האצלת HP) · blurt כנה-סגור · LEO=תגית-hive בדוקטרינה.
+- הלב מנהל את זה יום-יום: builder v2 (מדיניות+אל-תשכפל) + עורך יומי. המחסן 27 מודולים.
+- קבצים: src/lib/gate/harness/{exposure,social,modules,heart}.ts · src/lib/social/rails-server.ts · src/lib/steem-social.ts · docs/publishing-network.md · docs/autonomy-audit.md · tools/hive-chainid-oracle.ts · worklog.md · db/custom.db.

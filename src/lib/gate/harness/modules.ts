@@ -21,7 +21,7 @@ import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
-import { publishPostFromAgent, interactFromAgent, SOCIAL_RAILS } from "./social";
+import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, SOCIAL_RAILS } from "./social";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
@@ -473,8 +473,8 @@ export const MODULES: HarnessModule[] = [
     id: "steem.post",
     name: "קול-ריבוני — פרסום",
     kind: "actor",
-    desc: `פרסום פוסט/תגובה אמיתי בשרשרת מ-@headcorner (authority-posting — לעולם לא נוגע בכספים). הכספת חותמת ישר: זו היד האוטונומית שלך, במסילות ${SOCIAL_RAILS.maxPostsPerDay} פרסומים/יום לצי. פרסם ערך אמיתי — דוח-צי, ממצא, ניתוח — לא רעש. מוחזר permlink + txId אמיתיים.`,
-    args: `{"title":"string","body":"markdown ≤20000","tags":["≤5, [a-z0-9-]"],"replyTo":{"author":"…","permlink":"…"} (optional — comment)}`,
+    desc: `פרסום פוסט/תגובה אמיתי מ-@headcorner (authority-posting — לעולם לא נוגע בכספים). מסילה: rail=steem (steemit.com) או rail=hive (peakd) — אותו מנוע-חותם, שרשרת-יעד שונה. מדיניות-חשיפה אוכפת חי: סודות/נתיבים/שמות-קוד/תוכניות לא יצאו — טיוטה חשופה נחסמת ומוחזרת לתיקון. תקרה ${SOCIAL_RAILS.maxPostsPerDay}/יום לצי. permlink + txId אמיתיים.`,
+    args: `{"title":"string","body":"markdown ≤20000","tags":["≤5, [a-z0-9-]"],"rail":"steem|hive (ברירת-מחדל steem)","replyTo":{"author":"…","permlink":"…"} (optional — comment)}`,
     needsVault: true,
     cacheable: false,
     async exec(args, ctx) {
@@ -483,14 +483,63 @@ export const MODULES: HarnessModule[] = [
       const body = String(args.body || "").trim();
       if (!body) throw new GateError("bad-input", "דרוש params.body (markdown)");
       const tags = Array.isArray(args.tags) ? args.tags.map((t) => String(t)) : [];
-      if (!tags.length) throw new GateError("bad-input", 'דרוש params.tags (מערך, למשל ["saos","steem"])');
+      if (!tags.length) throw new GateError("bad-input", 'דרוש params.tags (מערך, למשל ["steem","news"])');
+      const rail = String(args.rail || "steem") === "hive" ? "hive" as const : "steem" as const;
       let replyTo: { author: string; permlink: string } | undefined;
       if (args.replyTo && typeof args.replyTo === "object") {
         const rt = args.replyTo as { author?: unknown; permlink?: unknown };
         if (typeof rt.author === "string" && typeof rt.permlink === "string") replyTo = { author: rt.author, permlink: rt.permlink };
       }
-      const r = await publishPostFromAgent({ agentName: ctx.agentName, runId: ctx.runId, title, body, tags, replyTo });
-      return { ...r, meaning: `פורסם חי בשרשרת — ${r.url}` };
+      const r = await publishPostFromAgent({ agentName: ctx.agentName, runId: ctx.runId, title, body, tags, rail, replyTo });
+      return { ...r, meaning: `פורסם חי בשרשרת (${r.rail}) — ${r.url}` };
+    },
+  },
+  {
+    id: "steem.edit",
+    name: "קול-ריבוני — עריכת פוסט",
+    kind: "actor",
+    desc: `עריכת פוסט קיים של @headcorner על מסילה (steem|hive): שליפת המקור מהשרשרת, שימור permlink+קטגוריה+תגיות, שער מדיניות-החשיפה, ושידור גרסה מתוקנת. זו דרך-הצי לתקן תוכן חשוף/שגוי — מהר, בגבולות (${SOCIAL_RAILS.maxEditsPerDay}/יום), בלי לרסק היסטוריה. txId אמיתי מוחזר.`,
+    args: `{"permlink":"string (הפוסט הקיים)","title":"string","body":"markdown חדש","rail":"steem|hive (ברירת-מחדל steem)","tags":["optional — ברירת-מחדל: תגיות המקור"]}`,
+    needsVault: true,
+    cacheable: false,
+    async exec(args, ctx) {
+      const permlink = String(args.permlink || "").trim();
+      if (!permlink) throw new GateError("bad-input", "דרוש params.permlink של הפוסט הקיים (קרא social.audit קודם)");
+      const title = String(args.title || "").trim();
+      if (!title) throw new GateError("bad-input", "דרוש params.title");
+      const body = String(args.body || "").trim();
+      if (!body) throw new GateError("bad-input", "דרוש params.body (הגוף המתוקן המלא)");
+      const rail = String(args.rail || "steem") === "hive" ? "hive" as const : "steem" as const;
+      const tags = Array.isArray(args.tags) ? args.tags.map((t) => String(t)) : undefined;
+      const r = await editPostFromAgent({ agentName: ctx.agentName, runId: ctx.runId, permlink, title, body, rail, tags });
+      return { ...r, meaning: `הפוסט נערך חי בשרשרת (${r.rail}) — ${r.url}` };
+    },
+  },
+  {
+    id: "social.audit",
+    name: "ביקורת-פרסום חיה",
+    kind: "connector",
+    desc: 'האמת מהשרשראות: הפידים האחרונים של @headcorner על steem ו-hive, כל פוסט נסרק מול מדיניות-החשיפה — מה פורסם, מתי, באילו תגיות, איזה תגמול, ומה מדוגל לעריכה (סודות/שמות-קוד/דוחות פנימיים שדלפו). זה עונה ״מי מפרסם מה ואיך, ומה חייב לצאת או להתוקן״. קרא את זה לפני פרסום/עריכה.',
+    args: `{"limit":"1..10 למסילה (ברירת-מחדל 8)"}`,
+    needsVault: false,
+    cacheable: true,
+    async exec(args) {
+      const limit = Math.min(Math.max(Number(args.limit) || 8, 1), 10);
+      const audit = await auditFleetContent(limit);
+      return { ...audit, meaning: audit.summary };
+    },
+  },
+  {
+    id: "social.rails",
+    name: "מסילות-הפרסום",
+    kind: "connector",
+    desc: "תמונת-מצב חיה של מסילות-הפרסום של הרשת (steem/hive/blurt): איזו שרשרת חיה ועד איזה בלוק, איזה חשבונות יש לנו שם, והאם מפתח-ה-posting בכספת אומת מול הסמכות בשרשרת עצמה (השוואת מפתח-ציבורי 33 בייט). זה לוח-ההמראה לפני כל פרסום רב-מסילתי.",
+    args: "{}",
+    needsVault: true,
+    cacheable: true,
+    async exec() {
+      const o = await fleetRailsOverview();
+      return { ...o, meaning: `steem: ${o.rails[0]?.reachable ? `חי @ ${o.rails[0].headBlock}` : "לא נגיש"} · hive: ${o.rails[1]?.reachable ? `חי @ ${o.rails[1].headBlock}` : "לא נגיש"} · blurt: ${o.rails[2]?.reachable ? "חי" : "סגור (אין endpoint מאומת)"}` };
     },
   },
   {

@@ -22,14 +22,28 @@ import { steemBroadcastAdapter } from "@/lib/steem-server";
 import { buildSteemPostTx, buildSteemVoteTx, buildSteemFollowTx, buildSteemReblogTx, type SocialBuild } from "@/lib/steem-social";
 import { PrivateKey } from "../../../../packages/crypto/src/index";
 import { toSigningKey, COMMANDER_ACCOUNT } from "./orders";
+import { assertPublishable, scanExposure } from "./exposure";
+import {
+  hiveBroadcastAdapter,
+  railBlogPosts,
+  railGetContent,
+  railHealth,
+  verifyPostingKeyOnChain,
+  type Rail,
+  type RailHealth,
+  type RailPost,
+} from "@/lib/social/rails-server";
 
 export const SOCIAL_RAILS = {
   maxPostsPerDay: 4, // fleet-wide real publications per UTC day
   maxInteractionsPerDay: 12, // votes + follows + reblogs combined per UTC day
+  maxEditsPerDay: 8, // fixing exposed/wrong content is a duty, not spam — but bounded
   maxVoteWeight: 2000, // ≤ 20% — the fleet votes with conviction, never spam
   maxPostBodyChars: 20000,
   maxTags: 5,
 } as const;
+
+export type PublishRail = "steem" | "hive";
 
 function dayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -41,16 +55,57 @@ async function socialMsg(body: string, meta: Record<string, unknown>): Promise<v
     .catch(() => {});
 }
 
-/** The vault POSTING key of the commander — never taken from agent input. */
-async function commanderPostingKey(): Promise<PrivateKey> {
+/** The vault POSTING key of the commander on a rail — never taken from agent input. */
+async function commanderPostingKey(rail: Rail = "steem"): Promise<PrivateKey> {
   requireMaster();
   const entry = await db.vaultEntry.findFirst({
-    where: { chain: "steem", account: COMMANDER_ACCOUNT, role: "posting" },
+    where: { chain: rail, account: COMMANDER_ACCOUNT, role: "posting" },
     orderBy: { updatedAt: "desc" },
   });
-  if (!entry) throw new GateError("vault-missing-key", `אין מפתח-posting של ${COMMANDER_ACCOUNT} בכספת`);
+  if (!entry) throw new GateError("vault-missing-key", `אין מפתח-posting של ${COMMANDER_ACCOUNT} על ${rail} בכספת`);
   const wif = openSecret({ encPriv: entry.encPriv, privIv: entry.privIv, privTag: entry.privTag });
   return toSigningKey(wif);
+}
+
+/**
+ * PUBLISH-DESK gate: prove the vault key is the account's CURRENT posting
+ * authority ON THE CHAIN (33-byte public-key comparison) before any rail
+ * broadcast. Fail-closed — a mismatch refuses to sign, loud and honest.
+ */
+async function verifiedRailKey(rail: Rail): Promise<PrivateKey> {
+  const priv = await commanderPostingKey(rail);
+  const proof = await verifyPostingKeyOnChain(rail, COMMANDER_ACCOUNT, { pub33: priv.publicKey.bytes });
+  if (!proof.match) {
+    throw new GateError(
+      "rail-key-mismatch",
+      `מפתח ה-posting בכספת אינו הסמכות הנוכחית של ${COMMANDER_ACCOUNT} על ${rail}` +
+        ` (chain: ${proof.chainPub ?? "—"} · derived: ${proof.derivedPub ?? "—"}${proof.reason ? ` · ${proof.reason}` : ""}) — השידור נחסם`,
+    );
+  }
+  return priv;
+}
+
+async function signAndBroadcastRail(
+  rail: PublishRail,
+  kind: string,
+  agentName: string,
+  built: SocialBuild,
+  evidence: Record<string, unknown>,
+): Promise<{ txId: string; blockNum?: number }> {
+  const priv = await verifiedRailKey(rail);
+  const adapter = rail === "hive" ? hiveBroadcastAdapter() : steemBroadcastAdapter();
+  try {
+    const signed = await adapter.sign(built.unsigned, { byRole: { posting: priv } }, ["posting"]);
+    const res = await adapter.broadcast(signed);
+    const txId = res.txId || built.txId;
+    await audit(`sovereign-voice:${kind}`, agentName, { rail, ...evidence }, true, { txId, blockNum: res.blockNum ?? null });
+    return { txId, blockNum: res.blockNum };
+  } catch (e) {
+    const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300);
+    await audit(`sovereign-voice:${kind}`, agentName, { rail, ...evidence }, false, { error: msg });
+    await socialMsg(`❌ שידור ${kind} נכשל על ${rail} (${agentName}): ${msg} — נרשם בכנות`, {}).catch(() => {});
+    throw new GateError("broadcast-failed", `השידור נכשל: ${msg}`);
+  }
 }
 
 async function audit(action: string, agentName: string, params: unknown, ok: boolean, result: unknown): Promise<void> {
@@ -64,27 +119,14 @@ async function dayCount(status: string): Promise<number> {
   return db.gateAction.count({ where: { action: { startsWith: status }, createdAt: { gte: dayStart }, ok: true } });
 }
 
-/** Sign + broadcast a built social tx with the vault posting key. Returns REAL chain evidence. */
+/** Sign + broadcast a built social tx with the vault posting key (steem rail — legacy interact path). */
 async function signAndBroadcast(
   kind: string,
   agentName: string,
   built: SocialBuild,
   evidence: Record<string, unknown>,
 ): Promise<{ txId: string; blockNum?: number }> {
-  const priv = await commanderPostingKey();
-  const adapter = steemBroadcastAdapter();
-  try {
-    const signed = await adapter.sign(built.unsigned, { byRole: { posting: priv } }, ["posting"]);
-    const res = await adapter.broadcast(signed);
-    const txId = res.txId || built.txId;
-    await audit(`sovereign-voice:${kind}`, agentName, evidence, true, { txId, blockNum: res.blockNum ?? null });
-    return { txId, blockNum: res.blockNum };
-  } catch (e) {
-    const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300);
-    await audit(`sovereign-voice:${kind}`, agentName, evidence, false, { error: msg });
-    await socialMsg(`❌ שידור ${kind} נכשל (${agentName}): ${msg} — נרשם בכנות`, {}).catch(() => {});
-    throw new GateError("broadcast-failed", `השידור נכשל: ${msg}`);
-  }
+  return signAndBroadcastRail("steem", kind, agentName, built, evidence);
 }
 
 export interface VoicePostResult {
@@ -95,15 +137,21 @@ export interface VoicePostResult {
   url: string;
 }
 
-/** Publish a REAL post to the chain — bounded, audited, chain-evidenced. */
+/**
+ * Publish a REAL post to a rail — exposure-gated, bounded, audited,
+ * chain-evidenced. rail="hive" runs the SAME wire-exact packer against a
+ * hive node after verifyPostingKeyOnChain proved the vault key rules there.
+ */
 export async function publishPostFromAgent(input: {
   agentName: string;
   runId: string;
   title: string;
   body: string;
   tags: string[];
+  rail?: PublishRail;
   replyTo?: { author: string; permlink: string };
 }): Promise<VoicePostResult> {
+  const rail: PublishRail = input.rail === "hive" ? "hive" : "steem";
   const postsToday = await dayCount("sovereign-voice:post");
   if (postsToday >= SOCIAL_RAILS.maxPostsPerDay) {
     throw new GateError("rate-limited", `תקרת-הפרסום היומית של הצי מוצו (${postsToday}/${SOCIAL_RAILS.maxPostsPerDay}) — איכות קודמת לכמות`);
@@ -112,16 +160,211 @@ export async function publishPostFromAgent(input: {
   if (body.length > SOCIAL_RAILS.maxPostBodyChars) {
     throw new GateError("bad-input", `הגוף חורג מ-${SOCIAL_RAILS.maxPostBodyChars} תווים`);
   }
+  // ── exposure policy: the cards stay home ──────────────────────────────
+  const exposure = assertPublishable(input.title, body);
   const tags = (input.tags || []).slice(0, SOCIAL_RAILS.maxTags);
-  const built = await buildSteemPostTx({ author: COMMANDER_ACCOUNT, title: input.title, body, tags, replyTo: input.replyTo });
-  const { txId, blockNum } = await signAndBroadcast("post", input.agentName, built, {
+  const built = await buildSteemPostTx(
+    { author: COMMANDER_ACCOUNT, title: input.title, body, tags, replyTo: input.replyTo },
+    rail === "hive" ? hiveBroadcastAdapter() : undefined, // build ref-block FROM the rail we broadcast to
+  );
+  const { txId, blockNum } = await signAndBroadcastRail(rail, "post", input.agentName, built, {
     agentName: input.agentName, runId: input.runId, permlink: built.permlink, title: input.title.slice(0, 120), tags,
+    exposureRisk: exposure.risk, exposureKinds: exposure.findings.map((f) => f.kind),
   });
   await socialMsg(
-    `🗣️ ${input.agentName} פרסם לשרשרת: "${input.title.slice(0, 100)}" · @${COMMANDER_ACCOUNT}/${built.permlink} · txId: ${txId}`,
-    { permlink: built.permlink, txId, runId: input.runId },
+    `🗣️ ${input.agentName} פרסם לשרשרת (${rail}): "${input.title.slice(0, 100)}" · @${COMMANDER_ACCOUNT}/${built.permlink} · txId: ${txId}` +
+      (exposure.risk === "medium" ? ` · ⚠️ חשיפה-בינונית: ${exposure.findings.map((f) => f.kind).join(",")}` : ""),
+    { rail, permlink: built.permlink, txId, runId: input.runId },
   );
-  return { permlink: built.permlink, category: built.category, txId, blockNum, url: `https://steemit.com/@${COMMANDER_ACCOUNT}/${built.permlink}` };
+  return {
+    rail, permlink: built.permlink, category: built.category, txId, blockNum,
+    url: rail === "hive" ? `https://peakd.com/@${COMMANDER_ACCOUNT}/${built.permlink}` : `https://steemit.com/@${COMMANDER_ACCOUNT}/${built.permlink}`,
+  };
+}
+
+export interface VoiceEditResult {
+  rail: PublishRail;
+  permlink: string;
+  txId: string;
+  blockNum?: number;
+  changedChars: number;
+  url: string;
+}
+
+/**
+ * EDIT an existing fleet post on a rail — the remediation primitive behind
+ * "עריכת כל הפוסטים": fetch the original from the chain, prove ownership,
+ * run the exposure gate, then broadcast the comment op with the SAME
+ * permlink/parent (a graphene edit is a re-comment). Bounded daily cap.
+ */
+export async function editPostFromAgent(input: {
+  agentName: string;
+  runId: string;
+  rail?: PublishRail;
+  permlink: string;
+  title: string;
+  body: string;
+  tags?: string[];
+}): Promise<VoiceEditResult> {
+  const rail: PublishRail = input.rail === "hive" ? "hive" : "steem";
+  const editsToday = await dayCount("sovereign-voice:edit");
+  if (editsToday >= SOCIAL_RAILS.maxEditsPerDay) {
+    throw new GateError("rate-limited", `תקרת-העריכות היומית מוצו (${editsToday}/${SOCIAL_RAILS.maxEditsPerDay}) — עריכה מתוכננת, לא ריסוק-היסטוריה`);
+  }
+  const permlink = String(input.permlink || "").trim();
+  if (!/^[a-z0-9-]{1,256}$/.test(permlink)) throw new GateError("bad-input", "permlink חייב להיות [a-z0-9-]");
+  const original: RailPost | null = await railGetContent(rail, COMMANDER_ACCOUNT, permlink);
+  if (!original) throw new GateError("no-post", `אין פוסט @${COMMANDER_ACCOUNT}/${permlink} על ${rail} — אין מה לערוך`);
+  if (original.author !== COMMANDER_ACCOUNT) throw new GateError("not-ours", "רק פוסטים של הצי נערכים");
+  const newBody = String(input.body || "");
+  if (!newBody.trim() || newBody.length > SOCIAL_RAILS.maxPostBodyChars) {
+    throw new GateError("bad-input", "גוף-עריכה חייב להיות לא ריק ובתוך התקרה");
+  }
+  // tags: default to the ORIGINAL tags — an edit must not silently re-categorize the post
+  let tags = (input.tags && input.tags.length ? input.tags : original.tags).slice(0, SOCIAL_RAILS.maxTags);
+  if (!tags.length && original.category) tags = [original.category];
+  if (!tags.length) throw new GateError("bad-input", "לעריכה דרושות תגיות (המקור לא כלל תגיות ואין קטגוריה שמורה)");
+  // ── exposure policy applies to edits too ──────────────────────────────
+  const exposure = assertPublishable(input.title, newBody);
+  const built = await buildSteemPostTx(
+    {
+      author: COMMANDER_ACCOUNT,
+      title: String(input.title || original.title).trim() || original.title,
+      body: newBody,
+      tags,
+      permlink, // SAME permlink + SAME original category parent = edit, not a new post
+      category: original.category || undefined,
+    },
+    rail === "hive" ? hiveBroadcastAdapter() : undefined,
+  );
+  const { txId, blockNum } = await signAndBroadcastRail(rail, "edit", input.agentName, built, {
+    agentName: input.agentName, runId: input.runId, permlink, title: input.title.slice(0, 120),
+    exposureRisk: exposure.risk, exposureKinds: exposure.findings.map((f) => f.kind),
+  });
+  await socialMsg(
+    `✏️ ${input.agentName} ערך פוסט קיים (${rail}): @${COMMANDER_ACCOUNT}/${permlink} · txId: ${txId} · שינוי ${original.bodyPreview.length}→${newBody.length} תווים`,
+    { rail, permlink, txId, runId: input.runId },
+  );
+  return {
+    rail, permlink, txId, blockNum, changedChars: newBody.length - original.bodyPreview.length,
+    url: rail === "hive" ? `https://peakd.com/@${COMMANDER_ACCOUNT}/${permlink}` : `https://steemit.com/@${COMMANDER_ACCOUNT}/${permlink}`,
+  };
+}
+
+export interface FleetContentAuditRow {
+  rail: PublishRail;
+  permlink: string;
+  title: string;
+  created: string;
+  payout: string;
+  tags: string[];
+  risk: string;
+  findings: Array<{ kind: string; why: string; redacted: string }>;
+  needsEdit: boolean;
+}
+
+export interface FleetContentAudit {
+  rails: Array<{ rail: PublishRail; ok: boolean; posts: number; flagged: number; error?: string }>;
+  posts: FleetContentAuditRow[];
+  summary: string;
+}
+
+/**
+ * The chain-truth audit: pull each managed publishing account's blog feed
+ * per rail and run the exposure scanner over every post — "מי מפרסם מה,
+ * מה חייב לצאת, מה חייב עריכה". Read-only, no keys, bounded (≤10 per rail).
+ */
+export async function auditFleetContent(limitPerRail = 10): Promise<FleetContentAudit> {
+  const rails: Array<PublishRail> = ["steem", "hive"];
+  const posts: FleetContentAuditRow[] = [];
+  const railStats: FleetContentAudit["rails"] = [];
+  for (const rail of rails) {
+    try {
+      const feed = await railBlogPosts(rail, COMMANDER_ACCOUNT, limitPerRail);
+      let flagged = 0;
+      for (const p of feed) {
+        const report = scanExposure(p.title, p.bodyPreview);
+        if (report.risk === "high") flagged++;
+        posts.push({
+          rail, permlink: p.permlink, title: p.title, created: p.created, payout: p.payout, tags: p.tags,
+          risk: report.risk, findings: report.findings, needsEdit: report.risk === "high",
+        });
+      }
+      railStats.push({ rail, ok: true, posts: feed.length, flagged });
+    } catch (e) {
+      railStats.push({ rail, ok: false, posts: 0, flagged: 0, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  const total = posts.length;
+  const flagged = posts.filter((p) => p.needsEdit).length;
+  const summary = `ביקורת-תוכן חיה: ${total} פוסטים אחרונים נסרקו על ${railStats.filter((r) => r.ok).length} מסילות, ${flagged} מדגלים לעריכה (מדיניות-חשיפה)`;
+  return { rails: railStats, posts, summary };
+}
+
+export interface RailsOverview {
+  rails: RailHealth[];
+  commander: {
+    account: string;
+    perRail: Array<{
+      rail: Rail;
+      keyInVault: boolean;
+      accountOnChain: boolean | null;
+      keyVerifiedAgainstChain: boolean | null; // null = rail unreachable, not a mismatch
+      chainPub: string | null;
+      derivedPub: string | null;
+      reason?: string;
+    }>;
+  };
+  broadcastPolicy: string;
+}
+
+/**
+ * PUBLISH-DESK overview — which publishing rails exist, which are alive,
+ * which accounts the fleet holds THERE, and whether each vault posting key
+ * is provably the account's current on-chain authority (33-byte pubkey
+ * comparison against the chain itself — never a stored assumption).
+ * This is the pre-flight board for every multi-rail publication.
+ */
+export async function fleetRailsOverview(): Promise<RailsOverview> {
+  requireMaster();
+  const all: Rail[] = ["steem", "hive", "blurt"];
+  const rails = await Promise.all(all.map((r) => railHealth(r)));
+  const perRail: RailsOverview["commander"]["perRail"] = [];
+  for (const rail of all) {
+    const health = rails.find((r) => r.rail === rail);
+    const entry = await db.vaultEntry.findFirst({
+      where: { chain: rail, account: COMMANDER_ACCOUNT, role: "posting" },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (!entry) {
+      perRail.push({ rail, keyInVault: false, accountOnChain: null, keyVerifiedAgainstChain: null, chainPub: null, derivedPub: null, reason: "אין מפתח-posting של המפקד בכספת למסילה זו" });
+      continue;
+    }
+    if (health && !health.reachable) {
+      perRail.push({ rail, keyInVault: true, accountOnChain: null, keyVerifiedAgainstChain: null, chainPub: null, derivedPub: null, reason: `המסילה לא נגישה — לא ניתן לאמת (${health.error ?? "no endpoint"})` });
+      continue;
+    }
+    const wif = openSecret({ encPriv: entry.encPriv, privIv: entry.privIv, privTag: entry.privTag });
+    // the vault stores headcorner keys in the non-canonical 33-byte quirk —
+    // derive pub33 through the SAME tolerant path the signing pipeline uses
+    const pub33 = toSigningKey(wif).publicKey.bytes;
+    const proof = await verifyPostingKeyOnChain(rail, COMMANDER_ACCOUNT, { pub33 });
+    perRail.push({
+      rail,
+      keyInVault: true,
+      accountOnChain: proof.hasChainAccount,
+      keyVerifiedAgainstChain: proof.hasChainAccount ? proof.match : null,
+      chainPub: proof.chainPub,
+      derivedPub: proof.derivedPub,
+      reason: proof.reason,
+    });
+  }
+  return {
+    rails,
+    commander: { account: COMMANDER_ACCOUNT, perRail },
+    broadcastPolicy:
+      "שידור מותר רק על מסילה שבה המפתח אומת מול השרשרת (steem+hive כרגע) · blurt נשאר סגור עד endpoint מאומת + מפתח · posting לעולם לא נוגע בכספים",
+  };
 }
 
 export interface VoiceInteractResult {
