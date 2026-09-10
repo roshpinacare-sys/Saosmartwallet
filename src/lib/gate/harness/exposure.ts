@@ -43,6 +43,19 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
+  // ── outward language routing (ניתוב-שפה) ─────────────────────────────────
+  // roast-2026-09-10: the language doctrine lived only in PROMPTS — the editor
+  // itself published a HEBREW remediation notice (post-mtusiimi) and left a
+  // Hebrew title live (post-mtuvl028) straight through the exposure gate.
+  // Language routing is now enforced in CODE: anything leaving to a public
+  // chain must be in the audience's language — English. Hebrew stays inside.
+  {
+    kind: "outward-language",
+    pattern: /[\u0590-\u05FF]/g,
+    severity: "high",
+    why: "תוכן-החוצה כתוב בעברית — ניתוב-שפה: הקהל ברשת דובר-אנגלית; כתוב את התוכן באנגלית (עברית נשארת בפנים בלבד)",
+  },
+
   // ── private material ────────────────────────────────────────────────────
   {
     kind: "wif-private-key",
@@ -169,9 +182,12 @@ export function scanExposure(...parts: Array<string | undefined | null>): Exposu
   return { risk, findings };
 }
 
-/** Fail-closed publish gate: HIGH risk refuses; MEDIUM passes but is reported. */
-export function assertPublishable(title: string, body: string): ExposureReport {
-  const report = scanExposure(title, body);
+/** Fail-closed publish gate: HIGH risk refuses; MEDIUM passes but is reported.
+ *  roast-2026-09-10: tags were NEVER scanned — a codename tag ("saos") went
+ *  out through an edit while title+body were scanned. Tags are part of the
+ *  publication; they are scanned now (fail-closed). */
+export function assertPublishable(title: string, body: string, tags?: string[]): ExposureReport {
+  const report = scanExposure(title, body, Array.isArray(tags) ? tags.join(" ") : undefined);
   if (report.risk === "high") {
     const list = report.findings.map((f) => `· [${f.kind}] ${f.redacted} — ${f.why}`).join("\n");
     throw new GateError(

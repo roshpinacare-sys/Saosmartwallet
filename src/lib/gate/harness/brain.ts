@@ -99,6 +99,9 @@ export async function brainChat(
           lastErr = new GateError("brain-http", `NIM ${res.status}: ${txt.slice(0, 180)}`);
           // 5xx/429 → one retry; 4xx (bad model, bad key) → fail fast, honest
           if (res.status < 500 && res.status !== 429) break;
+          // roast-2026-09-10: a retry with NO backoff fires back into the same
+          // rate-limit window — both attempts die, the run dies with them.
+          await new Promise((r) => setTimeout(r, 6_000));
           continue;
         }
         const j = JSON.parse(txt) as {
@@ -120,18 +123,34 @@ export async function brainChat(
 
   /* zai provider — backend-only SDK */
   const { default: ZAI } = await import("z-ai-web-dev-sdk");
-  const zai = await ZAI.create();
   // z-ai chat contract: system instructions ride on the "assistant" role.
   const mapped = messages.map((m) => ({
     role: m.role === "system" ? ("assistant" as const) : m.role,
     content: m.content,
   }));
-  const completion = await zai.chat.completions.create({
-    messages: mapped as Parameters<typeof zai.chat.completions.create>[0]["messages"],
-    thinking: { type: "disabled" },
-  });
-  const content = completion.choices[0]?.message?.content ?? "";
-  return { content, model: "zai" };
+  // roast-2026-09-10: the zai path had ZERO retry — a single 429 killed the
+  // whole run (8/12 first-day builder/guardian schedule runs died exactly
+  // this way in a creation burst). Transient failures get one backoff retry;
+  // anything else fails fast, honest.
+  let zaiLastErr: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const zai = await ZAI.create();
+      const completion = await zai.chat.completions.create({
+        messages: mapped as Parameters<typeof zai.chat.completions.create>[0]["messages"],
+        thinking: { type: "disabled" },
+      });
+      const content = completion.choices[0]?.message?.content ?? "";
+      return { content, model: "zai" };
+    } catch (e) {
+      zaiLastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      const transient = /(?:^|\D)(?:429|5\d\d)(?:\D|$)|rate.?limit|too many requests|timeout|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(msg);
+      if (!transient) break;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 6_000));
+    }
+  }
+  throw zaiLastErr instanceof Error ? zaiLastErr : new GateError("brain-failed", "המוח (ZAI) לא הגיב");
 }
 
 /** The checker must NEVER share a brain with the maker (generator/evaluator separation). */

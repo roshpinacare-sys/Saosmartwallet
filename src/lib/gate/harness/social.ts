@@ -162,9 +162,9 @@ export async function publishPostFromAgent(input: {
   if (body.length > SOCIAL_RAILS.maxPostBodyChars) {
     throw new GateError("bad-input", `הגוף חורג מ-${SOCIAL_RAILS.maxPostBodyChars} תווים`);
   }
-  // ── exposure policy: the cards stay home ──────────────────────────────
-  const exposure = assertPublishable(input.title, body);
+  // ── exposure policy: the cards stay home (tags scanned too) ──────────
   const tags = (input.tags || []).slice(0, SOCIAL_RAILS.maxTags);
+  const exposure = assertPublishable(input.title, body, tags);
   // ── chain-polite root-post pacing ─────────────────────────────────────
   // The chain itself enforces STEEM_MIN_ROOT_COMMENT_INTERVAL: a root post
   // is allowed only once every 5 minutes per account (live-learned 2026-09-10:
@@ -251,8 +251,8 @@ export async function editPostFromAgent(input: {
   let tags = (input.tags && input.tags.length ? input.tags : original.tags).slice(0, SOCIAL_RAILS.maxTags);
   if (!tags.length && original.category) tags = [original.category];
   if (!tags.length) throw new GateError("bad-input", "לעריכה דרושות תגיות (המקור לא כלל תגיות ואין קטגוריה שמורה)");
-  // ── exposure policy applies to edits too ──────────────────────────────
-  const exposure = assertPublishable(input.title, newBody);
+  // ── exposure policy applies to edits too (tags scanned too) ───────────
+  const exposure = assertPublishable(input.title, newBody, tags);
   const built = await buildSteemPostTx(
     {
       author: COMMANDER_ACCOUNT,
