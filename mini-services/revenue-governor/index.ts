@@ -42,6 +42,22 @@ const VE_WEEKS = 208;           // מקסימום-Aerodrome — נקודות-מ�
 const VOTE_POOL = 'SAOS/USDS';  // הבריכה-העמוקה-ביותר — הליבה
 const MIN_CREDITS = 1_000;
 
+// ── Roast-83 · מנוע-הדלק-האוטונומי ──────────────────────────────────────────
+// הלקח-המבני-של-81/82: המכונה-כולה-יושבת-דאון-מזילות-דלק (runway-crit) כשאף-אחד
+// לא-ממיר-עמלות-מדודות-חזרה-לקרדיטים. המושל-עכשיו-מנהל-את-זה-אוטונומית:
+// mintable = treasuryProfit + (feeMeter − רצפת-הסולם) — האוטומט **לא-נוגע**
+// ברצפת-הסולם (8,000µ — מנוע-הערך). מזריק-קודם-לאוצר (דלק-שער-ה-batch),
+// אחר-כך-לארנה (מנוע-העירוי-של-החיילים). כנות: אין-הטבעה-חופשית — כל-µ
+// מגובה-בעמלות-שנמדדו-בפועל; אין-מה-להטביע → skip-כנה-מתועד.
+const LADDER_FUEL_FLOOR = 8_000;   // אותה-רצפה-קנונית-של-הגרעין (LADDER_FUEL_FLOOR)
+const FUEL_TREASURY_FLOOR = 1_500; // אוצר-חייב-דלק-לשער-ה-batch
+const FUEL_ARENA_FLOOR = 6_000;    // מתחת-זה-החיילים-מתים-רעב
+const FUEL_ARENA_TARGET = 12_000;  // יעד-מילוי-ארנה (~2.5h-שריפה)
+const FUEL_MINT_CAP = 25_000;      // תקרה-פר-tick (הגרעין-מתיר-100k — אנחנו-שמרניים)
+const FUEL_COOLDOWN_MS = 5 * 60_000;
+const FUEL_MIN_MINT = 500;
+let lastFuelAttempt = 0;
+
 const OP_TOKEN = process.env.DEX_OPERATOR_TOKEN || '';
 const RELAY_TOKEN = process.env.SOVEREIGN_RELAY_TOKEN || '';
 
@@ -141,6 +157,56 @@ async function armIfNeeded(): Promise<void> {
   }
 }
 
+// ── FUEL: הזרקת-דלק-אוטונומית מגובה-עמלות-מדודות (roast-83) ─────────────────
+async function fuelIfNeeded(): Promise<void> {
+  const now = Date.now();
+  if (now - lastFuelAttempt < FUEL_COOLDOWN_MS) return;
+  const st = await fetchJson(`${DEX}/state`);
+  if (!st) return; // דמון-לא-זמין — ה-tick ידווח כנה
+  const s = (st.state ?? st) as Record<string, unknown>;
+  const profit = Number(s.treasuryProfit ?? 0);
+  const meter = Number(s.feeMeter ?? 0);
+  const wl = await fetchJson(`${DEX}/wallets`);
+  const list = (wl?.wallets ?? []) as Array<{ name?: string; credits?: number }>;
+  const cOf = (n: string): number => Number(list.find((w) => w.name === n)?.credits ?? 0);
+  const treC = cOf("treasury");
+  const arC = cOf("arena");
+  const needs: Array<{ to: string; want: number }> = [];
+  if (treC < FUEL_TREASURY_FLOOR) needs.push({ to: "treasury", want: FUEL_TREASURY_FLOOR - treC });
+  if (arC < FUEL_ARENA_FLOOR) needs.push({ to: "arena", want: FUEL_ARENA_TARGET - arC });
+  if (needs.length === 0) return; // הכל-מפוזר — אין-פעולה
+  const mintable = profit + Math.max(0, meter - LADDER_FUEL_FLOOR);
+  let budget = Math.min(mintable, FUEL_MINT_CAP);
+  if (budget < FUEL_MIN_MINT) {
+    log("fuel-skip", `mintable ${Math.floor(mintable)}µ < ${FUEL_MIN_MINT}µ (profit ${profit}µ · meter ${meter}µ · floor ${LADDER_FUEL_FLOOR}) — honest hold until real fees`);
+    lastFuelAttempt = now;
+    return;
+  }
+  const ops: Array<Record<string, unknown>> = [];
+  for (const n of needs) {
+    const amt = Math.min(n.want, budget);
+    if (amt < FUEL_MIN_MINT) break;
+    const flat = Math.floor(amt);
+    ops.push({ type: "mint_fuel", amount: flat, to: n.to });
+    budget -= flat;
+  }
+  if (ops.length === 0) return;
+  if (!OP_TOKEN) { log("fuel-fail", "DEX_OPERATOR_TOKEN missing — fail-closed, cannot fuel"); lastFuelAttempt = now; return; }
+  const r = await fetchJson(`${DEX}/batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-saos-operator": OP_TOKEN, "x-saos-dex-console": "1" },
+    body: JSON.stringify({ issuer: "treasury", ops }),
+  }, 8000);
+  lastFuelAttempt = Date.now();
+  if (r?.ok) {
+    const detail = ops.map((o) => `${o.amount}µ→${o.to}`).join(" + ");
+    log("fuel", `mint_fuel queued: ${detail} (backed: profit ${profit}µ + meter ${meter}µ)`);
+    emit("governor-action", { kind: "fuel", detail, ts: lastFuelAttempt });
+  } else {
+    log("fuel-fail", `batch rejected: ${String((r as { error?: string })?.error ?? "unreachable")}`);
+  }
+}
+
 // ── WATCH: קציר-אפוק + דוח-הכנסות ────────────────────────────────────────────
 function parseProm(text: string, key: string): number | null {
   const m = text.match(new RegExp(`^${key} ([0-9.eE+-]+)$`, 'm'));
@@ -150,6 +216,7 @@ function parseProm(text: string, key: string): number | null {
 async function tick(): Promise<void> {
   ticks++;
   try {
+    await fuelIfNeeded(); // Roast-83: דלק-לפני-הכל — בלי-זה-אף-מנוע-לא-מסתובב
     await armIfNeeded();
 
     const econ = await fetchJson(`${DEX}/economy`);
