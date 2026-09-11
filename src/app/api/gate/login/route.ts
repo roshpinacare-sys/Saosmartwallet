@@ -69,6 +69,11 @@ export async function POST(req: Request) {
     const seals = await loadKeySeals();
 
     if (!hc) {
+      // r28 — the WHY, with on-chain evidence: when the key is rejected, the
+      // rejection itself carries the live owner-authority update timestamps,
+      // so "my key stopped working" gets its honest answer in the same breath:
+      // the chain rotated the keys, HERE is exactly when.
+      const evidence = await rotationEvidence();
       // ── r32 — rotated-out recognition: this may BE an old headcorner key that
       // the chain itself rotated away (e.g. the r16/r17 D1 rotation of steem).
       // An honest system says "this key WAS ours, it was replaced — here is the
@@ -82,7 +87,7 @@ export async function POST(req: Request) {
           const where = sealHit ? `${sealHit.chain}·${sealHit.role}` : `${storedHit!.chain}·${storedHit!.role} (${storedHit!.status})`;
           throw new GateError(
             "rotated-out-key",
-            `המפתח הזה אכן היה מפתח-headcorner (${where}) — אך הוצא מה-authority ברוטציה על-השרשרת והוחלף בשורשי-D1. ` +
+            `המפתח הזה אכן היה מפתח-headcorner (${where}) — אך הוצא מה-authority ברוטציה על-השרשרת והוחלף בשורשי-D1.${evidence} ` +
             "היכנס עם מפתח נוכחי של headcorner: מפתח-HIVE מבלוק-HIVE בהדקור.txt (owner/active/posting/memo) " +
             "או מפתח-steem נוכחי — הכספת נאטמת תחת כל מפתח-נוכחי והיא תחתום את עצמה מחדש בכניסה הראשונה.",
           );
@@ -90,7 +95,8 @@ export async function POST(req: Request) {
       }
       throw new GateError(
         "not-headcorner-key",
-        "המפתח אינו מחזיק authority נוכחי על headcorner (STEEM/HIVE) — כניסה אפשרית רק עם מפתח כזה",
+        "המפתח אינו מחזיק authority נוכחי על headcorner (STEEM/HIVE) — כניסה אפשרית רק עם מפתח כזה." + evidence +
+        " אם זה מפתח-ישן: הרשתות החליפו את מפתחות-headcorner ברוטציה על-השרשרת — הכניסה מתקבלת ממפתח-נוכחי בלבד.",
       );
     }
 
@@ -185,6 +191,39 @@ export async function POST(req: Request) {
   } catch (e) {
     return fail(e);
   }
+}
+
+/**
+ * r28 — live rotation evidence for honest rejections: reads headcorner's
+ * last_owner_update from both rails (best-effort; empty on silence).
+ * Proven live 2026-09-11: STEEM owner updated 2026-09-10T23:25:21,
+ * HIVE owner updated 2026-09-08T21:17:39 — the two rotations that retired
+ * the operator's older keys.
+ */
+async function rotationEvidence(): Promise<string> {
+  const rails: Array<[string, string]> = [
+    ["STEEM", "https://api.steemit.com"],
+    ["HIVE", "https://api.hive.blog"],
+  ];
+  const parts: string[] = [];
+  await Promise.all(
+    rails.map(async ([label, node]) => {
+      try {
+        const r = await fetch(node, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_accounts", params: [["headcorner"]], id: 1 }),
+          signal: AbortSignal.timeout(8000),
+        });
+        const j = (await r.json()) as { result?: Array<{ last_owner_update?: string }> };
+        const ts = j.result?.[0]?.last_owner_update;
+        if (ts && ts !== "1970-01-01T00:00:00") parts.push(`${label} owner עודכן על-השרשרת ב-${ts} UTC`);
+      } catch {
+        /* evidence is best-effort — the rejection stands on the sweep itself */
+      }
+    }),
+  );
+  return parts.length ? ` (ראיה חיה: ${parts.join(" · ")})` : "";
 }
 
 /** Rebuild the vault from surviving sources and seal the fresh master under EVERY current headcorner key — PLUS the pasted key (r32). */

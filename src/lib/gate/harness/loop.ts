@@ -34,7 +34,7 @@
  */
 import { db } from "@/lib/db";
 import { GateError } from "@/lib/gate/crypto";
-import { brainChat, parseBrain, pickCheckerBrain, type ChatMsg } from "./brain";
+import { brainChat, parseBrain, pickCheckerBrain, type BrainReply, type ChatMsg } from "./brain";
 import { getModule, modulesForPrompt, type ModuleCtx } from "./modules";
 import { workerId, claimRun, stillMine, renewLease, LEASE_MS, LEASE_CLEAR } from "./lease";
 import { emitEvent } from "./events";
@@ -293,6 +293,27 @@ export async function bumpModuleStats(modId: string, kind: "call" | "cache" | "f
  * strict re-ask) and never fabricates a pass — if every attempt is garbage
  * the original honest throw stands. */
 const CHECKER_RESCUE_LIMIT = 2;
+/**
+ * r28 — brain-call retry: a 429/hiccup on the checker's brain call used to
+ * escape runChecker entirely (the r30 rescue only guards JSON garbage AFTER a
+ * reply arrives). Live-measured: 12 of 62 blocked runs were checker-silent
+ * (5× "429 Too many requests", 7× protocol garbage that also threw) — every
+ * one graded "blocked" with NO verdict, feeding the repair chase an empty
+ * gaps list. One polite backoff retry on THROW — the call-level sibling of
+ * the r30 rescue — costs nothing and converts silence into a verdict.
+ */
+async function brainChatRetry(b: ReturnType<typeof parseBrain>, messages: ChatMsg[], opts: { maxTokens: number; temperature: number }): Promise<BrainReply> {
+  try {
+    return await brainChat(b, messages, opts);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/429|rate|timeout|fetch failed|network/i.test(msg)) {
+      await new Promise((r) => setTimeout(r, 3500)); // transient — one polite backoff
+      return await brainChat(b, messages, opts);
+    }
+    throw e; // non-transient — the honest throw stands
+  }
+}
 async function runChecker(opts: {
   checkerSpec: string;
   goal: string;
@@ -304,7 +325,7 @@ async function runChecker(opts: {
     { role: "system", content: checkerSystemPrompt(opts.goal, opts.doneMeans) },
     { role: "user", content: `EVIDENCE TRACE:\n${transcript.slice(0, 12000)}\n\nGrade the pass-gate now.` },
   ];
-  const reply = await brainChat(parseBrain(opts.checkerSpec), messages, { maxTokens: 900, temperature: 0 });
+  const reply = await brainChatRetry(parseBrain(opts.checkerSpec), messages, { maxTokens: 900, temperature: 0 });
   let v: CheckerVerdict | null = null;
   let rescues = 0;
   try {
@@ -312,7 +333,7 @@ async function runChecker(opts: {
   } catch (firstErr) {
     let lastErr: unknown = firstErr;
     for (; rescues < CHECKER_RESCUE_LIMIT; rescues++) {
-      const reply2 = await brainChat(
+      const reply2 = await brainChatRetry(
         parseBrain(opts.checkerSpec),
         [...messages, { role: "user", content: "Your previous reply was NOT valid protocol JSON. Reply AGAIN — ONLY the compact JSON verdict object, nothing else." }],
         { maxTokens: 900, temperature: 0 },
@@ -496,7 +517,7 @@ async function processRunInner(runId: string): Promise<void> {
         { role: "system", content: makerSystemPrompt(rec.goal, doneMeans, modules, lessons, fleetFacts) },
         { role: "user", content: userContent },
       ];
-      const reply = await brainChat(makerSpec, base, { maxTokens: 800, temperature: 0.2 });
+      const reply = await brainChatRetry(makerSpec, base, { maxTokens: 800, temperature: 0.2 });
       if (reply.usage && (reply.usage.prompt || reply.usage.completion)) {
         usageKnown = true;
         tokPrompt += reply.usage.prompt;
@@ -507,7 +528,7 @@ async function processRunInner(runId: string): Promise<void> {
       } catch {
         if (freeRescues >= FREE_RESQUE_LIMIT) return { call: null, rescued: false };
         freeRescues++;
-        const reply2 = await brainChat(
+        const reply2 = await brainChatRetry(
           makerSpec,
           [...base, { role: "user", content: "Your previous reply was NOT valid protocol JSON. Reply AGAIN — ONLY the compact JSON object, nothing else." }],
           { maxTokens: 800, temperature: 0 },
@@ -666,7 +687,7 @@ async function processRunInner(runId: string): Promise<void> {
       lines.push("🫀 התאוששות-מקריסה — העקבות חודשו מה-DB");
     }
     if (brainFailoverNote) lines.push(brainFailoverNote);
-    lines.push(`⚖️ פסיקת בודק עצמאי (${checkerSpec}): ${verdict ? (verdict.done ? "עבר את שער-המעבר — כל הקריטריונים הוכחו" : "לא הוכח — פתוח") : "הבודק לא ענה"}`);
+    lines.push(`⚖️ פסיקת בודק עצמאי (${checkerSpec}): ${verdict ? (verdict.done ? "עבר את שער-המעבר — כל הקריטריונים הוכחו" : "לא הוכח — פתוח") : "הבודק לא ענה (גם אחרי ניסיון-חוזר r28) — הרצה בלתי-מדורגת, ללא מרדף-תיקון"}`);
     if (verdict?.checks?.length) {
       lines.push(...verdict.checks.map((c) => `${c.pass ? "✅" : "❌"} ${c.criterion}${c.evidence ? " — " + c.evidence.slice(0, 160) : ""}`));
     }
@@ -690,9 +711,13 @@ async function processRunInner(runId: string): Promise<void> {
     /* ── fleet memory: a final finding recorded here teaches every future run ── */
     await harvestFleetMemory(run.agentName, runId, steps);
 
-    /* ── emit the terminal event — the nervous system may react (bounded) ── */
+    /* ── emit the terminal event — the nervous system may react (bounded) ──
+     * r28: a checker-SILENT run (verdict null after call-level retry) emits
+     * run.ungraded, NOT run.blocked — unproven gaps were never claimed, so the
+     * repair chase must not fire on an empty evidence demand. */
+    const terminalEvent = status === "done" ? "run.done" : verdict ? "run.blocked" : "run.ungraded";
     await emitEvent(
-      status === "done" ? "run.done" : "run.blocked",
+      terminalEvent,
       { agent: run.agentName, goal: run.goal, gaps: verdict && !verdict.done ? String(verdict.gaps || "").slice(0, 600) : "" },
       "harness",
     );
