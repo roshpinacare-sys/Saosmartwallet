@@ -153,9 +153,9 @@ interface SituationData {
   anchors: { ok: boolean; count: number; latest: { chain: string; txId: string; blockNum: number | null; at: string; round: string; signedBy: string }[]; error?: string };
 }
 interface DigestItemRow { repo: string; file: string; ours: boolean; ok: boolean; error?: string; bytes: number; hash8: string; echo: boolean; isNew: boolean; lang: string; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
-interface DoorVoiceRow { file: string; ok: boolean; error?: string; bytes: number; hash8: string; isNew: boolean; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
+interface DoorVoiceRow { file: string; ok: boolean; error?: string; bytes: number; hash8: string; isNew: boolean; selfEcho?: boolean; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
 interface RootVoiceRow { file: string; ok: boolean; error?: string; hash8: string; looksLikeReport: boolean; isNew: boolean; headline: string; mentionsUs: boolean }
-interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
+interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; selfEchoVoices?: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -1831,8 +1831,8 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                     </div>
                     {digest.door && digest.door.checked && digest.door.incoming > 0 && (
                       <div className="mt-1 rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-2 py-1.5">
-                        <p className="text-[10px] font-mono text-emerald-300">🚪 דלת-קדמית — {digest.door.incoming} דופק/ים ב-broadcasts/ שלנו (r26)</p>
-                        {digest.door.voices.filter((v) => v.ok).map((v) => (
+                        <p className="text-[10px] font-mono text-emerald-300">🚪 דלת-קדמית — {digest.door.incoming} דופק/ים ב-broadcasts/ שלנו (r26 · זיהוי-טביעת-אצבע r27)</p>
+                        {digest.door.voices.filter((v) => v.ok && !v.selfEcho).map((v) => (
                           <div key={v.file} className="mt-0.5 text-[9px] font-mono" dir="ltr">
                             <span className={v.isNew ? "text-amber-300 font-semibold" : "text-emerald-200/90"}>{v.isNew ? "NEW " : ""}[{v.kind}] {v.file}</span>
                             <span className="text-zinc-500"> — {v.headline.slice(0, 52)}</span>
@@ -1841,6 +1841,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                             ))}
                           </div>
                         ))}
+                        {(digest.door.selfEchoVoices ?? 0) > 0 && <p className="text-[9px] font-mono text-zinc-500" dir="rtl">🪞 {digest.door.selfEchoVoices} רישום-שידור-שלנו על-הדלת — זוהה בטביעת-אצבע (תוכן-זהה למסמך-שחיברנו), לא דופק (r27)</p>}
                         {digest.door.voices.some((v) => !v.ok) && <p className="text-[9px] text-rose-300/70 mt-0.5">דופק-שלא-נקרא: {digest.door.voices.filter((v) => !v.ok).length} תוכן-לא-הושג (כנות)</p>}
                       </div>
                     )}

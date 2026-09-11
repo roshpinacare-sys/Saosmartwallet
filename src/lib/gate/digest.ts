@@ -39,7 +39,7 @@
  *    writes into partner repos, ever.
  */
 import { createHash } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { getSituationSnapshot } from "@/lib/gate/situation";
@@ -54,6 +54,39 @@ const MAX_ROOT_VOICES = 4; // bounded — newest root candidates fetched
 
 /** our authored broadcast naming convention — a door file NOT matching this is not ours by name */
 const OUR_BROADCAST_NAME = /^\d{4}-\d{2}-\d{2}-vault-(report|ack|reply)\.md$/;
+
+/**
+ * r27-finalization — identity by FINGERPRINT, not only by name.
+ * Our own authored docs (e.g. the r27 efficiency broadcast, whose name is not
+ * vault-*) land in our own door and used to be miscounted as knocks.
+ * Fix: hash every file in our local docs/broadcast/ at read time — any door
+ * voice whose content hash matches one of those is OURS, whatever its name.
+ * Honest and generic: zero secrets, zero extra API calls, works for any
+ * future authored doc. If the local dir is unreadable the set is empty and
+ * behavior degrades to name-only (exactly the pre-fix behavior).
+ */
+async function readOurFingerprints(): Promise<Set<string>> {
+  const fingerprints = new Set<string>();
+  try {
+    const dir = path.join(process.cwd(), "docs", "broadcast");
+    const entries = await readdir(dir).catch(() => [] as string[]);
+    await Promise.all(
+      entries
+        .filter((f) => f.endsWith(".md"))
+        .map(async (f) => {
+          try {
+            const c = await readFile(path.join(dir, f), "utf8");
+            fingerprints.add(createHash("sha256").update(c).digest("hex"));
+          } catch {
+            /* one unreadable file never kills the set */
+          }
+        })
+    );
+  } catch {
+    /* identity degrades honestly to name-only */
+  }
+  return fingerprints;
+}
 /** root files that are repo infrastructure, never partner voices */
 const ROOT_INFRA = new Set(["README.md", "worklog.md", "SECURITY.md", "Caddyfile"]);
 /** a root *.md file whose name smells like a dropped report/briefing */
@@ -86,7 +119,8 @@ export interface SuggestedResponse {
   draft?: string[]; // draft lines only — sending stays an operator/agent decision
 }
 
-/** a voice that arrived AT OUR DOOR — inside our own broadcasts/ folder, written by someone else */
+/** a voice that arrived AT OUR DOOR — inside our own broadcasts/ folder, written by someone else.
+ *  selfEcho (r27): the hash matched our own authored docs — our own broadcast record, not a knock. */
 export interface DoorVoice {
   file: string;
   ok: boolean;
@@ -95,6 +129,7 @@ export interface DoorVoice {
   hash: string;
   hash8: string;
   isNew: boolean;
+  selfEcho: boolean;
   lang: "he" | "en" | "he+en" | "?";
   kind: BroadcastKind;
   headline: string;
@@ -120,8 +155,9 @@ export interface DoorPlane {
   checked: boolean;
   error?: string;
   files: number; // total files at our door
-  oursFiles: number; // files authored by us (name convention)
-  incoming: number; // non-ours contents counted (fetched or bounded-out)
+  oursFiles: number; // files authored by us — by name convention OR by fingerprint (r27)
+  selfEchoVoices: number; // r27 — our own broadcast records seen on the door (fingerprint match)
+  incoming: number; // genuine knocks: not ours by name AND not ours by fingerprint
   voices: DoorVoice[]; // fetched (bounded ≤ MAX_DOOR_VOICES)
 }
 
@@ -274,7 +310,7 @@ async function buildDigest(): Promise<BroadcastDigest> {
 
   const ours = lists.find((b) => b.ours);
   const org = sit.repos.org;
-  const door: DoorPlane = { checked: false, files: 0, oursFiles: 0, incoming: 0, voices: [] };
+  const door: DoorPlane = { checked: false, files: 0, oursFiles: 0, selfEchoVoices: 0, incoming: 0, voices: [] };
   const rootVoices: RootPlane = { checked: false, scanned: 0, voices: [] };
   let ourAuthoredFile: string | null = null;
   const seen = await readSeen();
@@ -283,30 +319,38 @@ async function buildDigest(): Promise<BroadcastDigest> {
 
   if (ours) {
     // 2a) our door: list our broadcasts/ — authored = our name convention; everything else = a knock
-    const doorFiles = await listGithubDir(token, org, ours.repo, "broadcasts");
+    //     r27-finalization: a knock whose CONTENT hash matches one of our local authored docs is
+    //     OURS (self-echo on the door, e.g. our efficiency broadcast) — not a knock anymore.
+    const [doorFiles, ourFingerprints] = await Promise.all([
+      listGithubDir(token, org, ours.repo, "broadcasts"),
+      readOurFingerprints(),
+    ]);
     if (doorFiles === null) {
       door.error = "our broadcasts/ listing failed honestly — the door stays unwatched this round";
     } else {
       door.checked = true;
       door.files = doorFiles.length;
       const authored = doorFiles.filter((f) => OUR_BROADCAST_NAME.test(f));
-      door.oursFiles = authored.length;
       ourAuthoredFile = authored[0] ?? null; // name-sorted desc → newest authored report
       const knocks = doorFiles.filter((f) => !OUR_BROADCAST_NAME.test(f));
-      door.incoming = knocks.length;
       const seen2 = seen; // capture for isNew before merging
       door.voices = await Promise.all(
         knocks.slice(0, MAX_DOOR_VOICES).map(async (file): Promise<DoorVoice> => {
           const content = await fetchBroadcastContent(token, org, ours.repo, file);
           if (content === null) {
-            return { file, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", isNew: false, lang: "?", kind: "report", headline: "(unavailable)", asks: [], mentionsUs: false };
+            return { file, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", isNew: false, selfEcho: false, lang: "?", kind: "report", headline: "(unavailable)", asks: [], mentionsUs: false };
           }
           const hash = createHash("sha256").update(content).digest("hex");
-          const isNew = !Object.prototype.hasOwnProperty.call(seen2, hash);
+          const selfEcho = ourFingerprints.has(hash);
+          const isNew = !Object.prototype.hasOwnProperty.call(seen2, hash) && !selfEcho; // our own records never count as new
           if (isNew) nextSeen[hash] = nowIso;
-          return { file, ok: true, bytes: Buffer.byteLength(content, "utf8"), hash, hash8: hash.slice(0, 8), isNew, ...classify(content) };
+          return { file, ok: true, bytes: Buffer.byteLength(content, "utf8"), hash, hash8: hash.slice(0, 8), isNew, selfEcho, ...classify(content) };
         })
       );
+      const selfEchoCount = door.voices.filter((v) => v.ok && v.selfEcho).length;
+      door.selfEchoVoices = selfEchoCount;
+      door.oursFiles = authored.length + selfEchoCount;
+      door.incoming = knocks.length - selfEchoCount;
     }
 
     // 2b) root voices: partners who bypass the channel and drop reports at our repo root
@@ -364,12 +408,12 @@ async function buildDigest(): Promise<BroadcastDigest> {
   const okItems = items.filter((i) => i.ok);
   const partnerVoices = okItems.filter((i) => !i.ours && !i.echo);
   const unique = new Set(okItems.map((i) => i.hash));
-  const doorNewVoices = door.voices.filter((v) => v.ok && v.isNew);
+  const doorNewVoices = door.voices.filter((v) => v.ok && v.isNew && !v.selfEcho); // our own records never count as new partner voices
   const rootNewVoices = rootVoices.voices.filter((v) => v.ok && v.isNew);
 
   // 5) draft-only response: answer a partner voice's asks / acknowledge a door response
   let suggestedResponse: SuggestedResponse;
-  const doorResponse = door.voices.find((v) => v.ok && v.kind === "response");
+  const doorResponse = door.voices.find((v) => v.ok && v.kind === "response" && !v.selfEcho);
   const asking = partnerVoices.filter((i) => i.asks.length > 0);
   if (doorResponse) {
     suggestedResponse = {
@@ -419,14 +463,19 @@ async function buildDigest(): Promise<BroadcastDigest> {
 }
 
 function emptyDigest(error: string): BroadcastDigest {
-  return { measuredAt: new Date().toISOString(), cached: false, scannedRepos: 0, fetched: 0, failed: 0, uniqueContents: 0, echoesOfOurs: 0, newPartnerContents: 0, partnerVoices: 0, items: [], door: { checked: false, files: 0, oursFiles: 0, incoming: 0, voices: [] }, rootVoices: { checked: false, scanned: 0, voices: [] }, suggestedResponse: { needed: false, reason: "הערוץ לא נקרא — ראה שדה השגיאה הכנה" }, error };
+  return { measuredAt: new Date().toISOString(), cached: false, scannedRepos: 0, fetched: 0, failed: 0, uniqueContents: 0, echoesOfOurs: 0, newPartnerContents: 0, partnerVoices: 0, items: [], door: { checked: false, files: 0, oursFiles: 0, selfEchoVoices: 0, incoming: 0, voices: [] }, rootVoices: { checked: false, scanned: 0, voices: [] }, suggestedResponse: { needed: false, reason: "הערוץ לא נקרא — ראה שדה השגיאה הכנה" }, error };
 }
 
 export async function getBroadcastDigest(force = false): Promise<BroadcastDigest> {
   const cache = g.__saosDigestCache;
-  // shape-guard (r26): a cache from an older module generation (pre-door) is not
+  // shape-guard (r26/r27): a cache from an older module generation is not
   // an honest read — treat it as absent so the fresh code rebuilds immediately.
-  const shapeOk = !!cache && typeof (cache.digest as { door?: unknown }).door === "object" && cache.digest.door !== null;
+  // r27: the door must also carry selfEchoVoices (fingerprint identity).
+  const shapeOk =
+    !!cache &&
+    typeof (cache.digest as { door?: unknown }).door === "object" &&
+    cache.digest.door !== null &&
+    typeof (cache.digest.door as { selfEchoVoices?: unknown }).selfEchoVoices === "number";
   const stale = !cache || !shapeOk || Date.now() - Date.parse(cache.digest.measuredAt) > DIGEST_REFRESH_MS;
 
   if (!force && cache && stale && !cache.refreshing) {
