@@ -145,11 +145,23 @@ function checkerSystemPrompt(goal: string, doneMeans: string[]): string {
   ].join("\n");
 }
 
+/** The error text of a failed step — r29: a failed step must NEVER render as
+ * "ERROR: undefined". Live-caught pathology: the treasurer's claim SUCCEEDED
+ * on-chain (real txId), the follow-up honest nothing-to-claim replies rendered
+ * as "ERROR: undefined", and the checker graded a harvest as a failure. The
+ * truth lives in s.error OR inside result.payload.error — both are read here. */
+function stepErrorText(s: TraceStep): string {
+  if (typeof s.error === "string" && s.error.trim()) return s.error;
+  const r = s.result as { error?: unknown } | undefined;
+  if (r && typeof r.error === "string" && r.error.trim()) return r.error;
+  return "unknown error (no message recorded)";
+}
+
 function traceToTranscript(steps: TraceStep[]): string {
   return steps
     .map((s) => {
       if (s.side === "checker") return `[checker] done=${(s.result as CheckerVerdict | undefined)?.done} — gaps: ${(s.result as CheckerVerdict | undefined)?.gaps || "-"}`;
-      const body = s.ok ? JSON.stringify(s.result) : `ERROR: ${s.error}`;
+      const body = s.ok ? JSON.stringify(s.result) : `ERROR: ${stepErrorText(s)}`;
       return `[step ${s.i}] thought: ${s.thought || "-"}\n  → ${s.tool}(${JSON.stringify(s.args || {})})\n  ⇐ ${String(body).slice(0, 600)}`;
     })
     .join("\n");
@@ -167,7 +179,7 @@ function ratchetedTranscript(steps: TraceStep[], recentFull = 2): string {
   const compact = older
     .map((s) => {
       if (s.side === "checker") return `[checker] done=${(s.result as CheckerVerdict | undefined)?.done}`;
-      const body = s.ok ? JSON.stringify(s.result) : `ERROR: ${s.error}`;
+      const body = s.ok ? JSON.stringify(s.result) : `ERROR: ${stepErrorText(s)}`;
       return `[step ${s.i}] ${s.tool} ⇐ ${String(body).slice(0, 240)}`;
     })
     .join("\n");
@@ -469,9 +481,19 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
       }
 
       const out = await execModule(tool, call.args || {}, { agentName: rec.agentName, runId }, toolCache);
+      // r29: a failed module step must carry its real message in `error` —
+      // execModule wraps failures as {error: msg} INSIDE result, and the
+      // transcript renders s.error — without this lift the checker (and the
+      // maker's own ratchet) saw "ERROR: undefined" instead of the truth.
+      const failMsg = out.ok
+        ? undefined
+        : typeof (out.result as { error?: unknown } | null | undefined)?.error === "string"
+          ? (out.result as { error: string }).error
+          : String(out.result);
       steps.push({
         i, side: "maker", thought: call.thought, tool, args: call.args,
         ok: out.ok, result: out.ok ? clampResult(out.result) : out.result,
+        ...(failMsg !== undefined ? { error: failMsg } : {}),
         ms: Date.now() - t0,
         ...(out.cached ? { cached: true } : {}),
         ...(rescued ? { rescued: true } : {}),
