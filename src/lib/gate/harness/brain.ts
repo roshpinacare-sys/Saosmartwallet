@@ -17,7 +17,7 @@
  * crew must not believe you."
  */
 import { db } from "@/lib/db";
-import { sealSecret, openSecret, GateError } from "@/lib/gate/crypto";
+import { sealSecret, openSecret, masterReady, GateError } from "@/lib/gate/crypto";
 
 export interface ChatMsg {
   role: "system" | "user" | "assistant";
@@ -47,11 +47,26 @@ export const BRAIN_CATALOG = {
 
 const NV_ENTRY = { chain: "nvidia", kind: "token", account: "nvidia-nim" };
 
-/** Read the NIM key from the vault; on first use, seal it there from env. */
+/**
+ * Read the NIM key. Order (r27 efficiency plane):
+ *  1. vault open  → decrypt the sealed entry (existing flow).
+ *  2. vault sealed + runtime env key → use the env key READ-ONLY (never sealed,
+ *     never written to git/disk). The sealed entry stays sealed — sovereignty
+ *     untouched. Previously this case silently fell through to the weak brain
+ *     (zai 34.5% success vs nvidia 91.5% measured live r27) and burned run
+ *     budget on failures during every locked window.
+ *  3. vault sealed + no env key → honest vault-locked (caller falls back to zai).
+ *  4. no vault entry + env key → seal it on first use (existing flow, requires
+ *     an open vault — which is exactly when sealing is possible).
+ */
 async function nvidiaKey(): Promise<string> {
-  const row = await db.vaultEntry.findFirst({ where: NV_ENTRY });
-  if (row) return openSecret({ encPriv: row.encPriv, privIv: row.privIv, privTag: row.privTag });
   const envKey = process.env.NVIDIA_API_KEY?.trim();
+  const row = await db.vaultEntry.findFirst({ where: NV_ENTRY });
+  if (row) {
+    if (masterReady()) return openSecret({ encPriv: row.encPriv, privIv: row.privIv, privTag: row.privTag });
+    if (envKey) return envKey;
+    throw new GateError("vault-locked", "הכספת נעולה ואין מפתח-סביבה — המוח-NIM לא זמין בכנות");
+  }
   if (!envKey) throw new GateError("no-brain-key", "אין מפתח NVIDIA בכספת ובסביבה — המוח לא זמין");
   await db.vaultEntry.create({
     data: {
