@@ -141,6 +141,17 @@ interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalStee
 interface TreasuryRow { account: string; liquid: string; debt: string; vesting: string | null; liquidNum: number; debtNum: number }
 interface TreasuryRail { rail: string; ok: boolean; liquidSymbol: string; debtSymbol: string; accounts: TreasuryRow[]; totals: { liquid: number; debt: number }; error?: string }
 interface TreasurySnapshot { measuredAt: string; rails: TreasuryRail[]; fleet: Record<string, number>; cached: boolean }
+interface SituationRepoRow { name: string; language: string | null; sizeKB: number; pushedAt: string; pushedMinutesAgo: number | null; ours: boolean; fresh: boolean }
+interface SituationData {
+  measuredAt: string; cached: boolean;
+  treasury: { rails: TreasuryRail[]; measuredAt: string; error?: string };
+  evm: { ethereum: { ok: boolean; wallets: number; okWallets: number; total: string; block: number | null; error?: string }; solana: { ok: boolean; wallets: number; okWallets: number; total: string; slot: number | null; error?: string } };
+  rewards: { ok: boolean; accounts: number; pendingAccounts: { account: string; steemEquiv: number }[]; totalPendingSteemEquiv: number; error?: string };
+  repos: { ok: boolean; org: string; scannedAt: string | null; ageMinutes: number | null; count: number; freshCount: number; repos: SituationRepoRow[]; error?: string };
+  vault: { ok: boolean; total: number; verified: number; unverified: number; imported: number; operatorCustody: number; rotatedOut: number; chains: Record<string, number>; error?: string };
+  fleet: { ok: boolean; agents: number; autonomous: number; activeRuns: number; error?: string };
+  anchors: { ok: boolean; count: number; latest: { chain: string; txId: string; blockNum: number | null; at: string; round: string; signedBy: string }[]; error?: string };
+}
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -167,6 +178,7 @@ const ENDPOINTS: Ep[] = [
   { method: "GET", path: "/api/gate/orders", desc: "יד-ריבונית: תור-החתימות (פקודות-המרה שהסוכנים הכינו — כל חשבון-צי × steem/hive × לימיט/המרת-מדין) + מדדי-הגבול", auth: "operator" },
   { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל של חשבון-הפקודה עצמו ומשדרת לשרשרת-היעד (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
   { method: "GET", path: "/api/gate/treasury", desc: "אמת-הכיס (r21): יתרות חיות של כל חשבונות-הצי על שלוש-המסילות (נזיל/חוב/vesting) — כל-מסילה נכשלת בכנות בנפרד", auth: "operator" },
+  { method: "GET", path: "/api/gate/situation", desc: "מצב-העניינים (r22): הכל במקום אחד — כסף-מסילות + ETH/SOL + תגמולים-ממתינים + כספת + צי + עוגנים + מה-קורה-בשאר-הריפו של הארגון (12 מאגרים, מה נדחף עכשיו). מטמון 60s, אפס-עומס", auth: "public" },
   { method: "GET", path: "/api/gate/stream", desc: "גשר-הפיקוד בזמן-אמת (SSE) — הודעות חדשות נדחפות, בלי דגימה", auth: "operator" },
   { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
   { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
@@ -1389,6 +1401,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   const [mem, setMem] = useState<MemoryRow[]>([]);
   const [orders, setOrders] = useState<OrdersData | null>(null);
   const [treasury, setTreasury] = useState<TreasurySnapshot | null>(null);
+  const [situation, setSituation] = useState<SituationData | null>(null);
 
   /* patrol form */
   const [label, setLabel] = useState("");
@@ -1414,11 +1427,15 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     const r = await apiJson<TreasurySnapshot & { ok: boolean }>("/api/gate/treasury");
     if (r?.ok) setTreasury(r);
   }, []);
-  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); void Promise.resolve().then(loadTreasury); }, [load, loadMem, loadOrders, loadTreasury]);
+  const loadSituation = useCallback(async () => {
+    const r = await apiJson<SituationData & { ok: boolean }>("/api/gate/situation");
+    if (r?.ok) setSituation(r);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); void Promise.resolve().then(loadTreasury); void Promise.resolve().then(loadSituation); }, [load, loadMem, loadOrders, loadTreasury, loadSituation]);
   useEffect(() => {
-    const t = setInterval(() => { load(); loadMem(); loadOrders(); loadTreasury(); }, 8000);
+    const t = setInterval(() => { load(); loadMem(); loadOrders(); loadTreasury(); loadSituation(); }, 8000);
     return () => clearInterval(t);
-  }, [load, loadMem, loadOrders, loadTreasury]);
+  }, [load, loadMem, loadOrders, loadTreasury, loadSituation]);
 
   async function toggleAutonomy(v: boolean) {
     setBusy(true);
@@ -1719,6 +1736,97 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
             </div>
           )}
           <p className="text-[10px] text-zinc-600 mt-1.5">מישור-ההמרות: לימיט-קנייה/מכירה + המרת-מדין על steem/hive — חשבון-הפקודה נבחר מתוך מפתחות-ה-active המאומתים בכספת · blurt מוצא כנות מחוץ למישור (ספר-BBD לא נמדד)</p>
+        </div>
+
+        {/* situation plane — everything in one place, zero-load (r22) */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <p className="text-xs text-zinc-400 flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5 text-sky-300" />
+              מצב-העניינים — הכל במקום אחד ({situation?.cached ? "מטמון 60s" : "טרי"})
+            </p>
+            {situation && <span className="text-[10px] text-zinc-600 font-mono" dir="ltr">{new Date(situation.measuredAt).toLocaleTimeString("he-IL")}</span>}
+          </div>
+          {!situation && <p className="text-xs text-zinc-600 py-3 text-center">מרכיב את התמונה המלאה — כסף, עיניים, ריפו-הארגון, כספת וצי…</p>}
+          {situation && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* money + eyes */}
+              <div className="rounded-xl border border-zinc-800 bg-black/40 px-3 py-2.5">
+                <p className="text-[11px] font-mono text-zinc-300 mb-1.5">💰 היד הכלכלית</p>
+                <div className="space-y-1">
+                  {situation.treasury.rails.map((r) => (
+                    <div key={r.rail} className="flex items-center justify-between text-[10px] font-mono" dir="ltr">
+                      <span className={r.ok ? "text-zinc-400" : "text-rose-300/80"}>{r.rail.toUpperCase()}</span>
+                      <span className={r.ok ? "text-emerald-300" : "text-rose-300/80"}>{r.ok ? `${r.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 })} ${r.liquidSymbol}${r.totals.debt > 0 ? ` · ${r.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} ${r.debtSymbol}` : ""}` : "כשל כן"}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between text-[10px] font-mono" dir="ltr">
+                    <span className={situation.evm.ethereum.ok ? "text-zinc-400" : "text-rose-300/80"}>ETH</span>
+                    <span className={situation.evm.ethereum.ok ? "text-emerald-300" : "text-rose-300/80"}>{situation.evm.ethereum.ok ? `${situation.evm.ethereum.total} · ${situation.evm.ethereum.okWallets}/${situation.evm.ethereum.wallets} ארנקים` : "כשל כן"}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-mono" dir="ltr">
+                    <span className={situation.evm.solana.ok ? "text-zinc-400" : "text-rose-300/80"}>SOL</span>
+                    <span className={situation.evm.solana.ok ? "text-emerald-300" : "text-rose-300/80"}>{situation.evm.solana.ok ? `${situation.evm.solana.total} · ${situation.evm.solana.okWallets}/${situation.evm.solana.wallets} ארנקים` : "כשל כן"}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-zinc-800/60" dir="ltr">
+                    <span className={situation.rewards.ok ? "text-zinc-400" : "text-rose-300/80"}>תגמולים-ממתינים</span>
+                    {situation.rewards.ok ? (
+                      situation.rewards.totalPendingSteemEquiv > 0 ? (
+                        <span className="text-amber-300">{situation.rewards.totalPendingSteemEquiv.toFixed(4)} STEEM-equiv · {situation.rewards.pendingAccounts.length} חשבונות</span>
+                      ) : (
+                        <span className="text-zinc-500">אפס — הכל נתבע; הקציר גדל עם תעסוקת-התוכן</span>
+                      )
+                    ) : <span className="text-rose-300/80">כשל כן</span>}
+                  </div>
+                </div>
+              </div>
+              {/* org repos — what is happening in the OTHER repos */}
+              <div className="rounded-xl border border-zinc-800 bg-black/40 px-3 py-2.5">
+                <div className="flex items-center justify-between mb-1.5 gap-1 flex-wrap">
+                  <p className="text-[11px] font-mono text-zinc-300">🛰️ ריפו-הארגון ({situation.repos.org})</p>
+                  {situation.repos.ok && <Badge variant="outline" className={"text-[9px] font-mono " + (situation.repos.freshCount > 0 ? "text-amber-300 border-amber-500/40" : "text-zinc-500 border-zinc-700")}>{situation.repos.count} מאגרים · {situation.repos.freshCount} פעילים-עכשיו</Badge>}
+                </div>
+                {!situation.repos.ok && <p className="text-[10px] text-rose-300/80">{situation.repos.error ?? "סריקת-הארגון נכשלה כנה"}</p>}
+                {situation.repos.ok && (
+                  <div className="max-h-32 overflow-y-auto scroll-thin space-y-0.5">
+                    {situation.repos.repos.map((r) => (
+                      <div key={r.name} className="flex items-center justify-between text-[10px] font-mono py-0.5" dir="ltr">
+                        <span className={"truncate max-w-[60%] " + (r.ours ? "text-sky-300 font-semibold" : r.fresh ? "text-amber-200/90" : "text-zinc-400")}>{r.ours ? "★ " : ""}{r.name}</span>
+                        <span className="flex items-center gap-1 text-zinc-500">
+                          {r.fresh && <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" aria-label="פעיל עכשיו" />}
+                          {r.pushedMinutesAgo !== null ? (r.pushedMinutesAgo < 60 ? `${r.pushedMinutesAgo} דק׳` : r.pushedMinutesAgo < 1440 ? `${Math.floor(r.pushedMinutesAgo / 60)} שע׳` : `${Math.floor(r.pushedMinutesAgo / 1440)} ימ׳`) : "?"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו</p>
+              </div>
+              {/* vault + fleet + anchors */}
+              <div className="rounded-xl border border-zinc-800 bg-black/40 px-3 py-2.5">
+                <p className="text-[11px] font-mono text-zinc-300 mb-1.5">🔐 הכספת והצי</p>
+                <div className="space-y-1 text-[10px] font-mono">
+                  <div className="flex items-center justify-between" dir="ltr">
+                    <span className="text-zinc-400">vault</span>
+                    <span className="text-zinc-200">{situation.vault.ok ? `${situation.vault.total} · ${situation.vault.verified} verified` : "כשל כן"}</span>
+                  </div>
+                  <div className="flex items-center justify-between" dir="ltr">
+                    <span className="text-zinc-400">fleet</span>
+                    <span className={situation.fleet.ok ? "text-zinc-200" : "text-rose-300/80"}>{situation.fleet.ok ? `${situation.fleet.agents} סוכנים (${situation.fleet.autonomous} אוטונומיים) · ${situation.fleet.activeRuns} ריצות-חיות` : "כשל כן"}</span>
+                  </div>
+                  <div className="flex items-center justify-between" dir="ltr">
+                    <span className="text-zinc-400">anchors</span>
+                    <span className="text-zinc-200">{situation.anchors.ok ? `${situation.anchors.count} רשומים · עדכני: ${situation.anchors.latest[0] ? `${situation.anchors.latest[0].chain} blk ${situation.anchors.latest[0].blockNum ?? "?"}` : "—"}` : "כשל כן"}</span>
+                  </div>
+                  <div className="flex items-center justify-between" dir="ltr">
+                    <span className="text-zinc-400">chains</span>
+                    <span className="text-zinc-500 truncate max-w-[65%]">{Object.entries(situation.vault.chains).map(([c, n]) => `${c}:${n}`).join(" · ")}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <p className="text-[10px] text-zinc-600 mt-1.5">העיקרון (r22): הכספת רואה את כל היד — מה יש, מה אין, מה קורה בכל מקום (כולל שאר-הריפו של הארגון) — בקריאה אחת בלי עומס. הסוכנים קוראים את אותה-אמת דרך fleet.situation</p>
         </div>
 
         {/* sovereign hand — the controlled signing queue */}

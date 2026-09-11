@@ -1,0 +1,10 @@
+import { PrismaClient } from '@prisma/client';
+const db = new PrismaClient();
+const runs = await db.gateRun.findMany({ where: { status: { in: ['queued','running'] } }, orderBy: { createdAt: 'desc' }, take: 10 });
+console.log('ACTIVE RUNS:', JSON.stringify(runs.map(r => ({ id: r.id, agent: r.agentName, status: r.status, createdAt: r.createdAt })), null, 1));
+const agents = await db.gateAgent.findMany({ where: { active: true } });
+console.log('ACTIVE AGENTS:', agents.map(a => `${a.name}(auto=${a.autonomy})`).join(', '));
+const msgs = await db.gateMessage.findMany({ orderBy: { createdAt: 'desc' }, take: 12 });
+console.log('LAST MESSAGES:');
+for (const m of msgs) console.log(` [${m.createdAt.toISOString().slice(5,16)}] ${m.fromKind}:${m.fromName} :: ${m.body.slice(0,160)}`);
+await db.$disconnect();

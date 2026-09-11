@@ -1,22 +1,22 @@
 {
   "verdict": {
-    "scannedAt": "2026-09-08T00:40:44.128Z",
-    "repoCount": 8,
+    "scannedAt": "2026-09-11T01:59:59.621Z",
+    "repoCount": 12,
     "ethereumCodeAnywhere": true,
     "solanaCodeAnywhere": true,
     "keywordCoverage": {
-      "bridge": 2,
-      "wallet": 2,
-      "ethereum": 1,
-      "solana": 1,
-      "sign": 2,
+      "bridge": 4,
+      "wallet": 4,
+      "ethereum": 2,
+      "solana": 3,
+      "sign": 4,
       "multisig": 0,
-      "multi-sig": 0,
-      "gas": 1,
-      "mev": 0,
-      "anchor": 3,
+      "multi-sig": 1,
+      "gas": 4,
+      "mev": 1,
+      "anchor": 5,
       "keystore": 0,
-      "vault": 1
+      "vault": 3
     },
     "gaps": [
       {
@@ -47,11 +47,11 @@
   },
   "repos": [
     {
-      "name": "steem",
-      "description": "SAOS — Steem AI Agent OS sovereign cycle (Task 114 snapshot restored) — PRIVATE",
-      "language": "JavaScript",
-      "sizeKB": 188671,
-      "pushedAt": "2026-09-08T00:23:55Z",
+      "name": "saos-sovereign-foundry",
+      "description": "SAOS Sovereign Foundry v2 - cross-network anchoring, energy sovereignty, evidence economy. אנחנו מנצחים את הבלוקצ'יין",
+      "language": "TypeScript",
+      "sizeKB": 2911,
+      "pushedAt": "2026-09-11T01:48:21Z",
       "archived": false,
       "branch": "main",
       "defaultBranch": "main",
@@ -59,21 +59,20 @@
         "package.json"
       ],
       "stack": [
-        "graphene-stack",
+        "evm-tooling",
         "nextjs"
       ],
       "keywordHits": [
-        "bridge",
         "anchor"
       ],
       "notes": ""
     },
     {
-      "name": "saos-sovereign-platform",
-      "description": "The chosen project - standalone canonical copy. Sovereign anchoring platform (folder B)",
+      "name": "saos-control-center",
+      "description": "Sovereign Control Center — smart key login (any WIF, live chain-verify), AES-256-GCM vault, owner-lock, agent API, realtime chat. Zero plaintext key material — forensically verified.",
       "language": "TypeScript",
-      "sizeKB": 698,
-      "pushedAt": "2026-09-07T23:53:55Z",
+      "sizeKB": 7614,
+      "pushedAt": "2026-09-11T01:46:35Z",
       "archived": false,
       "branch": "main",
       "defaultBranch": "main",
@@ -88,60 +87,11 @@
       "notes": ""
     },
     {
-      "name": "Saosmartwallet",
-      "description": null,
-      "language": "TypeScript",
-      "sizeKB": 1002,
-      "pushedAt": "2026-09-07T23:32:45Z",
-      "archived": false,
-      "branch": "main",
-      "defaultBranch": "main",
-      "manifests": [
-        "package.json"
-      ],
-      "stack": [
-        "evm-tooling",
-        "solana-tooling",
-        "nextjs"
-      ],
-      "keywordHits": [
-        "bridge",
-        "wallet",
-        "ethereum",
-        "solana",
-        "sign",
-        "anchor",
-        "vault"
-      ],
-      "notes": ""
-    },
-    {
-      "name": "saos-sovereign-foundry",
-      "description": "SAOS Sovereign Foundry v2 - cross-network anchoring, energy sovereignty, evidence economy. אנחנו מנצחים את הבלוקצ'יין",
-      "language": "TypeScript",
-      "sizeKB": 756,
-      "pushedAt": "2026-09-07T23:32:15Z",
-      "archived": false,
-      "branch": "main",
-      "defaultBranch": "main",
-      "manifests": [
-        "package.json"
-      ],
-      "stack": [
-        "evm-tooling",
-        "nextjs"
-      ],
-      "keywordHits": [
-        "anchor"
-      ],
-      "notes": ""
-    },
-    {
       "name": "saos-dex",
       "description": "SAOS-DEX — הבורסה הריבונית: ספר-הזמנות דטרמיניסטי + AMM 30bps + ארנת-חיילים אוטונומית (מורשת saos-dex + grid98)",
       "language": "TypeScript",
-      "sizeKB": 295,
-      "pushedAt": "2026-09-07T23:30:44Z",
+      "sizeKB": 13145,
+      "pushedAt": "2026-09-11T01:46:26Z",
       "archived": false,
       "branch": "main",
       "defaultBranch": "main",
@@ -161,25 +111,41 @@
       "notes": ""
     },
     {
-      "name": "anchor-baseline",
-      "description": "Folder A - restore of the latest baseline commit 5356dab",
-      "language": null,
-      "sizeKB": 1,
-      "pushedAt": "2026-09-07T13:56:41Z",
+      "name": "saos-sovereign-platform",
+      "description": "The chosen project - standalone canonical copy. Sovereign anchoring platform (folder B)",
+      "language": "TypeScript",
+      "sizeKB": 6381,
+      "pushedAt": "2026-09-11T01:44:55Z",
       "archived": false,
       "branch": "main",
       "defaultBranch": "main",
-      "manifests": [],
-      "stack": [],
-      "keywordHits": [],
+      "manifests": [
+        "package.json"
+      ],
+      "stack": [
+        "evm-tooling",
+        "solana-tooling",
+        "graphene-stack",
+        "nextjs",
+        "signer-flow-readme"
+      ],
+      "keywordHits": [
+        "bridge",
+        "wallet",
+        "solana",
+        "sign",
+        "gas",
+        "anchor",
+        "vault"
+      ],
       "notes": ""
     },
     {
-      "name": "roshpina",
-      "description": "Roshpina — Sovereign Trust & Value Platform: profit (fee engine + cost arbitrage) + protection (fail-closed guard, hash-linked audit, Ed25519 passports) + intelligence (potential engine) — PRIVATE",
-      "language": "TypeScript",
-      "sizeKB": 481,
-      "pushedAt": "2026-09-07T13:25:45Z",
+      "name": "steem",
+      "description": "SAOS — Steem AI Agent OS sovereign cycle (Task 114 snapshot restored) — PRIVATE",
+      "language": "JavaScript",
+      "sizeKB": 233393,
+      "pushedAt": "2026-09-11T01:44:48Z",
       "archived": false,
       "branch": "main",
       "defaultBranch": "main",
@@ -190,6 +156,133 @@
         "graphene-stack",
         "nextjs"
       ],
+      "keywordHits": [
+        "bridge",
+        "anchor"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "Saosmartwallet",
+      "description": null,
+      "language": "HTML",
+      "sizeKB": 43573,
+      "pushedAt": "2026-09-11T01:35:06Z",
+      "archived": false,
+      "branch": "main",
+      "defaultBranch": "main",
+      "manifests": [
+        "package.json"
+      ],
+      "stack": [
+        "evm-tooling",
+        "solana-tooling",
+        "graphene-stack",
+        "nextjs",
+        "signer-flow-readme"
+      ],
+      "keywordHits": [
+        "bridge",
+        "wallet",
+        "ethereum",
+        "solana",
+        "sign",
+        "multi-sig",
+        "gas",
+        "mev",
+        "anchor",
+        "vault"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "saos-jummper",
+      "description": "Cross-chain batched proof notary — anchor any claim to Ethereum mainnet for ~$0.10, witnessed by 5 independent chain clocks. Independent workspace; does not touch other repos.",
+      "language": "Python",
+      "sizeKB": 541,
+      "pushedAt": "2026-09-11T01:21:26Z",
+      "archived": false,
+      "branch": "main",
+      "defaultBranch": "main",
+      "manifests": [
+        "pyproject.toml",
+        "requirements.txt"
+      ],
+      "stack": [
+        "signer-flow-readme"
+      ],
+      "keywordHits": [
+        "bridge",
+        "wallet",
+        "ethereum",
+        "solana",
+        "sign",
+        "gas",
+        "anchor",
+        "vault"
+      ],
+      "notes": ""
+    },
+    {
+      "name": "Adsmarket",
+      "description": null,
+      "language": "HTML",
+      "sizeKB": 1878,
+      "pushedAt": "2026-09-11T01:17:55Z",
+      "archived": false,
+      "branch": "main",
+      "defaultBranch": "main",
+      "manifests": [],
+      "stack": [
+        "signer-flow-readme"
+      ],
+      "keywordHits": [],
+      "notes": ""
+    },
+    {
+      "name": "Sdk",
+      "description": null,
+      "language": null,
+      "sizeKB": 0,
+      "pushedAt": "2026-09-08T13:07:57Z",
+      "archived": false,
+      "branch": "main",
+      "defaultBranch": "main",
+      "manifests": [],
+      "stack": [],
+      "keywordHits": [],
+      "notes": "tree fetch failed (HTTP 409)"
+    },
+    {
+      "name": "roshpina",
+      "description": "Roshpina — Sovereign Trust & Value Platform: profit (fee engine + cost arbitrage) + protection (fail-closed guard, hash-linked audit, Ed25519 passports) + intelligence (potential engine) — PRIVATE",
+      "language": "TypeScript",
+      "sizeKB": 490,
+      "pushedAt": "2026-09-08T03:15:14Z",
+      "archived": false,
+      "branch": "main",
+      "defaultBranch": "main",
+      "manifests": [
+        "package.json"
+      ],
+      "stack": [
+        "graphene-stack",
+        "nextjs"
+      ],
+      "keywordHits": [],
+      "notes": ""
+    },
+    {
+      "name": "anchor-baseline",
+      "description": "Folder A - restore of the latest baseline commit 5356dab",
+      "language": null,
+      "sizeKB": 0,
+      "pushedAt": "2026-09-08T03:10:40Z",
+      "archived": false,
+      "branch": "main",
+      "defaultBranch": "main",
+      "manifests": [],
+      "stack": [],
       "keywordHits": [],
       "notes": ""
     },

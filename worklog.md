@@ -1685,3 +1685,23 @@ Stage Summary:
 - הכסף-במערכת נמדד-ומוצג-חי: אמת-הכיס על-הדף (3.982 STEEM · 0.041 SBD · 0.049 HIVE · 0.001 HBD · 33.935 BLURT) — הפעם-הראשונה שהרשת-רואה-את-כל-הכיס-שלה-במקום-אחד.
 - שני-גילויי-חוט-חדשים נרשמו-במקורות: סדר-שדות-convert (requestid-לפני-amount — מהשרשרת-עצמה) וסמלי-wire-פנימיים-על-hive (STEEM/SBD) — שניהם node-proven, מונעים-דיגסט-סוטה.
 - קבצים: packages/chains/steem/src/{operations,adapter,serializer}.ts · src/lib/{steem-order,steem-engine}.ts · src/lib/social/rails-server.ts · src/lib/gate/{dex-rail,signing-key,treasury}.ts · src/lib/gate/harness/{orders,modules}.ts · src/app/api/gate/treasury/route.ts · src/app/page.tsx · tools/r21-*.ts · worklog.md · db/custom.db.
+
+---
+Task ID: 38
+Agent: Z.ai Code (main)
+Task: r22 — "אין לנו איך לעשות את זה — בחן את כל מה שיש לנו ביד, איך נוכל לייצר ממה שיש כדי להתקדם, כי אין לנו כלום גם לסוכנים; תבדוק את הריפו האחרים, תראה מה קורה שם; במיוחד ETH/SOL — סוכן אחר עובד על זה, אבל בתור כספת אתה צריך להיות מודע הרבה יותר ממנו; איך לעקוב אחרי הכל בקלות בלי עומס; תמשיך ודחוף"
+
+Work Log:
+- בסיס: קומיט-DB-אוטומטי (a8f1d6b) ישב לא-דחוף; origin/main = r21 (183b83e). אפס-ריצות-פעילות בתחילת-העבודה (הצי פנוי; בהמשך סיור-מתוכנן נכנס-לבד — לא נגענו).
+- **מדידת-היד-המלאה** (כלים חד-פעמיים, נמחקו — הממצאים כאן): אמת-הכיס נמדדה חי: **3.982 STEEM · 0.041 SBD · 0.049 HIVE · 0.001 HBD · 33.935 BLURT** (headcorner 31.064); **ETH 12/12 ארנקים חיים — 0.002101 ETH** סה״כ (0.0002 לכל-ארנק = דשא-גז שהוזרם-מבחוץ + cashmachine 0.0001); **SOL 12/12 ארנקים חיים — 0.060815 SOL** (0.006 לכל-ארנק = rent-exempt דשא). כספת: 234 כניסות (172 verified · 34 unverified · 16 imported · 1 operator-custody · 11 rotated-out) על 11 שרשרות (steem:99 · blurt:48 · tron:20 · ethereum:12 · solana:12 · bitcoin:12 · hive:12 · infra:4 · sovereign:2 · github:1 · nvidia:1).
+- **תשובה-כנה ל"איך מייצרים"**: תגמולים-ממתינים = **0.0000 STEEM-equiv בכל-12-החשבונות** (מה שהיה-ל-headcorner ב-r20/תורת-התגמולים — 0.156+1401-VESTS — כבר-נתבע; מנגנון-steem.claim קיים-ומוכח). אין-SBD/HBD-עודף להמיר. המנוע-היחיד-שמייצר-מאפס: תעסוקת-התוכן של-הצי (פוסטים/אינטראקציות → צובר → claim → כספת → המרות-כשיהיה-מה) — ולכן התרומה-המרכזית: **לראות את-זה-קורה-בזמן-אמת**.
+- **ריפו-הארגון — נמדד-חי**: roshpinacare-sys הוא **משתמש** (לא-ארגון — /orgs/… נתן 404; /user/repos הוא-האמת, כפי-שהוכיח repo-scan מ-M4). **12 מאגרים, 8 נדחפו ב-3-השעות-האחרונות**: steem (2 דק׳), saos-jummper (Python, 8 דק׳), saos-sovereign-foundry (evm-tooling, 25 דק׳), saos-control-center (חדש! 27 דק׳), saos-dex (27 דק׳), saos-sovereign-platform (29 דק׳), Saosmartwallet=אנחנו, Adsmarket (חדש). הסוכן-האחר על-ETH/SOL עובד-כנראה ב-foundry/jummper — עכשיו **הכספת רואה אותם-חי**.
+- **הנדסה — מישור-המודעות**: (א) src/lib/gate/situation.ts — סנאפשוט-מאוחד (מטמון 60s; שבעה-מקטעים ב-Promise.allSettled — כל-מקטע נכשל-בכנות-בנפרד; אפס-סודות-בחוץ). (ב) ריפו-הארגון: רענון-קל-אחד (GET /user/repos?sort=pushed) עם stale-while-revalidate (10 דק׳, נעילה-בזיכרון, fill-ראשון-חוסם-עד-2s ואז-רק-רקע) + התמדה docs/org-scan.json (gitignored — ארטיפקט-ריצה). (ג) GET /api/gate/situation (פומבי-בלי-סודות). (ד) מודול-סוכנים **fleet.situation** (סה״כ 40 מודולים): הסוכן קורא כסף+EVM+תגמולים+כספת+צי+ריפו-ארגון+עוגנים בקריאה-אחת — "לראות את כל היד ולא רק קלף אחד". (ה) כרטיס "מצב-העניינים — הכל במקום אחד" בדף: היד-הכלכלית · ריפו-הארגון (נקודה-כתומה-פועמת = סוכן-אחר דחף-עכשיו; ★=אנחנו) · הכספת-והצי.
+- **דפדפן (agent-browser)**: שבע-בדיקות-אמת-חיות בתוך-הכרטיס — money(3.982/33.935)✓ eth(0.0021)✓ sol(0.060815)✓ repos(jummper+Saosmartwallet)✓ rewards(אפס-כן)✓ vault(234·172)✓ anchors(blk)✓; אפס-שגיאות-קונסולה; 390px אפס-גלילה-אופקית (390=390); פוטר-טבעי (844=844, natural:true); 1280px נקי (1280=1280). tsc 0 · lint 0 · אפס-ליטרלי-מפתח ב-git.
+- היגיינה: כלי-המדידה-חד-פעמיים נמחקו (r22-inventory/r22-pending/r22-repotest/r22-module-test) — הממצאים חרותים כאן ובהערות-הקוד; docs/org-scan.json נוסף-ל-gitignore.
+
+Stage Summary:
+- פער-המודעות נחתך: עד-היום הכספת ידעה-הרבה-אבל ראתה-בפיזור; מהיום **קריאה-אחת קלה עונה "מה יש, מה אין, מה קורה בכל-מקום"** — כולל המקומות-שאנחנו-לא-הסוכנים-שלהם: 12-ריפו-הארגון-עם-8-פעילים-עכשיו. זו-הפעם-הראשונה שהמערכת-רואה את-הסוכנים-האחרים-עובדים-בזמן-אמת.
+- האמת-הכלכלית-הכנה: אין-מה-להמיר-ואין-מה-לקצור-היום (הכל-נמדד-חי, לא-מנוחש) — מנוע-הייצור-הוא-תעסוקת-התוכן-של-הצי, ומהיום גם-הסוכנים וגם-המפעיל רואים-את-הקציר-מתקרב-חי.
+- ETH/SOL: 12+12 ארנקים-חיים-מהכספת, נמדדו-שניהם-עכשיו (דשא-גז בלבד) — עיניים-חיות במודולים (chain.ethereum/chain.solana), בסנאפשוט (situation.evm), ובכרטיס-הדף.
+- קבצים: src/lib/gate/situation.ts · src/app/api/gate/situation/route.ts · src/lib/gate/harness/modules.ts (fleet.situation) · src/app/page.tsx (כרטיס+רישום-API) · .gitignore · docs/autonomy-meaning.md (חוק-10) · worklog.md.
