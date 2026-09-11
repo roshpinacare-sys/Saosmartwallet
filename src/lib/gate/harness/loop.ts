@@ -356,6 +356,30 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     const won = await claimRun(runId);
     if (!won) return; // someone else owns it — never double-run
   }
+  // r33 — the honest outer net: everything BEFORE the big maker try used to
+  // die silently (a bad run spec threw, the dispatcher's .catch swallowed it,
+  // and the row zombified until the reaper turned it into a mute watchdog
+  // tombstone — live-caught this round). Every early failure now confesses
+  // into the row itself.
+  try {
+    await processRunInner(runId);
+  } catch (e) {
+    const msg = (e instanceof Error ? e.message : String(e)).slice(0, 400);
+    await db.gateRun.update({
+      where: { id: runId },
+      data: {
+        status: "failed",
+        error: msg,
+        report: `🛑 הריצה נפלה לפני-תחילת-העבודה (${msg.slice(0, 200)}) — כשל-כן של-הסביבה/מפרט, נרשם בשורה עצמה במקום-למות בשקט.`,
+        finishedAt: new Date(),
+        ...LEASE_CLEAR,
+      },
+    }).catch(() => {});
+    await emitEvent("run.failed", { agent: "?", goal: "(early failure)", gaps: msg }, "harness").catch(() => {});
+  }
+}
+
+async function processRunInner(runId: string): Promise<void> {
   const run = await db.gateRun.findUnique({ where: { id: runId } });
   if (!run || run.status !== "running") return;
   // ROAST r4: a non-null alias for closures below — TS narrowing of `run`
@@ -386,8 +410,20 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
   }
   const recovering = attempt > 1;
 
-  const doneMeans = JSON.parse(run.doneMeans) as string[];
-  const modules = JSON.parse(run.modules) as string[];
+  // r33 — run-spec hardening: doneMeans/modules MUST be JSON string arrays.
+  // A raw-text doneMeans (bad tooling write) used to throw JSON.parse OUTSIDE
+  // every catch and zombify the row; now it is an honest, named failure.
+  const parseSpecArray = (raw: string | null, what: string): string[] => {
+    try {
+      const v = JSON.parse(raw || "[]") as unknown;
+      if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v as string[];
+      throw new Error("not a string array");
+    } catch {
+      throw new GateError("bad-run-spec", `${what} של-הריצה אינו מערך-JSON תקין — הכלי-שיצר-אותה צריך תיקון (כשל-כן, לא-זומבי)`);
+    }
+  };
+  const doneMeans = parseSpecArray(run.doneMeans, "doneMeans");
+  const modules = parseSpecArray(run.modules, "modules");
   let lessons: string[] = [];
   try { lessons = JSON.parse(run.lessons || "[]"); } catch { lessons = []; }
   // recovery: the trace persisted before the crash is the checkpoint — reload it

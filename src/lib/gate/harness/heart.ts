@@ -834,7 +834,12 @@ async function stageDispatch(p: HeartPulse): Promise<void> {
       if ((r.attempt ?? 0) + 1 > 1) p.counters.recovered++;
       slots--;
       fired++;
-      void processRun(r.id, { claimed: true, workerId: workerId() }).catch(() => { /* self-reports into GateRun.error */ });
+      void processRun(r.id, { claimed: true, workerId: workerId() }).catch((e) => {
+        // r33 — never swallow silently again: the run row itself confesses.
+        const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300);
+        console.error(`[heart] processRun threw for ${r.id}: ${msg}`);
+        void db.gateRun.update({ where: { id: r.id }, data: { error: `dispatcher: ${msg}` } }).catch(() => {});
+      });
     }
   }
   p.loops.dispatch = { lastAt: new Date().toISOString(), ok: true, fired };

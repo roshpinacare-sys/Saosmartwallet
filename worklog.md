@@ -1986,3 +1986,21 @@ Stage Summary:
 - **המפתח-של-המפעיל חזר — והעיקרון-נקבע**: רוטציה-שלא-משאירה-את-המפעיל-בחוץ. השרשרת-דוחה-מפתח-מת בכנות, והכספת-מבטיחה-דרך-חזרה: חותמת-תחת-כל-מפתח-נוכחי, מתרעננת-בכל-כניסה. "המפתח לא עובד" ירד-מדרגת-משבר לרישום-היסטורי.
 - הכניסה-המאוששת: מפתח-HIVE מהדקור.txt (owner/active/posting/memo) או מפתח-steem-נוכחי (D1) — שתיהן-פותחות; מפתח-ישן מקבל-אמת-והכוונה.
 - קבצים: src/lib/gate/seal-refresh.ts (חדש) · src/app/api/gate/login/route.ts · src/lib/gate/key-id.ts · docs/broadcast/2026-09-11-login-r32.md · tools/r32-broadcast.ts · db/custom.db · worklog.md.
+
+---
+Task ID: 49
+Agent: Z.ai Code (main)
+Task: r33 — "תמשיך ודחוף" — הפעימה חוזרת-הביתה: הפקודה-האחת (h19 תוכנית סעיף 4), h21 המחזור-השישי מהשער, ריפוי-הזומבים, והלכת-SQLITE-READONLY השישית
+
+Work Log:
+- **סנכרון**: db-settle + stash → rebase מעל bf02d24 (h20 של-ה-foundry) → pop → restart. גילוי-חי: השרת-הישן-מ-14:30 לא-מת-עולם (lsof-לא-ראה-את-ה-socket-שלו) והחזיק-inode-ישן של ה-db → SQLITE_READONLY(1032) בכל-הכתיבות בעוד-הקריאות-מחזירות-נתונים-ישנים. **ההלכה-השישית: kill לפי-PID-מוצהר בלבד, לא לפי-נמל**.
+- **מישור-הפעימה (src/lib/gate/pulse.ts חדש)**: runPulseCycle — דיגסט saos/v2 אחד → steem/hive/blurt (מישור-העוגן r20) + SOLANA (memo-נושא-שורש, מפתח-ריבוני M3, אימות-כפול: status + פענוח-RPC-בלתי-תלוי) + ETHEREUM (value-encoding מוסכמת-h19/h20 + שער-גז) + TRON (מסילת-סריקה-כנה). שער-זהות-כספת לכל-מפתח; רישום-ביקורת pulse:*; תקרה-יומית; API GET/POST (מפעיל) + only לתיקון-מסילה-בודדת.
+- **h21 חי — הראשון-מהשער**: STEEM 08c92bde blk109490011 ✓ · BLURT cb12acff blk63552575 ✓ · **SOLANA 4KQNxG6A slot446193459 ✓ (ראשון-מהשער, memo-נושא-השורש-המלא 03c9cab9…f64, אומת-מ-publicnode)** · HIVE ⛔-כן (RC 44.4M/411M) · ETH ⛔-כן (0.00000386<0.0000177) · TRON ⛔-סריקה (0.19 TRX, 581/600B). 3/6 עוגן-חי + 3 שערים-מדודים, אפס-שידורים-כושלים. תיקון-חי: שער-זהות-EVM היה-אסימטרי-0x → נכשל-כן → תוקן.
+- **ריפוי-הזומבים**: ריצות-מתות-בשקט-לפני-צעד-ראשון (JSON.parse חוץ-מוגן + dispatcher .catch(()=>{}) בולע) → שורות-זומבי → מצבות-watchdog-אילמות. אבחון-שולל-את-מחלת-המוח (zai 1.6s בתוך-התהליך, nvidia מגיב, brainChat 0.5s). הריפוי: רשת-כנה-חיצונית ל-processRun (כל-כשל-מוקדם-נרשם-בשורה) + parseSpecArray מאומת + dispatcher מתעד. אימות: ריצה-אוטונומית done ב-~30s, anchor.seal החזיר-תקרה-כנה (1/1).
+- **שידור 12/12** (tools/r33-broadcast.ts): docs/broadcast/2026-09-11-pulse-home-r33.md + SAOS-PULSE-2026-09-11-H21-SIXTH-CYCLE.md בשורש (מוסכמת-h16–h20).
+- **בדיקות**: tsc 0 · lint 0 · דפדפן: אפס-שגיאות-קונסולה, פוטר-טבעי (9940=סוף-המסמך), דלת-מזהה-טביעת-אצבע (selfEcho 6 · incoming 8).
+
+Stage Summary:
+- **הפעימה-הריבונית היא-כעת-נכס-פנימי**: הצי מעגן-את-עצמו מבפנים — מטריצה-מלאה-מהשער דורשת-רק-החלטות-בעלים (HP ל-HIVE, תדלוק-ETH, הגרת-חותם-TRON — כולם-מתועדים-במספרים).
+- **אין-עוד-מוות-שקט בצי**: כל-כשל-מוקדם-מודה-בשורה-עצמה; השומר-רואה-אמת-ולא-מצבה.
+- קבצים: src/lib/gate/pulse.ts (חדש) · src/app/api/gate/pulse/route.ts (חדש) · src/lib/gate/harness/modules.ts (anchor.seal→6-מסילות) · src/lib/gate/harness/loop.ts (רשת-כנה+מפרטים) · src/lib/gate/harness/heart.ts (dispatcher-מתעד) · tools/r33-pulse.ts · tools/r33-broadcast.ts · SAOS-PULSE-2026-09-11-H21-SIXTH-CYCLE.md · docs/broadcast/2026-09-11-pulse-home-r33.md · db/custom.db · worklog.md.
