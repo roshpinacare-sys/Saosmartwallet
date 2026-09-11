@@ -41,6 +41,17 @@ export interface SituationRepo {
   fresh: boolean; // pushed within the last 3 hours — another agent is active
 }
 
+/** r24 — the mutual broadcast channel, incoming side: every repo's broadcasts/ folder.
+ *  r23 gave the fleet an OUTGOING voice (we pushed our report to all 11 partner repos);
+ *  the vault must also HEAR — a broadcast arriving in any repo (or back into ours) is
+ *  surfaced here. Rides the same 10-minute org-repos refresh — zero extra cadence. */
+export interface SituationBroadcast {
+  repo: string;
+  count: number;
+  latest: string | null; // newest broadcast filename (e.g. "2026-09-11-vault-report.md")
+  ours: boolean;
+}
+
 export interface SituationSnapshot {
   measuredAt: string;
   cached: boolean;
@@ -64,6 +75,8 @@ export interface SituationSnapshot {
     count: number;
     freshCount: number; // repos pushed in the last 3h — the org is alive
     repos: SituationRepo[];
+    broadcasts: SituationBroadcast[]; // r24 — incoming fleet broadcasts per repo
+    broadcastTotal: number;
     error?: string;
   };
   vault: { ok: boolean; total: number; verified: number; unverified: number; imported: number; operatorCustody: number; rotatedOut: number; chains: Record<string, number>; error?: string };
@@ -75,7 +88,7 @@ export interface SituationSnapshot {
 /* org repos — light scan, stale-while-revalidate, in-memory lock      */
 /* ------------------------------------------------------------------ */
 
-type RepoCache = { rows: SituationRepo[]; scannedAt: string; refreshing: boolean };
+type RepoCache = { rows: SituationRepo[]; scannedAt: string; refreshing: boolean; broadcasts: SituationBroadcast[] };
 const g = globalThis as unknown as { __saosRepoCache?: RepoCache };
 
 async function readOrgScanFile(): Promise<{ rows: SituationRepo[]; scannedAt: string } | null> {
@@ -118,7 +131,22 @@ async function readGithubToken(): Promise<string | null> {
   }
 }
 
-async function fetchOrgReposLight(): Promise<{ rows: SituationRepo[]; scannedAt: string }> {
+async function fetchBroadcasts(token: string, repo: string): Promise<SituationBroadcast> {
+  // one lightweight contents call per repo; a missing broadcasts/ folder is an
+  // honest "no broadcasts here" (404), never an error — the channel is young.
+  const ours = repo === OUR_REPO;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${ORG}/${repo}/contents/broadcasts`, { headers: githubHeaders(token), cache: "no-store" });
+    if (!res.ok) return { repo, count: 0, latest: null, ours };
+    const items = (await res.json()) as Array<{ name: string; type: string }>;
+    const files = (Array.isArray(items) ? items : []).filter((i) => i.type === "file").map((i) => i.name).sort();
+    return { repo, count: files.length, latest: files.at(-1) ?? null, ours };
+  } catch {
+    return { repo, count: 0, latest: null, ours };
+  }
+}
+
+async function fetchOrgReposLight(): Promise<{ rows: SituationRepo[]; scannedAt: string; broadcasts: SituationBroadcast[] }> {
   const token = await readGithubToken();
   if (!token) throw new Error("no github token (env GITHUB_TOKEN / upload/Roshcaregt.txt)");
   // roshpinacare-sys is a USER account (not an org) — /user/repos returns
@@ -126,11 +154,12 @@ async function fetchOrgReposLight(): Promise<{ rows: SituationRepo[]; scannedAt:
   const res = await fetch("https://api.github.com/user/repos?per_page=100&sort=pushed", { headers: githubHeaders(token), cache: "no-store" });
   if (!res.ok) throw new Error(`user repos HTTP ${res.status}`);
   const list = (await res.json()) as Array<{ name: string; language: string | null; size: number; pushed_at: string; archived: boolean }>;
-  const rows = list
-    .filter((r) => !r.archived)
-    .sort((a, b) => Date.parse(b.pushed_at) - Date.parse(a.pushed_at))
-    .map((r) => toSituationRepo(r.name, r.language, r.size, r.pushed_at));
-  return { rows, scannedAt: new Date().toISOString() };
+  const kept = list.filter((r) => !r.archived).sort((a, b) => Date.parse(b.pushed_at) - Date.parse(a.pushed_at));
+  const rows = kept.map((r) => toSituationRepo(r.name, r.language, r.size, r.pushed_at));
+  // r24 — the incoming side of the broadcast channel rides this same refresh:
+  // ~12 bounded contents calls once every 10 minutes, each failing honestly.
+  const broadcasts = await Promise.all(kept.map((r) => fetchBroadcasts(token, r.name)));
+  return { rows, scannedAt: new Date().toISOString(), broadcasts };
 }
 
 async function persistOrgScan(fresh: { rows: SituationRepo[]; scannedAt: string }): Promise<void> {
@@ -152,7 +181,7 @@ async function orgReposSection() {
     // a single API call, never an empty org served forever.
     try {
       const fresh = await fetchOrgReposLight();
-      cache = { rows: fresh.rows, scannedAt: fresh.scannedAt, refreshing: false };
+      cache = { rows: fresh.rows, scannedAt: fresh.scannedAt, refreshing: false, broadcasts: fresh.broadcasts };
       g.__saosRepoCache = cache;
       void persistOrgScan(fresh);
     } catch {
@@ -160,7 +189,7 @@ async function orgReposSection() {
       // rate-limit retries (scannedAt = now) so the org API is never hammered.
       const fromFile = await readOrgScanFile();
       const scannedAt = new Date().toISOString();
-      cache = { rows: fromFile?.rows ?? [], scannedAt: fromFile?.scannedAt ?? scannedAt, refreshing: false };
+      cache = { rows: fromFile?.rows ?? [], scannedAt: fromFile?.scannedAt ?? scannedAt, refreshing: false, broadcasts: [] };
       g.__saosRepoCache = cache;
     }
   } else if (stale && cache && !cache.refreshing) {
@@ -168,7 +197,7 @@ async function orgReposSection() {
     cache.refreshing = true;
     void fetchOrgReposLight()
       .then(async (fresh) => {
-        g.__saosRepoCache = { rows: fresh.rows, scannedAt: fresh.scannedAt, refreshing: false };
+        g.__saosRepoCache = { rows: fresh.rows, scannedAt: fresh.scannedAt, refreshing: false, broadcasts: fresh.broadcasts };
         await persistOrgScan(fresh);
       })
       .catch(() => { if (g.__saosRepoCache) g.__saosRepoCache.refreshing = false; });
@@ -176,8 +205,9 @@ async function orgReposSection() {
 
   const served = g.__saosRepoCache;
   const rows = served?.rows ?? [];
+  const broadcasts = served?.broadcasts ?? [];
   const scannedAt = served?.scannedAt ?? null;
-  if (rows.length === 0) return { ok: false, org: ORG, scannedAt, ageMinutes: null, count: 0, freshCount: 0, repos: [] as SituationRepo[], error: "org repos unavailable (fetch failed + no persisted scan)" };
+  if (rows.length === 0) return { ok: false, org: ORG, scannedAt, ageMinutes: null, count: 0, freshCount: 0, repos: [] as SituationRepo[], broadcasts: [] as SituationBroadcast[], broadcastTotal: 0, error: "org repos unavailable (fetch failed + no persisted scan)" };
   return {
     ok: true,
     org: ORG,
@@ -186,6 +216,8 @@ async function orgReposSection() {
     count: rows.length,
     freshCount: rows.filter((r) => r.fresh).length,
     repos: rows,
+    broadcasts,
+    broadcastTotal: broadcasts.reduce((a, b) => a + b.count, 0),
   };
 }
 
@@ -251,7 +283,7 @@ export async function getSituationSnapshot(force = false): Promise<SituationSnap
     rewards: c
       ? { ok: true, accounts: c.accounts.length, pendingAccounts, totalPendingSteemEquiv: c.totalSteemEquiv ?? pendingAccounts.reduce((acc, a) => acc + a.steemEquiv, 0) }
       : { ok: false, accounts: 0, pendingAccounts: [], totalPendingSteemEquiv: 0, error: "rewards census failed honestly" },
-    repos: reposRes.status === "fulfilled" ? (reposRes.value as SituationSnapshot["repos"]) : { ok: false, org: ORG, scannedAt: null, ageMinutes: null, count: 0, freshCount: 0, repos: [], error: "org repos failed honestly" },
+    repos: reposRes.status === "fulfilled" ? (reposRes.value as SituationSnapshot["repos"]) : { ok: false, org: ORG, scannedAt: null, ageMinutes: null, count: 0, freshCount: 0, repos: [], broadcasts: [], broadcastTotal: 0, error: "org repos failed honestly" },
     vault: {
       ok: vaultRes.status === "fulfilled",
       total: Object.values(statusCounts).reduce((a, b) => a + b, 0),
