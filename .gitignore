@@ -77,3 +77,6 @@ upload/
 
 # autonomy research input — external ZIPs + extracted content (local-only)
 engineering/autonomy-input/
+
+# runtime artifact — rewritten live by /api/gate/situation
+docs/org-scan.json

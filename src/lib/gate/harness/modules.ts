@@ -22,6 +22,7 @@ import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
 import { getTreasurySnapshot } from "@/lib/gate/treasury";
+import { getSituationSnapshot } from "@/lib/gate/situation";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
 import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
@@ -479,6 +480,30 @@ export const MODULES: HarnessModule[] = [
         error: r.error,
       }));
       return { measuredAt: snap.measuredAt, summary, rails: snap.rails, meaning: "אמת-הכיס נמדדה חי — בנה פקודות-המרה על מה שקיים בפועל, לא על הנחות" };
+    },
+  },
+  {
+    id: "fleet.situation",
+    name: "מצב-העניינים — הכל במקום אחד",
+    kind: "skill",
+    desc: 'המודעות הריבונית המלאה בקריאה אחת (r22): הכסף על שלוש-המסילות, יתרות ETH/SOL של הארנקים מהכספת, תגמולים-ממתינים (מה אפשר לקצור), ספירת-הכספת, הצי (סוכנים/ריצות-פעילות), והעוגנים — וגם מה קורה בשאר-הריפו של הארגון (roshpinacare-sys): 12 מאגרים, מה נדחף לאחרונה ומאיזה סוכן-אחר. קרא לפני כל החלטה — כך רואים את כל היד ולא רק קלף אחד. מטמון 60s, כל-מקטע נכשל בכנות בנפרד.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    async exec() {
+      const s = await getSituationSnapshot(true);
+      const money = s.treasury.rails.map((r) => ({ rail: r.rail, ok: r.ok, totals: r.ok ? `${r.totals.liquid} ${r.liquidSymbol}` : r.error }));
+      return {
+        measuredAt: s.measuredAt,
+        money,
+        evm: { eth: `${s.evm.ethereum.total} ETH (${s.evm.ethereum.okWallets}/${s.evm.ethereum.wallets} ארנקים)`, sol: `${s.evm.solana.total} SOL (${s.evm.solana.okWallets}/${s.evm.solana.wallets} ארנקים)` },
+        pendingRewards: s.rewards.totalPendingSteemEquiv > 0 ? { total: s.rewards.totalPendingSteemEquiv, accounts: s.rewards.pendingAccounts } : "אפס ממתינים — הכל נתבע; הקציר הבא גדל עם תעסוקת-התוכן של הצי",
+        vault: s.vault,
+        fleet: s.fleet,
+        orgRepos: { count: s.repos.count, fresh: s.repos.freshCount, repos: s.repos.repos.slice(0, 12).map((r) => `${r.ours ? "★" : " "}${r.name} (${r.pushedMinutesAgo ?? "?"} דק׳)`), note: "★ = הריפו שלנו (Saosmartwallet); טרי = נדחף ב-3 השעות האחרונות — סוכנים אחרים פעילים שם עכשיו" },
+        anchors: s.anchors.latest.map((a) => `${a.chain} blk ${a.blockNum} · ${a.round}`),
+        meaning: "הכספת רואה את כל היד: מה יש, מה חסר, מה קורה בכל מקום — קבל החלטות מהאמת הזאת, לא מהנחות",
+      };
     },
   },
   {
