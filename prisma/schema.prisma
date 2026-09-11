@@ -95,6 +95,7 @@ model GateRun {
   leaseOwner String? // worker id that claimed this run (crash-safety: the trace IS the checkpoint)
   leaseExpiresAt DateTime?
   heartbeatAt    DateTime? // renewed after every persisted step
+  retryNotBefore DateTime? // r36 crash-burst backoff — a re-queued crashed run is not claimable until this passes (the retry lands on a WARM server, not inside a restart storm)
   attempt        Int       @default(0) // incremented on every claim — >1 means this run RECOVERED from a crash
   maxAttempts    Int       @default(2)
   verdict    String? // JSON — independent checker verdict {done, checks[], gaps, notes}

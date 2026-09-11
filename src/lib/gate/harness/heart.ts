@@ -45,6 +45,19 @@ const MAX_SCHEDULES_PER_TICK = 3;
 const MIN_SCHEDULE_EVERY_MS = 60_000; // no runaway cadences
 const DAY_MS = 86_400_000;
 const SCHEDULE_VAULT_RETRY_MS = 20 * 60_000; // r28 vault-gate: sealed-vault deferral — quota untouched, retries inside the daily grace window
+// r36 crash-burst healing — live evidence 2026-09-11: 8/10 failed runs today were
+// "watchdog: קרסה יותר מדי פעמים" clustered 15:27–16:13Z — EXACTLY the rebase/restart
+// storm window. The reaper re-queued a crashed run and the very next dispatch tick
+// re-claimed it (~20s) INTO the same storm: attempt 2 burned, honest-failure verdict
+// on a healthy run that never saw a warm server. The fix: a re-queued crashed run is
+// not claimable until retryNotBefore passes (90s × attempt, capped 5min) — the retry
+// lands on a WARM server or the exhaustion verdict waits for it. maxAttempts is
+// honored EXACTLY: the reaper runs before dispatch in every beat, so a backoff that
+// expires releases the final verdict, never a third claim.
+const CRASH_BACKOFF_BASE_MS = 90_000;
+const CRASH_BACKOFF_CAP_MS = 300_000;
+// factory — a FRESH date per call (a module-level Date would freeze at load time and jam the gate shut)
+const notInBackoff = () => ({ OR: [{ retryNotBefore: null }, { retryNotBefore: { lte: new Date() } }] });
 
 interface HeartPulse {
   startedAt: string;
@@ -161,7 +174,10 @@ async function stageReap(p: HeartPulse): Promise<void> {
   const now = new Date();
   const staleLegacy = new Date(now.getTime() - REAP_STALE_MS);
   // crashed mid-lease (lease expired) or legacy orphans (no lease, old updatedAt)
-  const reaped = await db.gateRun.updateMany({
+  // r36: per-run re-queue — a crashed run with attempts burned gets a warm-gap
+  // (retryNotBefore = 90s × attempt, capped) so its retry lands OUTSIDE the storm.
+  // Legacy orphans (attempt 0) never ran — the crash was not theirs; no backoff.
+  const crashed = await db.gateRun.findMany({
     where: {
       status: "running",
       OR: [
@@ -169,16 +185,36 @@ async function stageReap(p: HeartPulse): Promise<void> {
         { heartbeatAt: null, createdAt: { lt: staleLegacy }, attempt: 0 },
       ],
     },
-    data: { status: "queued", leaseOwner: null, leaseExpiresAt: null, heartbeatAt: null },
+    select: { id: true, attempt: true },
+    take: 20,
   });
+  let reaped = 0;
+  for (const c of crashed) {
+    const attempt = c.attempt ?? 0;
+    const backoffMs = attempt >= 1 ? Math.min(attempt * CRASH_BACKOFF_BASE_MS, CRASH_BACKOFF_CAP_MS) : 0;
+    const won = await db.gateRun.updateMany({
+      where: { id: c.id, status: "running" }, // atomic re-check — only still-crashed rows
+      data: {
+        status: "queued",
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        heartbeatAt: null,
+        retryNotBefore: backoffMs > 0 ? new Date(now.getTime() + backoffMs) : null,
+      },
+    });
+    reaped += won.count;
+  }
   // runs that keep dying: past their last allowed attempt → honest failure.
   // ROAST r8 — this path used to die MUTE: error set, report NULL, no bridge
   // message. Live proof: run cmtvmw5v (14:40Z) — crashed twice off-process
   // (sandbox reaper), the exhausted-reaper marked it failed, and the bridge
   // showed NOTHING. r7's "no run dies mute" only covered the in-process
   // catch. Every terminal failure path must confess in Hebrew.
+  // r36: a run still inside its warm-gap is NOT failed yet — its honest verdict
+  // waits until the gap passes (reap precedes dispatch, so the verdict releases
+  // exactly when the last warm chance could have been claimed, never after a third one).
   const exhaustedRows = await db.gateRun.findMany({
-    where: { status: "queued", attempt: { gte: 2 }, maxAttempts: { lte: 2 } },
+    where: { status: "queued", attempt: { gte: 2 }, maxAttempts: { lte: 2 }, ...notInBackoff() },
     select: { id: true, agentName: true, goal: true, error: true, attempt: true },
     take: 20,
   });
@@ -206,12 +242,12 @@ async function stageReap(p: HeartPulse): Promise<void> {
       data: { channel: "command", fromKind: "system", fromName: "harness", body: `🫀 ריצת-מטרה של ${run.agentName} קרסה ${run.attempt} פעמים ונכשלה סופית — וידוי כן נכתב לדוח שלה`, meta: JSON.stringify({ runId: run.id }) },
     }).catch(() => {});
   }
-  p.counters.reaped += reaped.count;
-  if (reaped.count || exhausted > 0) {
-    p.loops.reaper = { lastAt: now.toISOString(), ok: true, fired: reaped.count + exhausted };
-    if (reaped.count) {
+  p.counters.reaped += reaped;
+  if (reaped > 0 || exhausted > 0) {
+    p.loops.reaper = { lastAt: now.toISOString(), ok: true, fired: reaped + exhausted };
+    if (reaped > 0) {
       await db.gateMessage.create({
-        data: { channel: "command", fromKind: "system", fromName: "harness", body: `🫀 השומר החזיר ${reaped.count} ריצה/ות קרוסות לתור — יוכרו מחדש עם עקבותיהן (התאוששות-מקריסה)`, meta: "{}" },
+        data: { channel: "command", fromKind: "system", fromName: "harness", body: `🫀 השומר החזיר ${reaped} ריצה/ות קרוסות לתור — יוכרו מחדש עם עקבותיהן (התאוששות-מקריסה) · ריפוי-פרץ r36: ריצה-קרוסה ניתנת-מחדש אחרי הפוגת-חימום (90 שנ' × מספר-ניסיונות, עד 5 דק') — הניסיון-החוזר ייפול-בשרת-חם ולא-בסערת-הפעלה`, meta: "{}" },
       }).catch(() => {});
     }
   }
@@ -820,7 +856,7 @@ async function stageDispatch(p: HeartPulse): Promise<void> {
   let fired = 0;
   if (slots > 0) {
     const queued = await db.gateRun.findMany({
-      where: { status: "queued" },
+      where: { status: "queued", ...notInBackoff() }, // r36: runs inside a warm-gap are invisible to dispatch
       orderBy: { createdAt: "asc" },
       take: MAX_DISPATCH_PER_TICK + 2,
     });
