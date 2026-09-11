@@ -26,7 +26,8 @@ import { getSituationSnapshot } from "@/lib/gate/situation";
 import { getBroadcastDigest } from "@/lib/gate/digest";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
-import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
+import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2 } from "@/lib/gate/anchor";
+import { runPulseCycle } from "@/lib/gate/pulse";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { fundingCensus, FUNDING_ADDRESS } from "@/lib/gate/funding-watch";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
@@ -1185,9 +1186,9 @@ export const MODULES: HarnessModule[] = [
   },
   {
     id: "anchor.seal",
-    name: "איטום-עוגן — חותם את מצב-הכספת על השרשרות",
+    name: "פעימה ריבונית — איטום מלא על כל המסילות (r33)",
     kind: "actor",
-    desc: "המעשה-הריבוני: חותם עוגן saos.vault.anchor.v1 חדש — דיגסט אחד (saos/v2) משודר לכל המסילות (steem+hive+blurt), חתום headcorner@posting לכל-מסילה, שידור-סינכרוני, והשרשרת מאמתת בתום. כפוף לתקרת-איטום יומית (1/יום) — העוגן של היום כבר נחתם? המודול משיב בכנות ולא מכפיל. כספת-נעולה = תשובה-כנה (האיטום דורש פתיחה). מסילה שנדחית (RC כלכלי וכד') נרשמת ככשל-כן, לא משתקת את האחרות.",
+    desc: "הפקודה-האחת (h19 תוכנית סעיף 4): דיגסט saos/v2 אחד נחתם על כל המסילות — steem+hive+blurt (מישור-העוגן r20) + SOLANA (memo נושא-שורש, מפתח-ריבוני M3) + ETHEREUM (הסכום-עצמו מקודד את-השורש, שער-גז נמדד) + TRON (מסילת-סריקה-כנה — החותם-שם במסילת-ה-foundry). שער-כן לכל-מסילה: זהות-כספת נגזרת-מול-שורה, דלק/גז/RC נמדדים לפני-שידור, סירוב = רישום-מספרים ואפס-שידור. תקרת-פעימה יומית (1/יום) — הפעימה-של-היום כבר חיה? המודול משיב בכנות. כספת-נעולה = תשובה-כנה.",
     args: "{}",
     needsVault: false, // handles the locked vault itself — an honest answer, not an error
     cacheable: false,
@@ -1196,22 +1197,23 @@ export const MODULES: HarnessModule[] = [
         return {
           ok: false,
           locked: true,
-          meaning: "הכספת חתומה — איטום-עוגן דורש פתיחה (fail-closed). זו תשובה כנה, לא כשל: המשמרת תרוץ שוב כשהכספת פתוחה.",
+          meaning: "הכספת חתומה — פעימה דורשת פתיחה (fail-closed). זו תשובה כנה, לא כשל: המשמרת תרוץ שוב כשהכספת פתוחה.",
         };
       }
       const dayStart = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
-      const sealedToday = await db.gateAction.count({ where: { action: "vault-anchor:saos.vault.anchor.v1", ok: true, createdAt: { gte: dayStart } } });
-      if (sealedToday >= 1) {
-        return { ok: true, skipped: true, sealedToday, meaning: `תקרת-האיטום היומית מוצו (${sealedToday}/1) — העוגן של היום כבר חי על השרשרת; אין לכפול עוגנים.` };
+      const pulsedToday = await db.gateAction.count({ where: { action: "pulse:cycle", ok: true, createdAt: { gte: dayStart } } });
+      if (pulsedToday >= 1) {
+        return { ok: true, skipped: true, pulsedToday, meaning: `תקרת-הפעימה היומית מוצו (${pulsedToday}/1) — הפעימה של היום כבר חיה על השרשרות; אין לכפול עוגנים.` };
       }
       const round = `fleet-${new Date().toISOString().slice(0, 10)}`;
-      const r = await sealAnchorRound(round, ctx.agentName);
+      const r = await runPulseCycle(round, ctx.agentName);
+      if (r.skipped) return { ok: true, skipped: true, meaning: "הפעימה של היום כבר נרשמה — דילוג-כן" };
       const landed = r.rails.filter((x) => x.ok && x.onChain);
       return {
         ok: landed.length > 0,
         digest: r.digest,
         rails: r.rails.map((x) => ({ rail: x.rail, ok: x.ok, txId: x.txId ? x.txId.slice(0, 16) : null, blockNum: x.blockNum, onChain: x.onChain, error: x.error })),
-        meaning: `איטום ${round}: digest ${r.digest.slice(0, 12)}… · ${landed.length}/${r.rails.length} מסילות עוגן-חי (${r.rails.map((x) => `${x.rail}=${x.ok ? (x.onChain ? "✓" : "שודר") : "נכשל-כן"}`).join(", ")})`,
+        meaning: `פעימה ${round}: digest ${r.digest.slice(0, 12)}… · ${landed.length}/${r.rails.length} מסילות עוגן-חי (${r.rails.map((x) => `${x.rail}=${x.ok ? (x.onChain ? "✓" : "שודר") : "שער-כן"}`).join(", ")})`,
       };
     },
   },
