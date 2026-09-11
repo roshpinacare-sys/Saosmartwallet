@@ -153,7 +153,9 @@ interface SituationData {
   anchors: { ok: boolean; count: number; latest: { chain: string; txId: string; blockNum: number | null; at: string; round: string; signedBy: string }[]; error?: string };
 }
 interface DigestItemRow { repo: string; file: string; ours: boolean; ok: boolean; error?: string; bytes: number; hash8: string; echo: boolean; isNew: boolean; lang: string; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
-interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
+interface DoorVoiceRow { file: string; ok: boolean; error?: string; bytes: number; hash8: string; isNew: boolean; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
+interface RootVoiceRow { file: string; ok: boolean; error?: string; hash8: string; looksLikeReport: boolean; isNew: boolean; headline: string; mentionsUs: boolean }
+interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -181,7 +183,7 @@ const ENDPOINTS: Ep[] = [
   { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל של חשבון-הפקודה עצמו ומשדרת לשרשרת-היעד (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
   { method: "GET", path: "/api/gate/treasury", desc: "אמת-הכיס (r21): יתרות חיות של כל חשבונות-הצי על שלוש-המסילות (נזיל/חוב/vesting) — כל-מסילה נכשלת בכנות בנפרד", auth: "operator" },
   { method: "GET", path: "/api/gate/situation", desc: "מצב-העניינים (r22): הכל במקום אחד — כסף-מסילות + ETH/SOL + תגמולים-ממתינים + כספת + צי + עוגנים + מה-קורה-בשאר-הריפו של הארגון (12 מאגרים, מה נדחף עכשיו). מטמון 60s, אפס-עומס", auth: "public" },
-  { method: "GET", path: "/api/gate/digest", desc: "מישור-ההבנה (r25): הכספת קוראת את ערוץ-השידורים — הדים-שלנו מול קולות-שותף, סיווג (דוח/שאלה/בקשה/התראה), שאלות-שהוצבו-לנו, טיוטת-תשובה (שליחה = החלטת-מפעיל). מטמון 10 דק׳, אפס-עומס", auth: "public" },
+  { method: "GET", path: "/api/gate/digest", desc: "מישור-ההבנה (r25) + מישור-הדלת-הקדמית (r26): הכספת קוראת את ערוץ-השידורים — הדים-שלנו מול קולות-שותף, סיווג (דוח/שאלה/בקשה/התראה/תגובה), שאלות-שהוצבו-לנו, ומעכשיו גם: סריקת-הדלת-שלנו (מי דופק ב-broadcasts/ של עצמנו — הפלטפורמה ענתה שם) + זיהוי-קולות-שורש (דוחות-שותף שנזרקו בשורש-הריפו ועקפו את-הערוץ). טיוטת-תשובה בלבד — שליחה = החלטת-מפעיל. מטמון 10 דק׳, אפס-עומס", auth: "public" },
   { method: "GET", path: "/api/gate/stream", desc: "גשר-הפיקוד בזמן-אמת (SSE) — הודעות חדשות נדחפות, בלי דגימה", auth: "operator" },
   { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
   { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
@@ -1825,8 +1827,37 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                   <div className="mt-1 pt-1 border-t border-zinc-800/60">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <p className="text-[10px] font-mono text-sky-300/90">🧠 מישור-ההבנה — הכספת קוראת</p>
-                      <span className="text-[9px] font-mono text-zinc-500" dir="ltr">{digest.fetched}/{digest.scannedRepos} נקראו · {digest.uniqueContents} תוכן-ייחודי · {digest.echoesOfOurs} הדים-שלנו</span>
+                      <span className="text-[9px] font-mono text-zinc-500" dir="ltr">{digest.fetched}/{digest.scannedRepos} נקראו · {digest.echoesOfOurs} הדים-שלנו · דלת {digest.door?.incoming ?? 0}</span>
                     </div>
+                    {digest.door && digest.door.checked && digest.door.incoming > 0 && (
+                      <div className="mt-1 rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-2 py-1.5">
+                        <p className="text-[10px] font-mono text-emerald-300">🚪 דלת-קדמית — {digest.door.incoming} דופק/ים ב-broadcasts/ שלנו (r26)</p>
+                        {digest.door.voices.filter((v) => v.ok).map((v) => (
+                          <div key={v.file} className="mt-0.5 text-[9px] font-mono" dir="ltr">
+                            <span className={v.isNew ? "text-amber-300 font-semibold" : "text-emerald-200/90"}>{v.isNew ? "NEW " : ""}[{v.kind}] {v.file}</span>
+                            <span className="text-zinc-500"> — {v.headline.slice(0, 52)}</span>
+                            {v.asks.slice(0, 2).map((a, k) => (
+                              <div key={k} className="text-amber-200/70 truncate max-w-[95%]" title={a}>? {a.slice(0, 66)}</div>
+                            ))}
+                          </div>
+                        ))}
+                        {digest.door.voices.some((v) => !v.ok) && <p className="text-[9px] text-rose-300/70 mt-0.5">דופק-שלא-נקרא: {digest.door.voices.filter((v) => !v.ok).length} תוכן-לא-הושג (כנות)</p>}
+                      </div>
+                    )}
+                    {digest.door && digest.door.error && <p className="text-[9px] text-rose-300/70 mt-0.5">🚪 {digest.door.error}</p>}
+                    {digest.rootVoices && digest.rootVoices.checked && digest.rootVoices.voices.length > 0 && (
+                      <div className="mt-0.5 pt-0.5 border-t border-zinc-800/50">
+                        <p className="text-[10px] font-mono text-amber-300/90">🪓 קולות-שורש — {digest.rootVoices.voices.length} דוחות-שותף בשורש-הריפו (עקפו-את-הערוץ)</p>
+                        <div className="space-y-0.5 max-h-16 overflow-y-auto scroll-thin">
+                          {digest.rootVoices.voices.map((v) => (
+                            <div key={v.file} className="text-[9px] font-mono" dir="ltr">
+                              <span className={v.isNew ? "text-amber-300 font-semibold" : "text-amber-200/80"}>{v.isNew ? "NEW " : ""}{v.file}</span>
+                              <span className="text-zinc-500"> — {v.headline.slice(0, 48)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {digest.partnerVoices > 0 && (
                       <div className="mt-0.5 space-y-0.5 max-h-20 overflow-y-auto scroll-thin">
                         {digest.items.filter((i) => i.ok && !i.ours && !i.echo).map((i) => (
@@ -1841,14 +1872,23 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                       </div>
                     )}
                     {digest.suggestedResponse.needed ? (
-                      <p className="text-[9px] text-sky-300/80 mt-0.5">✍️ טיוטת-תשובה מוכנה עבור {digest.suggestedResponse.toRepo} — השליחה החלטת-מפעיל/סוכן (fleet.digest)</p>
+                      <div className="mt-0.5">
+                        <p className="text-[9px] text-sky-300/80">✍️ טיוטת-תשובה מוכנה עבור {digest.suggestedResponse.toRepo} — השליחה החלטת-מפעיל/סוכן (fleet.digest)</p>
+                        {digest.suggestedResponse.draft && (
+                          <div className="mt-0.5 space-y-0.5 max-h-14 overflow-y-auto scroll-thin">
+                            {digest.suggestedResponse.draft.slice(0, 4).map((d, k) => (
+                              <p key={k} className="text-[9px] text-sky-200/60 truncate" title={d} dir="rtl">↳ {d.slice(0, 90)}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <p className="text-[9px] text-zinc-600 mt-0.5">{digest.suggestedResponse.reason}</p>
                     )}
                   </div>
                 )}
                 {digest?.error && <p className="text-[9px] text-rose-300/70 mt-1">🧠 קריאת-השידורים: {digest.error}</p>}
-                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו · 📡 ערוץ-הדדי (r24) + 🧠 קריאה (r25) — הכספת שומעת ומבינה</p>
+                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו · 📡 ערוץ-הדדי (r24) + 🧠 קריאה (r25) + 🚪 דלת-קדמית וקולות-שורש (r26) — הכספת שומעת, מבינה, וגם רואה מי-דופק-בדלת-שלה</p>
               </div>
               {/* vault + fleet + anchors */}
               <div className="rounded-xl border border-zinc-800 bg-black/40 px-3 py-2.5">
