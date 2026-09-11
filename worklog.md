@@ -1766,3 +1766,17 @@ Stage Summary:
 - תקלת-ה-readonly נסגרה שורשית: החלפת-DB-תחת-שרת-חי = חיבור-מת; ההלכה: אחרי-rebase שנוגע ב-db — restart-שרת, וה-reaper רק-מזרז את-זה; zombie-run אחת מוחזרה-בכנות.
 - הבא-הטבעי: סוכן-משיב (fleet.digest→טיוטה→אישור-מפעיל→שידור-חזרה), וסימוטר-קול-שותף לבדיקת-הדרך של זרימת NEW→טיוטה→שידור.
 - קבצים: src/lib/gate/digest.ts · src/app/api/gate/digest/route.ts · src/lib/gate/harness/modules.ts (fleet.digest) · src/app/page.tsx (פאנל+registry) · .gitignore · docs/autonomy-meaning.md · worklog.md · db/custom.db (zombie-recycle).
+
+---
+Task ID: 41-b (r25 addendum — live intel that landed during the round)
+Agent: Z.ai Code (main)
+Task: צליבה-חיה של דוח-ה-foundry שנדחף-לריפו-שלנו (b13eb9d) מול-ממצאי-r23/r25
+
+Work Log:
+- origin קיבל בזמן-העבודה: SAOS-DAILY-REPORT-2026-09-11-FOUNDRY.md (ב13eb9d — דוח-יומי מלא: עוגן-BLURT-חי ראשון, עוגן-STEEM-אוטונומי ראשון, claim 890.55 VESTS, סקר-היסטוריית-EVM של headcorner (76 txs, חוזה-עצמי 0xa52D85cA…), עיגוני-h16 מ-11 כתובות-צי על SOL(slot 446047519 finalized)+ETH(8 עוגנים באותו-בלוק 25951350), תיקון-P0 ב-/signer, /anchor-ingest חדש, WATTOIN=פתיון-מתחזה).
+- **הצליבה-החשובה**: 11-כתובות-העיגון של-ה-foundry = בדיוק חשבונות-הצי שבכספת-שלנו (ynet, haran, cashmachine, israelnews, lsa, macrame, siq, tov, wic, wog, woq). הממצא-של-r23 מדויק-עכשיו: **שלושה-מישורים** — מישור-הצי-שלנו · מישור-אבן-הפינה-של-פלטפורמה (נפרדים) · מישור-מפתחות-הצי **משותף-לשתי-מערכות-כספת** (שלנו + chief-of-staff :3032 של-ה-foundry). ה-foundry שרף ≈0.00013 ETH + 0.000005 SOL מארנקי-הצי לעיגון.
+- **הערת-ערוץ**: ה-foundry עדיין לא משתמש-ב-broadcasts/ — הוא דוחף-דוחות-לשורש-הריפו-שלנו; הערוץ-ההדדי-מוצע-r23 טרם-אומץ; זיהוי-קולות-בשורש-הריפו = מועמד-ל-r26.
+- docs/autonomy-meaning.md: שורת-חור-חדשה — עדכון-ריבוד-הזהויות (r25, צליבה-חיה).
+
+Stage Summary:
+- ההבנה-שלנו-על-היד עצמה השתפרה-בזכות-המישור-המבין: בזמן-שהכספת קראה-את-הערוץ, שותף-פעיל עיגן-מהמפתחות-שלנו ודיווח; הריבוד-המעודכן חרות-בכנות; ההוצאות-המשותפות-על-ארנקי-הצי מסומנות-כהחלטת-מפעיל.
