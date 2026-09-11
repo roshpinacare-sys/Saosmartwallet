@@ -44,6 +44,7 @@ const MAX_DISPATCH_PER_TICK = 2; // bounded pass (TITAI maxJobsPerPass)
 const MAX_SCHEDULES_PER_TICK = 3;
 const MIN_SCHEDULE_EVERY_MS = 60_000; // no runaway cadences
 const DAY_MS = 86_400_000;
+const SCHEDULE_VAULT_RETRY_MS = 20 * 60_000; // r28 vault-gate: sealed-vault deferral — quota untouched, retries inside the daily grace window
 
 interface HeartPulse {
   startedAt: string;
@@ -122,7 +123,13 @@ async function enqueueRun(opts: {
       modules: JSON.stringify(modules),
       brain,
       checker: pickCheckerBrain(brainStr),
-      budget: Math.min(Math.max(opts.budget || 5, 1), 8),
+      // r28 efficiency plane: the 8-step ceiling DOOMED write-missions —
+      // live-measured: editor (trends→audit→compose→post→report) burned its
+      // budget on reads + one retry and never reached the publish step; every
+      // budget-8 blocked run was a write mission. 12 keeps the token-blowout
+      // guard hard (cached modules, bounded brains) while giving the final
+      // WRITE step room to actually happen.
+      budget: Math.min(Math.max(opts.budget || 5, 1), 12),
       status: "queued",
       origin: opts.origin,
       meta: JSON.stringify(meta),
@@ -359,6 +366,30 @@ async function stageSchedules(p: HeartPulse): Promise<void> {
         p.counters.schedulesDeferred++;
         continue;
       }
+      /* ── r28 — vault-gate: don't enqueue a DOOMED mission ──
+       * A schedule armed with needsVault modules (posting / treasury authority)
+       * cannot possibly finish while the vault is sealed — the maker burns its
+       * whole budget on reads, honest-blocks at the end, and the day's quota is
+       * gone with it. Live-measured r28: the daily editor (13:00Z) blocked this
+       * way repeatedly, each time re-reading trends it already had instead of
+       * posting. The gate defers WITHOUT consuming quota — the mission fires
+       * the moment the vault opens again (inside the daily grace window), or
+       * waits for tomorrow's window honestly. */
+      try {
+        // r28: a schedule may arm modules explicitly OR ride the agent's armed
+        // set (enqueueRun falls back to it) — the gate must see BOTH, or a
+        // null-modules editor schedule sails through and blocks anyway.
+        const armed: string[] = s.modules ? JSON.parse(s.modules) : (JSON.parse(agent.modules || "[]") as string[]);
+        const needsVault = Array.isArray(armed) && armed.some((id) => MODULES.find((m) => m.id === id)?.needsVault);
+        if (needsVault && !masterReady()) {
+          await db.gateSchedule.update({
+            where: { id: s.id },
+            data: { nextRunAt: new Date(now + SCHEDULE_VAULT_RETRY_MS), dayKey: dk, dayCount: count },
+          });
+          p.counters.schedulesDeferred++;
+          continue;
+        }
+      } catch { /* modules parse failed — enqueue anyway, the run fails honestly */ }
       let next: Date;
       if (s.kind === "daily" && typeof s.hourUtc === "number") {
         const d = new Date();
