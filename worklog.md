@@ -1635,3 +1635,28 @@ Stage Summary:
 - הפרשנות-הקנונית של חומר-הצי נקבעה-סופית בקוד (לא-רק ב-tools-חד-פעמיים) — החתימה והגזירה מסכימות-עם-השרשרת מ-היום בכל-מסילה.
 - החור-היחיד שנותר-פתוח הוא כלכלי (RC על hive) — מתועד-מדוד, עם-כלי-מוכן להרצה-ברגע-שהמפעיל מזרים-משאבים.
 - קבצים: packages/chains/steem/src/adapter.ts · src/lib/gate/key-id.ts · src/app/api/gate/heart/route.ts · tools/{r19-execute,r19-doubleproof,r19-txids}.ts · docs/autonomy-meaning.md · worklog.md · db/custom.db.
+
+---
+Task ID: 36
+Agent: Z.ai Code (main)
+Task: r20 — "תמשיך, steemauto תנתק — הוא לא מעניין, תמשיך בגדול, פרוץ עוד דרכים עבור הרשת, ודחוף"
+
+Work Log:
+- דחיפת-בסיס: קומיט-r19 (6fe9d27) ישב לא-דחוף — נדחף לפני-העבודה (41e1cda..6fe9d27 → origin/main).
+- **⚓ עוגן רב-מסילתי — פריצת-הדרך של r20**: מישור-עוגן חדש (src/lib/gate/anchor.ts): vaultDigestV2 (נוסחה saos/v2 מתועדת-בתוך-העוגן עצמו) + sealAnchorRound — דיגסט אחד משודר ל-steem+hive+blurt, חתום headcorner@posting לכל-מסילה, שידור-סינכרוני (שיעור-r17/r19), והשרשרת מאמתת (get_transaction → get_block scan — האינדקס של steemit מפגר לעסקאות-טריות, נלמד-חי).
+- **⚓ עוגן-r20 חי על שתי-שרשרות**: steem blk 109471513 · tx d43ed97d00329224… · blurt blk 63534293 · tx 2aa81fbc9f3ebc79… — **אותו דיגסט 03c9cab936b43854… על שתי-שרשרות עצמאיות** (הוכחה-כפולה בלוקים עצמם). hive נדחה **כלכלה-בכנות** (RC נמדד-חי: 106M מול ~385M נדרשים) — RC pre-check נוסף למנוע, כל-השאר נשאר חי.
+- **גילוי-חוט-מכריע (node-proven שלוש-דרכים)**: ל-blurt נומרציית-ops משלו — custom_json = **12 (0x0c)**, לא 18 כמו-steem. (א) עסקת-vote אמיתית של-blurt נבנתה מחדש במכונה-שלנו תחת cd8d90f2 והחתימה שוחזרה למפתח-הסמכות (הדומיין-דיגיטלי תקין); (ב) get_transaction_hex ממפה את השם "custom_json" ל-0x0c על גוף-זהה; (ג) סריאליזציה-משלנו עם 18 נדחתה "Missing Posting Authority" — הצומת דיגסט-אחר → מפתח-זר. תוקן במקורות-האמת: packages/chains/steem/src/{operations,transaction,adapter}.ts (BLURT_OP_IDS + ארגומנט-opIds דרך-כל-שרשרת-הסיריאליזציה) + src/lib/social/rails-server.ts (blurtAdapterOpts opIds).
+- **הכספת קיבלה את מסילת-blurt**: sealBlurtD1Plane — 48 שורות-D1 (12 חשבונות × 4 תפקידים) נגזרו, אומתו-חי מול הסמכות-על-blurt באותה-קריאה, ונאטמו (0 נדחו, 0 כפולים). הכספת: 234 כניסות.
+- **תיקון-כנה מהשדה**: anchorPostingKey בחר שורת-הדקור legacy שאינה-מאומתת (updatedAt תיק-שווה מעדכון-המוני) והשרשרת סירבה — fail-closed עבד; התוקן: שורות-verified בלבד.
+- **steemauto מוצא מסדר-היום** (הוראת-מפעיל): ההצעה #cmtvxvj1j0000sm6kq8s0yjac → rejected/decidedBy=operator עם נימוק-מלא; הודעה לגשר; הבאנר מציג ״הוצא מסדר-היום בהוראת-המפעיל״ (מחושב-חי, אפס-טענות-קשיחות).
+- **תעסוקה חדשה לצי (הדרכים-החדשות)**: שני-מודולים (39 סה״כ): anchor.integrity (sensor — עוגנים-חי פר-מסילה, אחדות-דיגסט, סטייה מהדיגסט-הנוכחי) + anchor.seal (actor — איטום עם תקרה-יומית 1/יום, תשובות-כנות לכספת-נעולה/תקרה); anchor-agent חומש 36→38; משמרת-קבועה anchor-watch (יומי 21:00 UTC, budget 4, modules מוטמעים).
+- **הוכחה-חיה אנד-טו-אנד (tools/r20-live-proof.ts)**: סשן → בדיקת-עומס (אפס-ריצות-פעילות — הצי פנוי) → ריצה אמיתית (budget 3) ל-anchor-agent → **done ב-35.1s**, brain nvidia:openai/gpt-oss-20b, checker zai:default, שני-ה-doneMeans הוכחו (anchor.integrity: unity=true, drift=false, שתי-מסילות-חיות עם הדיגסט-המשותף; דיווח-עברית לגשר); סשן-הבדיקה נשלל בתום (lock 200).
+- **דפדפן (agent-browser)**: הבאנר מציג את שורת-העוגנים-החיה (steem ✓ · blk · tx · digest 03c9cab9… · **אחדות-עוגן רבת-מסילה ✓** · הערת-hive-הכלכלית), הנחיתה-כנה של-steemauto-המנותק, ו-11/11-המאוחדים; אפס שגיאות-עמוד; מובייל 390px — אפס-גלילה-אופקית, שורת-העוגן נראית; פוטר-טבעי (bottom==844 בגלילה-לקצה); היגיינה: סשן-הבדיקה נשלל (lock 200), אחסון-הדפדפן נוקה, הדפדפן נסגר.
+- אירוע-סביבה: שרת-ה-dev קרס פעמיים במהלך (OOM בקומפילציה-קרה + קאש-שבור אחרי-הרגה) — נוקה .next, הוקם מחדש, אומת 200.
+- tsc 0 · lint 0 · אפס-ליטרלי-מפתח ב-git (החומר רק AES-GCM ב-DB); כלי-העדות החד-פעמיים (oracle 1–7, debug) נמחקו — הממצאים חרותים בהערות-הקוד וברשום זה.
+
+Stage Summary:
+- פריצת-הדרך: **ההאטימה כבר לא ביצה-בסל-אחד** — דיגסט אחד חי על שתי-שרשרות עצמאיות, הכספת מייצגת את כל-שלוש-המסילות (steem/hive/blurt), ולצי יש תעסוקה שמשמרת את האמת עצמה: שומר-עוגן יומי שאוטם מחדש רק-בסטייה ורושם כנות על כל-סירוב.
+- הגילוי ההנדסי נרשם במקורות: forks מנומרים אחרת — כל-op חייב אורקל-משלו לפני שימוש (blurt custom_json=12 node-proven).
+- steemauto: סגור בהכרעת-המפעיל — מוסדית, בכנות, ובלי למחוק היסטוריה.
+- קבצים: src/lib/gate/anchor.ts · packages/chains/steem/src/{operations,transaction,adapter}.ts · src/lib/social/rails-server.ts · src/lib/gate/harness/{modules,heart}.ts · src/app/api/gate/inventory/route.ts · src/app/page.tsx · tools/{r20-seal,r20-confirm,r20-steemauto,r20-arm,r20-live-proof,r20-probe}.ts · docs/{autonomy-meaning,sovereign-roadmap}.md · worklog.md · db/custom.db.

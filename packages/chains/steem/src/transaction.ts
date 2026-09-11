@@ -20,7 +20,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 
 import { ByteReader, ByteWriter, SerializationError } from "./serializer";
-import { type SteemOperationBody, type SteemOperationName, packOperation, unpackOperation } from "./operations";
+import { type SteemOperationBody, type SteemOperationName, packOperation, unpackOperation, OP_IDS, type OpIdTable } from "./operations";
 
 /** Steem mainnet chain id — 32 zero bytes (reference: steem-js/dhive hardcoded default). */
 export const STEEM_CHAIN_ID = new Uint8Array(32);
@@ -35,14 +35,15 @@ export interface SteemTransaction {
   extensions?: never[];
 }
 
-/** Serializes the digest portion of a transaction (no signatures). */
-export function serializeTransaction(tx: SteemTransaction): Uint8Array {
+/** Serializes the digest portion of a transaction (no signatures).
+ *  r20: opIds lets fork chains (blurt custom_json=12) reuse the exact packer. */
+export function serializeTransaction(tx: SteemTransaction, opIds: OpIdTable = OP_IDS): Uint8Array {
   const w = new ByteWriter();
   w.u16(tx.refBlockNum);
   w.u32(tx.refBlockPrefix);
   w.u32(tx.expiration);
   w.varint(tx.operations.length);
-  for (const op of tx.operations) packOperation(w, op.name, op.body);
+  for (const op of tx.operations) packOperation(w, op.name, op.body, opIds);
   const extCount = tx.extensions?.length ?? 0;
   if (extCount !== 0) {
     throw new SerializationError("non-empty extensions are not supported in M0");
@@ -75,9 +76,9 @@ export function deserializeTransaction(bytes: Uint8Array): SteemTransaction {
 }
 
 /** The bytes that signatures commit to: sha256(chain_id ‖ serialized_tx). */
-export function transactionDigest(tx: SteemTransaction, chainId: Uint8Array = STEEM_CHAIN_ID): Uint8Array {
+export function transactionDigest(tx: SteemTransaction, chainId: Uint8Array = STEEM_CHAIN_ID, opIds: OpIdTable = OP_IDS): Uint8Array {
   if (chainId.length !== 32) throw new SerializationError("chain id must be exactly 32 bytes");
-  const serialized = serializeTransaction(tx);
+  const serialized = serializeTransaction(tx, opIds);
   const preimage = new Uint8Array(32 + serialized.length);
   preimage.set(chainId, 0);
   preimage.set(serialized, 32);

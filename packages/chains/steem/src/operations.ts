@@ -102,6 +102,24 @@ export const OP_IDS = {
 
 export type OperationId = (typeof OP_IDS)[keyof typeof OP_IDS];
 
+/** The wire tag table a serializer pass uses (steem by default, blurt override). */
+export type OpIdTable = typeof OP_IDS;
+
+/**
+ * r20 — BLURT's op numbering is NOT steem's. Blurt (a trimmed steem fork)
+ * removed the legacy pow / witness-vote / custom family, and its custom_json
+ * sits at 12, not 18. NODE-PROVEN 2026-09-10: condenser_api.get_transaction_hex
+ * on blurt-rpc.saboin.com maps the NAME "custom_json" to the wire tag 0x0c for
+ * the byte-identical body (tools/r20-blurt-oracle7), while a real blurt vote
+ * (tag 0, shared numbering) recovers its signature under our stack with the
+ * SAME chain id — isolating the divergence to op numbering, not the digest
+ * domain. This mismatch was the real story behind the r20 "Missing Posting
+ * Authority" blurt refusal: our tag-18 digest recovered a foreign key.
+ * Only custom_json is overridden until every other op is byte-proven on blurt
+ * — the per-op live oracle rule stays absolute.
+ */
+export const BLURT_OP_IDS = { ...OP_IDS, custom_json: 12 } as unknown as OpIdTable;
+
 export interface TransferOperation {
   from: string;
   to: string;
@@ -301,11 +319,11 @@ export interface CustomJsonOperation {
   json: string; // stringified JSON, ≤ 8192 bytes on the chain
 }
 
-export function packOperation(w: ByteWriter, name: SteemOperationName, body: SteemOperationBody): void {
+export function packOperation(w: ByteWriter, name: SteemOperationName, body: SteemOperationBody, opIds: OpIdTable = OP_IDS): void {
   switch (name) {
     case "transfer": {
       const t = body as TransferOperation;
-      w.varint(OP_IDS.transfer);
+      w.varint(opIds.transfer);
       w.string(t.from);
       w.string(t.to);
       packAsset(w, t.amount);
@@ -314,7 +332,7 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
     }
     case "limit_order_create": {
       const o = body as LimitOrderCreateOperation;
-      w.varint(OP_IDS.limit_order_create);
+      w.varint(opIds.limit_order_create);
       w.string(o.owner);
       w.u32(o.orderid); // uint32 LE — oracle-confirmed, 0xffffffff preserved
       packAsset(w, o.amount_to_sell);
@@ -325,14 +343,14 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
     }
     case "limit_order_cancel": {
       const c = body as LimitOrderCancelOperation;
-      w.varint(OP_IDS.limit_order_cancel);
+      w.varint(opIds.limit_order_cancel);
       w.string(c.owner);
       w.u32(c.orderid); // uint32 LE — oracle-verified 2026-09-08 (see type doc)
       return;
     }
     case "vote": {
       const v = body as VoteOperation;
-      w.varint(OP_IDS.vote);
+      w.varint(opIds.vote);
       w.string(v.voter);
       w.string(v.author);
       w.string(v.permlink);
@@ -342,7 +360,7 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
     }
     case "comment": {
       const c = body as CommentOperation;
-      w.varint(OP_IDS.comment);
+      w.varint(opIds.comment);
       w.string(c.parent_author);
       w.string(c.parent_permlink);
       w.string(c.author);
@@ -354,7 +372,7 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
     }
     case "custom_json": {
       const j = body as CustomJsonOperation;
-      w.varint(OP_IDS.custom_json);
+      w.varint(opIds.custom_json);
       w.varint(j.required_auths.length);
       for (const a of j.required_auths) w.string(a);
       w.varint(j.required_posting_auths.length);
@@ -366,7 +384,7 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
     case "claim_reward_balance": {
       const c = body as ClaimRewardBalanceOperation;
       // steemd field order: account, reward_steem, reward_sbd, reward_vests
-      w.varint(OP_IDS.claim_reward_balance);
+      w.varint(opIds.claim_reward_balance);
       w.string(c.account);
       packAsset(w, c.reward_steem);
       packAsset(w, c.reward_sbd);
@@ -375,7 +393,7 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
     }
     case "account_update": {
       const a = body as AccountUpdateOperation;
-      w.varint(OP_IDS.account_update);
+      w.varint(opIds.account_update);
       w.string(a.account);
       packOptionalAuthority(w, a.owner);
       packOptionalAuthority(w, a.active);

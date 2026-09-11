@@ -101,6 +101,8 @@ interface Inventory {
   // never hardcoded (the old hardcoded "open" claim outlived its truth:
   // the r12 filing was auto-expired by policy and the page kept lying).
   steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string; runId?: string | null; runStatus?: string | null } | null;
+  // r20 — the multi-rail anchor plane, live-verified by the API
+  anchors?: Array<{ chain: string; txId: string; blockNum: number | null; round: string | null; at: string; onChain: boolean; digest: string | null }> | null;
   // r16 — rotation plane readiness, computed live by the API (never stored)
   rotation?: { targets: Array<{ account: string; hasOwnerKey: boolean; hasP5Root: boolean; ready: boolean; rotated?: boolean }>; readyCount: number; rotatedCount?: number } | null;
 }
@@ -1030,7 +1032,7 @@ function VaultGrid() {
                       return <span className="text-emerald-300">הריצה הוזנקה על-ידי המפעיל.</span>;
                     }
                     if (s.status === "adopted") return <span className="text-lime-300">ההצעה אומצה כסיור-קבוע.</span>;
-                    if (s.status === "rejected") return <span className="text-rose-300">המפעיל דחה את צעת-הסגירה.</span>;
+                    if (s.status === "rejected") return <span className="text-zinc-400">הוצא מסדר-היום בהוראת-המפעיל (r20) — לא על סדר-היום יותר; הדלתות נשארות מתועדות-מדוד (hive: חסומות-כלכלה RC · steem: חסות-מפעיל).</span>;
                     return <span className="text-zinc-400">ההצעה פגתה במדיניות — דורשת הגשה-מחדש.</span>;
                   })()}
                   {(() => {
@@ -1040,11 +1042,32 @@ function VaultGrid() {
                     const rotatedCount = rot.rotatedCount ?? rot.targets.filter((t) => t.rotated).length;
                     return (
                       <span className="block mt-1">
-                        <b className="text-lime-300">מישור-רוטציית account_update (רק-מפעיל):</b> הרוטציה לשורשי-D1 <b className="text-lime-300">בוצעה ואומתה-שרשרת ({rotatedCount}/11)</b> — המפתחות-החיים הם עכשיו שורשי-D1 הנאטמים; אין-צורך ברוטציה-נוספת. ה-ROT1 ומפתחות-2018 מוגדרים rotated-out (היסטוריה-אטומה, נשמרת). ⚓ האטימה-r19: בלוק 109470596 · tx 835ac78c… (קודמות: r17 · 109469449 · r12 · 109465716).
+                        <b className="text-lime-300">מישור-רוטציית account_update (רק-מפעיל):</b> הרוטציה לשורשי-D1 <b className="text-lime-300">בוצעה ואומתה-שרשרת ({rotatedCount}/11)</b> — המפתחות-החיים הם עכשיו שורשי-D1 הנאטמים; אין-צורך ברוטציה-נוספת. ה-ROT1 ומפתחות-2018 מוגדרים rotated-out (היסטוריה-אטומה, נשמרת).
                       </span>
                     );
                   })()}
-                  עוגני-האמת על-השרשרת: <span className="font-mono text-[11px] text-emerald-300/90" dir="ltr">r19 · block 109470596 · tx 835ac78c… (prior: r17 · block 109469449 · tx d4b33aa3… · r12 · block 109465716 · tx 95a33fcb…)</span>
+                  {(() => {
+                    // r20 — the anchor line is LIVE: per-rail chain-verified anchors
+                    // from /api/gate/inventory (get_transaction → get_block scan),
+                    // never a stored era. gap-54 doctrine applies here too.
+                    const an = inv?.anchors ?? [];
+                    if (!an.length) return (
+                      <span className="text-zinc-400">עוגני-האמת על-השרשרת: אין עוגנים מדודים כרגע — האמת תחושב כשהמדידה תרוץ.</span>
+                    );
+                    const digests = [...new Set(an.flatMap((a) => (a.digest ? [a.digest] : [])))];
+                    const unity = an.filter((a) => a.onChain).length >= 2 && digests.length === 1;
+                    return (
+                      <span className="block mt-1">
+                        עוגני-האמת על-השרשרת ({an.length} מסילות, אמת-חי):
+                        {an.map((a) => (
+                          <span key={a.chain} className="font-mono text-[11px] text-emerald-300/90" dir="ltr">{" "}{a.chain}{a.onChain ? " ✓" : " ?"} · blk {a.blockNum ?? "—"} · {a.txId.slice(0, 10)}…{a.round ? ` · ${a.round}` : ""} ·</span>
+                        ))}
+                        {digests.length === 1 && <span className="font-mono text-[11px] text-lime-300" dir="ltr">{" "}digest {digests[0].slice(0, 16)}…</span>}
+                        {unity && <b className="text-lime-300"> · אחדות-עוגן רבת-מסילה ✓ (דיגסט אחד, שרשרות עצמאיות)</b>}
+                        {!an.some((a) => a.chain === "hive") && <span className="text-zinc-500"> · hive: חסום-כלכלה RC (מדוד-חי) — ממתין להזרמת-HP</span>}
+                      </span>
+                    );
+                  })()}
                 </p>
               </div>
             </div>
