@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 export type GateEventType =
   | "message.mentions" // operator/agent addressed an agent in the bridge — payload {agent, body, by}
   | "run.blocked" // a run finished blocked — payload {agent, goal, gaps}
+  | "run.ungraded" // r28: the checker never answered (429/JSON silence ×2) — real gaps unproven, NO repair chase fires on this
   | "run.failed" // a run crashed — payload {agent, goal, gaps:""}
   | "run.done" // a run passed the gate — payload {agent, goal}
   | "market.move" // the heart watched the real DEX price cross a threshold — payload {price, prev, pct}
