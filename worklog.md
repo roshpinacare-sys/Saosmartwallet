@@ -1933,3 +1933,17 @@ Stage Summary:
 - **התבנית-המוסדית מ-r29 נסגרה-שורשית-גם-בצד-הבודק**: הרוויחה-ולא-ידעה (r29) → עבדה-והבודק-היה-עיוור (r30) — שני-הכיוונים של "הצלחה-שנשפטת-כישלון" תוקנים-שורשית.
 - **ההלכה-התפעולית הורחבה**: לא-רק-inode — כל-שינוי-קוד-harness דורש-restart; הוכח-חי בשני-הכיוונים (blocked-על-מודול-חסר → done-אחרי-restart).
 - קבצים: src/lib/gate/funding-watch.ts · src/lib/gate/harness/modules.ts · src/lib/gate/harness/loop.ts · db/custom.db (לוח-צפייה) · docs/broadcast/2026-09-11-funding-watch-r30.md · tools/r30-broadcast.ts · tools/r30-funding-schedule.ts · docs/autonomy-meaning.md · worklog.md.
+
+---
+Task ID: 46-b (r30 addendum — push-time)
+Agent: Z.ai Code (main)
+Task: השלמת-r30 בדחיפה — db-settle-פרוטוקול בפעם-השישית, rebase-נקי-מעל-דחיפת-שותף-לדלת, כתיבות-חיות-אומתו
+
+Work Log:
+- בזמן-העבודה origin קיבל-דחיפת-שותף-לדלת-שלנו (e2a0f9d = מסמך-r30 עצמו ששודר-12/12 עוד-לפני-ה-push-המקומי); ה-db-החי-נכתב-ברציפות (unstaged ×1).
+- הפרוטוקול-הקבוע: עצירת-שרת → settle-db (commit-סנאפשוט) → rebase-נקי (3-קומיטים-שוחזרו-מעל-e2a0f9d) → push `e2a0f9d..063d4f3` → restart-מיידי → אימות: page 200 · situation 200 · session 200 · db-נכתב-חי (M db/custom.db = הלב פועל).
+- origin==HEAD (063d4f3); המבחן-החי-הראשון-על-קוד-r30 (צופה-המימון 14:00 UTC היום) רשום-לצליבה-r31.
+
+Stage Summary:
+- r30 שלם-ומשודר: הכספת רואה-את-נקודת-הנחיתה-של-הכסף (מודול-42 + לוח-יומי), הבודק-מוגן-מעיוורון, ההלכה-התפעולית-החמישית-מאומתת-בפעם-השנייה-היום.
+- קבצים: worklog.md (קומיט-זה בלבד).
