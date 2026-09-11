@@ -116,7 +116,11 @@ export async function register() {
 
         // FIX(Roast-65-b · M6/L6): bun-אבסולוטי (process.execPath = הבינארי
         // שמריץ את השרת-הזה) — היה "bun" מ-PATH כשהילד-מקבל-env-סודות.
-        const BUN = process.execPath;
+        // FIX(roast-84 · revival): execPath=bun היה ההנחה; בסביבות שמריצות next דרך
+        // node (שימור-סנדבוקס) ה-spawn נופל ("Cannot find module 'run'") והשרת-האם
+        // מת בעקבותיו. עתה: SAOS_BUN_BIN → bun-אמתי-אם-execPath-אינו-bun → execPath.
+        const BUN = process.env.SAOS_BUN_BIN
+          || (process.execPath.includes("bun") ? process.execPath : "/usr/local/bin/bun");
         // כנות-מצב-ריצה: דמון-כסף על-סקריפט-dev רק-בפיתוח; בפרודקשן — start.
         const script = process.env.NODE_ENV === "production" ? "start" : "dev";
         if (script === "dev") {
