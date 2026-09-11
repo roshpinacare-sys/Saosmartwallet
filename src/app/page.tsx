@@ -152,6 +152,8 @@ interface SituationData {
   fleet: { ok: boolean; agents: number; autonomous: number; activeRuns: number; error?: string };
   anchors: { ok: boolean; count: number; latest: { chain: string; txId: string; blockNum: number | null; at: string; round: string; signedBy: string }[]; error?: string };
 }
+interface DigestItemRow { repo: string; file: string; ours: boolean; ok: boolean; error?: string; bytes: number; hash8: string; echo: boolean; isNew: boolean; lang: string; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
+interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -179,6 +181,7 @@ const ENDPOINTS: Ep[] = [
   { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל של חשבון-הפקודה עצמו ומשדרת לשרשרת-היעד (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
   { method: "GET", path: "/api/gate/treasury", desc: "אמת-הכיס (r21): יתרות חיות של כל חשבונות-הצי על שלוש-המסילות (נזיל/חוב/vesting) — כל-מסילה נכשלת בכנות בנפרד", auth: "operator" },
   { method: "GET", path: "/api/gate/situation", desc: "מצב-העניינים (r22): הכל במקום אחד — כסף-מסילות + ETH/SOL + תגמולים-ממתינים + כספת + צי + עוגנים + מה-קורה-בשאר-הריפו של הארגון (12 מאגרים, מה נדחף עכשיו). מטמון 60s, אפס-עומס", auth: "public" },
+  { method: "GET", path: "/api/gate/digest", desc: "מישור-ההבנה (r25): הכספת קוראת את ערוץ-השידורים — הדים-שלנו מול קולות-שותף, סיווג (דוח/שאלה/בקשה/התראה), שאלות-שהוצבו-לנו, טיוטת-תשובה (שליחה = החלטת-מפעיל). מטמון 10 דק׳, אפס-עומס", auth: "public" },
   { method: "GET", path: "/api/gate/stream", desc: "גשר-הפיקוד בזמן-אמת (SSE) — הודעות חדשות נדחפות, בלי דגימה", auth: "operator" },
   { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
   { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
@@ -1402,6 +1405,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   const [orders, setOrders] = useState<OrdersData | null>(null);
   const [treasury, setTreasury] = useState<TreasurySnapshot | null>(null);
   const [situation, setSituation] = useState<SituationData | null>(null);
+  const [digest, setDigest] = useState<DigestData | null>(null);
 
   /* patrol form */
   const [label, setLabel] = useState("");
@@ -1431,11 +1435,15 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     const r = await apiJson<SituationData & { ok: boolean }>("/api/gate/situation");
     if (r?.ok) setSituation(r);
   }, []);
-  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); void Promise.resolve().then(loadTreasury); void Promise.resolve().then(loadSituation); }, [load, loadMem, loadOrders, loadTreasury, loadSituation]);
+  const loadDigest = useCallback(async () => {
+    const r = await apiJson<DigestData & { ok: boolean }>("/api/gate/digest");
+    if (r?.ok) setDigest(r);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); void Promise.resolve().then(loadTreasury); void Promise.resolve().then(loadSituation); void Promise.resolve().then(loadDigest); }, [load, loadMem, loadOrders, loadTreasury, loadSituation, loadDigest]);
   useEffect(() => {
-    const t = setInterval(() => { load(); loadMem(); loadOrders(); loadTreasury(); loadSituation(); }, 8000);
+    const t = setInterval(() => { load(); loadMem(); loadOrders(); loadTreasury(); loadSituation(); loadDigest(); }, 8000);
     return () => clearInterval(t);
-  }, [load, loadMem, loadOrders, loadTreasury, loadSituation]);
+  }, [load, loadMem, loadOrders, loadTreasury, loadSituation, loadDigest]);
 
   async function toggleAutonomy(v: boolean) {
     setBusy(true);
@@ -1813,7 +1821,34 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                     </div>
                   </div>
                 )}
-                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו · 📡 = ערוץ-השידורים ההדדי (r24) — הכספת גם שומעת</p>
+                {digest && !digest.error && digest.scannedRepos > 0 && (
+                  <div className="mt-1 pt-1 border-t border-zinc-800/60">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-[10px] font-mono text-sky-300/90">🧠 מישור-ההבנה — הכספת קוראת</p>
+                      <span className="text-[9px] font-mono text-zinc-500" dir="ltr">{digest.fetched}/{digest.scannedRepos} נקראו · {digest.uniqueContents} תוכן-ייחודי · {digest.echoesOfOurs} הדים-שלנו</span>
+                    </div>
+                    {digest.partnerVoices > 0 && (
+                      <div className="mt-0.5 space-y-0.5 max-h-20 overflow-y-auto scroll-thin">
+                        {digest.items.filter((i) => i.ok && !i.ours && !i.echo).map((i) => (
+                          <div key={i.repo} className="text-[9px] font-mono" dir="ltr">
+                            <span className={i.isNew ? "text-amber-300 font-semibold" : "text-emerald-200/90"}>{i.isNew ? "NEW " : ""}[{i.kind}] {i.repo}</span>
+                            <span className="text-zinc-500"> — {i.headline.slice(0, 55)}</span>
+                            {i.asks.slice(0, 2).map((a, k) => (
+                              <div key={k} className="text-amber-200/70 truncate max-w-[95%]" title={a}>? {a.slice(0, 68)}</div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {digest.suggestedResponse.needed ? (
+                      <p className="text-[9px] text-sky-300/80 mt-0.5">✍️ טיוטת-תשובה מוכנה עבור {digest.suggestedResponse.toRepo} — השליחה החלטת-מפעיל/סוכן (fleet.digest)</p>
+                    ) : (
+                      <p className="text-[9px] text-zinc-600 mt-0.5">{digest.suggestedResponse.reason}</p>
+                    )}
+                  </div>
+                )}
+                {digest?.error && <p className="text-[9px] text-rose-300/70 mt-1">🧠 קריאת-השידורים: {digest.error}</p>}
+                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו · 📡 ערוץ-הדדי (r24) + 🧠 קריאה (r25) — הכספת שומעת ומבינה</p>
               </div>
               {/* vault + fleet + anchors */}
               <div className="rounded-xl border border-zinc-800 bg-black/40 px-3 py-2.5">

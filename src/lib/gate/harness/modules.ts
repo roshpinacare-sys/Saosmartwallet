@@ -23,6 +23,7 @@ import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
 import { getTreasurySnapshot } from "@/lib/gate/treasury";
 import { getSituationSnapshot } from "@/lib/gate/situation";
+import { getBroadcastDigest } from "@/lib/gate/digest";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
 import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
@@ -503,6 +504,27 @@ export const MODULES: HarnessModule[] = [
         orgRepos: { count: s.repos.count, fresh: s.repos.freshCount, repos: s.repos.repos.slice(0, 12).map((r) => `${r.ours ? "★" : " "}${r.name} (${r.pushedMinutesAgo ?? "?"} דק׳)`), note: "★ = הריפו שלנו (Saosmartwallet); טרי = נדחף ב-3 השעות האחרונות — סוכנים אחרים פעילים שם עכשיו" },
         anchors: s.anchors.latest.map((a) => `${a.chain} blk ${a.blockNum} · ${a.round}`),
         meaning: "הכספת רואה את כל היד: מה יש, מה חסר, מה קורה בכל מקום — קבל החלטות מהאמת הזאת, לא מהנחות",
+      };
+    },
+  },
+  {
+    id: "fleet.digest",
+    name: "קריאת-השידורים — מה באמת נאמר",
+    kind: "skill",
+    desc: 'המישור-המבין (r25): הכספת לא רק שומעת את ערוץ-השידורים — היא קוראת אותו. לכל ריפו-שותף נשלף תוכן-השידור האחרון (חסום, על-אותו-קצב 10 דק׳), ממוחשק (sha256), ומזוהה: הד של הדוח שלנו מול קול-אמיתי של שותף; סוג-הדיבור (דוח/שאלה/בקשה/התראה), שפה, כותרת, והשאלות/בקשות שהשותף מציב לנו. מטייטת תשובה (טיוטה-בלבד — השליחה החלטת-מפעיל/סוכן, אף-כתיבה-שקטה לריפו-שותף). קרא לפני שאתה עונה לסוכן-אחר — כך יודעים מה נאמר באמת ומה כבר נקרא.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true, // 10-min stale-while-revalidate inside the digest itself
+    async exec() {
+      const d = await getBroadcastDigest(true);
+      return {
+        measuredAt: d.measuredAt,
+        channel: { scanned: d.scannedRepos, fetched: d.fetched, failed: d.failed, uniqueContents: d.uniqueContents, echoesOfOurs: d.echoesOfOurs, partnerVoices: d.partnerVoices, newPartnerContents: d.newPartnerContents },
+        voices: d.items.filter((i) => i.ok && !i.ours && !i.echo).map((i) => ({ repo: i.repo, kind: i.kind, lang: i.lang, headline: i.headline, asks: i.asks, isNew: i.isNew, hash: i.hash8 })),
+        suggestedResponse: d.suggestedResponse,
+        meaning: d.partnerVoices > 0
+          ? "קול-שותף נשמע בערוץ — קרא את השאלות/בקשות והחלט אם להשיב; שליחת-תשובה לערוץ-שותף דורשת אישור-מפעיל"
+          : "הערוץ מהדהד כרגע רק את הדוח שלנו — המשך לעבוד; הכספת תשמע כשמשהו חדש ייאמר",
       };
     },
   },

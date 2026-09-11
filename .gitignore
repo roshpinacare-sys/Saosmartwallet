@@ -80,3 +80,6 @@ engineering/autonomy-input/
 
 # runtime artifact — rewritten live by /api/gate/situation
 docs/org-scan.json
+
+# run artifacts (r25)
+docs/broadcast-seen.json
