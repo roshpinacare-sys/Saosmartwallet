@@ -1717,6 +1717,7 @@ Work Log:
 - **docs/broadcast/2026-09-11-vault-report.md** — דוח-יומי-עצמאי-שלם (עברית + TL;DR-EN): מה-נעשה (r13→r22) · חמש-פריצות-הדרך · המספרים-החיים (3.982 STEEM · 0.041 SBD · 0.049 HIVE · 0.001 HBD · 33.935 BLURT · ETH 12/12=0.0021 · SOL 12/12=0.0608 · תגמולים 0 · כספת 234/172 · צי 5×40 · עוגנים 109471513/63534293 · 12 ריפו-8-טריים) · מה-אין (כנות) · מה-מתוכנן · חוקי-תיאום לסוכנים · איך-לצרוך-אמת-חיה.
 - **שידור-לכל-ריפו-הארגון**: GitHub-Contents-API PUT (טוקן-מ-git-config-בלבד, אפס-סודות-בקוד) של `broadcasts/2026-09-11-vault-report.md` אל **11 הריפו השותפים**: steem, saos-jummper, saos-sovereign-foundry, saos-control-center, saos-dex, saos-sovereign-platform, Adsmarket, Sdk, roshpina, anchor-baseline, Project-files — כל-שידור קומיט-נפרד על-הענף-ברירת-המחדל, תוצאות-נמדדו-ודווחו.
 - היגיינה: אפס-ליטרלי-מפתח; הטוקן-מושך-ראנטיים-מ-git-config ולא-נכתב-בשום-קובץ.
+- **תוצאות-השידור (נמדדו)**: 11/11 נוצרו בהצלחה — steem 3a2fdaf · jummper b17ae68 · foundry 7a3100d · control-center 2f7ef42 · dex 93991a3 · sovereign-platform b2a0dbe · Adsmarket f26b77f · Sdk cf03181 · roshpina ee99231 · anchor-baseline f2779de · Project-files 756fdeb. כלי: tools/r23-broadcast.ts (טוקן-ראנטיים-בלבד).
 
 Stage Summary:
 - לראשונה **הכספת משדרת-יוזמת-אמת אל-הצי-כולו**: דוח-אחת-עצמאי-שלם יושב ב-`broadcasts/` בכל-ריפו של-הארגון — כל-סוכן-שותף פותח-ריפו-שלו ורואה-מה-קרה, מה-נשבר, ומה-החוקים.
