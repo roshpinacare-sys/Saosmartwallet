@@ -23,6 +23,7 @@ import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
+import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
@@ -1042,6 +1043,72 @@ export const MODULES: HarnessModule[] = [
         data: { channel: "command", fromKind: "system", fromName: "harness", body: `🌸 הסוכן ${ctx.agentName} הציע סיור-קבוע חדש: "${label}" — ממתין להכרעת-המפעיל בפאנל יוזמות-היעד` },
       }).catch(() => {});
       return { proposalId: p.id, kind: "schedule-create", payload, meaning: "הצעת-הסיור הוגשה — רק המפעיל מאמץ תעסוקה-חוזרת (אישור ייצור אותה בפועל)" };
+    },
+  },
+  {
+    id: "anchor.integrity",
+    name: "שלמות-העוגנים — אמת-חי רבת-מסילה",
+    kind: "skill",
+    desc: "הסוכן בודק שההאטימה עדיין חיה: קורא את העוגן האחרון בכל מסילה (steem/hive/blurt), מוודא אותו מול השרשרת עצמה (get_transaction → get_block scan), משווה את הדיגסטים בין-המסילות (אחדות), ומחשב את הדיגסט הנוכחי של הכספת (saos/v2) — סטייה = נדרש איטום-חדש. קריאה-בלבד, אפס-מפתחות, כספת-נעולה אינה מפריעה (הדיגסט הנוכחי מושמט בכנות).",
+    args: "{}",
+    needsVault: false,
+    cacheable: true,
+    cacheKeyOf: () => "anchor.integrity",
+    async exec() {
+      const hist = await readAnchorHistory();
+      const rails: Array<{ chain: string; txId: string; blockNum: number | null; round: string | null; onChain: boolean; chainDigest: string | null }> = [];
+      for (const rec of hist.slice(0, 3)) {
+        const v = await verifyAnchorOnChain(rec.chain as never, rec.txId, undefined, rec.blockNum);
+        rails.push({ chain: rec.chain, txId: rec.txId, blockNum: v.blockNum ?? rec.blockNum, round: rec.round, onChain: v.onChain, chainDigest: v.digest ? v.digest.slice(0, 16) : null });
+      }
+      const digests = [...new Set(rails.filter((r) => r.chainDigest).map((r) => r.chainDigest))];
+      const unity = rails.filter((r) => r.onChain).length >= 2 && digests.length === 1;
+      const current = await vaultDigestV2().catch(() => null);
+      const drift = current && digests.length === 1 ? digests[0] !== current.digest.slice(0, 16) : null;
+      return {
+        ok: true,
+        digestNow: current ? current.digest.slice(0, 16) : null, // כספת-נעולה → null בכנות
+        vaultRows: current?.rowCount ?? null,
+        rails,
+        unity, // כל-המסילות החיות נושאות את אותו דיגסט
+        drift, // true = מצב-הכספת השתנה מאז העוגן — נדרש anchor.seal
+        meaning:
+          `שלמות-עוגנים: ${rails.length} מסילות נבדקו — ${rails.filter((r) => r.onChain).length} חיות-על-השרשרת · ` +
+          (unity ? "אחדות-דיגסט מלאה בין-המסילות ✓ · " : digests.length > 1 ? "⚠ אי-התאמה בין-דיגסטי-המסילות! · " : "אחדות לא ניתנת לקביעה (מסילה-חיה אחת) · ") +
+          (drift === null ? "הדיגסט-הנוכחי לא נמדד (כספת נעולה — כנות)" : drift ? "סטייה מהדיגסט-הנוכחי — נדרש איטום-חדש (anchor.seal)" : "הדיגסט הנוכחי זהה לעוגן — אין סטייה ✓"),
+      };
+    },
+  },
+  {
+    id: "anchor.seal",
+    name: "איטום-עוגן — חותם את מצב-הכספת על השרשרות",
+    kind: "actor",
+    desc: "המעשה-הריבוני: חותם עוגן saos.vault.anchor.v1 חדש — דיגסט אחד (saos/v2) משודר לכל המסילות (steem+hive+blurt), חתום headcorner@posting לכל-מסילה, שידור-סינכרוני, והשרשרת מאמתת בתום. כפוף לתקרת-איטום יומית (1/יום) — העוגן של היום כבר נחתם? המודול משיב בכנות ולא מכפיל. כספת-נעולה = תשובה-כנה (האיטום דורש פתיחה). מסילה שנדחית (RC כלכלי וכד') נרשמת ככשל-כן, לא משתקת את האחרות.",
+    args: "{}",
+    needsVault: false, // handles the locked vault itself — an honest answer, not an error
+    cacheable: false,
+    async exec(_args, ctx) {
+      if (!masterReady()) {
+        return {
+          ok: false,
+          locked: true,
+          meaning: "הכספת חתומה — איטום-עוגן דורש פתיחה (fail-closed). זו תשובה כנה, לא כשל: המשמרת תרוץ שוב כשהכספת פתוחה.",
+        };
+      }
+      const dayStart = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+      const sealedToday = await db.gateAction.count({ where: { action: "vault-anchor:saos.vault.anchor.v1", ok: true, createdAt: { gte: dayStart } } });
+      if (sealedToday >= 1) {
+        return { ok: true, skipped: true, sealedToday, meaning: `תקרת-האיטום היומית מוצו (${sealedToday}/1) — העוגן של היום כבר חי על השרשרת; אין לכפול עוגנים.` };
+      }
+      const round = `fleet-${new Date().toISOString().slice(0, 10)}`;
+      const r = await sealAnchorRound(round, ctx.agentName);
+      const landed = r.rails.filter((x) => x.ok && x.onChain);
+      return {
+        ok: landed.length > 0,
+        digest: r.digest,
+        rails: r.rails.map((x) => ({ rail: x.rail, ok: x.ok, txId: x.txId ? x.txId.slice(0, 16) : null, blockNum: x.blockNum, onChain: x.onChain, error: x.error })),
+        meaning: `איטום ${round}: digest ${r.digest.slice(0, 12)}… · ${landed.length}/${r.rails.length} מסילות עוגן-חי (${r.rails.map((x) => `${x.rail}=${x.ok ? (x.onChain ? "✓" : "שודר") : "נכשל-כן"}`).join(", ")})`,
+      };
     },
   },
 ];

@@ -21,6 +21,7 @@
  * match was falsely reported as a mismatch.)
  */
 import { SteemAdapter } from "../../../packages/chains/steem/src/adapter";
+import { BLURT_OP_IDS } from "../../../packages/chains/steem/src/operations";
 import { PrivateKey, steemPublicKeyDecode, steemPublicKeyEncode } from "../../../packages/crypto/src/index";
 
 export type Rail = "steem" | "hive" | "blurt";
@@ -314,6 +315,11 @@ function blurtAdapterOpts() {
     rpcUrls: RAIL_ENDPOINTS.blurt.slice(1),
     chainId: BLURT_CHAIN_ID,
     addressPrefix: "BLT", // blurt keys carry the BLT prefix on the wire
+    // r20 — blurt's op numbering is its own: custom_json = 12 (node-proven via
+    // get_transaction_hex name-mapping, tools/r20-blurt-oracle7). Steem's 18
+    // made the node digest a different tx than we signed → the chain refused
+    // every broadcast with "Missing Posting Authority".
+    opIds: BLURT_OP_IDS,
     requestTimeoutMs: 15_000,
   } as const;
 }

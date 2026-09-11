@@ -28,8 +28,8 @@ import {
 import { createHash } from "crypto";
 import { PrivateKey, STEEM_ROLES, type SteemRole, base58Decode } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
-import type { AccountUpdateOperation, ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemAuthority, SteemOperationName, VoteOperation } from "./operations";
-import { graphenePubToRaw33 } from "./operations";
+import type { AccountUpdateOperation, ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemAuthority, SteemOperationName, VoteOperation, OpIdTable } from "./operations";
+import { OP_IDS, graphenePubToRaw33 } from "./operations";
 import {
   STEEM_CHAIN_ID,
   SIGNATURE_SIZE,
@@ -111,6 +111,8 @@ export interface SteemAdapterOptions {
   chainId?: Uint8Array;
   /** Public key prefix. Default "STM" (mainnet); testnet forks use "TST". */
   addressPrefix?: string;
+  /** r20 — fork op-numbering table (blurt custom_json=12). Default: steem OP_IDS. */
+  opIds?: OpIdTable;
   /** Explicit broadcast opt-in — never enabled implicitly. */
   allowBroadcast?: boolean;
   requestTimeoutMs?: number;
@@ -143,6 +145,7 @@ export class SteemAdapter implements ChainAdapter {
   private readonly broadcastAllowed: boolean;
   private readonly chainIdBytes: Uint8Array;
   private readonly addressPrefix: string;
+  private readonly opIds: OpIdTable;
   private readonly timeoutMs: number;
 
   constructor(private readonly opts: SteemAdapterOptions) {
@@ -150,6 +153,7 @@ export class SteemAdapter implements ChainAdapter {
     if (this.chainIdBytes.length !== 32) throw new SerializationError("chainId must be 32 bytes");
     this.chainId = Buffer.from(this.chainIdBytes).toString("hex");
     this.addressPrefix = opts.addressPrefix ?? "STM";
+    this.opIds = opts.opIds ?? OP_IDS;
     this.broadcastAllowed = opts.allowBroadcast === true;
     this.timeoutMs = opts.requestTimeoutMs ?? 10_000;
     if (this.broadcastAllowed) {
@@ -693,7 +697,7 @@ export class SteemAdapter implements ChainAdapter {
       operations: tx.operations.map((o) => this.toWireOperation(o)),
     };
 
-    const digest = transactionDigest(steemTx, this.chainIdBytes);
+    const digest = transactionDigest(steemTx, this.chainIdBytes, this.opIds);
     const signatures: string[] = [];
     for (const role of roles) {
       const key = keys.byRole[role];
@@ -713,7 +717,7 @@ export class SteemAdapter implements ChainAdapter {
       ...tx,
       signatures,
       rolesUsed: [...roles],
-      metadata: { ...tx.metadata, digestHex: Buffer.from(digest).toString("hex"), serializedHex: Buffer.from(serializeTransaction(steemTx)).toString("hex") },
+      metadata: { ...tx.metadata, digestHex: Buffer.from(digest).toString("hex"), serializedHex: Buffer.from(serializeTransaction(steemTx, this.opIds)).toString("hex") },
     };
   }
 

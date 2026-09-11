@@ -4,6 +4,7 @@ import { requireOperator, openSessionMaster } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { verifyAll } from "@/lib/gate/verify";
 import { rotationStatus } from "@/lib/gate/rotation";
+import { readAnchorHistory, verifyAnchorOnChain } from "@/lib/gate/anchor";
 
 export const runtime = "nodejs";
 
@@ -64,7 +65,14 @@ export async function GET() {
     // the rotation panel render from this — never from stored assumptions.
     let rotation: Awaited<ReturnType<typeof rotationStatus>> | null = null;
     try { rotation = await rotationStatus(); } catch { rotation = null; }
-    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto ? { ...steemauto, runStatus: steemautoRunStatus } : null, rotation });
+    // r20 — the multi-rail anchor plane, verified LIVE (get_transaction →
+    // get_block scan) — the banner renders from this, never from a stored era.
+    const anchorHist = await readAnchorHistory();
+    const anchors = await Promise.all(anchorHist.slice(0, 3).map(async (a) => {
+      const v = await verifyAnchorOnChain(a.chain as never, a.txId, undefined, a.blockNum).catch(() => ({ onChain: false, digest: null as string | null, blockNum: null as number | null }));
+      return { chain: a.chain, txId: a.txId, blockNum: v.blockNum ?? a.blockNum, round: a.round, at: a.at, onChain: v.onChain, digest: v.digest };
+    }));
+    return ok({ locked: false, entries, summary, chains: { steemOk, hiveOk, blurtOk, githubOk }, steemautoProposal: steemauto ? { ...steemauto, runStatus: steemautoRunStatus } : null, rotation, anchors });
   } catch (e) {
     return fail(e);
   }

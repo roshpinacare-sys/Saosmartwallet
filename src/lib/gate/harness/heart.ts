@@ -1186,6 +1186,38 @@ async function ensureTriggerPolicy(): Promise<void> {
       },
     });
   }
+  /* ── the anchor-watch — one daily SEAL/VERIFY duty (r20) ──
+   * The fleet's newest sovereign employment: check the multi-rail anchor
+   * (steem+hive+blurt, r20 plane) and seal again ONLY on drift — bounded by
+   * the module's own 1/day cap. The seal is the fleet's act; the drift
+   * decision belongs to the measurement, never to enthusiasm. */
+  const anchorWatchLabels = new Set(
+    (await db.gateSchedule.findMany({ where: { label: { startsWith: "anchor-watch:" } }, select: { agentName: true } })).map((s) => s.agentName),
+  );
+  const anchorWatchMeans = JSON.stringify([
+    "anchor.integrity חי נקרא — כל המסילות נבדקו, עוגן-חי/כשל-כן לכל-אחת (ראייה: צעד anchor.integrity עם ok=true)",
+    "רק אם drift=true: anchor.seal בוצע והעוגן החדש חי על השרשרת — או תשובה כנה (תקרה-יומית / כספת-נעולה); אין סטייה? אין שידור — זו הצלחה מלאה",
+    "דוח עברית קצר לגשר-הפיקוד: מה חי, אחדות-דיגסט/סטייה, מה נחתם",
+  ]);
+  if (armed.some((a) => a.name === "anchor-agent") && !anchorWatchLabels.has("anchor-agent")) {
+    await db.gateSchedule.create({
+      data: {
+        label: "anchor-watch:anchor-agent",
+        agentName: "anchor-agent",
+        goal:
+          "תור-שומר-העוגן היומי (r20, מסלול-יחיד): אתה שומר-ההאטימה של הרשת — פעולה אחת בכל צעד. " +
+          "(1) anchor.integrity — אמת-חי של העוגנים בכל המסילות + אחדות-דיגסט בין-המסילות + סטייה מהדיגסט-הנוכחי. " +
+          "(2) רק אם drift=true: anchor.seal — איטום-חדש; התקרה-היומית של המודול תאכוף את עצמה. אין סטייה? אין שידור — זו הצלחה המלאה, לא כשל. " +
+          "(3) chat.report — דוח עברית קצר: מה חי על כל מסילה, אחדות/סטייה, מה נחתם (txIds). אל תקרא מודול פעמיים עם אותם ארגומנטים.",
+        doneMeans: anchorWatchMeans,
+        modules: JSON.stringify(["anchor.integrity", "anchor.seal", "chat.report"]), // defense-in-depth: the duty carries its own hands
+        budget: 4,
+        kind: "daily",
+        hourUtc: 21, // 00:00 Israel — the custody day closes with a seal check
+        maxPerDay: 1,
+      },
+    });
+  }
   const existing = await db.gateTrigger.findMany({ where: { on: "message.mentions" }, select: { agentName: true } });
   const have = new Set(existing.map((t) => t.agentName));
   const mentionMeans = JSON.stringify([
