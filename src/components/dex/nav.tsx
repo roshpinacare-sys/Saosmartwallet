@@ -8,7 +8,7 @@ import { useState } from 'react';
 import {
   ArrowLeftRight, CandlestickChart, Droplets, Wallet, Anchor, Coins,
   Fingerprint, Landmark, Zap, ScrollText, Settings2, LogIn, LogOut,
-  Menu, ChevronDown, Activity, Globe2, DoorOpen,
+  Menu, ChevronDown, Activity, Globe2, DoorOpen, TrendingUp,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
@@ -19,7 +19,7 @@ import type { StatusData } from '@/components/sv/shared';
 import type { World } from './common';
 import { fmtInt } from './common';
 
-export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'portfolio' | 'estate' | 'anchors' | 'door'
+export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'revenue' | 'portfolio' | 'estate' | 'anchors' | 'door'
   | 'vault' | 'towers' | 'ops' | 'audit' | 'settings';
 
 export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
@@ -28,6 +28,7 @@ export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.Compon
   { id: 'pro', label: 'מסחר', icon: CandlestickChart },
   { id: 'pools', label: 'בריכות', icon: Droplets },
   { id: 'economy', label: 'כלכלה', icon: Coins },
+  { id: 'revenue', label: 'הרווח', icon: TrendingUp },
   { id: 'portfolio', label: 'תיק', icon: Wallet },
   { id: 'estate', label: 'אחוזה', icon: Globe2 },
   { id: 'anchors', label: 'עיגונים', icon: Anchor },
@@ -211,7 +212,7 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
                 <SheetTitle className="text-sm text-[color:var(--text-1)]">כל התצוגות</SheetTitle>
               </SheetHeader>
               <div className="grid grid-cols-3 gap-2">
-                {[{ id: 'door' as ViewId, label: 'דלת-מטבעות', icon: DoorOpen }, { id: 'portfolio' as ViewId, label: 'תיק', icon: Wallet }, { id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, { id: 'estate' as ViewId, label: 'אחוזה', icon: Globe2 }, ...PLATFORM_NAV].map(v => {
+                {[{ id: 'revenue' as ViewId, label: 'הרווח', icon: TrendingUp }, { id: 'door' as ViewId, label: 'דלת-מטבעות', icon: DoorOpen }, { id: 'portfolio' as ViewId, label: 'תיק', icon: Wallet }, { id: 'anchors' as ViewId, label: 'עיגונים', icon: Anchor }, { id: 'economy' as ViewId, label: 'כלכלה', icon: Coins }, { id: 'estate' as ViewId, label: 'אחוזה', icon: Globe2 }, ...PLATFORM_NAV].map(v => {
                   const Icon = v.icon;
                   return (
                     <button key={v.id} onClick={() => { onNavigate(v.id); setMoreOpen(false); }}

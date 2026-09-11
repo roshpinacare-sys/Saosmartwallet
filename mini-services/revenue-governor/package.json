@@ -1,0 +1,10 @@
+{
+  "name": "revenue-governor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SAOS Revenue Governor (roast-80) — המושל-הכלכלי האוטונומי: מצייד את אסטרטגיית-ה-ve של האוצר (נעילה+הצבעה, אטומי), עוקב-אחרי-קציר-קרן-ה-ve בכל-אפוק, מדווח-לכל-הסוכנים-דרך-הריליי (3004) ומספק-סטטוס-חי לפלטפורמה (:3005). fail-closed · אפס-סודות-בלוג · מטמון-כישלון-מוגבל.",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  }
+}
