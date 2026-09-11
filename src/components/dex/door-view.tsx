@@ -25,8 +25,8 @@ type PegRow = {
 type DoorReport = {
   ok: boolean;
   at: string;
-  identities: { tron: string | null; sol: string | null; note: string };
-  custody: { tronSun: number | null; solLamports: number | null; at: number; note: string };
+  identities: { tron: string | null; sol: string | null; evm: string | null; note: string };
+  custody: { tronSun: number | null; solLamports: number | null; evmWei: number | null; at: number; note: string };
   anchors: {
     tron: { haveSun: number | null; needSun: number; gapSun: number | null; note: string };
     sol: { haveLamports: number | null; needLamports: number; gapLamports: number | null; note: string };
@@ -165,6 +165,9 @@ export function DoorView({ onNeedAuth, onNavigate, onDone }: {
             have: rep?.custody.solLamports != null ? (rep.custody.solLamports / 1e9) : null,
             gapVal: rep?.anchors.sol.gapLamports != null ? rep.anchors.sol.gapLamports / 1e9 : null,
             gapNote: rep?.anchors.sol.note, testid: 'deposit-sol' },
+          { key: 'eth', label: 'ETH (Ethereum)', addr: rep?.identities.evm ?? null, unit: 'ETH',
+            have: rep?.custody.evmWei != null ? (rep.custody.evmWei / 1e18) : null,
+            gapVal: null, gapNote: 'roast-76: הצי-רוכז אל כתובת-זו (10-txids) — אין-רצפת-שכרות; המשמורת היא דלק-העיגון-עצמו (EIP-1559)', testid: 'deposit-eth' },
         ].map(d => (
           <div key={d.key} className="dx-card p-4" data-testid={d.testid}>
             <div className="flex items-center justify-between mb-2">
