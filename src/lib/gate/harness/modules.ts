@@ -79,7 +79,17 @@ export const MODULES: HarnessModule[] = [
         orderBy: [{ chain: "asc" }, { account: "asc" }],
         take: 200,
       });
-      return { total: rows.length, entries: rows, note: "pubs בלבד — חומר-פרטי לא נחשף לסוכנים" };
+      // r31 — עיוורון-הבודק נסגר-כאן-כמו-שנסגר-ב-r29 (צנזורת-התגמולים): הרשימה-המלאה
+      // נחתכת לפי-תקרת-התוצאה (RESULT_CLAMP), והבודק-העצמאי לא-היה-מסוגל-לאמת
+      // אילו-רשומות-ממתינות. byStatus + waiting נמצאים-ראשונים-באובייקט —
+      // JSON.stringify שומר-על-סדר-המפתחות, ולכן-גם-אחרי-חיתוך הראש-מציג-את
+      // הפירוק-המלא-לפי-סטטוס ואת-רשימת-הממתינות (החלק-הניתן-לאימות).
+      const byStatus: Record<string, number> = {};
+      for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+      const waiting = rows
+        .filter((r) => r.status === "imported" || r.status === "unverified")
+        .map((r) => `${r.chain || "?"}/${r.account || "?"}|${r.role || "?"}|${r.kind}|${r.status}`);
+      return { byStatus, waiting, waitingCount: waiting.length, total: rows.length, entries: rows, note: "pubs בלבד — חומר-פרטי לא נחשף לסוכנים" };
     },
   },
   {
@@ -113,13 +123,18 @@ export const MODULES: HarnessModule[] = [
     cacheable: true,
     async exec() {
       const cfg = await db.gateConfig.findUnique({ where: { id: "gate" } });
-      const [entries, agents, messages, runs] = await Promise.all([
+      const [entries, agents, messages, runs, groupByStatus] = await Promise.all([
         db.vaultEntry.count(),
         db.gateAgent.count({ where: { active: true } }),
         db.gateMessage.count(),
         db.gateRun.count(),
+        // r31 — הבודק-העצמאי-נדרש-לאמת "כמה-רשומות באילו-סטטוסים"; בלי-הפירוק
+        // הקריטריון-נכשל-בכנות על-תשובה-כללית (נתפס-חי בהוכחת-הצי של-r31).
+        db.vaultEntry.groupBy({ by: ["status"], _count: { _all: true } }),
       ]);
-      return { vault: { initialized: Boolean(cfg?.initialized), unlocked: masterReady(), entries }, agents, messages, runs };
+      const entriesByStatus: Record<string, number> = {};
+      for (const g of groupByStatus) entriesByStatus[g.status] = g._count._all;
+      return { vault: { initialized: Boolean(cfg?.initialized), unlocked: masterReady(), entries, entriesByStatus }, agents, messages, runs };
     },
   },
   {
@@ -531,14 +546,19 @@ export const MODULES: HarnessModule[] = [
     cacheable: true, // 10-min stale-while-revalidate inside the digest itself
     async exec() {
       const d = await getBroadcastDigest(true);
+      // r31 — עיוורון-החיתוך נסגר (אותו-משפחה כמו vault.map/steem.rewards):
+      // האובייקט-המלא נחתך-על-תקרת-התוצאה, והמייצר נשאר עם-הספירות-בלבד בלי
+      // לראות את הקולות-עצמם. השדות-הפעילים (משמעות · סיכום · הקולות) ראשונים —
+      // JSON.stringify שומר-סדר-מפתחות, ולכן-גם-הראש-החתוך מציג-את-מה-שאפשר
+      // לפעול-לפיו; suggestedResponse בסוף (הטיוטה-שלנו-היא-memory.write של-הסוכן).
       return {
-        measuredAt: d.measuredAt,
-        channel: { scanned: d.scannedRepos, fetched: d.fetched, failed: d.failed, uniqueContents: d.uniqueContents, echoesOfOurs: d.echoesOfOurs, partnerVoices: d.partnerVoices, newPartnerContents: d.newPartnerContents },
-        voices: d.items.filter((i) => i.ok && !i.ours && !i.echo).map((i) => ({ repo: i.repo, kind: i.kind, lang: i.lang, headline: i.headline, asks: i.asks, isNew: i.isNew, hash: i.hash8 })),
-        suggestedResponse: d.suggestedResponse,
         meaning: d.partnerVoices > 0
           ? "קול-שותף נשמע בערוץ — קרא את השאלות/בקשות והחלט אם להשיב; שליחת-תשובה לערוץ-שותף דורשת אישור-מפעיל"
-          : "הערוץ מהדהד כרגע רק את הדוח שלנו — המשך לעבוד; הכספת תשמע כשמשהו חדש ייאמר",
+          : "הערוץ מהדהד כרגע רק את הדוח שלנו — דווח בכנות 'אין דופקים חדשים' והמשך לעבוד; הכספת תשמע כשמשהו חדש ייאמר",
+        channel: { scanned: d.scannedRepos, fetched: d.fetched, failed: d.failed, uniqueContents: d.uniqueContents, echoesOfOurs: d.echoesOfOurs, partnerVoices: d.partnerVoices, newPartnerContents: d.newPartnerContents },
+        voices: d.items.filter((i) => i.ok && !i.ours && !i.echo).map((i) => ({ repo: i.repo, kind: i.kind, lang: i.lang, headline: i.headline, asks: i.asks, isNew: i.isNew, hash: i.hash8 })),
+        measuredAt: d.measuredAt,
+        suggestedResponse: d.suggestedResponse,
       };
     },
   },
