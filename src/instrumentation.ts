@@ -46,6 +46,7 @@ const ALLOW_EXACT = new Set([
 // מפתחות-חתימה/עיגון של הדקס — שמות-מפורשים-בלבד, לעולם לא ירושה-כללית
 const ALLOW_KEYS = new Set([
   "STEEM_ACTIVE_WIF", "STEEM_POSTING_WIF", "HIVE_ACTIVE_WIF", "HIVE_POSTING_WIF",
+  "BLURT_ACTIVE_WIF", // Roast-82: מסילת-BLURT — השרשרת-השביעית (אפס-RC, אפס-עלות)
   "ETH_PRIVATE_KEY", "SOL_PRIVATE_KEY", "TRON_PRIVATE_KEY",
 ]);
 // משפחות-שמות ספציפיות-לדקס
