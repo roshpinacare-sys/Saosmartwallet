@@ -147,7 +147,7 @@ interface SituationData {
   treasury: { rails: TreasuryRail[]; measuredAt: string; error?: string };
   evm: { ethereum: { ok: boolean; wallets: number; okWallets: number; total: string; block: number | null; error?: string }; solana: { ok: boolean; wallets: number; okWallets: number; total: string; slot: number | null; error?: string } };
   rewards: { ok: boolean; accounts: number; pendingAccounts: { account: string; steemEquiv: number }[]; totalPendingSteemEquiv: number; error?: string };
-  repos: { ok: boolean; org: string; scannedAt: string | null; ageMinutes: number | null; count: number; freshCount: number; repos: SituationRepoRow[]; error?: string };
+  repos: { ok: boolean; org: string; scannedAt: string | null; ageMinutes: number | null; count: number; freshCount: number; repos: SituationRepoRow[]; broadcasts?: { repo: string; count: number; latest: string | null; ours: boolean }[]; broadcastTotal?: number; error?: string };
   vault: { ok: boolean; total: number; verified: number; unverified: number; imported: number; operatorCustody: number; rotatedOut: number; chains: Record<string, number>; error?: string };
   fleet: { ok: boolean; agents: number; autonomous: number; activeRuns: number; error?: string };
   anchors: { ok: boolean; count: number; latest: { chain: string; txId: string; blockNum: number | null; at: string; round: string; signedBy: string }[]; error?: string };
@@ -1800,7 +1800,20 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                     ))}
                   </div>
                 )}
-                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו</p>
+                {situation.repos.ok && (situation.repos.broadcastTotal ?? 0) > 0 && (
+                  <div className="mt-1.5 pt-1.5 border-t border-zinc-800/80">
+                    <p className="text-[10px] font-mono text-emerald-300/90 mb-0.5">📡 שידורים-נכנסים ({situation.repos.broadcastTotal}) — ערוץ הדדי</p>
+                    <div className="space-y-0.5 max-h-16 overflow-y-auto scroll-thin">
+                      {(situation.repos.broadcasts ?? []).filter((b) => b.count > 0).map((b) => (
+                        <div key={b.repo} className="flex items-center justify-between gap-2 text-[9px] font-mono" dir="ltr">
+                          <span className={(b.ours ? "text-sky-300 font-semibold" : "text-emerald-200/90") + " truncate max-w-[45%]"}>{b.ours ? "★ " : ""}{b.repo}</span>
+                          <span className="text-zinc-500 truncate max-w-[50%]" title={b.latest ?? ""}>{b.latest} ×{b.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-[9px] text-zinc-600 mt-1.5">★ = הריפו שלנו · עדכון-חי על 10 דק׳ · נקודה-כתומה = סוכן-אחר דחף עכשיו · 📡 = ערוץ-השידורים ההדדי (r24) — הכספת גם שומעת</p>
               </div>
               {/* vault + fleet + anchors */}
               <div className="rounded-xl border border-zinc-800 bg-black/40 px-3 py-2.5">
