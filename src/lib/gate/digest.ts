@@ -269,12 +269,29 @@ async function listGithubDir(token: string, org: string, repo: string, dir: stri
   }
 }
 
+/** r35 — a line meant for humans: no control bytes, no replacement chars, mostly printable */
+function humanLine(l: string): boolean {
+  if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(l)) return false;
+  if (l.includes("\uFFFD")) return false;
+  const printable = (l.match(/[\u0020-\u007E\u00A0-\u00FF\u0590-\u05FF\u0600-\u06FF\u2010-\u2027\u2030-\u205E]/g) ?? []).length;
+  return l.length > 0 && printable / l.length >= 0.85;
+}
+
 function classify(content: string): Pick<DigestItem, "lang" | "kind" | "headline" | "asks" | "mentionsUs"> {
+  // r35 defense-in-depth: a binary artifact that slipped through as "text"
+  // (e.g. a .png inside a partner's broadcasts/) must degrade to an honest
+  // unclassified voice — never produce garbage asks or a garbage headline.
+  const damage = (content.match(/[\u0000-\u0008\u000E-\u001F\u007F\uFFFD]/g) ?? []).length;
+  const corrupted = content.length > 0 && damage / content.length > 0.05;
+  if (corrupted) {
+    return { lang: "?", kind: "report", headline: "(ארטיפקט לא-טקסטואלי — נרשם בכנות, לא מסווג)", asks: [], mentionsUs: false };
+  }
+
   const heChars = (content.match(/[\u0590-\u05FF]/g) ?? []).length;
   const latinChars = (content.match(/[A-Za-z]/g) ?? []).length;
   const lang: DigestItem["lang"] = heChars > 40 && latinChars > 40 ? "he+en" : heChars > 40 ? "he" : latinChars > 40 ? "en" : "?";
 
-  const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).filter(humanLine);
   const heading = lines.find((l) => /^#{1,3}\s/.test(l));
   const headline = ((heading ?? lines[0] ?? "(empty)").replace(/^#{1,3}\s*/, "").slice(0, HEADLINE_MAX)) || "(empty)";
 
@@ -344,6 +361,12 @@ async function buildDigest(): Promise<BroadcastDigest> {
       const seen2 = seen; // capture for isNew before merging
       door.voices = await Promise.all(
         knocks.slice(0, MAX_DOOR_VOICES).map(async (file): Promise<DoorVoice> => {
+          // r35: the door counts every knock, but only TEXT knocks get fetched and
+          // classified — a binary artifact (image/archive) is registered honestly,
+          // never decoded into garbage "voices".
+          if (!/\.(md|txt|markdown)$/i.test(file)) {
+            return { file, ok: false, error: "ארטיפקט לא-טקסטואלי על הדלת — נספר כדופק, לא מסווג", bytes: 0, hash: "", hash8: "", isNew: false, selfEcho: false, lang: "?", kind: "report", headline: "(artifact — not classified)", asks: [], mentionsUs: false };
+          }
           const content = await fetchBroadcastContent(token, org, ours.repo, file);
           if (content === null) {
             return { file, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", isNew: false, selfEcho: false, lang: "?", kind: "report", headline: "(unavailable)", asks: [], mentionsUs: false };

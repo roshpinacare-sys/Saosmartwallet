@@ -134,13 +134,17 @@ async function readGithubToken(): Promise<string | null> {
 async function fetchBroadcasts(token: string, repo: string): Promise<SituationBroadcast> {
   // one lightweight contents call per repo; a missing broadcasts/ folder is an
   // honest "no broadcasts here" (404), never an error — the channel is young.
+  // r35: the channel is a TEXT channel — only .md counts and is elected "latest".
+  // (roast-79-economy-live.png proved it: a binary artifact sorted last by name,
+  //  got fetched as text, and its garbage bytes almost poisoned a suggested reply.)
   const ours = repo === OUR_REPO;
   try {
     const res = await fetch(`https://api.github.com/repos/${ORG}/${repo}/contents/broadcasts`, { headers: githubHeaders(token), cache: "no-store" });
     if (!res.ok) return { repo, count: 0, latest: null, ours };
     const items = (await res.json()) as Array<{ name: string; type: string }>;
-    const files = (Array.isArray(items) ? items : []).filter((i) => i.type === "file").map((i) => i.name).sort();
-    return { repo, count: files.length, latest: files.at(-1) ?? null, ours };
+    const files = (Array.isArray(items) ? items : []).filter((i) => i.type === "file").map((i) => i.name);
+    const texts = files.filter((n) => /\.md$/i.test(n)).sort();
+    return { repo, count: texts.length, latest: texts.at(-1) ?? null, ours };
   } catch {
     return { repo, count: 0, latest: null, ours };
   }
