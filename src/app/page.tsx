@@ -25,7 +25,7 @@ import {
   Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
   ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
   AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
-  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain, Hand, Radio, Activity,
+  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain, Hand, Radio, Activity, Wallet,
 } from "lucide-react";
 
 /* ══════════════════════════ auth plumbing ══════════════════════════ */
@@ -138,6 +138,9 @@ interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabl
 interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[]; proposals?: ProposalRow[]; proposalPolicy?: ProposalPolicyRow; checkerStats?: CheckerStatsRow | null }
 interface OrderRow { id: string; agentName: string; runId: string | null; op: string; account: string; spec: string; preview: string; notionalSteem: number; status: string; decidedBy: string | null; previewTxId: string | null; broadcastId: string | null; blockNum: number | null; error: string | null; createdAt: string; decidedAt: string | null }
 interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalSteem: number; maxSignedPerDay: number; pendingExpiryMs: number; defaultTtlSeconds: number }; account: string; signedToday: number; vaultOpen: boolean; error?: string }
+interface TreasuryRow { account: string; liquid: string; debt: string; vesting: string | null; liquidNum: number; debtNum: number }
+interface TreasuryRail { rail: string; ok: boolean; liquidSymbol: string; debtSymbol: string; accounts: TreasuryRow[]; totals: { liquid: number; debt: number }; error?: string }
+interface TreasurySnapshot { measuredAt: string; rails: TreasuryRail[]; fleet: Record<string, number>; cached: boolean }
 interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
@@ -161,8 +164,9 @@ const ENDPOINTS: Ep[] = [
   { method: "PATCH", path: "/api/gate/proposals", desc: "הכרעת הצעת-יעד: אישור מזניק ריצה אמיתית (origin=proposal)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
   { method: "PUT", path: "/api/gate/proposals", desc: "מדיניות-יוזמות: אישור-אוטומטי מרוסן (מקס-יומי + תקציב)", auth: "operator", body: '{ "autoApprove": true, "maxAutoPerDay": 2, "maxBudget": 4 }' },
   { method: "GET", path: "/api/gate/memory", desc: "זיכרון-הצי: בנק-הממצאים הסופיים המשותף", auth: "operator" },
-  { method: "GET", path: "/api/gate/orders", desc: "יד-ריבונית: תור-החתימות (פקודות DEX שהסוכנים הכינו) + מדדי-הגבול", auth: "operator" },
-  { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל ומשדרת לשרשרת (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
+  { method: "GET", path: "/api/gate/orders", desc: "יד-ריבונית: תור-החתימות (פקודות-המרה שהסוכנים הכינו — כל חשבון-צי × steem/hive × לימיט/המרת-מדין) + מדדי-הגבול", auth: "operator" },
+  { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל של חשבון-הפקודה עצמו ומשדרת לשרשרת-היעד (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
+  { method: "GET", path: "/api/gate/treasury", desc: "אמת-הכיס (r21): יתרות חיות של כל חשבונות-הצי על שלוש-המסילות (נזיל/חוב/vesting) — כל-מסילה נכשלת בכנות בנפרד", auth: "operator" },
   { method: "GET", path: "/api/gate/stream", desc: "גשר-הפיקוד בזמן-אמת (SSE) — הודעות חדשות נדחפות, בלי דגימה", auth: "operator" },
   { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
   { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
@@ -1384,6 +1388,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   const [busy, setBusy] = useState(false);
   const [mem, setMem] = useState<MemoryRow[]>([]);
   const [orders, setOrders] = useState<OrdersData | null>(null);
+  const [treasury, setTreasury] = useState<TreasurySnapshot | null>(null);
 
   /* patrol form */
   const [label, setLabel] = useState("");
@@ -1405,11 +1410,15 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     const r = await apiJson<OrdersData>("/api/gate/orders");
     if (r?.ok) setOrders(r);
   }, []);
-  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); }, [load, loadMem, loadOrders]);
+  const loadTreasury = useCallback(async () => {
+    const r = await apiJson<TreasurySnapshot & { ok: boolean }>("/api/gate/treasury");
+    if (r?.ok) setTreasury(r);
+  }, []);
+  useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); void Promise.resolve().then(loadTreasury); }, [load, loadMem, loadOrders, loadTreasury]);
   useEffect(() => {
-    const t = setInterval(() => { load(); loadMem(); loadOrders(); }, 8000);
+    const t = setInterval(() => { load(); loadMem(); loadOrders(); loadTreasury(); }, 8000);
     return () => clearInterval(t);
-  }, [load, loadMem, loadOrders]);
+  }, [load, loadMem, loadOrders, loadTreasury]);
 
   async function toggleAutonomy(v: boolean) {
     setBusy(true);
@@ -1669,6 +1678,49 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
           </div>
         </div>
 
+        {/* treasury truth — the fleet's money, measured live (r21) */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+            <p className="text-xs text-zinc-400 flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5 text-emerald-300" />
+              אמת-הכיס — הכסף במערכת, נמדד חי ({treasury?.cached === false ? "טרי" : "מטמון 30s"})
+            </p>
+            {treasury && <span className="text-[10px] text-zinc-600 font-mono" dir="ltr">{new Date(treasury.measuredAt).toLocaleTimeString("he-IL")}</span>}
+          </div>
+          {!treasury && <p className="text-xs text-zinc-600 py-3 text-center">מודד את הכיס של הצי על שלוש-המסילות…</p>}
+          {treasury && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {treasury.rails.map((r) => (
+                <div key={r.rail} className={"rounded-xl border px-3 py-2.5 " + (r.ok ? "border-zinc-800 bg-black/40" : "border-rose-500/25 bg-rose-500/5")}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-mono text-zinc-300" dir="ltr">{r.rail.toUpperCase()}</span>
+                    <Badge variant="outline" className={"text-[9px] font-mono " + (r.ok ? "text-emerald-300 border-emerald-500/40" : "text-rose-300 border-rose-500/40")}>{r.ok ? "live" : "שגיאה"}</Badge>
+                  </div>
+                  {r.ok ? (
+                    <>
+                      <p className="text-sm font-mono text-emerald-300 mt-1" dir="ltr">{r.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 })} <span className="text-[10px] text-zinc-500">{r.liquidSymbol}</span></p>
+                      <p className="text-xs font-mono text-amber-300/90" dir="ltr">{r.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} <span className="text-[10px] text-zinc-500">{r.debtSymbol}</span></p>
+                      <p className="text-[10px] text-zinc-500 mt-1">{r.accounts.length} חשבונות · חשבונות-על: {treasury.fleet?.[r.rail] ?? r.accounts.length}</p>
+                      <div className="mt-1.5 max-h-24 overflow-y-auto scroll-thin">
+                        {r.accounts.filter((a) => a.liquidNum > 0 || a.debtNum > 0).map((a) => (
+                          <div key={a.account} className="flex items-center justify-between text-[10px] font-mono text-zinc-400 py-0.5" dir="ltr">
+                            <span className="truncate max-w-[45%]">{a.account}</span>
+                            <span className="text-zinc-300">{a.liquidNum.toLocaleString("en-US")} · <span className={a.debtNum > 0 ? "text-amber-300/90" : "text-zinc-600"}>{a.debtNum.toLocaleString("en-US")}</span></span>
+                          </div>
+                        ))}
+                        {r.accounts.every((a) => a.liquidNum === 0 && a.debtNum === 0) && <p className="text-[10px] text-zinc-600 py-1">אין יתרות נזילות/חוב במסילה זו</p>}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[10px] text-rose-300/80 mt-1 break-all" dir="ltr">{r.error ?? "מדידה נכשלה"}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-zinc-600 mt-1.5">מישור-ההמרות: לימיט-קנייה/מכירה + המרת-מדין על steem/hive — חשבון-הפקודה נבחר מתוך מפתחות-ה-active המאומתים בכספת · blurt מוצא כנות מחוץ למישור (ספר-BBD לא נמדד)</p>
+        </div>
+
         {/* sovereign hand — the controlled signing queue */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -1677,7 +1729,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               יד-ריבונית — תור-החתימות ({orders?.orders?.filter((o) => o.status === "pending").length ?? 0} ממתינות)
             </p>
             <span className="text-[10px] text-zinc-500 font-mono" dir="ltr">
-              signed {orders?.signedToday ?? 0}/{orders?.rails.maxSignedPerDay ?? 6} today · ≤{orders?.rails.maxNotionalSteem ?? 100} STEEM · {orders?.account ?? "headcorner"}@active
+              signed {orders?.signedToday ?? 0}/{orders?.rails.maxSignedPerDay ?? 6} today · ≤{orders?.rails.maxNotionalSteem ?? 100} per order · חשבון-הפקודה: מפתח-active מאומת מהכספת
             </span>
           </div>
           {orders && !orders.vaultOpen && (orders?.orders?.some((o) => o.status === "pending") ?? false) && (
@@ -1685,16 +1737,21 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
           )}
           <div className="max-h-56 overflow-y-auto scroll-thin space-y-2 pl-1">
             {orders?.orders?.map((o) => {
-              let pv: { side?: string; amount?: string; price?: string; total?: string; orderid?: number; note?: string } = {};
+              let pv: { side?: string; amount?: string; price?: string; total?: string; orderid?: number; note?: string; rail?: string } = {};
               try { pv = JSON.parse(o.preview || "{}"); } catch { /* dim row */ }
+              const railChip = (pv.rail && pv.rail !== "steem") ? <Badge variant="outline" className="text-[9px] font-mono shrink-0 text-sky-300 border-sky-500/40" dir="ltr">{pv.rail}</Badge> : null;
               const what = o.op === "limit_order_cancel"
                 ? `ביטול הזמנה #${pv.orderid ?? "?"}`
-                : `${pv.side === "buy" ? "קניית" : "מכירת"} ${pv.amount ?? "?"} @ ${pv.price ?? "?"}`;
+                : o.op === "convert"
+                  ? `המרת-מדין ${pv.amount ?? "?"}`
+                  : `${pv.side === "buy" ? "קניית" : "מכירת"} ${pv.amount ?? "?"} @ ${pv.price ?? "?"}`;
               return (
                 <div key={o.id} className={"rounded-xl border px-3 py-2.5 " + (o.status === "pending" ? "border-orange-500/30 bg-orange-500/5" : o.status === "signed" ? "border-emerald-500/25 bg-emerald-500/5" : "border-zinc-800 bg-black/40 opacity-70")}>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (o.status === "pending" ? "text-orange-300 border-orange-500/40" : o.status === "signed" ? "text-emerald-300 border-emerald-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{o.status}</Badge>
                     <span className="text-[11px] font-mono text-zinc-400 shrink-0">{o.agentName}</span>
+                    <span className="text-[11px] font-mono text-zinc-500 shrink-0" dir="ltr">@{o.account}{pv.rail ? `·${pv.rail}` : ""}</span>
+                    {railChip}
                     <span className="text-[10px] text-zinc-300">{what}</span>
                     <span className="text-[9px] text-zinc-600 font-mono shrink-0" dir="ltr">#{pv.orderid ?? "—"}</span>
                     {o.decidedBy && <span className="text-[9px] text-zinc-600 shrink-0">הוכרע ע"י {o.decidedBy === "operator" ? "המפעיל" : o.decidedBy}</span>}
@@ -1714,7 +1771,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               );
             })}
             {orders && orders.orders.length === 0 && (
-              <p className="text-xs text-zinc-600 py-4 text-center">אין פקודות — סוכן חמוש ב-steem.order.build מכין פקודת-DEX אמתית, ואתה חותם (או לא)</p>
+              <p className="text-xs text-zinc-600 py-4 text-center">אין פקודות — סוכן חמוש ב-steem.order.build מכין פקודת-המרה אמתית (בכל חשבון-צי ושתי-המסילות), ואתה חותם (או לא)</p>
             )}
             {!orders && <p className="text-xs text-zinc-600 py-4 text-center">טוען תור-חתימות…</p>}
           </div>

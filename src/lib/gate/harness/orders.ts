@@ -19,14 +19,24 @@
  * honestly instead of lingering.
  */
 import { db } from "@/lib/db";
-import { requireMaster, openSecret, GateError } from "@/lib/gate/crypto";
-import { steemBroadcastAdapter } from "@/lib/steem-server";
-import { buildSteemOrderTx, buildSteemCancelTx } from "@/lib/steem-order";
-import { PrivateKey, base58Decode } from "../../../../packages/crypto/src/index";
-import { sha256 } from "@noble/hashes/sha2.js";
+import { requireMaster, GateError } from "@/lib/gate/crypto";
+import { buildSteemOrderTx, buildSteemCancelTx, buildConvertTx } from "@/lib/steem-order";
+import { toSigningKey } from "@/lib/gate/signing-key";
+import {
+  CONVERSION_RAILS,
+  conversionRailOf,
+  assertRailSigner,
+  railAdapters,
+  railActiveKey,
+  railChainId,
+  rcGuardHive,
+  type ConversionRail,
+} from "@/lib/gate/dex-rail";
+import type { PrivateKey } from "../../../../packages/crypto/src/index";
 
-// secp256k1 group order — @noble/curves (audited); no hand-rolled crypto.
-const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+// The signing boundary (toSigningKey) lives in gate/signing-key.ts — ONE
+// 33-byte-quirk implementation shared with the CONVERSION PLANE.
+export { toSigningKey }; // shared with SOVEREIGN-VOICE (social.ts) — same 33-byte quirk applies to every headcorner role
 
 /**
  * The vault's headcorner WIFs are stored in the 52-char bitcoin-flavored
@@ -38,28 +48,11 @@ const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0
  * 2026-09-09 against headcorner's posting authority. Signing must reproduce
  * steem-js semantics or the chain answers "missing required active authority".
  * (This quirk is also the real story behind the AUTHORITY-DRIFT finding.)
+ * → r21: the implementation moved verbatim to gate/signing-key.ts (re-export
+ * above) so the CONVERSION PLANE signs with the exact same boundary.
  */
-function toSigningKey(wif: string): PrivateKey {
-  const trimmed = wif.trim();
-  const raw = base58Decode(trimmed);
-  if (raw.length === 37 && raw[0] === 0x80) {
-    return PrivateKey.fromWif(trimmed); // canonical steem WIF — package handles it
-  }
-  if (raw.length === 38 && raw[0] === 0x80 && raw[33] === 0x01) {
-    // checksum over [0x80 ‖ 33B body] — fail closed on mismatch
-    const payload = raw.subarray(0, 34);
-    const chk = sha256(sha256(payload)).slice(0, 4);
-    if (!Buffer.from(chk).equals(Buffer.from(raw.subarray(34, 38)))) {
-      throw new GateError("bad-key", "בדיקת-סיכום של המפתח נכשלה — חומר-המפתח בכספת פגום");
-    }
-    const d = BigInt("0x" + Buffer.from(raw.subarray(1, 34)).toString("hex")) % SECP256K1_N;
-    return PrivateKey.fromBytes(Buffer.from(d.toString(16).padStart(64, "0"), "hex"));
-  }
-  return PrivateKey.fromWif(trimmed); // otherwise let the package fail closed
-}
-export { toSigningKey }; // shared with SOVEREIGN-VOICE (social.ts) — same 33-byte quirk applies to every headcorner role
 
-/** The commander account whose ACTIVE key lives in the vault — never taken from agent input. */
+/** The commander account whose ACTIVE key lives in the vault — the default order account. */
 export const COMMANDER_ACCOUNT = "headcorner";
 
 export const ORDER_RAILS = {
@@ -99,20 +92,28 @@ async function bridgeMsg(body: string, meta: Record<string, unknown>): Promise<v
 export interface BuildOrderInput {
   agentName: string;
   runId: string;
-  op?: string; // "create" (default) | "cancel"
+  op?: string; // "create" (default) | "cancel" | "convert" (r21)
   side?: string; // buy | sell (create only)
-  amount?: string; // STEEM leg, decimal string (create only)
-  price?: string; // SBD per STEEM, decimal string (create only)
+  amount?: string; // liquid leg (STEEM/HIVE) on create; debt leg (SBD/HBD) on convert
+  price?: string; // debt per liquid, decimal string (create only)
   ttlSeconds?: number;
   cancelOrderid?: number;
+  rail?: string; // "steem" (default) | "hive" — the CONVERSION PLANE (r21); blurt honest-refused
+  account?: string; // fleet account with a VERIFIED vault active key (default headcorner)
 }
 
 /**
  * The agent's one hand: prepare a REAL order. Every rail fails loudly with a
  * GateError so the maker learns the boundary instead of guessing it.
+ * r21: multi-account (any vault-verified active key) × multi-rail (steem/hive)
+ * × three ops (limit buy/sell, cancel, median-price convert).
  */
 export async function createOrderFromAgent(input: BuildOrderInput): Promise<OrderPreview> {
-  const op = input.op === "cancel" ? "limit_order_cancel" : "limit_order_create";
+  const op = input.op === "cancel" ? "limit_order_cancel" : input.op === "convert" ? "convert" : "limit_order_create";
+  const rail: ConversionRail = conversionRailOf(input.rail);
+  const account = (input.account || COMMANDER_ACCOUNT).trim().toLowerCase().replace(/^@/, "");
+  if (!/^[a-z0-9.\-]{3,16}$/.test(account)) throw new GateError("bad-input", `חשבון לא תקין: "${account}"`);
+  await assertRailSigner(account, rail); // the vault decides who is signable — fail closed, loudly
 
   // rail — one pending proposal per agent: initiative, not spam
   const pending = await db.gateOrder.count({ where: { agentName: input.agentName, status: "pending" } });
@@ -140,10 +141,33 @@ export async function createOrderFromAgent(input: BuildOrderInput): Promise<Orde
     if (!Number.isInteger(cancelOrderid) || cancelOrderid < 0 || cancelOrderid > 0xffffffff) {
       throw new GateError("bad-input", "דרוש params.cancelOrderid (uint32) — מזהה-ההזמנה שיש לבטל");
     }
-    const b = await buildSteemCancelTx({ account: COMMANDER_ACCOUNT, orderid: cancelOrderid });
-    specJson = JSON.stringify({ account: COMMANDER_ACCOUNT, orderid: cancelOrderid });
-    preview = { op, account: COMMANDER_ACCOUNT, orderid: cancelOrderid, previewTxId: b.txId, note: "ביטול הזמנה — הכספת תחתום רק באישור-מפעיל" };
+    const { read } = railAdapters(rail);
+    const b = await buildSteemCancelTx({ account, orderid: cancelOrderid, adapterOverride: read, chainId: railChainId(rail) });
+    specJson = JSON.stringify({ account, rail, op, orderid: cancelOrderid });
+    preview = { op, account, rail, orderid: cancelOrderid, previewTxId: b.txId, note: `ביטול הזמנה על ${account}@${rail} — הכספת תחתום רק באישור-מפעיל` };
     notionalSteem = 0;
+    previewTxId = b.txId;
+  } else if (op === "convert") {
+    // The chain's median-price debt→liquid conversion — the no-book path.
+    const amount = String(input.amount || "").trim();
+    if (!/^\d+(\.\d{1,3})?$/.test(amount) || Number(amount) <= 0) throw new GateError("bad-input", 'דרוש params.amount תקין (ספרות-עשרון עד 3, למשל "10.000")');
+    notionalSteem = Number(amount);
+    if (notionalSteem > ORDER_RAILS.maxNotionalSteem) {
+      throw new GateError("bad-input", `תקרת-הגודל: ${ORDER_RAILS.maxNotionalSteem} לפקודה (התקבל ${amount}) — חצייה ממתינה להחלטת-מפעיל מחוץ לגבולות-הצי`);
+    }
+    const { read } = railAdapters(rail);
+    const pair = CONVERSION_RAILS[rail];
+    const requestid = Date.now() % 0x100000000; // fixed at BUILD — the rebuild contract
+    const b = await buildConvertTx({ account, amount, requestid, assets: pair.wire, adapterOverride: read, chainId: railChainId(rail) });
+    specJson = JSON.stringify({ account, rail, op, amount, requestid });
+    preview = {
+      op,
+      account,
+      rail,
+      amount: `${amount} ${pair.display.debt}`,
+      requestid,
+      note: `המרת-מדין (3.5 ימים, מחיר-חוז של השרשרת): ${amount} ${pair.display.debt} → ${pair.display.liquid} על ${account} — הכספת תחתום רק באישור-מפעיל`,
+    };
     previewTxId = b.txId;
   } else {
     const side = input.side === "buy" || input.side === "sell" ? input.side : null;
@@ -159,8 +183,9 @@ export async function createOrderFromAgent(input: BuildOrderInput): Promise<Orde
     // the determinism contract: fixed orderid + orderExpiration ⇒ the signing
     // rebuild produces the SAME order the operator reviewed (only the ref-block
     // and tx-expiry are restamped fresh — that is what makes broadcast valid).
+    const { read } = railAdapters(rail);
     const b = await buildSteemOrderTx({
-      account: COMMANDER_ACCOUNT,
+      account,
       side,
       amount,
       price,
@@ -168,14 +193,18 @@ export async function createOrderFromAgent(input: BuildOrderInput): Promise<Orde
       ttlSeconds: ttl,
       orderid,
       orderExpiration,
+      assets: CONVERSION_RAILS[rail].wire,
+      adapterOverride: read,
+      chainId: railChainId(rail),
     });
-    specJson = JSON.stringify({ account: COMMANDER_ACCOUNT, side, amount, price, fillOrKill: false, ttlSeconds: ttl, orderid, orderExpiration });
+    specJson = JSON.stringify({ account, rail, side, amount, price, fillOrKill: false, ttlSeconds: ttl, orderid, orderExpiration });
     preview = {
       op,
-      account: COMMANDER_ACCOUNT,
+      account,
+      rail,
       side,
-      amount: `${amount} STEEM`,
-      price: `${price} SBD/STEEM`,
+      amount: `${amount} ${CONVERSION_RAILS[rail].display.liquid}`,
+      price: `${price} ${CONVERSION_RAILS[rail].display.debt}/${CONVERSION_RAILS[rail].display.liquid}`,
       total: `${Number(b.sellAsset.amount) / 1000} ${b.sellAsset.symbol}`, // the leg AT RISK, integer-exact
       notionalSteem,
       orderid,
@@ -191,7 +220,7 @@ export async function createOrderFromAgent(input: BuildOrderInput): Promise<Orde
       agentName: input.agentName,
       runId: input.runId,
       op,
-      account: COMMANDER_ACCOUNT,
+      account,
       spec: specJson,
       preview: JSON.stringify(preview),
       notionalSteem,
@@ -199,30 +228,31 @@ export async function createOrderFromAgent(input: BuildOrderInput): Promise<Orde
       previewTxId,
     },
   });
+  const pair = CONVERSION_RAILS[rail];
   const what = op === "limit_order_cancel"
-    ? `ביטול הזמנה #${Number(input.cancelOrderid)}`
-    : `${input.side === "buy" ? "קניית" : "מכירת"} ${input.amount} STEEM @ ${input.price} SBD`;
-  await bridgeMsg(`✋ ${input.agentName} הכין פקודת-DEX (${what}) · orderid ${orderid} · ממתין לאישור-מפעיל — הכספת חותמת רק בהכרעה מפורשת`, { orderId: row.id, runId: input.runId });
+    ? `ביטול הזמנה #${Number(input.cancelOrderid)} על ${account}@${rail}`
+    : op === "convert"
+      ? `המרת ${input.amount} ${pair.display.debt}→${pair.display.liquid} על ${account}@${rail}`
+      : `${input.side === "buy" ? "קניית" : "מכירת"} ${input.amount} ${pair.display.liquid} @ ${input.price} ${pair.display.debt} על ${account}@${rail}`;
+  await bridgeMsg(`✋ ${input.agentName} הכין פקודת-DEX (${what}) · ממתין לאישור-מפעיל — הכספת חותמת רק בהכרעה מפורשת`, { orderId: row.id, runId: input.runId });
   return { orderId: row.id, ...(preview as Omit<OrderPreview, "orderId" | "note">), note: String(preview.note) };
 }
 
 /* ══════════════════ decide (operator side — the vault signs) ══════════════════ */
 
-async function commanderActiveKey(): Promise<PrivateKey> {
-  // master must be in memory (operator session opened the vault) — fail closed
+/**
+ * The ORDER's own ACTIVE key from the vault (r21 multi-account plane).
+ * `requireMaster()` must already hold — a locked vault refuses to sign.
+ */
+async function orderActiveKey(account: string, rail: ConversionRail): Promise<PrivateKey> {
   requireMaster();
-  const entry = await db.vaultEntry.findFirst({
-    where: { chain: "steem", account: COMMANDER_ACCOUNT, role: "active" },
-    orderBy: { updatedAt: "desc" },
-  });
-  if (!entry) throw new GateError("vault-missing-key", `אין מפתח-active של ${COMMANDER_ACCOUNT} בכספת — אי אפשר לחתום`);
-  const wif = openSecret({ encPriv: entry.encPriv, privIv: entry.privIv, privTag: entry.privTag });
-  return toSigningKey(wif);
+  return railActiveKey(account, rail);
 }
 
 /**
  * The operator's decision. Approval = rebuild (same spec) → sign with the
- * vault ACTIVE key → broadcast → real chain evidence recorded everywhere.
+ * vault ACTIVE key OF THE ORDER'S OWN ACCOUNT on the ORDER'S OWN rail →
+ * broadcast → real chain evidence recorded everywhere.
  * The vault must be open in THIS process — a locked vault refuses to sign.
  */
 export async function approveOrder(id: string, operatorName: string): Promise<{ broadcastId: string; blockNum?: number }> {
@@ -237,25 +267,47 @@ export async function approveOrder(id: string, operatorName: string): Promise<{ 
     throw new GateError("rate-limited", `תקרת-החתימות היומית של הצי מוצו (${signedToday}/${ORDER_RAILS.maxSignedPerDay})`);
   }
 
-  const priv = await commanderActiveKey();
-  const adapter = steemBroadcastAdapter();
+  const spec = JSON.parse(o.spec) as Record<string, unknown>;
+  const rail: ConversionRail = conversionRailOf(spec.rail ?? "steem");
+  const account = String(spec.account || COMMANDER_ACCOUNT).toLowerCase();
+  // r19 lesson (hive RC starvation): measure BEFORE the broadcast, refuse honestly
+  if (rail === "hive" && o.op !== "limit_order_cancel") await rcGuardHive(account);
+
+  const priv = await orderActiveKey(account, rail);
+  const { broadcast } = railAdapters(rail);
   try {
-    const spec = JSON.parse(o.spec) as Record<string, unknown>;
     const unsigned =
       o.op === "limit_order_cancel"
-        ? await buildSteemCancelTx({ account: String(spec.account), orderid: Number(spec.orderid) })
-        : await buildSteemOrderTx({
-            account: String(spec.account),
-            side: spec.side === "buy" ? "buy" : "sell",
-            amount: String(spec.amount),
-            price: String(spec.price),
-            fillOrKill: spec.fillOrKill === true,
-            ttlSeconds: Number(spec.ttlSeconds) || ORDER_RAILS.defaultTtlSeconds,
-            orderid: Number(spec.orderid), // EXACTLY the reviewed order (determinism contract)
-            orderExpiration: Number(spec.orderExpiration),
-          });
-    const signed = await adapter.sign(unsigned.unsigned, { byRole: { active: priv } }, ["active"]);
-    const res = await adapter.broadcast(signed);
+        ? await buildSteemCancelTx({
+            account,
+            orderid: Number(spec.orderid),
+            adapterOverride: broadcast,
+            chainId: railChainId(rail),
+          })
+        : o.op === "convert"
+          ? await buildConvertTx({
+              account,
+              amount: String(spec.amount),
+              requestid: Number(spec.requestid), // EXACTLY the reviewed conversion (rebuild contract)
+              assets: CONVERSION_RAILS[rail].wire,
+              adapterOverride: broadcast,
+              chainId: railChainId(rail),
+            })
+          : await buildSteemOrderTx({
+              account,
+              side: spec.side === "buy" ? "buy" : "sell",
+              amount: String(spec.amount),
+              price: String(spec.price),
+              fillOrKill: spec.fillOrKill === true,
+              ttlSeconds: Number(spec.ttlSeconds) || ORDER_RAILS.defaultTtlSeconds,
+              orderid: Number(spec.orderid), // EXACTLY the reviewed order (determinism contract)
+              orderExpiration: Number(spec.orderExpiration),
+              assets: CONVERSION_RAILS[rail].wire,
+              adapterOverride: broadcast,
+              chainId: railChainId(rail),
+            });
+    const signed = await broadcast.sign(unsigned.unsigned, { byRole: { active: priv } }, ["active"]);
+    const res = await broadcast.broadcast(signed);
     const broadcastId = res.txId || unsigned.txId;
     await db.gateOrder.update({
       where: { id },
@@ -274,11 +326,11 @@ export async function approveOrder(id: string, operatorName: string): Promise<{ 
         action: `sovereign-hand:${o.op}`,
         params: o.spec,
         ok: true,
-        result: JSON.stringify({ broadcastId, blockNum: res.blockNum ?? null, orderId: id, signedBy: `${COMMANDER_ACCOUNT}@active` }),
+        result: JSON.stringify({ broadcastId, blockNum: res.blockNum ?? null, orderId: id, rail, signedBy: `${account}@active` }),
       },
     });
     await bridgeMsg(
-      `🖊️ הכספת חתמה ושידרה לשרשרת — פקודת ${o.op === "limit_order_cancel" ? "ביטול" : "DEX"} של ${o.agentName} על ${o.account} אושרה על-ידי המפעיל · txId: ${broadcastId}`,
+      `🖊️ הכספת חתמה ושידרה לשרשרת — פקודת ${o.op === "limit_order_cancel" ? "ביטול" : o.op === "convert" ? "המרה" : "DEX"} של ${o.agentName} על ${account}@${rail} אושרה על-ידי המפעיל · txId: ${broadcastId}`,
       { orderId: id, broadcastId },
     );
     return { broadcastId, blockNum: res.blockNum };
