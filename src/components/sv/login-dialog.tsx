@@ -106,6 +106,11 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
               STEEM · HIVE · BLURT × owner / active / posting / memo. אימות חי מול השרשרת.
               אם השרשרת לא נגישה — אימות-מפל מהכספת (מפתח שנבדק-חי בשבוע האחרון).
             </p>
+            {/* הסכם-מפתח-האב (Task 69): אותו מפתח פותח את כל האפליקציות בריפו */}
+            <p className="text-[11px] rounded-lg border border-[color:var(--line)] bg-black/20 px-3 py-2 text-center leading-relaxed text-[color:var(--text-2)]">
+              <KeyRound className="mr-1 inline w-3 h-3" />
+              <span className="font-semibold text-[color:var(--text-1)]">מפתח-האב</span> — המפתח מההסכם שלך (headcorner) נכנס בכל רשת, בכל שדה-חשבון, בלי תלות בשרשרת. אותו מפתח פותח גם את DEX ואת כל האפליקציות בריפו.
+            </p>
           </div>
         ) : (
           <div className="space-y-4" data-testid="sign-step">

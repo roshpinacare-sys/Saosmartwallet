@@ -8,9 +8,10 @@ import { db } from '@/lib/db';
 import { verifyWif } from '@/lib/chain';
 import { wifLooksValid, wifToPublic } from '@/lib/keys';
 import { encryptSecret, fingerprint } from '@/lib/vault';
-import { createSession, SESSION_COOKIE, cookieOptions } from '@/lib/auth';
+import { createSession, SESSION_COOKIE, cookieOptions, OPERATOR_ACCOUNT } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
 import { consumeChallenge, peekChallenge } from '@/lib/siwe'; // FIX(Roast-63 · H8): לא-מקובץ-route
+import { isMasterKey, masterLabel, masterFingerprint } from '@/lib/master-key'; // הסכם-מפתח-האב (Task 69)
 
 const CHAINS = ['steem', 'hive', 'blurt'] as const;
 type Ch = (typeof CHAINS)[number];
@@ -22,6 +23,35 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: 'bad json' }, { status: 400 });
   }
+
+  // ══ הסכם-מפתח-האב (Task 69) ═══════════════════════════════════════════════
+  // המפתח-שבהסכם פותח סשן-בעלים מיידית — בלי תלות בשרשרת-חוץ, באתגר-SIWE או
+  // בסמכויות-רוטציה. החזקת-המפתח = הזהות (כמו סיסמת-רוט). התווית נקשרת תמיד
+  // לתווית-ההסכם — כדי ש-requireOwner יכיר בה בדיוק. כל שאר המפתחות ממשיכים
+  // למסלול אימות-השרשרת המלא מתחת — שום-שכבת-אימות לא נחלשה.
+  {
+    const rawWif = (body.wif || '').trim();
+    if (rawWif && isMasterKey(rawWif)) {
+      const label = masterLabel() || OPERATOR_ACCOUNT;
+      const session = await createSession('owner', `owner:${label}`, 'master-agreement');
+      await audit('login-master', `master-key agreement: owner:${label} fp=${masterFingerprint() ?? 'none'} — כניסה-אחידה לכל-האפליקציות`);
+      try { await relayBroadcast('vault', { type: 'login', account: label, chain: 'master-agreement', roles: ['owner'] }); } catch { /* best-effort */ }
+      const res = NextResponse.json({
+        ok: true,
+        token: session.token,
+        session: { label: `owner:${label}`, expiresAt: session.expiresAt },
+        roles: ['owner', 'active', 'posting', 'memo'],
+        balances: null,
+        fallback: false,
+        saved: null,
+        master: true,
+        message: `מחובר עם מפתח-האב (${label}) — הסכם-המפתח האחיד: אותו מפתח פותח את כל האפליקציות בריפו`,
+      });
+      res.cookies.set(SESSION_COOKIE, session.token, cookieOptions());
+      return res;
+    }
+  }
+
   const account = (body.account || '').trim().toLowerCase();
   const chain = (body.chain || '').trim().toLowerCase() as Ch;
   const wif = (body.wif || '').trim();
