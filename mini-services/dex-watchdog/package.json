@@ -1,0 +1,10 @@
+{
+  "name": "dex-watchdog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SAOS-DEX guardian (roast-79) — probes the DEX daemon on 3010 and revives it via the canonical dex-daemon launcher when the sandbox reaps it (documented infra constraint: OOM kills ~60-90s after boot). No port of its own: pure supervisor loop.",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  }
+}
