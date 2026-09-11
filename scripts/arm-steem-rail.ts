@@ -34,50 +34,58 @@ function decryptSecret(cipherText: string): string {
   return Buffer.concat([d.update(Buffer.from(ctHex, "hex")), d.final()]).toString("utf8");
 }
 
-async function liveActiveKey(account: string): Promise<string> {
+async function liveKey(account: string, role: "active" | "posting"): Promise<string> {
   const r = await fetch("https://api.steemit.com", {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": UA },
     body: JSON.stringify({ jsonrpc: "2.0", method: "condenser_api.get_accounts", params: [[account]], id: 1 }),
     signal: AbortSignal.timeout(15_000),
   });
-  const j = (await r.json()) as { result?: { active?: { key_auths?: [string, number][] } }[] };
-  const pub = j.result?.[0]?.active?.key_auths?.[0]?.[0];
-  if (!pub) throw new Error("no live active key on steem for headcorner");
+  const j = (await r.json()) as { result?: Record<string, { key_auths?: [string, number][] }>[] };
+  const pub = j.result?.[0]?.[role]?.key_auths?.[0]?.[0];
+  if (!pub) throw new Error(`no live ${role} key on steem for ${account}`);
   return pub;
 }
 
 async function main(): Promise<void> {
   const db = new PrismaClient();
   try {
-    const rows = await db.vaultKey.findMany({
-      where: { chain: "steem", account: "headcorner-archive", role: "active" },
-      select: { account: true, cipher: true, pubKey: true },
-    });
-    if (rows.length !== 1) throw new Error(`expected exactly 1 steem headcorner-archive/active row — got ${rows.length}`);
-    const row = rows[0];
-    if (!row.cipher || !row.pubKey) throw new Error("cipher/pubKey missing");
-    const wif = decryptSecret(row.cipher);
-    if (!/^[5KL][1-9A-HJ-NP-Za-km-z]{50,52}$/.test(wif.trim())) throw new Error("decrypted WIF shape invalid (fail-closed)");
-    const pub = steemLib.auth.wifToPublic(wif.trim());
     const bodyOf = (p: string) => p.replace(/^STM/, "");
-    const matchesVault = bodyOf(pub) === bodyOf(row.pubKey);
-    const livePub = await liveActiveKey("headcorner");
-    const matchesChain = bodyOf(pub) === bodyOf(livePub);
-    console.log(`self-verify: vault=${matchesVault} chain=${matchesChain} pub=STM${bodyOf(pub).slice(0, 9)}...`);
-    if (!matchesVault || !matchesChain) throw new Error("cross-verify failed — refusing to arm (fail-closed)");
-
+    // roast-77: חימוש-כפול — active (עבור-ops-פיננסיים) **וגם** posting (עבור-חותמות-עיגון).
+    // האבחנה-החיה: ה-STEEM_POSTING_WIF-ב-.env היה-חומר-שגוי → כל-החותמות-נדחו-על-הצומת
+    // ("missing required posting authority") — הרכבת-העוגן-המרתקת-הייתה-חסומה.
+    const jobs: { role: "active" | "posting"; envKey: string }[] = [
+      { role: "active", envKey: "STEEM_ACTIVE_WIF" },
+      { role: "posting", envKey: "STEEM_POSTING_WIF" },
+    ];
     let content = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, "utf8") : "";
-    const line = `STEEM_ACTIVE_WIF=${wif.trim()}`;
-    if (/^STEEM_ACTIVE_WIF=/m.test(content)) {
-      content = content.replace(/^STEEM_ACTIVE_WIF=.*$/m, line);
-    } else {
-      content = content.replace(/\s*$/, "") + "\n" + line + "\n";
+    for (const job of jobs) {
+      const rows = await db.vaultKey.findMany({
+        where: { chain: "steem", account: "headcorner-archive", role: job.role },
+        select: { account: true, cipher: true, pubKey: true },
+      });
+      if (rows.length !== 1) throw new Error(`expected exactly 1 steem headcorner-archive/${job.role} row — got ${rows.length}`);
+      const row = rows[0];
+      if (!row.cipher || !row.pubKey) throw new Error("cipher/pubKey missing");
+      const wif = decryptSecret(row.cipher);
+      if (!/^[5KL][1-9A-HJ-NP-Za-km-z]{50,52}$/.test(wif.trim())) throw new Error("decrypted WIF shape invalid (fail-closed)");
+      const pub = steemLib.auth.wifToPublic(wif.trim());
+      const matchesVault = bodyOf(pub) === bodyOf(row.pubKey);
+      const livePub = await liveKey("headcorner", job.role);
+      const matchesChain = bodyOf(pub) === bodyOf(livePub);
+      console.log(`self-verify[${job.role}]: vault=${matchesVault} chain=${matchesChain} pub=STM${bodyOf(pub).slice(0, 9)}...`);
+      if (!matchesVault || !matchesChain) throw new Error(`cross-verify failed for ${job.role} — refusing to arm (fail-closed)`);
+      const line = `${job.envKey}=${wif.trim()}`;
+      if (new RegExp(`^${job.envKey}=`).test(content)) {
+        content = content.replace(new RegExp(`^${job.envKey}=.*$`, "m"), line);
+      } else {
+        content = content.replace(/\s*$/, "") + "\n" + line + "\n";
+      }
+      console.log(`armed: ${job.envKey} written to ${path.basename(ENV_PATH)} (0600, value never printed)`);
     }
     fs.writeFileSync(ENV_PATH, content, { mode: 0o600 });
     fs.chmodSync(ENV_PATH, 0o600);
-    console.log(`armed: STEEM_ACTIVE_WIF written to ${path.basename(ENV_PATH)} (0600, value never printed)`);
-    console.log("next: restart daemon (next dev -p 3010) to load the new env, then plan-rail network=steem");
+    console.log("next: restart daemon (next dev -p 3010) to load the new env, then the seal path picks posting-ראשון");
   } finally {
     await db.$disconnect();
   }
