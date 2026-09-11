@@ -60,6 +60,7 @@ export interface CheckerVerdict {
   checks: { criterion: string; pass: boolean; evidence: string }[];
   gaps: string;
   notes: string;
+  rescues?: number; // r30: how many free protocol re-asks the checker needed
 }
 
 const MAX_BUDGET = 8;
@@ -281,7 +282,17 @@ export async function bumpModuleStats(modId: string, kind: "call" | "cache" | "f
   } catch { /* telemetry must never break the loop */ }
 }
 
-/** The independent checker — generator/evaluator separation made code. */
+/** The independent checker — generator/evaluator separation made code.
+ *
+ * r30 — the checker gets the same free protocol-rescue the maker always had
+ * (FREE_RESQUE_LIMIT = 2). Live-caught (r30): three runs whose maker steps
+ * were ALL proven (e.g. the 05:40 scout — 4/4 ok) were graded blocked because
+ * the checker brain's SINGLE reply was protocol garbage — extractJson threw,
+ * verdict stayed null, and the repair round never even ran. One flaky reply
+ * voided real, evidenced work. The rescue costs zero budget (temperature 0,
+ * strict re-ask) and never fabricates a pass — if every attempt is garbage
+ * the original honest throw stands. */
+const CHECKER_RESCUE_LIMIT = 2;
 async function runChecker(opts: {
   checkerSpec: string;
   goal: string;
@@ -294,7 +305,27 @@ async function runChecker(opts: {
     { role: "user", content: `EVIDENCE TRACE:\n${transcript.slice(0, 12000)}\n\nGrade the pass-gate now.` },
   ];
   const reply = await brainChat(parseBrain(opts.checkerSpec), messages, { maxTokens: 900, temperature: 0 });
-  const v = extractJson<CheckerVerdict>(reply.content);
+  let v: CheckerVerdict | null = null;
+  let rescues = 0;
+  try {
+    v = extractJson<CheckerVerdict>(reply.content);
+  } catch (firstErr) {
+    let lastErr: unknown = firstErr;
+    for (; rescues < CHECKER_RESCUE_LIMIT; rescues++) {
+      const reply2 = await brainChat(
+        parseBrain(opts.checkerSpec),
+        [...messages, { role: "user", content: "Your previous reply was NOT valid protocol JSON. Reply AGAIN — ONLY the compact JSON verdict object, nothing else." }],
+        { maxTokens: 900, temperature: 0 },
+      );
+      try {
+        v = extractJson<CheckerVerdict>(reply2.content);
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!v) throw lastErr; // every attempt was garbage — the honest throw stands
+  }
   const checks = Array.isArray(v.checks) ? v.checks.slice(0, 12) : [];
   // Pass-gate is CONJUNCTIVE — enforced in code, not left to the model's mood:
   // one failed criterion ⇒ done=false, even if the checker's own "done" says true.
@@ -304,6 +335,7 @@ async function runChecker(opts: {
     checks,
     gaps: String(v.gaps || ""),
     notes: String(v.notes || ""),
+    ...(rescues ? { rescues } : {}),
   };
 }
 
@@ -605,6 +637,7 @@ export async function processRun(runId: string, opts: { claimed?: boolean; worke
     if (verdict && !verdict.done && verdict.gaps) lines.push(`⚠️ פערים: ${verdict.gaps.slice(0, 300)}`);
     if (repairRan) lines.push(`🔧 סבב-תיקון רץ אחרי הפסיקה הראשונה — הפערים הוחזרו למייצר ונבדקו שוב`);
     if (freeRescues) lines.push(`🛟 ${freeRescues} חילוצי-פרוטוקול בחינם — התקציב לא נשרף`);
+    if (verdict?.rescues) lines.push(`⚖️🛟 הבודק חולץ ${verdict.rescues}× מפרוטוקול-גרביים בחינם — פסיקה אמיתית במקום "הבודק לא ענה" (r30)`);
     lines.push(`🧾 עקבות: ${makerSteps} צעדי-מייצר (תקציב ${run.budget}) · ⏱ ${durS}s${usageKnown ? ` · טוקנים: ${tokPrompt}→${tokCompletion}` : ""} · ביקורת מלאה ביומן`);
 
     const report = lines.join("\n");

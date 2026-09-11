@@ -28,6 +28,7 @@ import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetC
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
 import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
+import { fundingCensus, FUNDING_ADDRESS } from "@/lib/gate/funding-watch";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
 
@@ -182,6 +183,19 @@ export const MODULES: HarnessModule[] = [
         return { address, count: tokens.length, tokens };
       }
       return await solanaEyes();
+    },
+  },
+  {
+    id: "chain.funding",
+    name: "צופה-המימון",
+    kind: "connector",
+    desc: "עיניים על כתובת-המימון של מישור-הפלטפורמה (מספר-האוצר v65 על הדלת שלנו) — המקום שבו הפקדת-גז פותחת 7 דלתות-פריסה EVM. צנזורה-חיה read-only על 8 רשתות דרך צמתים-ציבוריים: יתרה לכל רשת, ריק/ממומן, כשל-פר-רשת כן. הכתובת אינה שלנו ואין שום נתיב-כתיבה — הרגע שבו כסף נוחת, המערכת רואה אותו. קריאה-בלבד.",
+    args: `{"address":"0x… (optional override — default: כתובת-המימון המפורסמת)"}`,
+    needsVault: false,
+    cacheable: true,
+    cacheKeyOf: (args) => `funding:${String(args.address || FUNDING_ADDRESS).toLowerCase()}`,
+    async exec(args) {
+      return await fundingCensus(String(args.address || "").trim() || undefined);
     },
   },
   {
