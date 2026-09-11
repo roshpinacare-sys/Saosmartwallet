@@ -186,6 +186,12 @@ const KNOWN_PRECISIONS: Record<string, number> = {
   VESTS: 6,
   TESTS: 3,
   TST: 6,
+  // r21 CONVERSION PLANE — the graphene-family fork assets share the same
+  // 3-decimal asset layout; the symbol field is 7 ASCII bytes so all fit.
+  HIVE: 3,
+  HBD: 3,
+  BLURT: 3,
+  BBD: 3,
 };
 
 /**

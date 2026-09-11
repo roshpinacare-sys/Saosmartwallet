@@ -1660,3 +1660,28 @@ Stage Summary:
 - הגילוי ההנדסי נרשם במקורות: forks מנומרים אחרת — כל-op חייב אורקל-משלו לפני שימוש (blurt custom_json=12 node-proven).
 - steemauto: סגור בהכרעת-המפעיל — מוסדית, בכנות, ובלי למחוק היסטוריה.
 - קבצים: src/lib/gate/anchor.ts · packages/chains/steem/src/{operations,transaction,adapter}.ts · src/lib/social/rails-server.ts · src/lib/gate/harness/{modules,heart}.ts · src/app/api/gate/inventory/route.ts · src/app/page.tsx · tools/{r20-seal,r20-confirm,r20-steemauto,r20-arm,r20-live-proof,r20-probe}.ts · docs/{autonomy-meaning,sovereign-roadmap}.md · worklog.md · db/custom.db.
+
+---
+Task ID: 37
+Agent: Z.ai Code (main)
+Task: r21 — "תמשיך: אני מנסה לגרום לדקס לפתח את היכולת להמיר מה שצריך — יש לי קצת כסף במערכת, והשרת נפל. תמשיך ותדחוף"
+
+Work Log:
+- השרת-הנפול הוקם (אישור 200); קריסות-500 על status/session אובחנו — מודול-גרף פגום במטמון אחרי שינוי-נתיב חולף; ניקוי .next + הקמה-מחדש → 200/200.
+- **מישור-ההמרות (CONVERSION PLANE) — הדרך-החדשה**: עד-היום הדקס-הריבוני היה חשבון-אחד (headcorner) על מסילה-אחת (steem). הכסף חי על 12 חשבונות ושלוש-שרשרות — המישור הוכפל בשני-הצירים: rail (steem+hive) × account (כל חשבון עם מפתח-active מאומת בכספת) × שלוש-פקודות (לימיט-קנייה/מכירה, ביטול, **המרת-מדין convert**).
+- **convert נארז מחדש לפי השרשרת-עצמה**: ה-layout שהנחנו (owner‖amount‖requestid) הופרך חי — שחזור עסקת-convert אמתית מבלוק 15023057 (kadoka, 0.138 SBD, tx 5d565d59…) הוכיח **owner‖requestid‖amount** (requestid לפני-הכמות — הפוך מסדר-ה-JSON). תוקן בפאקר + אומת 4/4 מול הסריאליזר-של-הצמתים-עצמם (tools/r21-oracle.ts): steem-convert ✓ · steem-limit (רגרסיה) ✓ · hive-convert ✓ · hive-limit ✓.
+- **גילוי-חוט: סמלי-ה-wire של hive הם השמות-הפנימיים**: בלוק 92644300 (העברת 200.000 "HIVE") נושא על-החוט סמל **"STEEM"**; "5.000 HBD" חוזר מהצומת כסמל **"SBD"** (steemit.com דוחה "HBD" באסרט). CONVERSION_RAILS הופרדו: wire (STEEM/SBD — מה שנחתם) מול display (HIVE/HBD — מה שמוצג). הסריאליזציה-המקומית חייבת בייטים-פנימיים אחרת-הדיגסט סוטה והשרשרת עונה "missing active authority".
+- **אמת-הכיס (treasury.ts + GET /api/gate/treasury)**: תמונת-מצב חיה של כל-הכסף-במערכת על שלוש-המסילות — נגזרת-מהכספת (אף-רשימה-קשיחה), כל-מסילה נכשלת בכנות-בנפרד, מטמון 30s. המדידה: **STEEM 3.982 STEEM · 0.041 SBD** (headcorner 3.381 · tov 0.449 · ynet 0.060+0.041) · **HIVE 0.049 HIVE · 0.001 HBD** (רעב-RC הכלכלי של r19 נמדד-שוב) · **BLURT 33.935 BLURT** (headcorner 31.064).
+- **פורנזיה-של-שמות**: שורות "headcorner-legacy"/"tron-legacy" (חומר-היסטורי שקדם ל-ROT1, עם הערת-כנות עצמאית מ-r17) עוד-נשאו status=verified — דלפו לרשימות-החתימה והכספת כ"חשבונות" שאינם-קיימים-בשרשרת. 5 שורות הוגדרו מחדש rotated-out לפי-ההיגיין-של-r17 (נשמרים-אטומים); "unknown" סונן; הרשימות-מדברות-אמת: **steem 12 חתימים (כולל ynet — מפתחותיו-החיים-אכן-בכספת) · hive 2 (headcorner, tov)**.
+- **הנדסה**: signing-key.ts (גבול-החתימה היחיד — quirk-33-הבייטים יוצא מ-orders.ts, משותף-ל-SOVEREIGN-VOICE-ולמישור); dex-rail.ts (מסילות/סמלים/רשימות/מפתחות/שומר-RC-חי-ל-hive — רף 10M לפי מדידות-r19); buildConvertTx (steem-order.ts — רכישת-ה-reference-block מהצומת-של-המסילה-היעד, chainId-מידעי-נכון-למסילה); approveOrder חותם עם מפתח-החשבון-של-הפקודה-עצמו על-המסילה-שלה; adapter קיבל assetSymbols (ברירת-מחדל STEEM/SBD) + ולידציית-convert + FUNDS_OPS.
+- **תעסוקה**: מודול חדש fleet.treasury (סוכנים רואים-את-הכיס-האמתי לפני-שהם מציעים-המרה); steem.order.build חומש למישור-המלא (rail/account/op=convert ב-desc+args); הכרטיס "אמת-הכיס" חי-על-הדף (שלוש-מסילות, שורות-חשבון-עם-יתרה, כשל-כן לכל-מסילה) + שורות-התור מציגות rail-chip ו-account.
+- blurt מוצא-כנות מחוץ-למישור (ספר-BBD מעולם לא נמדד חי — שוק-ללא-הוכחת-חיים אינו נתיב-המרה) — מתועד-בקוד, במודול ובדף.
+- **דפדפן (agent-browser)**: כרטיס-אמת-הכיס מרנדר חי (12/2/12 חשבונות לאחר-הסינון, סכומים תואמים-למדידה); כרטיס-יד-ריבונית מציג-את-ההעתק-החדש; מובייל 390px — אפס-גלילה-אופקית (sw=390=cw); פוטר-טבעי (844=844); אפס-שגיאות-קונסולה.
+- היגיינה: סשן-ההוכחה נשלל בתום (lock 200 → treasury 400 fail-closed אחריו); אפס-שידורים — הכספת חתמה-כלום, אין-פקודה-מלאכותית בתור (אין-מה-להמיר-היום: אין-SBD/HBD עודף והצורך-האמתי של-hive הוא הזרמת-HP — החלטת-מפעיל).
+- tsc 0 · lint 0 · אפס-ליטרלי-מפתח ב-git.
+
+Stage Summary:
+- הדקס קיבל את-היכולת שהמפעיל ביקש: **כל-חשבון-צי × שתי-מסילות (steem/hive) × שלוש-פקודות (לימיט/ביטול/המרת-מדין)** — בנייה-חופשית-ממפתחות, חתימה-רק-בהכרעת-מפעיל עם מפתח-החשבון-עצמו מהכספת, והשרשרת-כשופט.
+- הכסף-במערכת נמדד-ומוצג-חי: אמת-הכיס על-הדף (3.982 STEEM · 0.041 SBD · 0.049 HIVE · 0.001 HBD · 33.935 BLURT) — הפעם-הראשונה שהרשת-רואה-את-כל-הכיס-שלה-במקום-אחד.
+- שני-גילויי-חוט-חדשים נרשמו-במקורות: סדר-שדות-convert (requestid-לפני-amount — מהשרשרת-עצמה) וסמלי-wire-פנימיים-על-hive (STEEM/SBD) — שניהם node-proven, מונעים-דיגסט-סוטה.
+- קבצים: packages/chains/steem/src/{operations,adapter,serializer}.ts · src/lib/{steem-order,steem-engine}.ts · src/lib/social/rails-server.ts · src/lib/gate/{dex-rail,signing-key,treasury}.ts · src/lib/gate/harness/{orders,modules}.ts · src/app/api/gate/treasury/route.ts · src/app/page.tsx · tools/r21-*.ts · worklog.md · db/custom.db.

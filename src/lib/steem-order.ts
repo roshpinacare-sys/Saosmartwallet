@@ -28,11 +28,13 @@ import {
   serializeTransaction,
   transactionDigest,
   transactionId,
+  type ConvertOperation,
   type LimitOrderCancelOperation,
   type LimitOrderCreateOperation,
   type SteemTransaction,
 } from "@/lib/steem-engine";
 import type { UnsignedTx } from "../../packages/chains/chain-adapter";
+import type { SteemAdapter } from "../../packages/chains/steem/src/adapter";
 import { steemAdapter } from "./steem-server";
 
 const PRICE_SCALE = 1_000_000n; // 6 decimals of price resolution (SBD per STEEM)
@@ -56,6 +58,23 @@ export interface SteemOrderSpec {
   orderid?: number;
   /** Caller-fixed order expiration, epoch seconds (deterministic rebuild). */
   orderExpiration?: number;
+  /**
+   * r21 CONVERSION PLANE — the rail's market pair. Default STEEM/SBD;
+   * the hive plane passes { liquid: "HIVE", debt: "HBD" }. Fail-closed
+   * validation lives in the adapter (its assetSymbols opt).
+   */
+  assets?: { liquid: string; debt: string };
+  /**
+   * r21 — rail-specific adapter for ref-block stamping (the build path hits
+   * the node of the TARGET rail, not always steem). Default: steemAdapter().
+   */
+  adapterOverride?: SteemAdapter;
+  /**
+   * r21 — the rail's signing domain for the informational digest/txId fields
+   * (steem = 32 zero bytes; hive = beeab0de…). Default: STEEM_CHAIN_ID. The
+   * authoritative digest at signing time is always recomputed by the adapter.
+   */
+  chainId?: Uint8Array;
 }
 
 export interface SteemOrderBuild {
@@ -154,14 +173,15 @@ export async function buildSteemOrderTx(spec: SteemOrderSpec): Promise<SteemOrde
   const fillOrKill = spec.fillOrKill === true;
 
   // Asset objects for exact integer math + wire body (BigInt, never floats).
+  const assets = spec.assets ?? { liquid: "STEEM", debt: "SBD" };
   const sellAsset: OrderAsset =
     side === "buy"
-      ? { amount: sellSbdSat, precision: 3, symbol: "SBD" }
-      : { amount: amountSteemSat, precision: 3, symbol: "STEEM" };
+      ? { amount: sellSbdSat, precision: 3, symbol: assets.debt }
+      : { amount: amountSteemSat, precision: 3, symbol: assets.liquid };
   const receiveAsset: OrderAsset =
     side === "buy"
-      ? { amount: amountSteemSat, precision: 3, symbol: "STEEM" }
-      : { amount: sellSbdSat, precision: 3, symbol: "SBD" };
+      ? { amount: amountSteemSat, precision: 3, symbol: assets.liquid }
+      : { amount: sellSbdSat, precision: 3, symbol: assets.debt };
 
   // The adapter contract carries assets as strings across the API boundary.
   const payload = {
@@ -173,12 +193,13 @@ export async function buildSteemOrderTx(spec: SteemOrderSpec): Promise<SteemOrde
     expiration: orderExpiration,
   };
 
-  const adapter = steemAdapter();
+  const adapter = spec.adapterOverride ?? steemAdapter();
   const unsigned = await adapter.buildOperations([
     { type: "limit_order_create", payload: payload as unknown as Record<string, unknown> },
   ]);
 
   const meta = unsigned.metadata as { refBlockNum: number; refBlockPrefix: number; expiration: number };
+  const chainIdBytes = spec.chainId ?? STEEM_CHAIN_ID;
   const steemTx: SteemTransaction = {
     refBlockNum: meta.refBlockNum,
     refBlockPrefix: meta.refBlockPrefix,
@@ -191,7 +212,7 @@ export async function buildSteemOrderTx(spec: SteemOrderSpec): Promise<SteemOrde
     ],
   };
   const serializedHex = Buffer.from(serializeTransaction(steemTx)).toString("hex");
-  const digestHex = Buffer.from(transactionDigest(steemTx, STEEM_CHAIN_ID)).toString("hex");
+  const digestHex = Buffer.from(transactionDigest(steemTx, chainIdBytes)).toString("hex");
   const txId = transactionId(steemTx);
 
   const effectivePriceSat = (sellSbdSat * PRICE_SCALE) / amountSteemSat; // in 1e6 scale
@@ -217,6 +238,10 @@ export interface SteemCancelSpec {
   account: string;
   /** The uint32 orderid from the original limit_order_create. */
   orderid: number;
+  /** r21 — rail-specific adapter for ref-block stamping (hive plane). Default: steemAdapter(). */
+  adapterOverride?: SteemAdapter;
+  /** r21 — the rail's signing domain for the informational digest. Default: STEEM_CHAIN_ID. */
+  chainId?: Uint8Array;
 }
 
 export interface SteemCancelBuild {
@@ -249,7 +274,7 @@ export async function buildSteemCancelTx(spec: SteemCancelSpec): Promise<SteemCa
   }
   const payload = { owner: account, orderid: spec.orderid };
 
-  const adapter = steemAdapter();
+  const adapter = spec.adapterOverride ?? steemAdapter();
   const unsigned = await adapter.buildOperations([
     { type: "limit_order_cancel", payload: payload as unknown as Record<string, unknown> },
   ]);
@@ -267,11 +292,109 @@ export async function buildSteemCancelTx(spec: SteemCancelSpec): Promise<SteemCa
     ],
   };
   const serializedHex = Buffer.from(serializeTransaction(steemTx)).toString("hex");
-  const digestHex = Buffer.from(transactionDigest(steemTx, STEEM_CHAIN_ID)).toString("hex");
+  const digestHex = Buffer.from(transactionDigest(steemTx, spec.chainId ?? STEEM_CHAIN_ID)).toString("hex");
   const txId = transactionId(steemTx);
 
   return {
     payload,
+    unsigned,
+    serializedHex,
+    digestHex,
+    txId,
+    byteLength: serializedHex.length / 2,
+    steemTx,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// convert — the median-price debt→liquid conversion (r21 CONVERSION PLANE)
+// ---------------------------------------------------------------------------
+
+export interface ConvertSpec {
+  account: string;
+  /** Debt-asset (SBD/HBD) decimal string, up to 3 decimals (e.g. "10.000"). */
+  amount: string;
+  /** Caller-chosen uint32 conversion id — fixed at BUILD for the rebuild contract. */
+  requestid?: number;
+  /** The rail's asset pair. Default STEEM/SBD; hive passes { liquid: "HIVE", debt: "HBD" }. */
+  assets?: { liquid: string; debt: string };
+  /** Rail-specific adapter for ref-block stamping. Default: steemAdapter(). */
+  adapterOverride?: SteemAdapter;
+  /** Rail signing domain for the informational digest. Default: STEEM_CHAIN_ID. */
+  chainId?: Uint8Array;
+}
+
+export interface ConvertBuild {
+  payload: { owner: string; amount: string; requestid: number };
+  requestid: number;
+  /** The burned debt-asset amount, integer satoshis (3dp). */
+  amountSat: bigint;
+  debtSymbol: string;
+  unsigned: UnsignedTx;
+  serializedHex: string;
+  digestHex: string;
+  txId: string;
+  byteLength: number;
+  /** Wire-exact transaction (asset body) behind serializedHex/digestHex. */
+  steemTx: SteemTransaction;
+}
+
+/**
+ * Builds one `convert` op end-to-end: payload → adapter-stamped unsigned tx →
+ * serialized hex → digest → txId. The requestid is used EXACTLY when provided
+ * (the signing rebuild converts exactly what was reviewed); otherwise derived
+ * timestamp-style. Ref-block fields + the 60s tx expiration are stamped FRESH
+ * by adapter.buildOperations on every call.
+ *
+ * No keys exist on this path — unsigned preview only; broadcast happens in
+ * the sovereign-hand pipeline after the operator's explicit decision.
+ */
+export async function buildConvertTx(spec: ConvertSpec): Promise<ConvertBuild> {
+  const account = spec.account.trim().toLowerCase();
+  if (!account) throw new SerializationError("account is required");
+  const assets = spec.assets ?? { liquid: "STEEM", debt: "SBD" };
+  const amountSat = parseDecimalToUnits(spec.amount, 3); // debt assets are 3dp across the family
+  let requestid: number;
+  if (spec.requestid !== undefined) {
+    if (!Number.isInteger(spec.requestid) || spec.requestid < 0 || spec.requestid > 0xffffffff) {
+      throw new SerializationError("requestid must be an integer in [0, 4294967295]");
+    }
+    requestid = spec.requestid;
+  } else {
+    // unsigned uint32 — bitwise & yields a SIGNED int32 (see buildSteemOrderTx note)
+    requestid = Date.now() % 0x100000000;
+  }
+
+  const amountAsset = { amount: amountSat, precision: 3 as const, symbol: assets.debt };
+  const payload = { owner: account, amount: formatAsset(amountAsset), requestid };
+
+  const adapter = spec.adapterOverride ?? steemAdapter();
+  const unsigned = await adapter.buildOperations([
+    { type: "convert", payload: payload as unknown as Record<string, unknown> },
+  ]);
+
+  const meta = unsigned.metadata as { refBlockNum: number; refBlockPrefix: number; expiration: number };
+  const chainIdBytes = spec.chainId ?? STEEM_CHAIN_ID;
+  const steemTx: SteemTransaction = {
+    refBlockNum: meta.refBlockNum,
+    refBlockPrefix: meta.refBlockPrefix,
+    expiration: meta.expiration,
+    operations: [
+      {
+        name: "convert",
+        body: { ...payload, amount: amountAsset } as unknown as ConvertOperation,
+      },
+    ],
+  };
+  const serializedHex = Buffer.from(serializeTransaction(steemTx)).toString("hex");
+  const digestHex = Buffer.from(transactionDigest(steemTx, chainIdBytes)).toString("hex");
+  const txId = transactionId(steemTx);
+
+  return {
+    payload,
+    requestid,
+    amountSat,
+    debtSymbol: assets.debt,
     unsigned,
     serializedHex,
     digestHex,

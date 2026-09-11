@@ -146,6 +146,28 @@ export interface LimitOrderCreateOperation {
 }
 
 /**
+ * `convert` — the median-price debt→liquid conversion (r21 CONVERSION PLANE).
+ * Burns `amount` (the rail's debt asset: SBD/HBD) and credits the liquid asset
+ * (STEEM/HIVE) at the median feed price AFTER the 3.5-day delay — the chain's
+ * own no-order-book conversion path. Independent of the internal market's
+ * depth: it is THE fallback when the book is thin. `requestid` is a caller-
+ * chosen uint32 (uniqueness per account; cancelable only by expiry).
+ * Wire layout (fc::raw): owner (string) · requestid (u32 LE) · amount (asset)
+ * — **CHAIN-PROVEN 2026-09-10** by rebuilding real block-15023057 tx
+ * 5d565d59… (kadoka, 0.138 SBD) byte-for-byte AND by all-node echo
+ * (get_transaction_hex): the struct order is requestid-BEFORE-amount, the
+ * opposite of the JSON key order seen in account history. Hive nodes echo
+ * the identical layout. Oracle-discipline: same as account_update (r16).
+ */
+export interface ConvertOperation {
+  owner: string;
+  /** The rail's debt asset ("10.000 SBD" / "10.000 HBD"), 3dp, positive. */
+  amount: Asset;
+  /** Caller-chosen uint32 conversion identifier (per-account uniqueness). */
+  requestid: number;
+}
+
+/**
  * Claim pending rewards (SOVEREIGN-TREASURY). Pending author/curation rewards
  * accrue into reward_steem/reward_sbd/reward_vests and stay INVISIBLE to
  * spendable balances until a claim_reward_balance op moves them into
@@ -163,6 +185,7 @@ export interface ClaimRewardBalanceOperation {
 export type SteemOperationBody =
   | TransferOperation
   | LimitOrderCreateOperation
+  | ConvertOperation
   | LimitOrderCancelOperation
   | VoteOperation
   | CommentOperation
@@ -173,6 +196,7 @@ export type SteemOperationName =
   | "transfer"
   | "limit_order_create"
   | "limit_order_cancel"
+  | "convert"
   | "vote"
   | "comment"
   | "custom_json"
@@ -346,6 +370,14 @@ export function packOperation(w: ByteWriter, name: SteemOperationName, body: Ste
       w.varint(opIds.limit_order_cancel);
       w.string(c.owner);
       w.u32(c.orderid); // uint32 LE — oracle-verified 2026-09-08 (see type doc)
+      return;
+    }
+    case "convert": {
+      const c = body as ConvertOperation;
+      w.varint(opIds.convert);
+      w.string(c.owner);
+      w.u32(c.requestid); // uint32 LE — caller-chosen, per-account uniqueness
+      packAsset(w, c.amount);
       return;
     }
     case "vote": {

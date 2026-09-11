@@ -320,6 +320,10 @@ function blurtAdapterOpts() {
     // made the node digest a different tx than we signed → the chain refused
     // every broadcast with "Missing Posting Authority".
     opIds: BLURT_OP_IDS,
+    // r21 CONVERSION PLANE — this instance's internal-market pair (read paths
+    // only for blurt today: the BBD book is not live-proven, so the conversion
+    // plane keeps blurt honest-excluded until the market itself is measured).
+    assetSymbols: { liquid: "BLURT", debt: "BBD" },
     requestTimeoutMs: 15_000,
   } as const;
 }
@@ -353,6 +357,12 @@ function hiveAdapterOpts() {
     rpcUrls: RAIL_ENDPOINTS.hive.slice(1), // roast r3: hive write/read path failover, same lesson as steem
     chainId: HIVE_CHAIN_ID,
     addressPrefix: "STM", // hive nodes keep the legacy STM key prefix
+    // r21 CONVERSION PLANE — hive's internal market trades the same legacy ops
+    // (limit_order_create=5/convert=8) with the INTERNAL wire symbols
+    // STEEM/SBD (node-proven: block 92644300 "HIVE" carries wire symbol
+    // "STEEM"; "HBD" echoes as "SBD"). The wire pair is enforced fail-closed
+    // by the adapter's asset validation; display names live in dex-rail.ts.
+    assetSymbols: { liquid: "STEEM", debt: "SBD" },
     requestTimeoutMs: 15_000,
   } as const;
 }

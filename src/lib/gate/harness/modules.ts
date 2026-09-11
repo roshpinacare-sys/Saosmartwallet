@@ -21,6 +21,7 @@ import { saosHubCached } from "@/lib/saos-hub";
 import { verifyIdentityAnchor } from "@/lib/anchor-verify";
 import { ecoNetworks } from "@/lib/eco-server";
 import { createOrderFromAgent } from "./orders";
+import { getTreasurySnapshot } from "@/lib/gate/treasury";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
 import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
@@ -440,8 +441,8 @@ export const MODULES: HarnessModule[] = [
     id: "steem.order.build",
     name: "יד-ריבונית: בניית פקודה",
     kind: "actor",
-    desc: "הכנת פקודת-DEX אמיתית לשוק STEEM/SBD בשם המפקד headcorner. בנייה אינה נוגעת במפתחות ואינה מזיזה כסף: הפקודה נכנסת לתור-החתימה, והכספת חותמת עם המפתח-הפעיל רק לאחר אישור-מפעיל מפורש. תקרות: פקודה ממתינה אחת לסוכן, 100 STEEM לפקודה, 6 חתימות/יום לצי. חובה: בנה מול מחיר-שוק אמיתי (market.watch) — פקודה מרוחקת מהספר תידחה על-ידי המפעיל.",
-    args: `{"op":"create|cancel (default create)","side":"buy|sell","amount":"0.100","price":"0.098","ttlSeconds":3600,"cancelOrderid":123}`,
+    desc: 'הכנת פקודת-המרה אמיתית במישור-ההמרות (r21): לימיט-קנייה/מכירה על ספר-הפנימי (STEEM/SBD או HIVE/HBD) או המרת-מדין (convert — מחיר-חוז של השרשרת, 3.5 ימים, בלי תלות בעומק-הספר). כל חשבון-צי שהכספת מחזיקה עבורו מפתח-active מאומת — לא רק המפקד (params.account). בנייה אינה נוגעת במפתחות ואינה מזיזה כסף: הפקודה נכנסת לתור-החתימה, והכספת חותמת עם המפתח-הפעיל של חשבון-הפקודה עצמו רק לאחר אישור-מפעיל מפורש. תקרות: פקודה ממתינה אחת לסוכן, 100 לפקודה, 6 חתימות/יום לצי. חובה: בנה מול מחיר-שוק אמיתי (market.watch) — פקודה מרוחקת מהספר תידחה על-ידי המפעיל. blurt מוצא כנות מחוץ למישור (ספר-BBD לא נמדד).',
+    args: '{"op":"create|cancel|convert (default create)","side":"buy|sell (create only)","amount":"10.000 (liquid leg on create; DEBT leg SBD/HBD on convert)","price":"0.098 (create only)","rail":"steem|hive (default steem)","account":"fleet account with verified vault active key (default headcorner)","ttlSeconds":3600,"cancelOrderid":123}',
     needsVault: false,
     cacheable: false, // a real submission — every build is a unique pending order
     async exec(args, ctx) {
@@ -454,8 +455,30 @@ export const MODULES: HarnessModule[] = [
         price: typeof args.price === "string" ? args.price : undefined,
         ttlSeconds: Number(args.ttlSeconds) || undefined,
         cancelOrderid: Number(args.cancelOrderid) || undefined,
+        rail: typeof args.rail === "string" ? args.rail : undefined,
+        account: typeof args.account === "string" ? args.account : undefined,
       });
-      return { ...p, meaning: "הפקודה ממתינה בתור — המפעיל רואה אותה בכרטיס לב-האוטונומיה; באישורו הכספת תחתום והשרשרת תענה ב-txId אמיתי" };
+      return { ...p, meaning: "הפקודה ממתינה בתור — המפעיל רואה אותה בכרטיס יד-ריבונית; באישורו הכספת תחתום עם מפתח-החשבון עצמו והשרשרת תענה ב-txId אמיתי" };
+    },
+  },
+  {
+    id: "fleet.treasury",
+    name: "אמת-הכיס של הצי",
+    kind: "skill",
+    desc: 'מדידת-כיס חיה (r21): היתרות האמתיות של כל חשבונות-הצי על שלוש-המסילות — נזיל (STEEM/HIVE/BLURT), חוב (SBD/HBD/BBD) וvesting — ישר מהשרשרות (condenser get_accounts). קרא לפני שאתה בונה פקודת-המרה: כך יודעים "מה צריך להמיר" במקום לנחש. כל-מסילה נכשלת בכנות בנפרד.',
+    args: "{}",
+    needsVault: false,
+    cacheable: true, // 30s in-process cache inside the snapshot itself
+    async exec() {
+      const snap = await getTreasurySnapshot(true);
+      const summary = snap.rails.map((r) => ({
+        rail: r.rail,
+        ok: r.ok,
+        accounts: r.accounts.length,
+        totals: r.ok ? `${r.totals.liquid} ${r.liquidSymbol} · ${r.totals.debt} ${r.debtSymbol}` : null,
+        error: r.error,
+      }));
+      return { measuredAt: snap.measuredAt, summary, rails: snap.rails, meaning: "אמת-הכיס נמדדה חי — בנה פקודות-המרה על מה שקיים בפועל, לא על הנחות" };
     },
   },
   {

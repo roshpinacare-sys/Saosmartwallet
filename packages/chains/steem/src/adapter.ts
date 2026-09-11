@@ -28,7 +28,7 @@ import {
 import { createHash } from "crypto";
 import { PrivateKey, STEEM_ROLES, type SteemRole, base58Decode } from "../../../crypto/src/index";
 import { SerializationError, parseAsset } from "./serializer";
-import type { AccountUpdateOperation, ClaimRewardBalanceOperation, CommentOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemAuthority, SteemOperationName, VoteOperation, OpIdTable } from "./operations";
+import type { AccountUpdateOperation, ClaimRewardBalanceOperation, CommentOperation, ConvertOperation, CustomJsonOperation, LimitOrderCancelOperation, LimitOrderCreateOperation, SteemAuthority, SteemOperationName, VoteOperation, OpIdTable } from "./operations";
 import { OP_IDS, graphenePubToRaw33 } from "./operations";
 import {
   STEEM_CHAIN_ID,
@@ -116,6 +116,13 @@ export interface SteemAdapterOptions {
   /** Explicit broadcast opt-in — never enabled implicitly. */
   allowBroadcast?: boolean;
   requestTimeoutMs?: number;
+  /**
+   * r21 CONVERSION PLANE — the internal-market symbols this instance trades.
+   * Default STEEM/SBD; hive/blurt instances pass their own pair (HIVE/HBD /
+   * BLURT/BBD). ValidateLimitOrderPayload + validateConvertPayload enforce it
+   * fail-closed — an order/convert in the wrong asset never reaches the wire.
+   */
+  assetSymbols?: { liquid: string; debt: string };
 }
 
 interface RpcAccountRaw {
@@ -146,6 +153,7 @@ export class SteemAdapter implements ChainAdapter {
   private readonly chainIdBytes: Uint8Array;
   private readonly addressPrefix: string;
   private readonly opIds: OpIdTable;
+  private readonly assetSymbols: { liquid: string; debt: string };
   private readonly timeoutMs: number;
 
   constructor(private readonly opts: SteemAdapterOptions) {
@@ -154,6 +162,7 @@ export class SteemAdapter implements ChainAdapter {
     this.chainId = Buffer.from(this.chainIdBytes).toString("hex");
     this.addressPrefix = opts.addressPrefix ?? "STM";
     this.opIds = opts.opIds ?? OP_IDS;
+    this.assetSymbols = opts.assetSymbols ?? { liquid: "STEEM", debt: "SBD" };
     this.broadcastAllowed = opts.allowBroadcast === true;
     this.timeoutMs = opts.requestTimeoutMs ?? 10_000;
     if (this.broadcastAllowed) {
@@ -269,11 +278,12 @@ export class SteemAdapter implements ChainAdapter {
   // -- ChainAdapter: write paths --------------------------------------------
 
   /** Ops that move/commit funds or mutate open orders — always require an ACTIVE (or owner) signature. A cancel refunds the caller, but it still mutates order state, so the chain demands active/owner authority and we mirror that. */
-  private static readonly FUNDS_OPS: ReadonlySet<string> = new Set(["transfer", "limit_order_create", "limit_order_cancel"]);
+  private static readonly FUNDS_OPS: ReadonlySet<string> = new Set(["transfer", "limit_order_create", "limit_order_cancel", "convert"]);
 
   /**
-   * Validates and stamps a limit_order_create payload (M1 DEX). Asset strings
-   * are parsed fail-closed; only STEEM/SBD are accepted for internal-market
+   * Validates and stamps a limit_order_create payload (M1 DEX, r21 multi-rail).
+   * Asset strings are parsed fail-closed; only this instance's asset pair
+   * (default STEEM/SBD; hive HIVE/HBD) is accepted for internal-market
    * orders, and the two sides must be opposite symbols.
    */
   private validateLimitOrderPayload(p: Record<string, unknown>): void {
@@ -289,9 +299,11 @@ export class SteemAdapter implements ChainAdapter {
     const receive = parseAsset(p.min_to_receive);
     if (sell.amount <= 0n) throw new SerializationError("amount_to_sell must be positive");
     if (receive.amount < 0n) throw new SerializationError("min_to_receive must be non-negative");
-    const bookSymbols = new Set(["STEEM", "SBD"]);
+    const bookSymbols = new Set([this.assetSymbols.liquid, this.assetSymbols.debt]);
     if (!bookSymbols.has(sell.symbol) || !bookSymbols.has(receive.symbol)) {
-      throw new SerializationError(`internal-market orders trade STEEM/SBD only (got ${sell.symbol}/${receive.symbol})`);
+      throw new SerializationError(
+        `internal-market orders trade ${this.assetSymbols.liquid}/${this.assetSymbols.debt} only (got ${sell.symbol}/${receive.symbol})`,
+      );
     }
     if (sell.symbol === receive.symbol) {
       throw new SerializationError("amount_to_sell and min_to_receive must be opposite symbols");
@@ -319,6 +331,27 @@ export class SteemAdapter implements ChainAdapter {
     validateAccountName(p.owner);
     if (!Number.isInteger(p.orderid) || (p.orderid as number) < 0 || (p.orderid as number) > 0xffffffff) {
       throw new SerializationError("limit_order_cancel orderid must be an integer in [0, 4294967295]");
+    }
+  }
+
+  /**
+   * Validates a convert payload (r21 CONVERSION PLANE). `amount` MUST be this
+   * instance's debt asset (SBD/HBD) at 3dp — the median-price conversion only
+   * burns debt assets; `requestid` is the caller-chosen uint32.
+   */
+  private validateConvertPayload(p: Record<string, unknown>): void {
+    if (typeof p.owner !== "string") throw new SerializationError("convert requires string owner");
+    validateAccountName(p.owner);
+    if (typeof p.amount !== "string") {
+      throw new SerializationError(`convert amount must be an asset string like "1.000 ${this.assetSymbols.debt}"`);
+    }
+    const a = parseAsset(p.amount);
+    if (a.amount <= 0n) throw new SerializationError("convert amount must be positive");
+    if (a.symbol !== this.assetSymbols.debt) {
+      throw new SerializationError(`convert burns the debt asset ${this.assetSymbols.debt} only (got ${a.symbol})`);
+    }
+    if (!Number.isInteger(p.requestid) || (p.requestid as number) < 0 || (p.requestid as number) > 0xffffffff) {
+      throw new SerializationError("convert requestid must be an integer in [0, 4294967295]");
     }
   }
 
@@ -500,6 +533,8 @@ export class SteemAdapter implements ChainAdapter {
         this.validateLimitOrderPayload(op.payload);
       } else if (op.type === "limit_order_cancel") {
         this.validateLimitOrderCancelPayload(op.payload);
+      } else if (op.type === "convert") {
+        this.validateConvertPayload(op.payload);
       } else if (op.type === "vote") {
         this.validateVotePayload(op.payload);
       } else if (op.type === "comment") {
@@ -512,7 +547,7 @@ export class SteemAdapter implements ChainAdapter {
         this.validateAccountUpdatePayload(op.payload);
       } else {
         throw new SerializationError(
-          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, vote, comment, custom_json, claim_reward_balance, account_update)`,
+          `operation "${op.type}" is not supported (transfer, limit_order_create, limit_order_cancel, convert, vote, comment, custom_json, claim_reward_balance, account_update)`,
         );
       }
     }
@@ -579,6 +614,12 @@ export class SteemAdapter implements ChainAdapter {
       const p = op.payload as { owner: string; orderid: number };
       const body: LimitOrderCancelOperation = { owner: p.owner, orderid: p.orderid };
       return { name: "limit_order_cancel", body };
+    }
+    if (op.type === "convert") {
+      this.validateConvertPayload(op.payload); // re-validate — payload is untrusted input
+      const p = op.payload as { owner: string; amount: string; requestid: number };
+      const body: ConvertOperation = { owner: p.owner, amount: parseAsset(p.amount), requestid: p.requestid };
+      return { name: "convert", body };
     }
     if (op.type === "vote") {
       this.validateVotePayload(op.payload); // re-validate — payload is untrusted input

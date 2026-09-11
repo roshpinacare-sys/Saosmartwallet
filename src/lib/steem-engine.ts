@@ -19,6 +19,7 @@ export {
   OP_IDS,
   type LimitOrderCreateOperation,
   type LimitOrderCancelOperation,
+  type ConvertOperation,
 } from "../../packages/chains/steem/src/operations";
 
 export { deserializeTransaction } from "../../packages/chains/steem/src/transaction";
