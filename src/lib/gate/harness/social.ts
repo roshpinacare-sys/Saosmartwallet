@@ -703,6 +703,7 @@ export interface FleetRewardRow {
 
 export interface FleetRewardsCensus {
   accounts: FleetRewardRow[];
+  census: string[]; // r29: compact verifiable one-liner per account — survives the result clamp
   notOnChain: string[]; // vault keys whose account does not exist on the chain — honest dead-weight report
   unclaimedCount: number;
   totalSteemEquiv: number;
@@ -745,9 +746,15 @@ export async function fleetRewardsCensus(): Promise<FleetRewardsCensus> {
   rows.sort((x, y) => y.steemEquiv - x.steemEquiv);
   const unclaimed = rows.filter((r) => num(r.rewardSteem) > 0 || num(r.rewardSbd) > 0 || num(r.rewardVests) > 0);
   const total = rows.reduce((acc, r) => acc + r.steemEquiv, 0);
+  // r29: compact verifiable census — the checker complained (live run 05:08)
+  // that the clamped census JSON made it impossible to verify "the full fleet
+  // was scanned". One short string per account fits under the clamp ceiling
+  // and IS the verifiable truth: account:equivalent:claimable?
+  const census = rows.map((r) => `${r.account}:${r.steemEquiv.toFixed(3)}${r.claimable ? "" : ":no-key"}`);
   const deadWeight = notOnChain.length > 0 ? ` · ⚠️ ${notOnChain.length} כניסות-כספת לחשבונות שאינם קיימים בשרשרת (${notOnChain.join(", ")}) — משקל-מת` : "";
   return {
     accounts: rows,
+    census,
     notOnChain,
     unclaimedCount: unclaimed.length,
     totalSteemEquiv: total,
@@ -764,6 +771,7 @@ export interface VoiceClaimResult {
   txId: string;
   blockNum?: number;
   verified: boolean; // live re-read AFTER broadcast: pending rewards are gone
+  meaning: string; // r29: teaches the maker — txId is the primary evidence; never re-claim in the same run
 }
 
 /** Vault posting key of ANY fleet account (steem) — never taken from agent input paths blindly. */
@@ -803,7 +811,15 @@ export async function claimRewardsFromAgent(input: {
   const rewardSbd = raw.reward_sbd_balance;
   const rewardVests = raw.reward_vesting_balance;
   if (num(rewardSteem) === 0 && num(rewardSbd) === 0 && num(rewardVests) === 0) {
-    throw new GateError("nothing-to-claim", `ל@${account} אין תגמולים ממתינים — אין מה לתבוע (זו תשובה כנה, לא כשל)`);
+    // r29: this honest answer rendered downstream as "ERROR: undefined" and the
+    // checker graded the run as broken — teach the maker what it means: if THIS
+    // run already claimed, the claim LANDED and the report with the txId is the
+    // finish line, not another claim attempt.
+    throw new GateError(
+      "nothing-to-claim",
+      `ל@${account} אין תגמולים ממתינים — אין מה לתבוע (זו תשובה כנה, לא כשל). ` +
+        `אם ביצעת claim לחשבון-זה בהרצה-זו — התביעה כבר נחתה: חפש את ה-txId בעקבות-הצעדים-שלך וסיים בדוח — אל תנסה לתבוע שוב.`,
+    );
   }
 
   const priv = await postingKeyFor(account);
@@ -824,16 +840,37 @@ export async function claimRewardsFromAgent(input: {
     const txId = res.txId || built.txId;
     await audit(`sovereign-voice:claim`, input.agentName, { account, rewardSteem, rewardSbd, rewardVests }, true, { txId, blockNum: res.blockNum ?? null });
 
-    // verification: the chain itself must now report zero pending
-    const [after] = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [[account]]);
-    const verified =
-      !!after && num(after.reward_steem_balance) === 0 && num(after.reward_sbd_balance) === 0 && num(after.reward_vesting_balance) === 0;
+    // verification: the chain itself must now report zero pending. r29: nodes
+    // lag behind the block that lands the claim — the live run at 05:08 got
+    // verified:false on the FIRST re-read (the claim was real, txId proven),
+    // the maker panicked and re-claimed three times, and the checker graded a
+    // successful harvest as a failure. Now: up to 3 re-reads with a short wait
+    // before honestly reporting verified:false.
+    let verified = false;
+    for (let readAttempt = 0; readAttempt < 3; readAttempt++) {
+      if (readAttempt > 0) await new Promise((r) => setTimeout(r, 1500));
+      const [after] = await steemRpc<RawAccount[]>("condenser_api.get_accounts", [[account]]);
+      verified =
+        !!after && num(after.reward_steem_balance) === 0 && num(after.reward_sbd_balance) === 0 && num(after.reward_vesting_balance) === 0;
+      if (verified) break;
+    }
     await socialMsg(
       `🪙 ${input.agentName} תבע את התגמולים של @${account}: ${rewardSteem} + ${rewardSbd} + ${rewardVests} · txId: ${txId}` +
-        (verified ? " · אומת חי: הממתינים התאפסו" : " · האימות החי עדיין מציג ממתינים (הצומת מתעדכן)"),
+        (verified ? " · אומת חי: הממתינים התאפסו" : " · האימות-החי עדיין מציג ממתינים (הצומת מתעדכן — ה-txId הוא הראיה)"),
       { account, txId, runId: input.runId },
     );
-    return { account, claimed: { steem: rewardSteem, sbd: rewardSbd, vests: rewardVests }, txId, blockNum: res.blockNum, verified };
+    return {
+      account,
+      claimed: { steem: rewardSteem, sbd: rewardSbd, vests: rewardVests },
+      txId,
+      blockNum: res.blockNum,
+      verified,
+      meaning:
+        `תביעה חיה בשרשרת: @${account} קיבל ${rewardSteem} + ${rewardSbd} + ${rewardVests} — txId ${txId}. ` +
+        (verified
+          ? "אומת חי: הממתינים התאפסו — התביעה הושלמה. אל תתבע שוב את אותו חשבון בהרצה-זו."
+          : "ה-txId הוא הראיה הראשית של ההצלחה (השידור נענה על-ידי השרשרת); האימות-החי עדיין מציג ממתינים כי הצומת מתעדכן — אל תתבע שוב (השרשרת תענה nothing-to-claim), השלם את הדוח עם ה-txId."),
+    };
   } catch (e) {
     const msg = (e instanceof Error ? e.message : String(e)).slice(0, 300);
     await audit(`sovereign-voice:claim`, input.agentName, { account, rewardSteem, rewardSbd, rewardVests }, false, { error: msg });
