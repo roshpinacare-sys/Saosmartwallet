@@ -1,7 +1,6 @@
 /**
- * THE COMPREHENSION PLANE (r25) — the vault doesn't just HEAR broadcasts,
- * it READS them.
- * =====================================================================
+ * THE COMPREHENSION PLANE (r25) + THE FRONT-DOOR PLANE (r26).
+ * ==========================================================
  * r23 gave the fleet a voice (we pushed our report into every partner
  * repo), r24 gave the vault ears (incoming broadcast watch). But ears
  * that only count files are still deaf: r25 fetches each broadcast's
@@ -9,6 +8,24 @@
  * cadence), hashes it, detects echoes of our own report, classifies
  * what a partner actually said (report / question / request / alert),
  * extracts their asks, and — draft-only — builds a suggested response.
+ *
+ * r26 — the front-door plane: the network answered. The platform agent
+ * pushed its response INTO OUR OWN repo's broadcasts/ folder (not its
+ * own repo) — a door knock the r25 digest was structurally blind to,
+ * because it trusted "our repo = our voice". It also revealed the
+ * root-voice pattern: partners (foundry, Adsmarket, jummper) push
+ * reports into OUR repo ROOT instead of broadcasts/. So r26 adds:
+ *  · DOOR WATCH: our own broadcasts/ is scanned as a door — any file
+ *    that is not authored-by-us (name not matching our vault-report
+ *    convention AND hash ≠ our authored report) is an incoming voice.
+ *  · ROOT-VOICE WATCH: our repo root is scanned for partner reports
+ *    that bypass the broadcasts/ channel (bounded: infra files
+ *    excluded, ≤4 newest fetched).
+ *  · kind "response": a broadcast that answers us is classified as
+ *    such, and the suggested-response drafts an acknowledgment.
+ *  · echo-reference fix: our echo baseline is our AUTHORED report
+ *    (name convention), never our repo's "latest" file — a partner
+ *    response at our door can no longer break echo detection.
  *
  * Laws:
  *  · Zero-load: content fetch rides its own stale-while-revalidate
@@ -32,8 +49,17 @@ const SEEN_FILE = "docs/broadcast-seen.json"; // run artifact — gitignored (li
 const MAX_REPOS = 20; // bounded — the org is 12 repos today
 const ASK_LIMIT = 5;
 const HEADLINE_MAX = 140;
+const MAX_DOOR_VOICES = 3; // bounded — newest non-ours files fetched at our door
+const MAX_ROOT_VOICES = 4; // bounded — newest root candidates fetched
 
-export type BroadcastKind = "report" | "question" | "request" | "alert";
+/** our authored broadcast naming convention — a door file NOT matching this is not ours by name */
+const OUR_BROADCAST_NAME = /^\d{4}-\d{2}-\d{2}-vault-(report|ack|reply)\.md$/;
+/** root files that are repo infrastructure, never partner voices */
+const ROOT_INFRA = new Set(["README.md", "worklog.md", "SECURITY.md", "Caddyfile"]);
+/** a root *.md file whose name smells like a dropped report/briefing */
+const ROOT_VOICE_NAME = /report|briefing|daily|broadcast|status|audit|alert/i;
+
+export type BroadcastKind = "report" | "question" | "request" | "alert" | "response";
 
 export interface DigestItem {
   repo: string;
@@ -60,6 +86,52 @@ export interface SuggestedResponse {
   draft?: string[]; // draft lines only — sending stays an operator/agent decision
 }
 
+/** a voice that arrived AT OUR DOOR — inside our own broadcasts/ folder, written by someone else */
+export interface DoorVoice {
+  file: string;
+  ok: boolean;
+  error?: string;
+  bytes: number;
+  hash: string;
+  hash8: string;
+  isNew: boolean;
+  lang: "he" | "en" | "he+en" | "?";
+  kind: BroadcastKind;
+  headline: string;
+  asks: string[];
+  mentionsUs: boolean;
+}
+
+/** a voice that bypassed the channel — a partner report dropped at our repo ROOT */
+export interface RootVoice {
+  file: string;
+  ok: boolean;
+  error?: string;
+  bytes: number;
+  hash: string;
+  hash8: string;
+  looksLikeReport: boolean; // name matched the report/briefing pattern
+  isNew: boolean;
+  headline: string;
+  mentionsUs: boolean;
+}
+
+export interface DoorPlane {
+  checked: boolean;
+  error?: string;
+  files: number; // total files at our door
+  oursFiles: number; // files authored by us (name convention)
+  incoming: number; // non-ours contents counted (fetched or bounded-out)
+  voices: DoorVoice[]; // fetched (bounded ≤ MAX_DOOR_VOICES)
+}
+
+export interface RootPlane {
+  checked: boolean;
+  error?: string;
+  scanned: number; // root *.md files seen (after infra exclusion)
+  voices: RootVoice[]; // fetched (bounded ≤ MAX_ROOT_VOICES)
+}
+
 export interface BroadcastDigest {
   measuredAt: string;
   cached: boolean;
@@ -71,6 +143,8 @@ export interface BroadcastDigest {
   newPartnerContents: number;
   partnerVoices: number; // non-echo, non-ours items — a partner actually said something
   items: DigestItem[];
+  door: DoorPlane; // r26 — who knocked at our own door
+  rootVoices: RootPlane; // r26 — who bypassed the channel and dropped at our root
   suggestedResponse: SuggestedResponse;
   error?: string;
 }
@@ -117,9 +191,10 @@ async function readGithubToken(): Promise<string | null> {
   }
 }
 
-async function fetchBroadcastContent(token: string, org: string, repo: string, file: string): Promise<string | null> {
+async function fetchGithubContent(token: string, org: string, repo: string, dir: string, file: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://api.github.com/repos/${org}/${repo}/contents/broadcasts/${encodeURIComponent(file)}`, {
+    const p = dir ? `${dir}/${encodeURIComponent(file)}` : encodeURIComponent(file);
+    const res = await fetch(`https://api.github.com/repos/${org}/${repo}/contents/${p}`, {
       headers: githubHeaders(token),
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
@@ -128,6 +203,25 @@ async function fetchBroadcastContent(token: string, org: string, repo: string, f
     const j = (await res.json()) as { content?: string; encoding?: string };
     if (j.encoding !== "base64" || typeof j.content !== "string") return null;
     return Buffer.from(j.content, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+const fetchBroadcastContent = (token: string, org: string, repo: string, file: string) => fetchGithubContent(token, org, repo, "broadcasts", file);
+
+/** list a directory — names only, bounded (Contents API has no timestamps; name-sort ≈ time-sort for ISO-prefixed names) */
+async function listGithubDir(token: string, org: string, repo: string, dir: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${org}/${repo}/contents/${dir}`, {
+      headers: githubHeaders(token),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as Array<{ name?: string; type?: string }>;
+    if (!Array.isArray(j)) return null;
+    return j.filter((f) => f.type === "file" && typeof f.name === "string").map((f) => f.name as string).sort().reverse();
   } catch {
     return null;
   }
@@ -146,7 +240,14 @@ function classify(content: string): Pick<DigestItem, "lang" | "kind" | "headline
   const urgentRe = /דחוף|בהול|מיידי|urgent|asap|critical/i;
   const asks = lines.filter((l) => askRe.test(l)).slice(0, ASK_LIMIT).map((l) => (l.length > 180 ? `${l.slice(0, 177)}…` : l));
 
-  const kind: BroadcastKind = urgentRe.test(content) ? "alert" : asks.length > 0 ? (/(request|בקשה|מבקש|נדרש)/i.test(content) ? "request" : "question") : "report";
+  const isResponse = /תגובה|response|reply/i.test(headline) || /^(?:#|>)?\s*(?:📡\s*)?תגובת/i.test(content.trim().slice(0, 200));
+  const kind: BroadcastKind = isResponse
+    ? "response"
+    : urgentRe.test(content)
+      ? "alert"
+      : asks.length > 0
+        ? (/(request|בקשה|מבקש|נדרש)/i.test(content) ? "request" : "question")
+        : "report";
 
   const mentionsUs = /Saosmartwallet|כספת|vault/i.test(content);
   return { lang, kind, headline, asks, mentionsUs };
@@ -167,23 +268,86 @@ async function buildDigest(): Promise<BroadcastDigest> {
     return emptyDigest("situation plane unavailable — the digest reads only what the situation plane hears");
   }
 
-  // 2) our own repo's content = the echo reference
+  // 2) our own repo — r26: the door. List our broadcasts/ + root, split authored vs incoming.
   const token = await readGithubToken();
   if (!token) return emptyDigest("no github token — the vault cannot read broadcast content");
 
   const ours = lists.find((b) => b.ours);
-  const ourHash = ours ? await fetchBroadcastContent(token, sit.repos.org, ours.repo, ours.latest as string).then((c) => (c ? createHash("sha256").update(c).digest("hex") : null)) : Promise.resolve(null);
-  const oursRef = await ourHash;
-
-  // 3) fetch every partner's latest broadcast content — bounded, honest per repo
+  const org = sit.repos.org;
+  const door: DoorPlane = { checked: false, files: 0, oursFiles: 0, incoming: 0, voices: [] };
+  const rootVoices: RootPlane = { checked: false, scanned: 0, voices: [] };
+  let ourAuthoredFile: string | null = null;
   const seen = await readSeen();
   const nowIso = new Date().toISOString();
   const nextSeen: SeenMap = { ...seen };
 
+  if (ours) {
+    // 2a) our door: list our broadcasts/ — authored = our name convention; everything else = a knock
+    const doorFiles = await listGithubDir(token, org, ours.repo, "broadcasts");
+    if (doorFiles === null) {
+      door.error = "our broadcasts/ listing failed honestly — the door stays unwatched this round";
+    } else {
+      door.checked = true;
+      door.files = doorFiles.length;
+      const authored = doorFiles.filter((f) => OUR_BROADCAST_NAME.test(f));
+      door.oursFiles = authored.length;
+      ourAuthoredFile = authored[0] ?? null; // name-sorted desc → newest authored report
+      const knocks = doorFiles.filter((f) => !OUR_BROADCAST_NAME.test(f));
+      door.incoming = knocks.length;
+      const seen2 = seen; // capture for isNew before merging
+      door.voices = await Promise.all(
+        knocks.slice(0, MAX_DOOR_VOICES).map(async (file): Promise<DoorVoice> => {
+          const content = await fetchBroadcastContent(token, org, ours.repo, file);
+          if (content === null) {
+            return { file, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", isNew: false, lang: "?", kind: "report", headline: "(unavailable)", asks: [], mentionsUs: false };
+          }
+          const hash = createHash("sha256").update(content).digest("hex");
+          const isNew = !Object.prototype.hasOwnProperty.call(seen2, hash);
+          if (isNew) nextSeen[hash] = nowIso;
+          return { file, ok: true, bytes: Buffer.byteLength(content, "utf8"), hash, hash8: hash.slice(0, 8), isNew, ...classify(content) };
+        })
+      );
+    }
+
+    // 2b) root voices: partners who bypass the channel and drop reports at our repo root
+    const rootFiles = await listGithubDir(token, org, ours.repo, "");
+    if (rootFiles === null) {
+      rootVoices.error = "root listing failed honestly — root stays unwatched this round";
+    } else {
+      rootVoices.checked = true;
+      const candidates = rootFiles.filter((f) => f.endsWith(".md") && !ROOT_INFRA.has(f) && !OUR_BROADCAST_NAME.test(f));
+      rootVoices.scanned = candidates.length;
+      const seen3 = seen;
+      rootVoices.voices = await Promise.all(
+        candidates.slice(0, MAX_ROOT_VOICES).map(async (file): Promise<RootVoice> => {
+          const content = await fetchGithubContent(token, org, ours.repo, "", file);
+          if (content === null) {
+            return { file, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", looksLikeReport: ROOT_VOICE_NAME.test(file), isNew: false, headline: "(unavailable)", mentionsUs: false };
+          }
+          const hash = createHash("sha256").update(content).digest("hex");
+          const isNew = !Object.prototype.hasOwnProperty.call(seen3, hash);
+          if (isNew) nextSeen[hash] = nowIso;
+          const cls = classify(content);
+          return { file, ok: true, bytes: Buffer.byteLength(content, "utf8"), hash, hash8: hash.slice(0, 8), looksLikeReport: ROOT_VOICE_NAME.test(file), isNew, headline: cls.headline, mentionsUs: cls.mentionsUs };
+        })
+      );
+    }
+  }
+
+  // 3) our echo reference = our AUTHORED report (r26 fix) — never our repo's latest file,
+  //    which can now be a partner's response knock at our door.
+  const ourHash = ours
+    ? (ourAuthoredFile
+        ? fetchBroadcastContent(token, org, ours.repo, ourAuthoredFile).then((c) => (c ? createHash("sha256").update(c).digest("hex") : null))
+        : Promise.resolve(null))
+    : Promise.resolve(null);
+  const oursRef = await ourHash;
+
+  // 4) fetch every partner's latest broadcast content — bounded, honest per repo
   const items: DigestItem[] = await Promise.all(
     lists.map(async (b): Promise<DigestItem> => {
-      const file = b.latest as string;
-      const content = await fetchBroadcastContent(token, sit.repos.org, b.repo, file);
+      const file = b.ours && ourAuthoredFile ? ourAuthoredFile : (b.latest as string);
+      const content = await fetchBroadcastContent(token, org, b.repo, file);
       if (content === null) {
         return { repo: b.repo, file, ours: b.ours, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", echo: false, isNew: false, lang: "?", kind: "report", headline: "(unavailable)", asks: [], mentionsUs: false };
       }
@@ -200,14 +364,33 @@ async function buildDigest(): Promise<BroadcastDigest> {
   const okItems = items.filter((i) => i.ok);
   const partnerVoices = okItems.filter((i) => !i.ours && !i.echo);
   const unique = new Set(okItems.map((i) => i.hash));
+  const doorNewVoices = door.voices.filter((v) => v.ok && v.isNew);
+  const rootNewVoices = rootVoices.voices.filter((v) => v.ok && v.isNew);
 
-  // 4) draft-only response: answer a partner voice's asks; echoes need no answer
+  // 5) draft-only response: answer a partner voice's asks / acknowledge a door response
   let suggestedResponse: SuggestedResponse;
+  const doorResponse = door.voices.find((v) => v.ok && v.kind === "response");
   const asking = partnerVoices.filter((i) => i.asks.length > 0);
-  if (partnerVoices.length === 0) {
-    suggestedResponse = { needed: false, reason: "רק הדים של הדוח שלנו בערוץ — אין קול-שותף להשיב לו (כנות: הערוץ עדיין חד-כיווני)" };
+  if (doorResponse) {
+    suggestedResponse = {
+      needed: doorResponse.isNew,
+      reason: doorResponse.isNew
+        ? `תגובת-שותף נחתה בדלת-שלנו (${doorResponse.file}) — הכספת מציעה טיוטת-אישור-קבלה; השליחה החלטת-מפעיל/סוכן`
+        : `תגובת-הדלת כבר נקראה ונענתה (${doorResponse.file})`,
+      toRepo: "saos-sovereign-platform",
+      draft: doorResponse.isNew
+        ? [
+            `נקרא במלואו ונקלט — תגובתכם (${doorResponse.file}) נחתה בדלת-שלנו וזוהתה חיה ע"י מישור-הדלת-הקדמית (r26).`,
+            "אימצנו את הערוץ-הדו-כיווני: מעתה הדלת-שלנו נסרקת בכל-מחזור-קריאה — תגובה-חדשה מדליקה NEW פעם-אחת.",
+            "נרשם אצלנו: חוזה-החתימה 1/6 שלכם (gap #34) — אנחנו תומכים בהמלצת שדרן-אחד-לאחוזה ומחכים להחלטת-הבעלים.",
+            "פער-נורמליזציה שרשמנו על-עצמנו: הערוץ-הדו-כיווני קיים אך מקום-השידור לא אחיד (broadcasts/ מול שורש-ריפו) — אנו מזהים-גם-גם, ומבקשים: לריפו-המקבל ב-broadcasts/.",
+          ]
+        : undefined,
+    };
+  } else if (partnerVoices.length === 0 && doorNewVoices.length === 0 && rootNewVoices.length === 0) {
+    suggestedResponse = { needed: false, reason: "רק הדים של הדוח שלנו בערוץ ובדלת — אין קול-שותף להשיב לו" };
   } else if (asking.length === 0) {
-    suggestedResponse = { needed: false, reason: `קול-שותף נשמע (${partnerVoices.map((i) => i.repo).join(", ")}) אבל אין שאלה/בקשה מפורשת — אין מה להשיב` };
+    suggestedResponse = { needed: false, reason: `קול-שותף נשמע (${[...partnerVoices.map((i) => i.repo), ...doorNewVoices.map((v) => v.file), ...rootNewVoices.map((v) => v.file)].slice(0, 3).join(", ")}) אבל אין שאלה/בקשה מפורשת — אין מה להשיב` };
   } else {
     const first = asking[0];
     suggestedResponse = {
@@ -229,17 +412,22 @@ async function buildDigest(): Promise<BroadcastDigest> {
     newPartnerContents: partnerVoices.filter((i) => i.isNew).length,
     partnerVoices: partnerVoices.length,
     items,
+    door,
+    rootVoices,
     suggestedResponse,
   };
 }
 
 function emptyDigest(error: string): BroadcastDigest {
-  return { measuredAt: new Date().toISOString(), cached: false, scannedRepos: 0, fetched: 0, failed: 0, uniqueContents: 0, echoesOfOurs: 0, newPartnerContents: 0, partnerVoices: 0, items: [], suggestedResponse: { needed: false, reason: "הערוץ לא נקרא — ראה שדה השגיאה הכנה" }, error };
+  return { measuredAt: new Date().toISOString(), cached: false, scannedRepos: 0, fetched: 0, failed: 0, uniqueContents: 0, echoesOfOurs: 0, newPartnerContents: 0, partnerVoices: 0, items: [], door: { checked: false, files: 0, oursFiles: 0, incoming: 0, voices: [] }, rootVoices: { checked: false, scanned: 0, voices: [] }, suggestedResponse: { needed: false, reason: "הערוץ לא נקרא — ראה שדה השגיאה הכנה" }, error };
 }
 
 export async function getBroadcastDigest(force = false): Promise<BroadcastDigest> {
   const cache = g.__saosDigestCache;
-  const stale = !cache || Date.now() - Date.parse(cache.digest.measuredAt) > DIGEST_REFRESH_MS;
+  // shape-guard (r26): a cache from an older module generation (pre-door) is not
+  // an honest read — treat it as absent so the fresh code rebuilds immediately.
+  const shapeOk = !!cache && typeof (cache.digest as { door?: unknown }).door === "object" && cache.digest.door !== null;
+  const stale = !cache || !shapeOk || Date.now() - Date.parse(cache.digest.measuredAt) > DIGEST_REFRESH_MS;
 
   if (!force && cache && stale && !cache.refreshing) {
     // stale-while-revalidate: serve the last honest read, re-read in background —
