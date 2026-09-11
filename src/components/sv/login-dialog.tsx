@@ -131,6 +131,10 @@ export function LoginDialog({ open, onOpenChange, msg, busy, onLogin }: {
                   {showWif ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {/* הסכם-מפתח-האב (Task 69b): המפתח מההסכם נכנס בכל רשת — בכל צורת-הדבקה */}
+              <p className="text-[10.5px] text-[color:var(--text-3)] leading-relaxed">
+                מפתח-האב מההסכם (headcorner.txt)? הדבק אותו כמו שהוא — הוא נכנס בכל רשת, גם עם קידומת P וגם בלי, בלי להתאים רשת.
+              </p>
             </div>
             {msg && (
               <div className={`text-xs rounded-lg px-3 py-2 border leading-relaxed ${msg.ok ? 'bg-[color:var(--green-soft)] text-[color:var(--green)] border-[color:var(--green)]/30' : 'bg-rose-950/40 text-rose-300 border-rose-900/60'}`} role="status" data-testid="login-msg">

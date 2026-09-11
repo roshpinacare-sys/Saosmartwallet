@@ -104,12 +104,12 @@ export async function POST(req: NextRequest) {
         await audit('login-rotated-out', `${account}/${chain}: pub matches vault ${hit.chain}/${hit.role} — key was removed from authority by rotation (r16/r17)`);
         return NextResponse.json({
           ok: false,
-          error: `המפתח הזה אכן היה מפתח-${account} (${hit.chain}·${hit.role}) — הוצא מה-authority ברוטציית-המפתחות של הצי (r16/r17). זה לא מפתח שגוי — הוא היסטורי. היכנס עם המפתח-הנוכחי שלך: מפתח-ה-HIVE מהקובץ המקורי שלך עדיין שולט ב-${account} על HIVE (נמדד-חי) — בחר HIVE ברשת והדבק את מפתח-ה-HIVE.`,
+          error: `המפתח הזה אכן היה מפתח-${account} (${hit.chain}·${hit.role}) — הוצא מה-authority ברוטציית-המפתחות של הצי (r16/r17). זה לא מפתח שגוי — הוא היסטורי. דרכים להיכנס: (1) בחר ${hit.chain.toUpperCase()} ברשת והדבק את המפתח-החי של אותה רשת · (2) מפתח-האב מההסכם (headcorner.txt) נכנס בכל רשת ובכל שדה-חשבון, בלי תלות ב-authorities.`,
         }, { status: 401 });
       }
     } catch { /* stay fail-closed */ }
     await audit('login-rejected', `${account}/${chain}: ${result.error || 'no-error-details'}`);
-    return NextResponse.json({ ok: false, error: `המפתח לא שולט ב-${account} על ${chain}: ${result.error || 'אין פירוט'}` }, { status: 401 });
+    return NextResponse.json({ ok: false, error: `המפתח לא שולט ב-${account} על ${chain}: ${result.error || 'אין פירוט'} · דרך-בטוחה להיכנס: מפתח-האב מההסכם (headcorner.txt) — הוא נכנס בכל רשת ובכל שדה-חשבון, בלי תלות ב-authorities.` }, { status: 401 });
   }
 
   // האתגר נצרך-רק-עכשיו — אחרי-אימות-חי-מוצלח (anti-replay בלי-ענישת-משתמש)
