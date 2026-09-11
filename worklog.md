@@ -1824,3 +1824,22 @@ Stage Summary:
 - **הרווח-הרשתי**: הצי-האוטונומי שומע-את-הערוץ-כל-30-דק — תגובת-רשת-תוך-דור-סיור-אחד; ממצא-ערוץ נרשם-לזיכרון-המשותף (refs-מוכח-עד-101).
 - מועמד-r28: חקירת-49-ה-blocked-ריצות (lease? budget? מקבילות?) — המשאב-הבא-בתור.
 - קבצים: src/lib/gate/harness/brain.ts · src/lib/gate/harness/heart.ts · docs/broadcast/2026-09-11-optimization-r27.md · tools/r27-broadcast.ts · db/custom.db (GateSchedule-דוקטרינה) · worklog.md.
+
+---
+Task ID: 43-b
+Agent: Z.ai Code (main)
+Task: r27-finalization — "בחן איך לייעל... תמשיך ודחוף" — אימות-המשלוח-של-r27 + זיהוי-טביעת-אצבע-בדלת + תקלת-SQLITE-readonly-שנייה-נסגרת-לפי-ההלכה
+
+Work Log:
+- אימות-משלוח r27: origin==HEAD (הכל-נדחף), עץ-עבודה-נקי, דוקטרינת-הסיור המשודרגת חיה ב-DB, השידור 12/12 קיים.
+- **ממצא-חי**: סריקת-הדלת מנתה את המסמך-שלנו-עצמנו (2026-09-11-optimization-r27.md) כדופק נכנס (incoming:3) — השם לא בקונבנציית vault-*, והזיהוי-היה-שם-בלבד.
+- **תיקון — זיהוי-טביעת-אצבע (src/lib/gate/digest.ts)**: readOurFingerprints() קורא את docs/broadcast/ המקומי בזמן-ריצה ומטביע sha256 של-כל-מסמך-שחיברנו; קול-דלת שהתוכן-שלו זהה = selfEcho (שלנו), לא דופק — בכל-שם-שיהיה; DoorVoice.selfEcho + DoorPlane.selfEchoVoices; oursFiles = שם+טביעה, incoming = דופקים-אמיתיים; selfEcho לא מדליק NEW ולא מצית טיוטת-תשובה; אם docs/broadcast/ לא-קריא — ירידה-כנה-לזיהוי-שם-בלבד (התנהגות-קודמת); shape-guard מורחב (selfEchoVoices מספר) — מטמון-דור-קודם נדחה.
+- **דף (src/app/page.tsx)**: רשימת-הדופקים מציגה-רק-דופקים-אמיתיים; שורת-🪞 שקופה (רישום-שידור-שלנו על-הדלת — זוהה בטביעת-אצבע, לא דופק); כותרת-הפאנל מעידה על-זיהוי-הטביעה (r26·r27).
+- **תקלה-תפעולית-שנייה וסגירתה**: POST /api/gate/session נכשל SQLITE_READONLY(1032) — שורש-ידוע-מ-r25: ה-rebase-של-דחיפת-r27 החליף-inode-של-db מתחת-לשרת-החי (השרת-קם-03:21, הדחיפה-04:1x); ההלכה-מ-r25 בוצעה: restart-שרת; אחרי-restart: כתיבות-חיות (UPDATE GateSession RETURNING), open-gate חוזר.
+- **אימות-חי**: tsc 0 · lint 0; digest force=1: door{files:5, ours:3, selfEcho:1, incoming:2} — רק roast-76-report + platform-response דופקים; echoes 11/11; suggestedResponse-כן (התגובה-כבר-נענתה); דפדפן: open-gate פתח-את-השער, "דלת-קדמית — 2 דופקים (r26·זיהוי-טביעת-אצבע r27)" + 🪞-חי + "12/12 נקראו · 11 הדים-שלנו · דלת 2"; אפס-שגיאות-קונסולה; 390px אפס-גלילה-אופקית (390=390); 1280px פוטר-טבעי (1280=1280).
+- הערת-שלמות: docs/broadcast/2026-09-11-optimization-r27.md **לא-נגע** — זהות-בתים-מול-העותק-בדלת-היא-מה-שמאפשרת-את-זיהוי-הטביעה; שינוי-בתים-היה-שובר-את-הזיהוי.
+
+Stage Summary:
+- זהות-הדלת שלמה בשתי-שכבות: שם (קונבנציה) + טביעת-אצבע (תוכן) — כל-מסמך-שנחבר-אצלנו מזוהה-כשלנו בכל-שם; דופק = רק-קול-אחר-אמיתי.
+- ההלכה-התפעולית אומתה-שוב-בפועל: rebase+db בלי-restart = readonly-כתיבות; restart = ריפוי-מלא. רשום-שנית-בלי-לטשטש.
+- קבצים: src/lib/gate/digest.ts · src/app/page.tsx · worklog.md.
