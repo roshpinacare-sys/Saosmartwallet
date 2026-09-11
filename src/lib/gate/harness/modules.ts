@@ -1070,10 +1070,14 @@ export const MODULES: HarnessModule[] = [
         }),
       );
       const line = per.map((p) => p.reachable ? `${p.rail}: ${p.voters.length} מצביעים · ${p.proxies.length} נציגויות · ${p.silent.length} שותקים` : `${p.rail}: לא-נגישה`).join(" · ");
+      // r35 — חוק-הראש (רביעי במשפחה): summary + meaning ראשונים באובייקט (JSON שומר-סדר-מפתחות),
+      // כדי שהחלק-הניתן-לאימות ישרוד את RESULT_CLAMP (1400) — ה-rails המפורטים (עד 12 חשבונות ×
+      // 30 הצבעות-עדים לכל-רשת) הם הגוף הכבד שחתך את השורה והוליד פסיקות "חלקי" שווא.
       return {
         measuredAt: new Date().toISOString(),
-        rails: per.map((p) => ({ rail: p.rail, reachable: p.reachable, voters: p.voters.slice(0, 12), proxies: p.proxies, silent: p.silent.slice(0, 12) })),
+        summary: line,
         meaning: `טביעת-רגל ממשלתית — ${line}. שותקים רבים = ריבונות-חצויה: יש לנו מפתחות אבל לא משתמשים בכוח-ההצבעה. הצבעה-לעדים היא פעולת-posting (steem.interact אינה מצביעה-עדים — הצע מסלול אם הממצא דורש).`,
+        rails: per.map((p) => ({ rail: p.rail, reachable: p.reachable, voters: p.voters.slice(0, 12), proxies: p.proxies, silent: p.silent.slice(0, 12) })),
       };
     },
   },
