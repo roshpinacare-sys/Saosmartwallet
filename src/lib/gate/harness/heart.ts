@@ -97,9 +97,16 @@ async function enqueueRun(opts: {
   const meta: Record<string, unknown> = { ...opts.meta };
   let brain = opts.brain || agent.brain || "zai:default";
   const parsed = parseBrain(brain);
-  if (parsed.provider === "nvidia" && !masterReady()) {
+  // r27 efficiency plane: downgrade to zai ONLY when the vault is sealed AND no
+  // runtime env key exists. Measured live (r27): nvidia 91.5% vs zai 34.5% run
+  // success — every silent downgrade during a locked window burned run budget.
+  // Env is runtime-only (never in git) → the zero-secrets-in-git law holds.
+  const envNim = !!process.env.NVIDIA_API_KEY?.trim();
+  if (parsed.provider === "nvidia" && !masterReady() && !envNim) {
     brain = "zai:default";
     meta.brainNote = "הכספת חתומה — המוח הוחלף ל-zai (מפתח-NIM חתום בכספת, לא נחשף)";
+  } else if (parsed.provider === "nvidia" && !masterReady() && envNim) {
+    meta.brainNote = "הכספת חתומה — המוח נשאר nvidia על-מפתח-סביבה (זמן-ריצה-בלבד, אפס-סודות-בגיט)";
   }
 
   const brainStr = `${parsed.provider}:${parsed.model}`;
