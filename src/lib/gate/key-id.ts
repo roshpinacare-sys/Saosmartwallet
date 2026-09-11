@@ -60,6 +60,8 @@ export interface KeyIdReport {
   controls: KeyControl[];
   liveChecked: boolean;
   notes: string[];
+  /** r32: which graphene rails actually answered — a partial sweep must never convict. */
+  rails?: { steem: boolean; hive: boolean; blurt: boolean };
 }
 
 export function chainPub(privHex: string, compressed: boolean): string {
@@ -146,8 +148,10 @@ export interface ChainAuthorityMap {
   blurtOk: boolean;
 }
 
-/** Decodes a graphene wire pub (STM/HIVE/BLT/TST prefix) to its raw 33 bytes, hex. */
-function pub33Hex(pub: string): string | null {
+/** Decodes a graphene wire pub (STM/HIVE/BLT/TST prefix) to its raw 33 bytes, hex.
+ *  r32: exported — prefix-independent key identity for seals/login (the same 33
+ *  bytes appear as STM… on steem/hive and BLT… on blurt; string compare lies). */
+export function pubRaw33(pub: string): string | null {
   const m = /^(STM|HIVE|BLT|TST)([1-9A-HJ-NP-Za-km-z]+)$/.exec(pub);
   if (!m) return null;
   try {
@@ -175,7 +179,7 @@ export async function fetchChainAuthorityMap(): Promise<ChainAuthorityMap> {
   const map = new Map<string, KeyControl[]>();
   const push = (chain: string, account: string, role: string, pub: string) => {
     if (!pub) return;
-    const raw = pub33Hex(pub);
+    const raw = pubRaw33(pub);
     if (!raw) return;
     const arr = map.get(raw) || [];
     arr.push({ chain, account, role, pub });
@@ -244,7 +248,8 @@ export async function identifyKey(raw: string): Promise<KeyIdReport> {
     report.pubs.push(pub);
     const { map, steemOk, hiveOk, blurtOk } = await fetchChainAuthorityMap();
     report.liveChecked = steemOk || hiveOk || blurtOk;
-    report.controls = map.get(pub33Hex(pub) || "") || [];
+    report.rails = { steem: steemOk, hive: hiveOk, blurt: blurtOk };
+    report.controls = map.get(pubRaw33(pub) || "") || [];
     if (report.liveChecked && !report.controls.length)
       notes.push("המפתח תקין קריפטוגרפית אך אינו מחזיק authority באף חשבון-מוכר ברשתות שנבדקו (steem/hive/blurt)");
     if (!steemOk) notes.push("steem node לא נענה");
@@ -264,7 +269,7 @@ export async function identifyKey(raw: string): Promise<KeyIdReport> {
     const { map, steemOk } = await fetchChainAuthorityMap();
     report.liveChecked = steemOk;
     for (const p of pubs) {
-      const raw = /^(STM|HIVE|BLT|TST)/.test(p) ? pub33Hex(p) : p.toLowerCase();
+      const raw = /^(STM|HIVE|BLT|TST)/.test(p) ? pubRaw33(p) : p.toLowerCase();
       for (const c of map.get(raw || "") || []) report.controls.push(c);
     }
     if (!report.controls.length) notes.push("נגזרו כתובות EVM+TRON — אין authority-steem למפתח (תקין לארנקי-צי)");
