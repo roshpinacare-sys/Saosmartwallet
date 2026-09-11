@@ -61,12 +61,17 @@ const OUR_BROADCAST_NAME = /^\d{4}-\d{2}-\d{2}-vault-(report|ack|reply)\.md$/;
  * vault-*) land in our own door and used to be miscounted as knocks.
  * Fix: hash every file in our local docs/broadcast/ at read time — any door
  * voice whose content hash matches one of those is OURS, whatever its name.
+ * r28 refinement: door voices beyond the bounded fetch window (MAX_DOOR_VOICES)
+ * can't be fingerprinted without extra fetches — but their NAMES are free, so
+ * the same index also returns our authored FILENAMES; a door file with the
+ * same name as a doc we authored locally is OURS by name+fingerprint-of-origin.
  * Honest and generic: zero secrets, zero extra API calls, works for any
- * future authored doc. If the local dir is unreadable the set is empty and
- * behavior degrades to name-only (exactly the pre-fix behavior).
+ * future authored doc. If the local dir is unreadable both sets are empty and
+ * behavior degrades to name-convention-only (exactly the pre-fix behavior).
  */
-async function readOurFingerprints(): Promise<Set<string>> {
+async function readOurAuthoredIndex(): Promise<{ fingerprints: Set<string>; names: Set<string> }> {
   const fingerprints = new Set<string>();
+  const names = new Set<string>();
   try {
     const dir = path.join(process.cwd(), "docs", "broadcast");
     const entries = await readdir(dir).catch(() => [] as string[]);
@@ -77,15 +82,16 @@ async function readOurFingerprints(): Promise<Set<string>> {
           try {
             const c = await readFile(path.join(dir, f), "utf8");
             fingerprints.add(createHash("sha256").update(c).digest("hex"));
+            names.add(f);
           } catch {
             /* one unreadable file never kills the set */
           }
         })
     );
   } catch {
-    /* identity degrades honestly to name-only */
+    /* identity degrades honestly to name-convention-only */
   }
-  return fingerprints;
+  return { fingerprints, names };
 }
 /** root files that are repo infrastructure, never partner voices */
 const ROOT_INFRA = new Set(["README.md", "worklog.md", "SECURITY.md", "Caddyfile"]);
@@ -321,10 +327,12 @@ async function buildDigest(): Promise<BroadcastDigest> {
     // 2a) our door: list our broadcasts/ — authored = our name convention; everything else = a knock
     //     r27-finalization: a knock whose CONTENT hash matches one of our local authored docs is
     //     OURS (self-echo on the door, e.g. our efficiency broadcast) — not a knock anymore.
-    const [doorFiles, ourFingerprints] = await Promise.all([
+    const [doorFiles, authoredIndex] = await Promise.all([
       listGithubDir(token, org, ours.repo, "broadcasts"),
-      readOurFingerprints(),
+      readOurAuthoredIndex(),
     ]);
+    const ourFingerprints = authoredIndex.fingerprints;
+    const ourAuthoredNames = authoredIndex.names;
     if (doorFiles === null) {
       door.error = "our broadcasts/ listing failed honestly — the door stays unwatched this round";
     } else {
@@ -341,13 +349,17 @@ async function buildDigest(): Promise<BroadcastDigest> {
             return { file, ok: false, error: "content fetch failed honestly", bytes: 0, hash: "", hash8: "", isNew: false, selfEcho: false, lang: "?", kind: "report", headline: "(unavailable)", asks: [], mentionsUs: false };
           }
           const hash = createHash("sha256").update(content).digest("hex");
-          const selfEcho = ourFingerprints.has(hash);
+          const selfEcho = ourFingerprints.has(hash) || ourAuthoredNames.has(file);
           const isNew = !Object.prototype.hasOwnProperty.call(seen2, hash) && !selfEcho; // our own records never count as new
           if (isNew) nextSeen[hash] = nowIso;
           return { file, ok: true, bytes: Buffer.byteLength(content, "utf8"), hash, hash8: hash.slice(0, 8), isNew, selfEcho, ...classify(content) };
         })
       );
-      const selfEchoCount = door.voices.filter((v) => v.ok && v.selfEcho).length;
+      // r28: self-echo beyond the fetch window is name-detected only — the
+      // bounded fetch can't fingerprint it, but our authored-name index can.
+      const fetched = door.voices.filter((v) => v.ok);
+      const unfetchedOurs = knocks.slice(MAX_DOOR_VOICES).filter((f) => ourAuthoredNames.has(f)).length;
+      const selfEchoCount = fetched.filter((v) => v.selfEcho).length + unfetchedOurs;
       door.selfEchoVoices = selfEchoCount;
       door.oursFiles = authored.length + selfEchoCount;
       door.incoming = knocks.length - selfEchoCount;
