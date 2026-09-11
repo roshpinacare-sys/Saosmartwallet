@@ -63,6 +63,21 @@ export async function POST(req: NextRequest) {
   }
 
   if (!result.ok) {
+    // Roast-85 · ריפוי-r32-משוחזר (אבד באיפוס-הסנדבוקס): זיהוי-מפתח-מוחלף —
+    // אם ה-pub הנגזר תואם שורת-כספת של החשבון, המפתח הזה היה פעם מפתח-החשבון
+    // והוצא מה-authority ברוטציה. במקום מבוי-סתום — תשובה-כנה ומכוונת.
+    try {
+      const pubBody = pub.replace(/^STM|^BLT/, '');
+      const prior = await db.vaultKey.findMany({ where: { account }, select: { chain: true, role: true, pubKey: true } });
+      const hit = prior.find(k => (k.pubKey || '').replace(/^STM|^BLT/, '') === pubBody);
+      if (hit) {
+        await audit('login-rotated-out', `${account}/${chain}: pub matches vault ${hit.chain}/${hit.role} — key was removed from authority by rotation (r16/r17)`);
+        return NextResponse.json({
+          ok: false,
+          error: `המפתח הזה אכן היה מפתח-${account} (${hit.chain}·${hit.role}) — הוצא מה-authority ברוטציית-המפתחות של הצי (r16/r17). זה לא מפתח שגוי — הוא היסטורי. היכנס עם המפתח-הנוכחי שלך: מפתח-ה-HIVE מהקובץ המקורי שלך עדיין שולט ב-${account} על HIVE (נמדד-חי) — בחר HIVE ברשת והדבק את מפתח-ה-HIVE.`,
+        }, { status: 401 });
+      }
+    } catch { /* stay fail-closed */ }
     await audit('login-rejected', `${account}/${chain}: ${result.error || 'no-error-details'}`);
     return NextResponse.json({ ok: false, error: `המפתח לא שולט ב-${account} על ${chain}: ${result.error || 'אין פירוט'}` }, { status: 401 });
   }
@@ -73,19 +88,29 @@ export async function POST(req: NextRequest) {
   }
 
   // Save the key encrypted (idempotent upsert) so the network stays connected.
-  const saved = await db.vaultKey.upsert({
-    where: { account_chain_role: { account, chain, role: result.roles[0] || 'active' } },
-    create: {
-      account, chain, role: result.roles[0] || 'active',
-      pubKey: pub, cipher: encryptSecret(wif), fingerprint: fingerprint(wif),
-      verified: true, lastVerifiedAt: new Date(), source: fallback ? 'login-vault-fallback' : 'login',
-      note: `roles=${result.roles.join('+')}`,
-    },
-    update: { pubKey: pub, cipher: encryptSecret(wif), fingerprint: fingerprint(wif), verified: true, lastVerifiedAt: new Date(), lastError: null },
-  });
+  // Roast-85: best-effort — הכניסה נשענת על הוכחת-השרשרת-החיה, לא על הכספת.
+  // כשל-כספת (סוד-חסר/קצר) לא נועל עוד את המפעיל בחוץ — הוא מדווח-כנה.
+  let saved: { id: string; fingerprint: string; role: string } | null = null;
+  let vaultSkip = '';
+  try {
+    const s = await db.vaultKey.upsert({
+      where: { account_chain_role: { account, chain, role: result.roles[0] || 'active' } },
+      create: {
+        account, chain, role: result.roles[0] || 'active',
+        pubKey: pub, cipher: encryptSecret(wif), fingerprint: fingerprint(wif),
+        verified: true, lastVerifiedAt: new Date(), source: fallback ? 'login-vault-fallback' : 'login',
+        note: `roles=${result.roles.join('+')}`,
+      },
+      update: { pubKey: pub, cipher: encryptSecret(wif), fingerprint: fingerprint(wif), verified: true, lastVerifiedAt: new Date(), lastError: null },
+    });
+    saved = { id: s.id, fingerprint: s.fingerprint, role: s.role };
+  } catch (e) {
+    vaultSkip = String(e).slice(0, 120);
+    await audit('login-vault-save-failed', `${account}/${chain}: session granted on live chain proof; vault-save skipped — ${vaultSkip}`);
+  }
 
-  const session = await createSession('owner', `owner:${account}`, `vault:${saved.id}`);
-  await audit(fallback ? 'login-vault-fallback' : 'login-ok', `${account}/${chain} roles=${result.roles.join('+')} fp=${saved.fingerprint}`);
+  const session = await createSession('owner', `owner:${account}`, saved ? `vault:${saved.id}` : 'no-vault-row');
+  await audit(fallback ? 'login-vault-fallback' : 'login-ok', `${account}/${chain} roles=${result.roles.join('+')}${saved ? ` fp=${saved.fingerprint}` : ' vault-save-skipped'}${vaultSkip ? ' vault-crypto-unavailable' : ''}`);
   await relayBroadcast('vault', { type: 'login', account, chain, roles: result.roles });
 
   const res = NextResponse.json({
@@ -97,8 +122,8 @@ export async function POST(req: NextRequest) {
     roles: result.roles,
     balances: result.balances,
     fallback,
-    saved: { id: saved.id, role: saved.role },
-    message: `מחובר ל-${account} (${chain}) — שולט ב: ${result.roles.join(', ')}${fallback ? ' (אומת מהכספת — השרשרת לא הייתה נגישה)' : ''}`,
+    saved: saved ? { id: saved.id, role: saved.role } : null,
+    message: `מחובר ל-${account} (${chain}) — שולט ב: ${result.roles.join(', ')}${fallback ? ' (אומת מהכספת — השרשרת לא הייתה נגישה)' : ''}${vaultSkip ? ' · שמירה-לכספת דולגה (מצב-כספת כנה בדוח)' : ''}`,
   });
   res.cookies.set(SESSION_COOKIE, session.token, cookieOptions());
   return res;
