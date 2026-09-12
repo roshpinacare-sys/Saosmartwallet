@@ -72,6 +72,7 @@ const LOCK = path.join(ROOT, "db", "heart-service.lock");
     if (take()) return; // fresh lock acquired
     const raw = fs.readFileSync(LOCK, "utf8").trim();
     const pid = Number(raw);
+    if (pid === process.pid) return; // hot-reload re-entry — the lock is already ours
     if (alive(pid)) {
       console.log(`[heart-service] another heart holds the lock (pid ${pid}) — exiting`);
       process.exit(0);
@@ -105,6 +106,59 @@ async function main(): Promise<void> {
       ),
   });
   console.log(`[heart-service] health on http://127.0.0.1:${port}/`);
+
+  // ── r32: inverted supervision — the heart now guards the PORTAL ────────────
+  // The truth-audit proved the ONLY process family that survives reboots AND
+  // tool-shell reaping in this sandbox is the heart (detached child of boot).
+  // The portal died once more in practice (dev wrapper reaped mid-life) and
+  // nothing brought it back. Fix: the heart health-pings :3000 every 15s and,
+  // when the portal is truly down (connection-refused/timeout — any HTTP
+  // response counts as alive), respawns `next dev` as ITS OWN detached child,
+  // with honest backoff so a crash-loop can never storm the machine.
+  const PORTAL = "http://127.0.0.1:3000/";
+  const RESPAWN_MIN_MS = 45_000; // backoff between spawn attempts
+  const QUIET_AFTER_FAILED = 6; // 6 failed spawns → rest 10 min before retry
+  let lastSpawn = 0;
+  let failedSpawns = 0;
+  const portalAlive = async (): Promise<boolean> => {
+    try {
+      await fetch(PORTAL, { signal: AbortSignal.timeout(2_500) });
+      return true; // any HTTP response means the server is serving
+    } catch {
+      return false; // refused / timeout = down
+    }
+  };
+  setInterval(() => {
+    void (async () => {
+      if (await portalAlive()) {
+        failedSpawns = 0;
+        return;
+      }
+      const now = Date.now();
+      const rest = failedSpawns >= QUIET_AFTER_FAILED ? 10 * 60_000 : RESPAWN_MIN_MS;
+      if (now - lastSpawn < rest) return;
+      lastSpawn = now;
+      try {
+        const out = fs.openSync(path.join(ROOT, "dev.log"), "a");
+        const proc = Bun.spawn({
+          cmd: ["bun", "./node_modules/next/dist/bin/next", "dev", "-p", "3000", "--webpack"],
+          cwd: ROOT,
+          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2048" },
+          stdio: ["ignore", out, out],
+        });
+        proc.unref();
+        failedSpawns += 1;
+        console.log(
+          `[heart-service] portal was DOWN — respawned next dev (pid ${proc.pid}, ` +
+            `attempt ${failedSpawns}, ts ${new Date().toISOString()})`,
+        );
+      } catch (e) {
+        failedSpawns += 1;
+        console.log("[heart-service] portal respawn failed:", e instanceof Error ? e.message : e);
+      }
+    })();
+  }, 15_000);
+  console.log("[heart-service] portal supervision armed (ping 15s, backoff 45s, quiet 10min after 6 fails)");
 }
 
 main().catch((e) => {

@@ -11,11 +11,16 @@
  * heart-service makes double-spawn harmless.
  */
 export async function register(): Promise<void> {
-  try {
-    const { ensureHeartAlive } = await import("@/lib/gate/heart-supervisor");
-    const r = await ensureHeartAlive();
-    console.log(`[instrumentation] heart-supervisor: ${r}`);
-  } catch (e) {
-    console.log(`[instrumentation] heart-supervisor skipped: ${e instanceof Error ? e.message : String(e)}`);
+  // Next compiles instrumentation for BOTH runtimes; node builtins exist only
+  // in the nodejs runtime. The docs-canonical branch form (=== 'nodejs') lets
+  // the bundler drop this graph from the edge bundle entirely.
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    try {
+      const { ensureHeartAlive } = await import("@/lib/gate/heart-supervisor");
+      const r = await ensureHeartAlive();
+      console.log(`[instrumentation] heart-supervisor: ${r}`);
+    } catch (e) {
+      console.log(`[instrumentation] heart-supervisor skipped: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 }
