@@ -36,6 +36,9 @@ interface HealResult {
   chains: Array<{ chain: string; exists: boolean; match: Record<string, boolean>; stored: number; pubKeys: Record<string, string> }>;
   masterStored: boolean; storedTotal: number; anyMatch: boolean;
 }
+// 72: סריקת-סוד-מול-כל-הצי — fleet_pass_sweep
+interface SweepHit { account: string; chains: Array<{ chain: string; roles: string[] }> }
+interface SweepResult { tried: number; hits: SweepHit[]; storedTotal: number; anyMatch: boolean }
 
 const STATUS_STYLE: Record<string, string> = {
   live: 'text-[color:var(--green)] border-[color:var(--green)]',
@@ -73,6 +76,10 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
   const [healBusy, setHealBusy] = useState(false);
   const [healResult, setHealResult] = useState<HealResult | null>(null);
   const [healErr, setHealErr] = useState<string | null>(null);
+  // 72: סריקת-סוד-מול-כל-הצי — אותו-שדה-סוד, בלי-חשבון (ההוכחה-קריפטוגרפית מגלה-לבד)
+  const [sweepBusy, setSweepBusy] = useState(false);
+  const [sweepResult, setSweepResult] = useState<SweepResult | null>(null);
+  const [sweepErr, setSweepErr] = useState<string | null>(null);
 
   const fetcher = useCallback(async (): Promise<boolean> => {
     try {
@@ -135,6 +142,24 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
     } catch { setHealErr('רשת לא נגישה'); }
     finally { setHealBusy(false); }
   }, [authed, onNeedAuth, healAccount, healPassword, fetcher]);
+
+  // 72: fleet_pass_sweep — סוד-אחד מול-כל-הצי (dry=בדיקה · exec=אטימת-התואמים)
+  const runSweep = useCallback(async (execute: boolean) => {
+    if (!authed) { onNeedAuth(); return; }
+    if (!healPassword) { setSweepErr('נדרש סוד (סיסמת-אב או מפתח) לסריקה'); return; }
+    setSweepBusy(true); setSweepErr(null);
+    try {
+      const r = await fetch('/api/saos/flow', {
+        method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ action: 'fleet_pass_sweep', execute, params: { password: healPassword } }),
+      });
+      const j = (await r.json()) as ActionResult;
+      if (j.ok && j.result) setSweepResult(j.result as unknown as SweepResult);
+      else setSweepErr(j.error ?? 'סריקה-נכשלה');
+      if (execute && j.ok) { setMsg('סריקה-הושלמה — ההתאמות אוטמו-בכספת ✓'); setHealPassword(''); fetcher(); }
+    } catch { setSweepErr('רשת לא נגישה'); }
+    finally { setSweepBusy(false); }
+  }, [authed, onNeedAuth, healPassword, fetcher]);
 
   if (!data) {
     return (
@@ -400,6 +425,53 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
             ))}
           </div>
         )}
+
+        {/* 72: סריקת-הסוד מול כל-הצי — fleet_pass_sweep */}
+        <div className="mt-3 pt-3 border-t border-[color:var(--line)]">
+          <p className="text-[11px] opacity-70 mb-2">
+            <span className="font-bold">סריקת-סוד-מול-כל-הצי · fleet_pass_sweep</span> — אין-לך-שם-חשבון? לא-חסר: אותו-סוד נבדק אוטומטית מול <span className="font-bold">כל-חשבונות-הצי × שלוש-השרשראות</span> — ההוכחה-הקריפטוגרפית מגלה-לבד לאיזה חשבון הוא שייך (הוכח-חי: תוויות-השיחה-מ-2018 הטעו — הסוד-שסומן-tov פתח-את-wic).
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => runSweep(false)}
+              disabled={sweepBusy || !healPassword}
+              className="min-h-[32px] rounded-lg border border-[color:var(--line)] px-2.5 py-1.5 text-xs hover:bg-black/30 disabled:opacity-50"
+              aria-label="סריקת הסוד מול כל חשבונות הצי — בדיקה בלבד"
+            >
+              {sweepBusy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'סרוק-מול-כל-הצי'}
+            </button>
+            <button
+              onClick={() => runSweep(true)}
+              disabled={sweepBusy || !healPassword}
+              className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2.5 py-1.5 text-xs hover:bg-black/30 disabled:opacity-50"
+              aria-label="סריקה ואטימת כל ההתאמות בכספת"
+            >
+              סרוק-ואטום-הכל
+            </button>
+            <span className="text-[10px] opacity-50">משתמש באותו-שדה-סוד למעלה · הסוד לא נשמר ולא מוצג</span>
+          </div>
+          {sweepErr && <p className="mt-2 text-[11px] text-[color:var(--amber)]">{sweepErr}</p>}
+          {sweepResult && (
+            <div className="mt-2 rounded-lg border border-[color:var(--line)] bg-black/30 p-2 text-[11px]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="opacity-70">נבדקו {sweepResult.tried} חשבונות ·</span>
+                <span className={sweepResult.hits.length ? 'text-[color:var(--green)] font-bold' : 'opacity-60'}>
+                  {sweepResult.hits.length ? `${sweepResult.hits.length} חשבונות נפתחו` : 'אין-התאמות (כנות)'}
+                </span>
+                {sweepResult.storedTotal > 0 && <span className="text-[color:var(--green)]">· נאטמו {sweepResult.storedTotal} מפתחות ✓</span>}
+              </div>
+              {sweepResult.hits.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5" dir="ltr">
+                  {sweepResult.hits.map((h) => (
+                    <span key={h.account} className="rounded border border-[color:var(--green)] text-[color:var(--green)] px-1.5 py-0.5 text-[10px]">
+                      @{h.account} · {h.chains.map((c) => `${c.chain}[${c.roles.join('+')}]`).join(' ')}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── מועמדי-קיוריישן ── */}

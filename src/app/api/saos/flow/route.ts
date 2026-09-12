@@ -4,7 +4,7 @@ import { audit, relayBroadcast } from '@/lib/audit';
 import { flowOverview, type FlowOverview } from '@/lib/saos/flow';
 import {
   chainVote, hiveSavingsSweep, claimRewards, curationCandidates, postInfo,
-  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, chainPublish, steemRcMana, getBlurtAccount, OPERATOR, chainVoteAs, claimRewardsAs, fleetScan, fleetHeal, type Chain3,
+  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, chainPublish, steemRcMana, getBlurtAccount, OPERATOR, chainVoteAs, claimRewardsAs, fleetScan, fleetHeal, fleetPasswordSweep, type Chain3,
 } from '@/lib/saos/steem-ops';
 import { trxEnergize, tronAccount, treasuryWallet } from '@/lib/saos/trx-ops';
 import { readAutopilotState, readAutopilotConfig, writeAutopilotConfig } from '@/lib/saos/autopilot-state';
@@ -482,6 +482,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, action, dryRun: !execute, result: r });
       }
 
+      /* ── 72: סריקת-סוד-מול-כל-הצי — סיסמה/מפתח-אחד → כל-החשבונות × כל-השרשראות ──
+       * הפתרון-הקבוע ל"אין-לי-עוד-מפתח": כל-סוד-שהמפעיל-מוצא נבדק מול-כל-הצי
+       * בלי-לסמוך-על-תוויות (הוכח-חי: תוויות-שגויות הטעו-את-כולם).
+       * תמיד-מאחורי-סשן-מפעיל · dry-run=בדיקה בלבד · execute=אטימת-התואמים. */
+      case 'fleet_pass_sweep': {
+        const password = String(p.password ?? '');
+        if (!password) {
+          return NextResponse.json({ ok: false, action, error: 'password נדרש — הסוד לעולם לא נדפס/לא נרשם בביקורת' });
+        }
+        const r = await fleetPasswordSweep(password, execute);
+        await audit('flow-fleet-sweep', `fleet_pass_sweep execute=${execute} — tried=${r.tried} · hits=${r.hits.map((h) => h.account).join(',') || 'none'} · stored=${r.storedTotal} by owner:${owner.label}`);
+        try { await relayBroadcast('vault', { type: 'flow-fleet-sweep', hits: r.hits.map((h) => h.account), stored: r.storedTotal }); } catch { /* */ }
+        return NextResponse.json({ ok: true, action, dryRun: !execute, result: r });
+      }
+
       /* ── 71-i: פרסום-רב-שרשרת — HIVE/BLURT ── */
       case 'hive_publish':
         return await chainPublishAction('hive', action, p, execute, owner.label);
@@ -512,7 +527,7 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'hive_publish', 'blurt_publish', 'fleet_scan', 'fleet_vote', 'fleet_claim', 'fleet_heal', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
+        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'hive_publish', 'blurt_publish', 'fleet_scan', 'fleet_vote', 'fleet_claim', 'fleet_heal', 'fleet_pass_sweep', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
     }
   } catch (e) {
     return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'flow action failed' }, { status: 200 });

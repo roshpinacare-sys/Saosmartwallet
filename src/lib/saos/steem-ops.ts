@@ -213,26 +213,38 @@ export function vestsToChainVests(vests: number, g: { total_vesting_fund_steem: 
 /* ── שידור-מודע-שרשרת: נעילה-סריאלית (קונפיג-סינגלטון גלובלי) ── */
 let broadcastLock: Promise<unknown> = Promise.resolve();
 
+function sendOpsOnce(chain: Chain3, url: string, ops: [string, Record<string, unknown>][], wif: string): Promise<{ ok: true; result?: unknown }> {
+  return new Promise<{ ok: true; result?: unknown }>((resolve, reject) => {
+    steemLib()
+      .then((lib) => {
+        lib.config.set('chain_id', CHAIN_ID[chain]); // חתימה על chain_id-הנכון — לא על ברירת-המחדל של STEEM
+        lib.api.setOptions({ url });
+        lib.broadcast.send(
+          { extensions: [], operations: ops.map(([name, data]) => [name, data]) },
+          { owner: wif },
+          (err, res) => {
+            if (err) reject(new Error(String((err as Error).message ?? err).slice(0, 300)));
+            else resolve({ ok: true, result: res });
+          },
+        );
+      })
+      .catch(reject);
+  });
+}
+
+/* 72: גלגול-צמתים-גם-בשידור — עד-היום השידור ניסה צומת-אחד בלבד (api.hive.blog
+ * מנתק-לפעמים — הוכח-חי: fleet-vote-על-HIVE נפל "request failed" בזמן-שפרסום
+ * עבר). עתה: ניסיון-פר-צומת-עד-הצלחה. בטיחות: הפעולות-המשודרות (vote/claim/comment)
+ * אידמפוטנטיות-בפועל — שידור-כפול-של-אותו-vote מחליף-את-אותו-משקל, תביעת-אפס-נדחית. */
 function sendOps(chain: Chain3, ops: [string, Record<string, unknown>][], wif: string): Promise<{ ok: true; result?: unknown }> {
-  const run = broadcastLock.then(
-    () =>
-      new Promise<{ ok: true; result?: unknown }>((resolve, reject) => {
-        steemLib()
-          .then((lib) => {
-            lib.config.set('chain_id', CHAIN_ID[chain]); // חתימה על chain_id-הנכון — לא על ברירת-המחדל של STEEM
-            lib.api.setOptions({ url: RPC[chain] });
-            lib.broadcast.send(
-              { extensions: [], operations: ops.map(([name, data]) => [name, data]) },
-              { owner: wif },
-              (err, res) => {
-                if (err) reject(new Error(String((err as Error).message ?? err).slice(0, 300)));
-                else resolve({ ok: true, result: res });
-              },
-            );
-          })
-          .catch(reject);
-      }),
-  );
+  const nodes = chain === 'hive' ? HIVE_NODES : chain === 'blurt' ? BLURT_NODES : [RPC.steem];
+  const run = broadcastLock.then(async () => {
+    let last = 'unknown';
+    for (const url of nodes) {
+      try { return await sendOpsOnce(chain, url, ops, wif); } catch (e) { last = String(e).slice(0, 200); }
+    }
+    throw new Error(`broadcast[${chain}] כל-${nodes.length}-הצמתים-נפלו (אחרון: ${last})`);
+  });
   broadcastLock = run.catch(() => {}); // השרשרת-חיה-גם-אחרי-כישלון — אף-שידור-לא-נתקע
   return run;
 }
@@ -480,7 +492,15 @@ export async function fleetScan(): Promise<FleetScan> {
         account: name, chain, exists: true,
         voteRole: audit.voteRole, activeVerified: audit.activeVerified, crossMatch: audit.crossMatch,
         vestsBase, delegatedOut, receivedIn, effVests,
-        vpPct: Number(a.voting_power ?? 0) / 100,
+        // 72: VP-אפקטיבי — כל-השרשראות מציגות-לפחות-חלקית את הערך-הקפוא-בשרשרת
+        // (הוכח-חי: wog@STEEM 57% · הצי-על-HIVE 0% — אף-שהשרשרת-מחשבת-התחדשות
+        // 20%/יום (5-ימים) בעת-ההצבעה). נוסחת-ההתחדשות מ-last_vote_time — אחידה-להכל;
+        // חשבון-שהצביע-לאחרונה לא-נפגע (min-עם-10000).
+        vpPct: Math.min(10000,
+            Number(a.voting_power ?? 0)
+            + Math.max(0, Date.now() / 1000 - (Date.parse(String(a.last_vote_time ?? '1970-01-01T00:00:00')) || 0) / 1000)
+              * 10000 / (5 * 86400),
+          ) / 100,
         rcPct: rcMap.get(name) ?? null,
         pending: {
           coin: num(chain === 'hive' ? a.reward_hive_balance : a.reward_steem_balance),
@@ -612,6 +632,68 @@ export async function fleetHeal(account: string, password: string, store: boolea
       },
     });
     out.masterStored = true;
+  }
+  if (store && out.storedTotal > 0) fleetCacheClear();
+  return out;
+}
+
+/* ══ 72: סריקת-סוד-מול-כל-הצי — הפתרון-הקבוע ל"אין-לי-עוד-מפתח" ═══════════════
+ * סוד-אחד (סיסמת-אב או מפתח-P5 בשימוש-כסיסמה — שניהם-אותו-דבר-בגזירה-הקנונית)
+ * נבדק מול כל-חשבונות-הצי × שלוש-השרשראות × ארבעת-התפקידים. לא-סומכים-על-תוויות:
+ * ההוכחה-הקריפטוגרפית-בלבד (הוכח-חי: סוד-שסומן-"tov" פתח-את-wic · מפתח-P5-שסומן
+ * "ynet" פתח-גם-cashmachine). execute=true → אטימת-כל-ההתאמות-דרך-fleetHeal
+ * (כולל-סיסמת-האב-עצמה-כנכס-התאוששות-על-לכל-חשבון-שנפתח). הסוד לעולם לא נדפס. */
+export interface FleetSweepHit {
+  account: string;
+  chains: Array<{ chain: Chain3; roles: string[] }>;
+}
+export interface FleetSweepResult {
+  tried: number;
+  hits: FleetSweepHit[];
+  storedTotal: number;
+  anyMatch: boolean;
+}
+
+export async function fleetPasswordSweep(password: string, store: boolean): Promise<FleetSweepResult> {
+  const pw = String(password ?? '');
+  if (!pw) throw new Error('sweep: password נדרש — הסוד לעולם לא נדפס/לא נרשם');
+  if (pw.length < 20) throw new Error('sweep: סוד-קצר-מדי (מינימום 20 תווים — הגנה-מטעויות-הזנה)');
+  const lib = await steemLib();
+  if (!lib.auth?.getPrivateKeys) throw new Error('sweep: steem-lib auth חסר (fail-closed)');
+  const vaultAccounts = await db.vaultKey.findMany({ select: { account: true }, distinct: ['account'] });
+  const names = [...new Set([
+    ...vaultAccounts.map((r) => r.account),
+    'haran', 'ynet', 'tov', 'cashmachine', 'wog', 'wic', 'macrame', 'lsa', 'siq', 'woq', 'israelnews', 'kashmashin',
+  ])].filter((n) => /^[a-z0-9\-\.]{3,20}$/.test(n) && n !== OPERATOR);
+  const roles = ['owner', 'active', 'posting', 'memo'] as const;
+  const payload = (s: string) => String(s).replace(/^STM|^TST|^BLT|^JMT/i, '').toLowerCase();
+  const out: FleetSweepResult = { tried: 0, hits: [], storedTotal: 0, anyMatch: false };
+  for (const name of names) {
+    let keys: Record<string, string>;
+    try { keys = lib.auth.getPrivateKeys(name, pw, [...roles]); } catch { continue; }
+    out.tried += 1;
+    const hitChains: FleetSweepHit['chains'] = [];
+    for (const chain of ['steem', 'hive', 'blurt'] as Chain3[]) {
+      const a = await getAccount(chain, name).catch(() => null);
+      if (!a) continue;
+      const rolesHit: string[] = [];
+      for (const role of ['owner', 'active', 'posting'] as const) {
+        const ks = ((a[role]?.key_auths ?? []) as unknown[]).map((x) => payload(String(Array.isArray(x) ? x[0] : x)));
+        const pub = String(keys[`${role}Pubkey`] ?? '');
+        if (pub && ks.includes(payload(pub))) rolesHit.push(role);
+      }
+      const memoPub = String(keys.memoPubkey ?? '');
+      if (memoPub && payload(String(a.memo_key ?? '')) === payload(memoPub)) rolesHit.push('memo');
+      if (rolesHit.length) hitChains.push({ chain, roles: rolesHit });
+    }
+    if (hitChains.length) {
+      out.anyMatch = true;
+      out.hits.push({ account: name, chains: hitChains });
+      if (store) {
+        const healed = await fleetHeal(name, pw, true).catch(() => null);
+        out.storedTotal += healed?.storedTotal ?? 0;
+      }
+    }
   }
   if (store && out.storedTotal > 0) fleetCacheClear();
   return out;
