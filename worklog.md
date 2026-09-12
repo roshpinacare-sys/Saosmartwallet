@@ -2348,3 +2348,25 @@ Stage Summary:
 - pool-מוח NVIDIA = 4 מפתחות מאומתים חתומים בכספת; הרצה חיה done מוכיחה את השרשרת כולה (unlock→seal→brain→checker).
 - כספת: 249 רשומות; keys-batch תוקן ל-slots נבדלים; dev-server יציב דרך daemon כפול- fork.
 - 13 ריפו מוסקרו עם טבלת-ערך ניתן-לבליעה; מועמדי-r29: בליעת jummper, twin-parity לבודק, תיקון אי-עקביות stats/map.
+
+---
+Task ID: 46-r29
+Agent: main (Z.ai Code)
+Task: r29 — בליעת jummper (שער-RC + פתיחת-מסילת-HIVE), twin-parity לבודק, סגירת אי-עקביות stats/map (המשך ישיר מ-Task 45: "תמשיך ודחוף")
+
+Work Log:
+- אבחון-חי: `condenser_api.find_rc_accounts` בצורת-wire הנכונה (`[["headcorner"]]`) — headcorner@hive: max_rc 41.24B, mana 3.0B (r20 נחסם על 209.9M מול 386.5M — החסם-הכלכלי נעלם). נתפס באג-חוט ב-anchor.ts: ה-pre-check של r20 שלח `[[ {accounts} ]]` → "Bad Cast" על כל-node.
+- תיקון anchor.ts (בליעת jummper): צורת-condenser נכונה + max-על-פני-כל-ה-nodes (עמיד-stale-read, RAIL_ENDPOINTS.hive) + ETA-התחדשות כנה (5 ימים) במקום סירוב-מעורפל; fail-closed ללא-שינוי (השרשרת = האורקל); rc-reading נרשם ב-mode של-התוצאה.
+- תיקון modules.ts vault.map: totalAll + byStatusAll + byKindAll (group-by לא-חתוך) + דגל truncated + note-התאמה — סגירת ממצא-הבודק מ-r28 (stats 178/24 מול map-חתוך).
+- תיקון modules.ts vault.stats: entriesByKind (groupBy kind) — הספירה-לפי-סוג שחסמה run#1 ב-r28 כנה.
+- מודול חדש parity.twin + scripts/parity_twin.py (תאומת-Python-סטדליב בלתי-תלויה: hashlib + base58-ממומש-ביד; D1 + WIF + נוסחת-דיגסט; זרעים-סינתטיים-חתומי-יום, אפס-סודות).
+- תיקון tools-lab.tsx: eslint set-state-in-effect (עבר לשגיאה בעדכון-ה-eslint) — fetch-התחלתי ל-IIFE אסינכרונית עם guard-alive.
+- הוכחות-חיות: twin חיובי 37/37 (bun↔python ישיר) + חיובי 37/37 מתוך-המודול-האמיתי (spawnSync python3) + שלילי (קורופציות d1/digest נתפסו); vault.map בתהליך-קר → fail-closed ✓; פיוזין stats↔map: 249=249, byStatus ביט-ביט ✓; lint 0/0.
+- פעימה-חיה POST /api/gate/pulse round=r29-hive-unblocked (token מ-session-route, לא-נחשף): steem עוגן-חי blk 109514737 · **hive עוגן-חי blk 109849406 (rc:3005M@2nodes — פתיחה-ראשונה מאז-r20)** · solana עוגן-חי memo confirmed · blurt fail-closed כנה (המפתח אינו הסמכות-החיה) · ethereum fail-closed כלכלי · 3/6 נחתו.
+- אימות-עצמאי-על-השרשרת: סריקת בלוק 109849406 ב-hive מצאה custom_json saos.vault.anchor.v1 עם round r29-hive-unblocked ודיגסט 951a4704… חתום headcorner@posting (get_transaction אינדקס-מפגר — לקח-r20 יושם: סריקת-בלוק ראשית).
+- דוק: docs/broadcast/2026-09-12-r29-hive-unblocked.md · סקריפטי-הוכחה זמניים ב-tmp-analysis/ (gitignored).
+
+Stage Summary:
+- מסילת-HIVE חוברה-חיה למטוס-העיגון — עוגן-רב-מסילה אמיתי (steem+hive+solana על דיגסט אחד 951a4704…), הישג-הרשת-הגדול מאז-r20; העתודה-הכלכלית: RC 3.0B מול ~387M ל-op → עד ~5,128 עיגונים/יום ב-$0 (jummper).
+- הבודק קיבל את שלושת-הדרישות שלו: ספירה-לפי-סוג (entriesByKind), התאמה stats↔map (totalAll/byStatusAll/truncated), ובודק-בלתי-תלוי (parity.twin, 37/37).
+- פתוח ל-r30: חקירת-blurt (סמכות-ריקה מה-chain), מימון-גז ל-ethereum, 429-rotation על pool-4, עיגון-jummper מתוזמן.

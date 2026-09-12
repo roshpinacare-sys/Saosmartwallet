@@ -64,10 +64,23 @@ export function ToolsLab() {
     if (res?.ok && res.banker) setBanker(res.banker);
   }, []);
 
+  // r29 — the loaders stay for manual refresh; the initial fetch runs inside
+  // an async IIFE so every setState lands AFTER an await (callback territory),
+  // not synchronously in the effect body (react-hooks/set-state-in-effect).
   useEffect(() => {
-    loadStatus();
-    loadBanker();
-  }, [loadStatus, loadBanker]);
+    let alive = true;
+    void (async () => {
+      const [resS, resB] = await Promise.all([
+        apiJson<{ ok: boolean; status?: AxiomStatus[] }>("/api/code/query?status=1"),
+        apiJson<{ ok: boolean; banker?: Array<{ agent: string; budget: { budget: number; maxBudget: number; refillPerHour: number }; defaults?: { unitCost?: number } }> }>("/api/gate/banker"),
+      ]);
+      if (!alive) return;
+      setStatus(resS?.ok && resS.status ? resS.status : []);
+      setLoading(false);
+      if (resB?.ok && resB.banker) setBanker(resB.banker);
+    })();
+    return () => { alive = false; };
+  }, []);
 
   const syncRoot = async (root: string) => {
     setSyncing(root);

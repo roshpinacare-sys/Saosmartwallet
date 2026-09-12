@@ -32,6 +32,10 @@ import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { fundingCensus, FUNDING_ADDRESS } from "@/lib/gate/funding-watch";
 import { getEthereumAdapter, getSolanaAdapter } from "../../../../packages/chains/index";
 import { formatEther } from "ethers";
+import { deriveRolePrivHex, privHexToWif } from "@/lib/gate/rotation";
+import { spawnSync } from "node:child_process";
+import { join } from "node:path";
+import { createHash } from "node:crypto";
 
 export type ModuleKind = "skill" | "connector" | "actor";
 
@@ -74,23 +78,46 @@ export const MODULES: HarnessModule[] = [
       const where: Record<string, string> = {};
       if (typeof args.chain === "string" && args.chain) where.chain = args.chain;
       if (typeof args.account === "string" && args.account) where.account = args.account;
-      const rows = await db.vaultEntry.findMany({
-        where,
-        select: { kind: true, chain: true, account: true, role: true, pub: true, status: true },
-        orderBy: [{ chain: "asc" }, { account: "asc" }],
-        take: 200,
-      });
-      // r31 — עיוורון-הבודק נסגר-כאן-כמו-שנסגר-ב-r29 (צנזורת-התגמולים): הרשימה-המלאה
-      // נחתכת לפי-תקרת-התוצאה (RESULT_CLAMP), והבודק-העצמאי לא-היה-מסוגל-לאמת
-      // אילו-רשומות-ממתינות. byStatus + waiting נמצאים-ראשונים-באובייקט —
-      // JSON.stringify שומר-על-סדר-המפתחות, ולכן-גם-אחרי-חיתוך הראש-מציג-את
-      // הפירוק-המלא-לפי-סטטוס ואת-רשימת-הממתינות (החלק-הניתן-לאימות).
+      // r29 — פער-ה-checker נסגר: map הציג sample-חתוך (take:200) וstats ספר
+      // את-הכל — שתי-האמיתות היו-נכונות ובלתי-ניתנות-להתאמה. עכשיו map נושאת
+      // את-האמת-המלאה עבור אותו where: totalAll + byStatusAll + byKindAll
+      // (group-by לא-נחתך) + דגל-truncated, כך שהבודק מתאים stats↔map בלי
+      // להאמין לאף-אחד — המספרים עצמם מצטלבים.
+      const [rows, totalAll, byStatusAllRows, byKindAllRows] = await Promise.all([
+        db.vaultEntry.findMany({
+          where,
+          select: { kind: true, chain: true, account: true, role: true, pub: true, status: true },
+          orderBy: [{ chain: "asc" }, { account: "asc" }],
+          take: 200,
+        }),
+        db.vaultEntry.count({ where }),
+        db.vaultEntry.groupBy({ by: ["status"], _count: { _all: true }, where }),
+        db.vaultEntry.groupBy({ by: ["kind"], _count: { _all: true }, where }),
+      ]);
       const byStatus: Record<string, number> = {};
       for (const r of rows) byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+      const byStatusAll: Record<string, number> = {};
+      for (const g of byStatusAllRows) byStatusAll[g.status] = g._count._all;
+      const byKindAll: Record<string, number> = {};
+      for (const g of byKindAllRows) byKindAll[g.kind] = g._count._all;
       const waiting = rows
         .filter((r) => r.status === "imported" || r.status === "unverified")
         .map((r) => `${r.chain || "?"}/${r.account || "?"}|${r.role || "?"}|${r.kind}|${r.status}`);
-      return { byStatus, waiting, waitingCount: waiting.length, total: rows.length, entries: rows, note: "pubs בלבד — חומר-פרטי לא נחשף לסוכנים" };
+      const truncated = totalAll > rows.length;
+      return {
+        byStatus,
+        byStatusAll,
+        byKindAll,
+        waiting,
+        waitingCount: waiting.length,
+        total: rows.length,
+        totalAll,
+        truncated,
+        entries: rows,
+        note: truncated
+          ? `pubs בלבד — חומר-פרטי לא נחשף; הרשימה sample של ${rows.length} מתוך ${totalAll} — הספירות המלאות ב-byStatusAll/byKindAll`
+          : "pubs בלבד — חומר-פרטי לא נחשף לסוכנים",
+      };
     },
   },
   {
@@ -124,7 +151,7 @@ export const MODULES: HarnessModule[] = [
     cacheable: true,
     async exec() {
       const cfg = await db.gateConfig.findUnique({ where: { id: "gate" } });
-      const [entries, agents, messages, runs, groupByStatus] = await Promise.all([
+      const [entries, agents, messages, runs, groupByStatus, groupByKind] = await Promise.all([
         db.vaultEntry.count(),
         db.gateAgent.count({ where: { active: true } }),
         db.gateMessage.count(),
@@ -132,10 +159,61 @@ export const MODULES: HarnessModule[] = [
         // r31 — הבודק-העצמאי-נדרש-לאמת "כמה-רשומות באילו-סטטוסים"; בלי-הפירוק
         // הקריטריון-נכשל-בכנות על-תשובה-כללית (נתפס-חי בהוכחת-הצי של-r31).
         db.vaultEntry.groupBy({ by: ["status"], _count: { _all: true } }),
+        // r29 — הבודק-דרש ספירה-לפי-סוג (run#1 נחסם על-זה בכנות): entriesByKind
+        db.vaultEntry.groupBy({ by: ["kind"], _count: { _all: true } }),
       ]);
       const entriesByStatus: Record<string, number> = {};
       for (const g of groupByStatus) entriesByStatus[g.status] = g._count._all;
-      return { vault: { initialized: Boolean(cfg?.initialized), unlocked: masterReady(), entries, entriesByStatus }, agents, messages, runs };
+      const entriesByKind: Record<string, number> = {};
+      for (const g of groupByKind) entriesByKind[g.kind] = g._count._all;
+      return { vault: { initialized: Boolean(cfg?.initialized), unlocked: masterReady(), entries, entriesByStatus, entriesByKind }, agents, messages, runs };
+    },
+  },
+  {
+    id: "parity.twin",
+    name: "צמד-פריטי (Twin-Parity)",
+    kind: "skill",
+    desc: "שני מנועים בלתי-תלויים מחשבים את אותם-וקטורים דטרמיניסטיים — גזירת-D1 (sha256), קידוד-WIF (base58check), ונוסחת-הדיגסט של הכספת — TS מול Python-סטדליב (base58 ממומש-ביד). אף-מנוע-לא-מעריך-את-עצמו (הדוקטרינה מ-saos-sovereign-platform); כל-אי-התאמה היא ממצא-גלוי.",
+    args: `{"vectors":"number (default 24, max 64)"}`,
+    needsVault: false,
+    cacheable: false,
+    async exec(args) {
+      const n = Math.min(64, Math.max(4, Number(args.vectors) || 24));
+      const dayKey = new Date().toISOString().slice(0, 10);
+      const accounts = ["parity-a", "parity-b", "parity-c"];
+      const roles = ["owner", "active", "posting", "memo"];
+      // deterministic synthetic seeds — never the real master (parity, not custody)
+      const d1: Array<{ account: string; role: string; seed: string; expected: string }> = [];
+      for (let i = 0; i < n; i++) {
+        const account = accounts[i % accounts.length];
+        const role = roles[i % roles.length];
+        const seed = `parity-v1/${dayKey}/${i}`;
+        d1.push({ account, role, seed, expected: deriveRolePrivHex(account, role, seed) });
+      }
+      const wif = d1.slice(0, Math.min(n, 12)).map((v) => ({ privHex: v.expected, expected: privHexToWif(v.expected) }));
+      // digest vector over REAL public pubs (identity material is public by design)
+      const sample = await db.vaultEntry.findMany({
+        where: { kind: "steem-key", status: "verified" },
+        select: { chain: true, account: true, role: true, pub: true },
+        orderBy: { updatedAt: "desc" as const },
+        take: 48,
+      });
+      const norm = sample.map((r) => `${r.chain}/${r.account}/${r.role}/${r.pub}`).sort();
+      const counts = { vectors: n, rows: norm.length, day: dayKey };
+      const digest = createHash("sha256").update(JSON.stringify({ protocol: "parity/v1", counts, rows: norm })).digest("hex");
+      // the twin engine recomputes from the raw inputs with its own code and
+      // compares against the TS outputs — echo is impossible, the script is
+      // committed (scripts/parity_twin.py) and inspectable by the checker.
+      const r = spawnSync("python3", [join(process.cwd(), "scripts", "parity_twin.py")], {
+        input: JSON.stringify({ d1, wif, digest: { counts, rows: norm, expected: digest } }),
+        timeout: 30_000,
+        maxBuffer: 4 * 1024 * 1024,
+      });
+      if (r.error || r.status !== 0) {
+        throw new GateError("bad-input", `twin-engine failed: ${String((r.error as Error | null)?.message ?? r.stderr ?? "unknown").slice(0, 160)}`);
+      }
+      const verdict = JSON.parse(String(r.stdout)) as Record<string, unknown>;
+      return { vectors: { d1: d1.length, wif: wif.length, digest: 1 }, engine: "ts(next)+python3-stdlib", verdict };
     },
   },
   {

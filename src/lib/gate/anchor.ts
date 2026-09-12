@@ -43,6 +43,11 @@ export const ANCHOR_ID = "saos.vault.anchor.v1";
 export const ANCHOR_ACCOUNT = "headcorner";
 const ANCHOR_RAILS: Rail[] = ["steem", "hive", "blurt"];
 const sha256hex = (s: string) => createHash("sha256").update(s).digest("hex");
+/** r20 measured the live op cost at ~387M RC; the r29 gate keeps headroom.
+ *  Re-measured live r29: headcorner@hive max_rc 41.24B, current mana 3.0B —
+ *  the r20 economic blocker (209.9M vs 386.5M) is history. */
+const HIVE_RC_MIN = 450_000_000;
+const HIVE_REGEN_DAYS = 5; // chain economics: RC regenerates fully in ~5 days
 
 export interface AnchorRecord {
   chain: string;
@@ -292,21 +297,61 @@ export async function sealAnchorRound(round: string, agentName = "operator-deleg
   if (payloadJson.length > 8192) throw new Error("anchor payload exceeds 8192 bytes");
 
   const rails: RailAnchorOutcome[] = [];
+  let rcProbe = "n/a"; // r29 — the live RC reading that gated the hive rail
   for (const rail of ANCHOR_RAILS) {
     try {
-      // r20 — RC pre-check for hive (the chain economics refused a perfectly
-      // signed anchor: headcorner 209.9M RC vs 386.5M needed — measured live).
-      // Fail fast with the honest economic answer instead of a doomed broadcast.
+      // r29 — jummper ingest (repo: roshpinacare-sys/saos-jummper). The r20 RC
+      // pre-check was vetoing the hive rail on a WRONG wire shape ([[ {accounts} ]]
+      // → "Bad Cast" on every node) and on a SINGLE-node read. jummper's field
+      // lesson: RC caches differ per node (stale-read) and a stale LOW read must
+      // not veto an anchor the chain itself would accept. The gate now:
+      //   (a) speaks the correct condenser shape (["headcorner"]) — verified live;
+      //   (b) reads EVERY hive endpoint and keeps the MAX (stale-read-immune);
+      //   (c) when even the max is short, reports the honest regen ETA instead
+      //       of a vague refusal (full regen ≈ 5 days, chain economics).
+      // Fail-closed unchanged: the chain remains the oracle — a signed broadcast
+      // the chain refuses is still recorded as a refusal, never hidden.
       if (rail === "hive") {
         try {
-          const rc = await railRpc<{ result?: Array<{ rc_manabar?: { current_mana?: string } }> }>("hive", "condenser_api.find_rc_accounts", [[{ accounts: [ANCHOR_ACCOUNT] }]]);
-          const mana = Number(rc?.result?.[0]?.rc_manabar?.current_mana ?? 0);
-          if (mana > 0 && mana < 450_000_000) {
-            throw new Error(`RC כלכלי — ל-${ANCHOR_ACCOUNT}@hive יש ${Math.round(mana / 1e6)}M RC מול ~387M שנדרשו ל-op (מדוד-חי r20); נדרשת הזרמת HP כדי לפתוח את המסילה`);
+          const reads = await Promise.allSettled(
+            RAIL_ENDPOINTS.hive.map((url) =>
+              fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "condenser_api.find_rc_accounts", params: [[ANCHOR_ACCOUNT]] }),
+                signal: AbortSignal.timeout(12_000),
+              })
+                .then((res) => res.json() as Promise<{ result?: Array<{ rc_manabar?: { current_mana?: string } }> }>)
+                .then((j) => Number(j?.result?.[0]?.rc_manabar?.current_mana ?? 0)),
+            ),
+          );
+          const manas = reads.filter((r): r is PromiseFulfilledResult<number> => r.status === "fulfilled" && r.value > 0).map((r) => r.value);
+          const manaMax = manas.length ? Math.max(...manas) : 0;
+          rcProbe = manas.length ? `${Math.round(manaMax / 1e6)}M@${manas.length}nodes` : "unavailable";
+          if (manas.length > 0 && manaMax < HIVE_RC_MIN) {
+            // regen ETA from the deficit — honest economics, not a shrug
+            const maxReads = await Promise.allSettled(
+              RAIL_ENDPOINTS.hive.map((url) =>
+                fetch(url, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "condenser_api.find_rc_accounts", params: [[ANCHOR_ACCOUNT]] }),
+                  signal: AbortSignal.timeout(12_000),
+                })
+                  .then((res) => res.json() as Promise<{ result?: Array<{ rc_manabar?: { max_rc?: string } }> }>)
+                  .then((j) => Number(j?.result?.[0]?.rc_manabar?.max_rc ?? 0)),
+              ),
+            );
+            const maxRc = maxReads.filter((r): r is PromiseFulfilledResult<number> => r.status === "fulfilled" && r.value > 0).map((r) => r.value).reduce((a, b) => Math.max(a, b), 0);
+            const perDay = maxRc > 0 ? maxRc / HIVE_REGEN_DAYS : 0;
+            const etaDays = perDay > 0 ? Math.ceil((HIVE_RC_MIN - manaMax) / perDay) : null;
+            throw new Error(
+              `RC כלכלי — ${ANCHOR_ACCOUNT}@hive: מקסימום-בין-ה-nodes ${Math.round(manaMax / 1e6)}M RC מול ${Math.round(HIVE_RC_MIN / 1e6)}M נדרשים (jummper-עמיד-stale-read, ${manas.length} nodes)${etaDays != null ? `; התחדשות-מלאה ~${HIVE_REGEN_DAYS} ימים — ETA לסף: ~${etaDays} ימים` : ""}`,
+            );
           }
         } catch (e) {
           if (String((e as Error).message).includes("RC כלכלי")) throw e;
-          // the pre-check itself failed (node flake) — proceed, the chain remains the oracle
+          // the pre-check itself failed (all nodes flaked) — proceed, the chain remains the oracle
         }
       }
       const { priv, source } = await anchorPostingKey(rail);
@@ -322,7 +367,7 @@ export async function sealAnchorRound(round: string, agentName = "operator-deleg
           v = await verifyAnchorOnChain(rail, txId, digest, blockNum);
         }
       }
-      rails.push({ rail, ok: true, txId, blockNum: v.blockNum ?? blockNum, digest, onChain: v.onChain, digestMatch: v.digestMatch, mode: `${source}·${mode}` });
+      rails.push({ rail, ok: true, txId, blockNum: v.blockNum ?? blockNum, digest, onChain: v.onChain, digestMatch: v.digestMatch, mode: `${source}·${mode}${rail === "hive" ? `·rc:${rcProbe}` : ""}` });
       await db.gateAction.create({
         data: {
           agentName,
