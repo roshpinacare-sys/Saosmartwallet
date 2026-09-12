@@ -42,15 +42,19 @@ const LOOP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   'grid-steem': Activity,
   'powerdown-drip': Repeat,
   curation: Vote,
+  'hive-curation': Vote,
+  'blurt-curation': Vote,
   'hbd-savings': PiggyBank,
   'trx-energize': Zap,
 };
+const CHAIN_LABEL: Record<string, string> = { steem: 'STEEM', hive: 'HIVE', blurt: 'BLURT' };
 
 export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: () => void }) {
   const [data, setData] = useState<FlowData | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, ActionResult>>({});
   const [cands, setCands] = useState<VoteCandidate[] | null>(null);
+  const [candsChain, setCandsChain] = useState<'steem' | 'hive' | 'blurt'>('steem');
   const [candsOpen, setCandsOpen] = useState(false);
   const [voteW, setVoteW] = useState(10); // משקל-הצבעה % — מדרג-תשואה (VP: 2%×משקל להצבעה)
   const [msg, setMsg] = useState<string | null>(null);
@@ -77,24 +81,25 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
       });
       const j = (await r.json()) as ActionResult;
       setResult((prev) => ({ ...prev, [key]: j }));
-      if (execute && j.ok) setMsg(action === 'steem_vote' ? 'ההצבעה שודרה לשרשרת ✓' : 'בוצע ✓');
+      if (execute && j.ok) setMsg(action.endsWith('_vote') ? 'ההצבעה שודרה לשרשרת ✓' : 'בוצע ✓');
       else if (execute && !j.ok) setMsg(`כישלון-כנה: ${j.error ?? '—'}`);
       fetcher();
     } catch { setResult((prev) => ({ ...prev, [key]: { ok: false, error: 'רשת לא נגישה' } })); }
     finally { setBusy(null); }
   }, [authed, onNeedAuth, fetcher]);
 
-  const pickCandidates = useCallback(async () => {
+  const pickCandidates = useCallback(async (chain: 'steem' | 'hive' | 'blurt') => {
     setBusy('pick');
     try {
       const r = await fetch('/api/saos/flow', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'autovote_pick', params: {} }),
+        body: JSON.stringify({ action: 'autovote_pick', params: { chain } }),
       });
       const j = (await r.json()) as ActionResult;
       setCands(j.candidates ?? []);
+      setCandsChain(chain);
       setCandsOpen(true);
-    } catch { setCands([]); setCandsOpen(true); }
+    } catch { setCands([]); setCandsChain(chain); setCandsOpen(true); }
     finally { setBusy(null); }
   }, []);
 
@@ -171,7 +176,7 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
 
       {/* ── לולאות-זרימה ── */}
       <div>
-        <h3 className="label-caps flex items-center gap-1.5 mb-2"><Landmark className="w-3.5 h-3.5" /> לולאות-הזרימה (5)</h3>
+        <h3 className="label-caps flex items-center gap-1.5 mb-2"><Landmark className="w-3.5 h-3.5" /> לולאות-הזרימה ({d.loops.length})</h3>
         <div className="grid gap-3 md:grid-cols-2">
           {d.loops.map((loop) => {
             const Icon = LOOP_ICON[loop.id] ?? Activity;
@@ -199,16 +204,22 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                 <p className="text-[11px] opacity-70 leading-relaxed mb-2 break-words">{loop.verdict}</p>
                 {loop.actions.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {loop.actions.includes('steem_vote') && (
-                      <button
-                        onClick={pickCandidates}
-                        className="min-h-[32px] rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
-                        aria-label="בחר פוסט להצבעת קיוריישן"
-                      >
-                        {busy === 'pick' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'בחר פוסט להצבעה'}
-                      </button>
-                    )}
-                    {loop.actions.filter((a) => a !== 'steem_vote').map((a) => (
+                    {(() => {
+                      // בורר-מועמדים-מודע-שרשרת: autovote_pick (STEEM) או <chain>_autovote_pick
+                      const pickAction = loop.actions.find((a) => a === 'autovote_pick' || a.endsWith('_autovote_pick'));
+                      if (!pickAction) return null;
+                      const pickChain = pickAction === 'autovote_pick' ? 'steem' : pickAction.split('_')[0];
+                      return (
+                        <button
+                          onClick={() => pickCandidates(pickChain as 'steem' | 'hive' | 'blurt')}
+                          className="min-h-[32px] rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                          aria-label={`בחר פוסט ${CHAIN_LABEL[pickChain]} להצבעת קיוריישן`}
+                        >
+                          {busy === 'pick' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : `בחר פוסט ${CHAIN_LABEL[pickChain]} להצבעה`}
+                        </button>
+                      );
+                    })()}
+                    {loop.actions.filter((a) => !a.includes('autovote_pick') && a !== 'steem_vote').map((a) => (
                       <button
                         key={a}
                         onClick={() => run(a, false)}
@@ -243,7 +254,7 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
       {candsOpen && cands !== null && (
         <div className="dx-card p-4">
           <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-            <h3 className="text-sm font-bold flex items-center gap-1.5"><Vote className="w-4 h-4 text-[color:var(--green)]" /> מועמדי-קיוריישן (טרנדינג · 1–18 שעות)</h3>
+            <h3 className="text-sm font-bold flex items-center gap-1.5"><Vote className="w-4 h-4 text-[color:var(--green)]" /> מועמדי-קיוריישן · {CHAIN_LABEL[candsChain]} (טרנדינג · 1–18 שעות)</h3>
             <div className="flex items-center gap-2">
               <label className="text-[11px] opacity-70 flex items-center gap-1" htmlFor="vote-weight">
                 משקל-הצבעה
@@ -270,7 +281,8 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
           ) : (
             <div className="space-y-2 max-h-72 overflow-y-auto">
               {cands.map((c) => {
-                const key = 'steem_vote' + c.permlink;
+                const voteAction = `${candsChain}_vote`;
+                const key = voteAction + c.permlink;
                 const res = result[key];
                 return (
                   <div key={c.permlink} className="rounded-lg border border-[color:var(--line)] bg-black/20 p-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -280,14 +292,14 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
-                        onClick={() => run('steem_vote', false, { author: c.author, permlink: c.permlink, weightPct: voteW })}
+                        onClick={() => run(voteAction, false, { author: c.author, permlink: c.permlink, weightPct: voteW })}
                         className="min-h-[32px] rounded-lg border border-[color:var(--line)] px-2 py-1.5 text-[11px] hover:bg-black/30"
                         aria-label={`נסיון הצבעה ${voteW}% על פוסט של ${c.author}`}
                       >
                         {busy === key + '!dry' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'בדוק'}
                       </button>
                       <button
-                        onClick={() => run('steem_vote', true, { author: c.author, permlink: c.permlink, weightPct: voteW })}
+                        onClick={() => run(voteAction, true, { author: c.author, permlink: c.permlink, weightPct: voteW })}
                         className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2 py-1.5 text-[11px] hover:bg-black/30"
                         aria-label={`הצבע אמת ${voteW}% על פוסט של ${c.author}`}
                       >

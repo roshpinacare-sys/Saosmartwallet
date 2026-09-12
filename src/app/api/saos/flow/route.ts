@@ -2,15 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
 import { flowOverview } from '@/lib/saos/flow';
-import { steemVote, hiveSavingsSweep, steemClaimRewards, curationCandidates, postInfo, getAccount, getGlobalProps, vestsToChainVests } from '@/lib/saos/steem-ops';
+import {
+  chainVote, hiveSavingsSweep, claimRewards, curationCandidates, postInfo,
+  getAccount, getGlobalProps, vestsToChainVests, type Chain3,
+} from '@/lib/saos/steem-ops';
 import { trxEnergize, tronAccount, treasuryWallet } from '@/lib/saos/trx-ops';
 
 export const dynamic = 'force-dynamic';
 
-/* ══ /api/saos/flow — מנוע-הזרימה הריבוני (Task 71-flow) ═════════════════════
+/* ══ /api/saos/flow — מנוע-הזרימה הריבוני (Task 71-flow · 71-e) ═════════════
  * GET  — תמונת-מצב אמת (אוצר + לולאות + פקדה) · קריאה-בלבד.
  * POST — פעולות: dry-run ברירת-מחדל; execute:true דורש-סשן-מפעיל (requireOwner)
- *        ונרשם-בביקורת + משודר-לריליי. אף-סוד לא נדפס/לא יוצא. */
+ *        ונרשם-בביקורת + משודר-לריליי. אף-סוד לא נדפס/לא יוצא.
+ * 71-e: פעולות-קיוריישן על-שלוש-השרשראות (steem/hive/blurt) — chainVote חותם
+ * על chain_id-הנכון לכל-שרשרת (steem-ops.ts). */
+
+const VOTE_CHAINS: Record<string, Chain3> = { steem_vote: 'steem', hive_vote: 'hive', blurt_vote: 'blurt' };
 
 export async function GET() {
   try {
@@ -34,6 +41,31 @@ async function dexRealmarket(body: Record<string, unknown>): Promise<{ status: n
   return { status: r.status, json };
 }
 
+/** הצבת-קיוריישן-משותפת לשלוש-השרשראות (dry-run + execute) */
+async function voteAction(chain: Chain3, action: string, p: Record<string, unknown>, execute: boolean, ownerLabel: string) {
+  const author = String(p.author ?? '');
+  const permlink = String(p.permlink ?? '');
+  const weightPct = Math.min(100, Math.max(0.1, Number(p.weightPct ?? 10) || 10)); // מדרג-תשואה · חסם-בטיחות 0.1–100
+  if (execute) {
+    const post = await postInfo(chain, author, permlink).catch(() => null);
+    const r = await chainVote(chain, { author, permlink, weightPct });
+    await audit(`flow-${chain}-vote`, `curation vote[${chain}]: @${author}/${permlink.slice(0, 60)} weight=${weightPct}% by owner:${ownerLabel} — post-age=${post ? Math.round((Date.now() - new Date(String(post.created)).getTime()) / 3600_000) + 'h' : '?'} title="${String(post?.title ?? '').slice(0, 50)}"`);
+    try { await relayBroadcast('vault', { type: `flow-${chain}-vote`, author, permlink, weightPct }); } catch { /* */ }
+    return NextResponse.json({ ok: true, action, dryRun: false, result: r });
+  }
+  const post = await postInfo(chain, author, permlink).catch(() => null);
+  if (!post) return NextResponse.json({ ok: false, action, dryRun: true, error: `post לא נמצא ב-${chain.toUpperCase()}` });
+  return NextResponse.json({
+    ok: true, action, dryRun: true,
+    plan: {
+      chain: chain.toUpperCase(), title: String(post.title).slice(0, 80), author: String(post.author), created: String(post.created),
+      ageH: Math.round((Date.now() - new Date(String(post.created)).getTime()) / 3600_000),
+      netVotes: Number(post.net_votes ?? (Array.isArray(post.active_votes) ? post.active_votes.length : 0)),
+      weightPct, note: 'הצבעה אמת מכספת-owner · chain_id-נכון-לשרשרת · weightPct של מסה-מצביעה',
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   let body: { action?: string; execute?: boolean; params?: Record<string, unknown> };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'bad-json' }, { status: 200 }); }
@@ -41,15 +73,22 @@ export async function POST(req: NextRequest) {
   const execute = body.execute === true;
   const p = body.params ?? {};
 
-  // autovote_pick הוא read-only — פתוח-בלי-סשן (בחירת-מועמד לתצוגה)
+  // autovote_pick הוא read-only — פתוח-בלי-סשן (בחירת-מועמד לתצוגה) · 71-e: לכל-שרשרת
   if (action === 'autovote_pick') {
     try {
+      const chain: Chain3 = p.chain === 'hive' ? 'hive' : p.chain === 'blurt' ? 'blurt' : 'steem';
       const tag = typeof p.tag === 'string' ? p.tag : '';
-      const cands = await curationCandidates(tag);
-      return NextResponse.json({ ok: true, action, dryRun: true, candidates: cands.slice(0, 5) });
+      const cands = await curationCandidates(chain, tag);
+      return NextResponse.json({ ok: true, action, dryRun: true, chain, candidates: cands.slice(0, 5) });
     } catch (e) {
       return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'pick failed' }, { status: 200 });
     }
+  }
+
+  // 71-e: dry-run-הצבעה = מידע-פומבי-בלבד (get_content) — לא-דורש-סשן. execute-מחייב-מפעיל.
+  const dryChain = VOTE_CHAINS[action];
+  if (dryChain && execute !== true) {
+    return await voteAction(dryChain, action, p, false, '');
   }
 
   const owner = await requireOwner(req);
@@ -57,30 +96,11 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (action) {
-      /* ── הצבעת-קיוריישן ── */
-      case 'steem_vote': {
-        const author = String(p.author ?? '');
-        const permlink = String(p.permlink ?? '');
-        const weightPct = Math.min(100, Math.max(0.1, Number(p.weightPct ?? 10) || 10)); // מדרג-תשואה · חסם-בטיחות 0.1–100
-        if (execute) {
-          const post = await postInfo(author, permlink).catch(() => null);
-          const r = await steemVote({ author, permlink, weightPct });
-          await audit('flow-vote', `curation vote: @${author}/${permlink.slice(0, 60)} weight=${weightPct}% by owner:${owner.label} — post-age=${post ? Math.round((Date.now() - new Date(String(post.created)).getTime()) / 3600_000) + 'h' : '?'} title="${String(post?.title ?? '').slice(0, 50)}"`);
-          try { await relayBroadcast('vault', { type: 'flow-vote', author, permlink, weightPct }); } catch { /* */ }
-          return NextResponse.json({ ok: true, action, dryRun: false, result: r });
-        }
-        const post = await postInfo(author, permlink).catch(() => null);
-        if (!post) return NextResponse.json({ ok: false, action, dryRun: true, error: 'post לא נמצא ב-STEEM' });
-        return NextResponse.json({
-          ok: true, action, dryRun: true,
-          plan: {
-            title: String(post.title).slice(0, 80), author: String(post.author), created: String(post.created),
-            ageH: Math.round((Date.now() - new Date(String(post.created)).getTime()) / 3600_000),
-            netVotes: Number(post.net_votes ?? 0),
-            weightPct, note: 'הצבעה אמת מכספת-owner · weightPct של SP-פנוי',
-          },
-        });
-      }
+      /* ── הצבעות-קיוריישן — STEEM/HIVE/BLURT (71-e: מנוע-משותף · execute-בלבד כאן) ── */
+      case 'steem_vote':
+      case 'hive_vote':
+      case 'blurt_vote':
+        return await voteAction(VOTE_CHAINS[action], action, p, execute, owner.label);
 
       /* ── פאוורדאון-מנוע (דרך מנוע-הדקס החי · STEEM_ACTIVE_WIF) ── */
       case 'steem_powerdown': {
@@ -124,14 +144,16 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      /* ── תביעת-פרסים ── */
-      case 'steem_claim': {
+      /* ── תביעת-פרסים — STEEM/HIVE (71-e: HIVE נוסף) ── */
+      case 'steem_claim':
+      case 'hive_claim': {
+        const chain: 'steem' | 'hive' = action === 'hive_claim' ? 'hive' : 'steem';
         if (execute) {
-          const r = await steemClaimRewards();
-          await audit('flow-claim', `claim_reward_balance: ${r.claimed} by owner:${owner.label}`);
+          const r = await claimRewards(chain);
+          await audit(`flow-${chain}-claim`, `claim_reward_balance[${chain}]: ${r.claimed} by owner:${owner.label}`);
           return NextResponse.json({ ok: true, action, dryRun: false, result: r });
         }
-        return NextResponse.json({ ok: true, action, dryRun: true, plan: { note: 'תביעת-כל-הפרסים-הממתינים (כנה אם 0)' } });
+        return NextResponse.json({ ok: true, action, dryRun: true, plan: { note: `תביעת-כל-הפרסים-הממתינים ב-${chain.toUpperCase()} (כנה אם 0)` } });
       }
 
       /* ── אנרגיז-TRX ── */
@@ -157,7 +179,7 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'trx_energize', 'autovote_pick'] }, { status: 200 });
+        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'autovote_pick'] }, { status: 200 });
     }
   } catch (e) {
     return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'flow action failed' }, { status: 200 });

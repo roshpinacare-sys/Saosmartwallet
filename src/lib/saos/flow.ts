@@ -9,9 +9,13 @@
  *   C. curation       — HP שלנו מצביע-על-פוסטים-חיים → תגמולי-קיוריישן
  *   D. hbd-savings    — HBD → חיסכון 15% APR (פרמטר-שרשרת)
  *   E. trx-energize   — ארנק-המערכת האטום → אנרגיה+הצבעה ~4.5% APR (ממתין-הפקדה)
+ * 71-e (עמוק) — הרחבת-המסה-המצביעה על-השרשראות-האחיות (בלי-פאוורדאון —
+ * 13-שבועות-שם = אבק; המסה מכפילה-קיוריישן):
+ *   F. hive-curation  — 24.3 HP אפקטיביים מצביעים על HIVE
+ *   G. blurt-curation — ~8.5K BLP מצביעים על BLURT
  */
 import { db } from '@/lib/db';
-import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser } from '@/lib/saos/steem-ops';
+import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser, getBlurtAccount, getBlurtProps } from '@/lib/saos/steem-ops';
 import { treasuryWallet, doorWallet, tronAccount } from '@/lib/saos/trx-ops';
 import { planEnergize } from '@/lib/saos/tron-energize';
 
@@ -64,6 +68,15 @@ async function pricesUsd(): Promise<Record<string, number> | null> {
       return Object.keys(out).length ? out : null;
     } catch { return null; }
   });
+}
+
+/** מפתח-owner מאומת בכספת לשרשרת? (קריאת-DB-מקומית · בלי-סודות) */
+async function hasVerifiedOwner(chain: string): Promise<boolean> {
+  const row = await db.vaultKey.findFirst({
+    where: { account: OPERATOR, chain, role: 'owner', verified: true },
+    select: { id: true },
+  });
+  return !!row;
 }
 
 async function dexGridSnapshot(): Promise<Record<string, unknown> | null> {
@@ -122,22 +135,20 @@ async function curationTrack(vestsToSp: (v: number) => number): Promise<Curation
 }
 
 export async function flowOverview(): Promise<FlowOverview> {
-  const [steemAcc, hiveAcc, props, prices, grid, treasury, door, blurtAcc] = await Promise.all([
+  const [steemAcc, hiveAcc, props, hiveProps, blurtProps, prices, grid, treasury, door, blurtAcc, vaultVerified] = await Promise.all([
     cached('steem-acc', 60_000, () => getAccount('steem').catch(() => null)),
     cached('hive-acc', 60_000, () => getAccount('hive').catch(() => null)),
     cached('steem-props', 60_000, () => getGlobalProps('steem').catch(() => null)),
+    cached('hive-props', 60_000, () => getGlobalProps('hive').catch(() => null)),
+    cached('blurt-props', 60_000, () => getBlurtProps().catch(() => null)),
     pricesUsd(),
     dexGridSnapshot(),
     treasuryWallet().catch(() => null),
     doorWallet().catch(() => null),
-    cached('blurt-acc', 60_000, async () => {
-      // צמתים-מוכחים (נבדקו-חי בביקורת 71-c · rpc.blurt.world/blurtworld.com מתים — החזירו ריק/HTML)
-      for (const url of ['https://blurt-rpc.saboin.com', 'https://rpc.beblurt.com', 'https://rpc.blurt.blog', 'https://blurtrpc.dagobert.uk', 'https://rpc.drakernoise.com']) {
-        try { return await condenser(url, 'condenser_api.get_accounts', [['headcorner']]); } catch { /* next */ }
-      }
-      return null;
-    }),
+    cached('blurt-acc', 60_000, () => getBlurtAccount().catch(() => null)),
+    cached('vault-verified', 60_000, () => Promise.all([hasVerifiedOwner('hive'), hasVerifiedOwner('blurt')])),
   ]);
+  const [hiveOwnerVerified, blurtOwnerVerified] = vaultVerified ?? [false, false];
   const [doorInfo, treasuryInfo] = await Promise.all([
     door?.address ? cached(`tron-door-${door.address}`, 60_000, () => tronAccount(door.address!).catch(() => null)) : Promise.resolve(null),
     treasury?.address ? cached(`tron-treasury-${treasury.address}`, 60_000, () => tronAccount(treasury.address!).catch(() => null)) : Promise.resolve(null),
@@ -169,13 +180,29 @@ export async function flowOverview(): Promise<FlowOverview> {
   const pdWeeks = pdWeekSp > 0 ? Math.max(1, Math.ceil(pdRemainingSp / pdWeekSp)) : 0;
 
   const hiveVests = parseFloat(String(hiveAcc?.vesting_shares ?? '0'));
+  const hiveDelegated = parseFloat(String(hiveAcc?.delegated_vesting_shares ?? '0'));
+  const hiveReceived = parseFloat(String(hiveAcc?.received_vesting_shares ?? '0'));
   const hiveLiquid = parseFloat(String(hiveAcc?.balance ?? '0'));
   const hiveHbd = parseFloat(String(hiveAcc?.hbd_balance ?? '0'));
-  const hiveHbdSavings = parseFloat(String(hiveAcc?.hbd_savings_balance ?? '0'));
-  const hiveHsp = props ? hiveVests * (parseFloat(String(props.total_vesting_fund_steem)) / parseFloat(String(props.total_vesting_shares))) : 0;
+  // FIX(71-e): השדה ב-HIVE נקרא savings_hbd_balance (לא hbd_savings_balance — undefined-שקרי)
+  const hiveHbdSavings = parseFloat(String(hiveAcc?.savings_hbd_balance ?? '0'));
+  // FIX(71-e): HP מחושב מ-props-של-HIVE עצמה — היה-מחושב בטעות מהיחס-של-STEEM (צלב-שרשראות)
+  const hiveFund = parseFloat(String(hiveProps?.total_vesting_fund_hive ?? '0'));
+  const hiveShares = parseFloat(String(hiveProps?.total_vesting_shares ?? '0'));
+  const hiveRatio = hiveShares > 0 ? hiveFund / hiveShares : 0;
+  const hiveHsp = hiveVests * hiveRatio;
+  const hiveHspOwn = Math.max(0, hiveVests - hiveDelegated) * hiveRatio;
+  const hiveHspEffective = (hiveVests + hiveReceived - hiveDelegated) * hiveRatio;
+  const hiveHistVests = Number(hiveAcc?.curation_rewards ?? 0) + Number(hiveAcc?.posting_rewards ?? 0); // VESTS-היסטוריים (רווחי-עבר שהופקו ל-HP)
 
-  const blurtLiquid = blurtAcc?.[0] ? parseFloat(String(blurtAcc[0].balance ?? '0')) : null;
-  const blurtVests = blurtAcc?.[0] ? parseFloat(String(blurtAcc[0].vesting_shares ?? '0')) : null;
+  const blurtLiquid = blurtAcc ? parseFloat(String(blurtAcc.balance ?? '0')) : null;
+  const blurtVests = blurtAcc ? parseFloat(String(blurtAcc.vesting_shares ?? '0')) : null;
+  const blurtVp = blurtAcc ? Number(blurtAcc.voting_power ?? 0) : null;
+  // BLP מתוך VESTS — יחס-BLURT עצמה (fund/shares), לא-יחס-STEEM/HIVE
+  const blurtFund = parseFloat(String(blurtProps?.total_vesting_fund_blurt ?? '0'));
+  const blurtShares = parseFloat(String(blurtProps?.total_vesting_shares ?? '0'));
+  const blurtRatio = blurtShares > 0 ? blurtFund / blurtShares : 0;
+  const blurtBlp = blurtVests !== null ? blurtVests * blurtRatio : null;
 
   const treasuryRows: FlowOverview['treasury']['rows'] = [
     {
@@ -191,11 +218,15 @@ export async function flowOverview(): Promise<FlowOverview> {
     },
     {
       chain: 'HIVE', label: 'HIVE · headcorner', ok: !!hiveAcc,
-      usd: hivePrice !== null ? hiveLiquid * hivePrice + hiveHbd * hivePrice : null,
-      items: [
+      usd: hivePrice !== null && hiveAcc ? hiveLiquid * hivePrice + hiveHbd * hivePrice : null,
+      items: !hiveAcc ? [
+        { k: 'RPC', v: 'לא-נגיש רגעית (כנות — לא-אפס)' },
+      ] : [
         { k: 'נזיל', v: `${fmt(hiveLiquid)} HIVE` },
         { k: 'HBD', v: `${fmt(hiveHbd)} HBD` },
-        { k: 'HP', v: `${fmt(hiveHsp, 1)}` },
+        { k: 'HP כולל', v: `${fmt(hiveHsp, 1)}`, hint: hivePrice ? `~$${(hiveHsp * hivePrice).toFixed(2)} ב-HP` : undefined },
+        { k: 'HP פנוי', v: `${fmt(hiveHspOwn, 1)}`, hint: `מואצל-החוצה ${fmt(hiveDelegated, 0)} VESTS (ynet+tov) · מתקבל ${fmt(hiveReceived, 0)} VESTS → אפקטיבי ${fmt(hiveHspEffective, 1)} HP` },
+        { k: 'רווחי-עבר', v: `${fmt(hiveHistVests, 0)}`, hint: 'מוני-שרשרת-היסטוריים (curation_rewards+posting_rewards) — סקאלת-מונה, לא-מומרת (כנות)' },
         { k: 'חיסכון-HBD', v: `${fmt(hiveHbdSavings)} HBD` },
       ],
     },
@@ -205,7 +236,8 @@ export async function flowOverview(): Promise<FlowOverview> {
       items: [
         { k: 'RPC', v: blurtLiquid !== null ? 'חי' : 'לא-נגיש מהסנדבוקס (כנות)' },
         ...(blurtLiquid !== null ? [{ k: 'נזיל', v: `${fmt(blurtLiquid)} BLURT`, hint: '~$' + (blurtPrice !== null ? (blurtLiquid * blurtPrice).toFixed(2) : '—') }] : []),
-        ...(blurtVests !== null ? [{ k: 'BLP (מואצל-אפס)', v: `${fmt(blurtVests, 0)} VESTS` }] : []),
+        ...(blurtBlp !== null ? [{ k: 'BLP', v: `${fmt(blurtBlp, 0)}`, hint: `${fmt(blurtVests ?? 0, 0)} VESTS × יחס-BLURT${blurtPrice ? ` · ~$${(blurtBlp * blurtPrice).toFixed(2)}` : ''}` }] : []),
+        ...(blurtVp !== null ? [{ k: 'VP', v: `${(blurtVp / 100).toFixed(1)}%` }] : []),
       ],
     },
     {
@@ -293,6 +325,51 @@ export async function flowOverview(): Promise<FlowOverview> {
     actions: ['steem_vote', 'autovote_pick'],
   });
 
+  const [hiveVoted, blurtVoted] = await Promise.all([
+    db.auditLog.findFirst({ where: { action: 'flow-hive-vote' }, select: { id: true } }),
+    db.auditLog.findFirst({ where: { action: 'flow-blurt-vote' }, select: { id: true } }),
+  ]);
+
+  // F. hive-curation (71-e) — המסה-המצביעה-על-HIVE · בלי-פאוורדאון (13-שבועות = אבק)
+  loops.push({
+    id: 'hive-curation', title: 'קיוריישן-HIVE (HP מצביע)', engine: 'hive · vote',
+    status: hiveOwnerVerified && hiveAcc && hiveHspEffective > 1 ? (hiveVoted ? 'live' : 'armed') : 'blocked',
+    statusLabel: hiveOwnerVerified && hiveAcc && hiveHspEffective > 1 ? (hiveVoted ? 'חי — הוכח-בשרשרת' : 'חמוש') : hiveAcc ? 'חסום' : 'RPC-רגעית',
+    numbers: !hiveAcc ? [
+      { k: 'מצב', v: 'RPC-HIVE-לא-נגיש רגעית — לא-אפס (כנות)' },
+    ] : [
+      { k: 'HP אפקטיבי', v: fmt(hiveHspEffective, 1), hint: hivePrice ? `~$${(hiveHspEffective * hivePrice).toFixed(2)} מסה-מצביעה` : undefined },
+      { k: 'HP פנוי', v: fmt(hiveHspOwn, 1), hint: `מואצל-החוצה ${fmt(hiveDelegated, 0)} VESTS → ynet 3,000 + tov 6,000` },
+      { k: 'רווחי-עבר', v: `${fmt(hiveHistVests, 0)}`, hint: 'מוני-שרשרת-היסטוריים — סקאלה-לא-מאומתת, לא-מומרת (כנות)' },
+      { k: 'מפתח-חתימה', v: hiveOwnerVerified ? 'כספת · owner מאומת' : 'לא-מאומת — הרץ verify' },
+    ],
+    verdict: hiveOwnerVerified
+      ? (hiveVoted
+        ? 'הלולאה חיה-ומוכחת-בשרשרת: הצבעת-HIVE-ראשונה שודרה (פקדה: flow-hive-vote) — HP-מצביע. כנות: פאוורדאון-HIVE נשקל-ונדחה — 13-שבועות = טפטוף-אבק, ואיבוד-המסה-המקיוריישן.'
+        : 'HP-HIVE יושב-מנוצל (בלי-הצבעות-מ-2023). הצבעה-ראשונה תיצור-הוכחת-שרשרת. כנות: פאוורדאון-HIVE נשקל-ונדחה — 13-שבועות = טפטוף-אבק.')
+      : 'מפתח-owner-HIVE לא מאומת בכספת — הרץ אימות-כספת לפני-הפעלה (fail-closed).',
+    actions: hiveOwnerVerified ? ['hive_vote', 'hive_autovote_pick'] : [],
+  });
+
+  // G. blurt-curation (71-e) — המסה-המצביעה-על-BLURT
+  loops.push({
+    id: 'blurt-curation', title: 'קיוריישן-BLURT (BLP מצביע)', engine: 'blurt · vote',
+    status: blurtOwnerVerified && blurtBlp !== null && blurtBlp > 1 ? (blurtVoted ? 'live' : 'armed') : 'blocked',
+    statusLabel: blurtOwnerVerified && blurtBlp !== null && blurtBlp > 1 ? (blurtVoted ? 'חי — הוכח-בשרשרת' : 'חמוש') : 'חסום',
+    numbers: [
+      { k: 'BLP', v: blurtBlp !== null ? fmt(blurtBlp, 0) : '—', hint: blurtBlp !== null && blurtPrice ? `~$${(blurtBlp * blurtPrice).toFixed(2)} מסה-מצביעה` : undefined },
+      { k: 'נזיל', v: blurtLiquid !== null ? `${fmt(blurtLiquid)} BLURT` : '—' },
+      { k: 'VP', v: blurtVp !== null ? `${(blurtVp / 100).toFixed(1)}%` : '—', hint: 'מתחדש ~20%/יום' },
+      { k: 'מפתח-חתימה', v: blurtOwnerVerified ? 'כספת · owner מאומת' : 'לא-מאומת — הרץ verify' },
+    ],
+    verdict: blurtOwnerVerified
+      ? (blurtVoted
+        ? 'הלולאה חיה-ומוכחת-בשרשרת: הצבעת-BLURT-ראשונה שודרה (פקדה: flow-blurt-vote · rshares-חי>0) — BLP-מצביע. chain_id-BLURT (cd8d90f2… מ-blurtjs-רשמי). פאוורדאון-BLURT נדחה — 13-שבועות על-אבק.'
+        : 'BLP יושב-מנוצל. chain_id-BLURT (cd8d90f2… מ-blurtjs-רשמי) + צמתי-מוכחים. הצבעה-ראשונה תיצור-הוכחה. פאוורדאון-BLURT נדחה — 13-שבועות על-אבק.')
+      : 'מפתח-owner-BLURT קיים-בכספת אך-טרם-אומת מול-השרשרת — הרץ אימות-כספת (fail-closed).',
+    actions: blurtOwnerVerified ? ['blurt_vote', 'blurt_autovote_pick'] : [],
+  });
+
   // D. hbd-savings
   loops.push({
     id: 'hbd-savings', title: 'חיסכון HBD', engine: 'hive · transfer_to_savings',
@@ -332,7 +409,7 @@ export async function flowOverview(): Promise<FlowOverview> {
 
   /* ── פקדה ── */
   const ledger = await db.auditLog.findMany({
-    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
+    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
     orderBy: { createdAt: 'desc' }, take: 12,
   });
 
