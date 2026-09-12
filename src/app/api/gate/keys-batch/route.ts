@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { sealSecret, GateError, masterReady } from "@/lib/gate/crypto";
+import { sealSecret, sha256hex, GateError, masterReady } from "@/lib/gate/crypto";
 import { requireOperator } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { identifyKey, wifToChainPub, tokenFingerprint } from "@/lib/gate/key-id";
@@ -189,6 +189,7 @@ export async function POST(req: Request) {
         label: identity?.label ?? "לא זוהה",
         controls: identity?.controls ?? [],
         notes: identity?.notes ?? [],
+        pubs: identity?.pubs ?? [], // derived public addresses only — r28 distinct generic slots
         dupOf,
       });
     }
@@ -212,13 +213,25 @@ export async function POST(req: Request) {
       if (!take.has(String(it.hash))) continue;
       const c = candidates.find((x) => x.hash === it.hash)!;
       const controls = (it.controls as Ctrl[]) || [];
+      // r28-distinct-slots: generic fallback slots used to collide on
+      // (kind, chain=null, account=null, role, pub=null) — so only ONE 64-hex
+      // wallet and ONE mnemonic could ever exist in the vault. Now every
+      // generic target carries a distinct, non-reversible public identity:
+      //   · evm/hex   → the DERIVED address/pubkey (same as /api/gate/key does)
+      //   · mnemonic  → sha256 fingerprint of the phrase (never the phrase)
+      const genericPub =
+        c.kind === "evm-key" || c.kind === "hex-priv"
+          ? ((it.pubs as string[] | undefined)?.[0] ?? null)
+          : c.kind === "mnemonic"
+            ? `mn-fp:${sha256hex(c.secret).slice(0, 16)}`
+            : null;
       const targets: Ctrl[] = controls.length
         ? controls
         : c.kind === "nvidia-api"
           ? // r40: NVIDIA keys anchor to the nvidia-nim slot with a non-reversible
             // fingerprint as pub — the brain's multi-key pool and re-scan dedup both read it.
             [{ chain: "nvidia", account: "nvidia-nim", role: "token", pub: tokenFingerprint(c.secret) }]
-          : [{ chain: c.kind === "github-pat" ? "github" : null, account: null, role: c.kind === "mnemonic" ? "doors" : "wallet", pub: null }];
+          : [{ chain: c.kind === "github-pat" ? "github" : null, account: null, role: c.kind === "mnemonic" ? "doors" : "wallet", pub: genericPub }];
       for (const t of targets) {
         const dup = existing.find((e) => e.kind === kindOf(c.kind) && e.chain === t.chain && e.account === t.account && e.role === t.role && e.pub === t.pub);
         if (dup) continue;
