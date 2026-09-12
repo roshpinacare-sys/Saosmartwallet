@@ -110,8 +110,12 @@ export async function flowOverview(): Promise<FlowOverview> {
   const steemOwnVp = props ? vestsToChainVests(steemOwnVests, props) : 0;
   const steemLiquid = parseFloat(String(steemAcc?.balance ?? '0'));
   const steemSbd = parseFloat(String(steemAcc?.sbd_balance ?? '0'));
-  const pdRate = parseFloat(String(steemAcc?.vesting_withdraw_rate ?? '0'));
-  const pdRemaining = Number(steemAcc?.to_withdraw ?? 0) - Number(steemAcc?.withdrawn ?? 0);
+  const pdRate = parseFloat(String(steemAcc?.vesting_withdraw_rate ?? '0')); // VESTS תצוגה (6 עשרוניות)
+  const pdRemaining = Number(steemAcc?.to_withdraw ?? 0) - Number(steemAcc?.withdrawn ?? 0); // ראו-אינטג'ר (×1e6)
+  const vestsToSp = (v: number) => props ? vestsToChainVests(v, props) : 0;
+  const pdRemainingSp = vestsToSp(pdRemaining / 1e6);
+  const pdWeekSp = vestsToSp(pdRate);
+  const pdWeeks = pdWeekSp > 0 ? Math.max(1, Math.ceil(pdRemainingSp / pdWeekSp)) : 0;
 
   const hiveVests = parseFloat(String(hiveAcc?.vesting_shares ?? '0'));
   const hiveLiquid = parseFloat(String(hiveAcc?.balance ?? '0'));
@@ -130,7 +134,7 @@ export async function flowOverview(): Promise<FlowOverview> {
         { k: 'SBD', v: `${fmt(steemSbd)} SBD` },
         { k: 'SP כולל', v: `${fmt(steemTotalVp, 1)}` },
         { k: 'SP פנוי (לא-מואצל)', v: `${fmt(steemOwnVp, 1)}`, hint: `${fmt(steemDelegated / 1e6, 1)}M VESTS מואצלים לצי-ה-RC` },
-        { k: 'פאוורדאון', v: pdRate > 0 ? `פעיל — ${fmt(pdRemaining / 1e13)} SP נותרו` : 'כבוי', hint: 'op: withdraw_vesting' },
+        { k: 'פאוורדאון', v: pdRate > 0 ? `פעיל — ${fmt(pdRemainingSp, 1)} SP בשחרור` : 'כבוי', hint: 'op: withdraw_vesting' },
       ],
     },
     {
@@ -190,21 +194,24 @@ export async function flowOverview(): Promise<FlowOverview> {
   });
 
   // B. powerdown-drip
-  const powerdownableVp = steemOwnVp;
-  const weekly = powerdownableVp / 13;
   loops.push({
     id: 'powerdown-drip', title: 'פאוורדאון-מנוע (HP פנוי → נזיל)', engine: 'steem · withdraw_vesting',
     status: pdRate > 0 ? 'live' : 'armed',
     statusLabel: pdRate > 0 ? 'מטפטף' : 'חמוש',
-    numbers: [
-      { k: 'SP פנוי', v: fmt(powerdownableVp, 1) },
-      { k: 'טפטוף-אם-מופעל', v: `${fmt(weekly)} SP/שבוע × 13 שבועות`, hint: '~$' + (spPrice ? (weekly * 13 * spPrice).toFixed(2) : '—') + ' סה״כ' },
-      { k: 'מצב-נוכחי', v: pdRate > 0 ? `${fmt(pdRemaining / 1e13)} SP בשחרור` : 'כבוי — החלטת-מפעיל' },
+    numbers: pdRate > 0 ? [
+      { k: 'SP בשחרור', v: fmt(pdRemainingSp, 1), hint: '~$' + (spPrice ? (pdRemainingSp * spPrice).toFixed(2) : '—') + ' נכנסים-לנזיל' },
+      { k: 'קצב-שרשרת', v: `${fmt(pdWeekSp, 1)} SP/שבוע`, hint: '~$' + (spPrice ? (pdWeekSp * spPrice).toFixed(2) : '—') + '/שבוע' },
+      { k: 'תזמון-שרשרת', v: `~${pdWeeks} תשלומים שבועיים`, hint: 'קצב-אמת מהשרשרת (לא-הערכת-/13)' },
+      { k: 'תשלום-הבא', v: String(steemAcc?.next_vesting_withdrawal ?? '—').replace('T', ' ').slice(0, 16) + ' UTC' },
+    ] : [
+      { k: 'SP פנוי', v: fmt(steemOwnVp, 1) },
+      { k: 'טפטוף-אם-מופעל', v: `${fmt(steemOwnVp / 13)} SP/שבוע × 13 שבועות`, hint: '~$' + (spPrice ? (steemOwnVp * spPrice).toFixed(2) : '—') + ' סה״כ' },
+      { k: 'מצב-נוכחי', v: 'כבוי — החלטת-מפעיל' },
     ],
     verdict: pdRate > 0
-      ? 'הטפטוף פעיל — STEEM נזיל זורם מדי-שבוע לחשבון.'
-      : 'HP פנוי יושב-מנוצל. הפעלת-פאוורדאון מזרימה ~' + fmt(weekly) + ' SP/שבוע למלאי-הספר (עלות: ויתור-קיוריישן חלקי על החלק-הזה).',
-    actions: ['steem_powerdown'],
+      ? 'הטפטוף פעיל בשרשרת (אושר-ע״י-המפעיל) — SP נזיל זורם מדי-שבוע ומזין-מלאי-הספר.'
+      : 'HP פנוי יושב-מנוצל. הפעלת-פאוורדאון מזרימה SP/שבוע למלאי-הספר (עלות: ויתור-קיוריישן חלקי על החלק-הזה).',
+    actions: pdRate > 0 ? [] : ['steem_powerdown'],
   });
 
   // C. curation
