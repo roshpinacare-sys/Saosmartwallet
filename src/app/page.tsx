@@ -1611,7 +1611,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                     </div>
                     {digest.door && digest.door.checked && digest.door.incoming > 0 && (
                       <div className="mt-1 rounded-lg border border-emerald-900/60 bg-emerald-950/20 px-2 py-1.5">
-                        <p className="text-[10px] font-mono text-emerald-300">🚪 דלת-קדמית — {digest.door.incoming} דופק/ים ב-broadcasts/ שלנו (r26 · טביעת-אצבע r27 · אמת-מסלול r29 · תעלה-נקייה r35)</p>
+                        <p className="text-[10px] font-mono text-emerald-300">🚪 דלת-קדמית — {digest.door.incoming} דופק/ים ב-broadcasts/ שלנו (r26 · טביעת-אצבע r27 · אמת-מסלול r29 · תעלה-נקייה r35){digest.door.voices.length < digest.door.incoming && <span className="text-zinc-500"> · להלן דגימת {digest.door.voices.length} (חלון-קריאה מוגבל, שאר הדופקים נספרים אך לא נשלפים — חוק-האפס-עומס)</span>}</p>
                         {digest.door.voices.filter((v) => v.ok && !v.selfEcho).map((v) => (
                           <div key={v.file} className="mt-0.5 text-[9px] font-mono" dir="ltr">
                             <span className={v.isNew ? "text-amber-300 font-semibold" : "text-emerald-200/90"}>{v.isNew ? "NEW " : ""}[{v.kind}] {v.file}</span>
@@ -1677,7 +1677,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                 <div className="space-y-1 text-[10px] font-mono">
                   <div className="flex items-center justify-between" dir="ltr">
                     <span className="text-zinc-400">vault</span>
-                    <span className="text-zinc-200">{situation.vault.ok ? `${situation.vault.total} · ${situation.vault.verified} verified` : "כשל כן"}</span>
+                    <span className="text-zinc-200">{situation.vault.ok ? `${situation.vault.total} · ${situation.vault.verified} verified (status-col)` : "כשל כן"}</span>
                   </div>
                   <div className="flex items-center justify-between" dir="ltr">
                     <span className="text-zinc-400">fleet</span>
