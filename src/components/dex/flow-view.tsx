@@ -52,6 +52,7 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
   const [result, setResult] = useState<Record<string, ActionResult>>({});
   const [cands, setCands] = useState<VoteCandidate[] | null>(null);
   const [candsOpen, setCandsOpen] = useState(false);
+  const [voteW, setVoteW] = useState(10); // משקל-הצבעה % — מדרג-תשואה (VP: 2%×משקל להצבעה)
   const [msg, setMsg] = useState<string | null>(null);
 
   const fetcher = useCallback(async (): Promise<boolean> => {
@@ -241,8 +242,25 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
       {/* ── מועמדי-קיוריישן ── */}
       {candsOpen && cands !== null && (
         <div className="dx-card p-4">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
             <h3 className="text-sm font-bold flex items-center gap-1.5"><Vote className="w-4 h-4 text-[color:var(--green)]" /> מועמדי-קיוריישן (טרנדינג · 1–18 שעות)</h3>
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] opacity-70 flex items-center gap-1" htmlFor="vote-weight">
+                משקל-הצבעה
+                <select
+                  id="vote-weight"
+                  value={voteW}
+                  onChange={(e) => setVoteW(Number(e.target.value))}
+                  className="rounded-lg border border-[color:var(--line)] bg-black/30 px-1.5 py-1 text-[11px]"
+                  aria-label="משקל הצבעת קיוריישן באחוזים"
+                >
+                  {[1, 10, 25, 50, 100].map((w) => (
+                    <option key={w} value={w}>{w}%</option>
+                  ))}
+                </select>
+              </label>
+              <span className="text-[10px] opacity-50">תשואה ×{voteW} מול-1% · VP {(voteW * 0.02).toFixed(1)}%/הצבעה</span>
+            </div>
             <button onClick={() => setCandsOpen(false)} className="text-xs opacity-60 hover:opacity-100" aria-label="סגור רשימה">
               {candsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
@@ -262,18 +280,18 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
-                        onClick={() => run('steem_vote', false, { author: c.author, permlink: c.permlink, weightPct: 1 })}
+                        onClick={() => run('steem_vote', false, { author: c.author, permlink: c.permlink, weightPct: voteW })}
                         className="min-h-[32px] rounded-lg border border-[color:var(--line)] px-2 py-1.5 text-[11px] hover:bg-black/30"
-                        aria-label={`נסיון הצבעה על פוסט של ${c.author}`}
+                        aria-label={`נסיון הצבעה ${voteW}% על פוסט של ${c.author}`}
                       >
                         {busy === key + '!dry' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'בדוק'}
                       </button>
                       <button
-                        onClick={() => run('steem_vote', true, { author: c.author, permlink: c.permlink, weightPct: 1 })}
+                        onClick={() => run('steem_vote', true, { author: c.author, permlink: c.permlink, weightPct: voteW })}
                         className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2 py-1.5 text-[11px] hover:bg-black/30"
-                        aria-label={`הצבע אמת 1% על פוסט של ${c.author}`}
+                        aria-label={`הצבע אמת ${voteW}% על פוסט של ${c.author}`}
                       >
-                        {busy === key + '!exec' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'הצבע 1%'}
+                        {busy === key + '!exec' ? <Loader2 className="w-3 h-3 animate-spin" /> : `הצבע ${voteW}%`}
                       </button>
                     </div>
                     {res?.plan && (

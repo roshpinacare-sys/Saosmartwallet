@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       case 'steem_vote': {
         const author = String(p.author ?? '');
         const permlink = String(p.permlink ?? '');
-        const weightPct = Number(p.weightPct ?? 1);
+        const weightPct = Math.min(100, Math.max(0.1, Number(p.weightPct ?? 10) || 10)); // מדרג-תשואה · חסם-בטיחות 0.1–100
         if (execute) {
           const post = await postInfo(author, permlink).catch(() => null);
           const r = await steemVote({ author, permlink, weightPct });

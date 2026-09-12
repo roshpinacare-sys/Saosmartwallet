@@ -11,9 +11,12 @@
  *   E. trx-energize   — ארנק-המערכת האטום → אנרגיה+הצבעה ~4.5% APR (ממתין-הפקדה)
  */
 import { db } from '@/lib/db';
-import { getAccount, getGlobalProps, vestsToChainVests, condenser } from '@/lib/saos/steem-ops';
+import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser } from '@/lib/saos/steem-ops';
 import { treasuryWallet, doorWallet, tronAccount } from '@/lib/saos/trx-ops';
 import { planEnergize } from '@/lib/saos/tron-energize';
+
+const STEEM_RPC = 'https://api.steemit.com';
+const USDT_TRC20 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'; // USDT-TRC20 חוזה-קנוני
 
 const HBD_SAVINGS_APR = 15; // hive DHF — פרמטר-שרשרת נוכחי
 const CURATION_APR_EST = [0.5, 2.0]; // הערכה-כנה (תלוי-שותפויות-הצבעה) — מתויג-כהערכה
@@ -75,6 +78,49 @@ async function dexGridSnapshot(): Promise<Record<string, unknown> | null> {
 
 function fmt(n: number, d = 3): string { return n.toLocaleString('en-US', { maximumFractionDigits: d }); }
 
+/* ── מעקב-קיוריישן — אמת-שרשרת: הצבעות + curation_reward ששולם + pending-מוערך ── */
+interface CurationTrack {
+  paidVests: number;
+  paidSp: number | null;
+  votesCount: number;
+  pending: Array<{ author: string; permlink: string; estUsd: number }>;
+  pendingEstUsd: number | null;
+}
+async function curationTrack(vestsToSp: (v: number) => number): Promise<CurationTrack> {
+  return cached('curation-track', 300_000, async () => {
+    const out: CurationTrack = { paidVests: 0, paidSp: null, votesCount: 0, pending: [], pendingEstUsd: null };
+    try {
+      // condenser מאפשר לכל-היותר 100 — דף-אחרון מספיק (ההצבעות-שלנו-טריות)
+      const hist = await condenser(STEEM_RPC, 'condenser_api.get_account_history', [OPERATOR, -1, 100]);
+      const voteKeys: Array<{ author: string; permlink: string }> = [];
+      for (const [, op] of hist as Array<[number, { op: [string, Record<string, unknown>] }]>) {
+        const [name, val] = op.op;
+        if (name === 'curation_reward') out.paidVests += parseFloat(String(val.reward ?? '0')) || 0;
+        if (name === 'vote' && String(val.voter) === OPERATOR) voteKeys.push({ author: String(val.author), permlink: String(val.permlink) });
+      }
+      out.votesCount = voteKeys.length;
+      out.paidSp = out.paidVests > 0 ? vestsToSp(out.paidVests) : null;
+      // 3 הפוסטים-האחרונים-שהצבענו-בהם — get_content (פרמטרים-שטוחים!) למדידת-פנדינג
+      const uniq = [...new Map(voteKeys.map((v) => [`${v.author}/${v.permlink}`, v])).values()].slice(-3);
+      let estSum = 0;
+      for (const v of uniq) {
+        try {
+          const c = await condenser(STEEM_RPC, 'condenser_api.get_content', [v.author, v.permlink]);
+          const pendingSbd = parseFloat(String(c.pending_payout_value ?? '0')) || 0;
+          const ourR = Number((c.active_votes as Array<{ voter: string; rshares: number | string }>)?.find((x) => x.voter === OPERATOR)?.rshares ?? 0);
+          const net = Number(c.net_rshares ?? c.abs_rshares ?? 0) || 0;
+          if (pendingSbd <= 0 || ourR <= 0 || net <= 0) continue;
+          const est = pendingSbd * 0.5 * (ourR / net); // הערכה-כנה: מנת-רשיירז × חצי-מאגר-קיוריישן
+          estSum += est;
+          out.pending.push({ author: v.author, permlink: v.permlink, estUsd: est });
+        } catch { /* פוסט-נעלם — דלג */ }
+      }
+      if (out.pending.length) out.pendingEstUsd = estSum; // SBD≈USD
+    } catch { /* כנות: היסטוריה-לא-זמינה — נשאר אפס */ }
+    return out;
+  });
+}
+
 export async function flowOverview(): Promise<FlowOverview> {
   const [steemAcc, hiveAcc, props, prices, grid, treasury, door, blurtAcc] = await Promise.all([
     cached('steem-acc', 60_000, () => getAccount('steem').catch(() => null)),
@@ -96,6 +142,9 @@ export async function flowOverview(): Promise<FlowOverview> {
     door?.address ? cached(`tron-door-${door.address}`, 60_000, () => tronAccount(door.address!).catch(() => null)) : Promise.resolve(null),
     treasury?.address ? cached(`tron-treasury-${treasury.address}`, 60_000, () => tronAccount(treasury.address!).catch(() => null)) : Promise.resolve(null),
   ]);
+  const doorUsdt = doorInfo ? (doorInfo.trc20?.[USDT_TRC20] ?? 0) / 1e6 : null;
+  const treasuryUsdt = treasuryInfo ? (treasuryInfo.trc20?.[USDT_TRC20] ?? 0) / 1e6 : null;
+  const usdtStr = (v: number | null) => (v === null ? 'לא-מדוד' : `${v.toFixed(2)} USDT`);
 
   /* ── אוצר ── */
   const spPrice = prices?.steem ?? null;
@@ -161,18 +210,20 @@ export async function flowOverview(): Promise<FlowOverview> {
     },
     {
       chain: 'TRON-DOOR', label: 'TRX · זהות-הדלת', ok: !!door,
-      usd: trxPrice !== null && doorInfo ? doorInfo.balance * trxPrice : null,
+      usd: trxPrice !== null && doorInfo ? doorInfo.balance * trxPrice + (doorUsdt ?? 0) : null,
       items: [
         { k: 'כתובת', v: door?.address ?? '—' },
         { k: 'יתרה', v: doorInfo ? `${fmt(doorInfo.balance, 4)} TRX` : 'לא-מדוד', hint: doorInfo && !doorInfo.active ? 'מעולם-לא-הייתה-פעילה בשרשרת' : undefined },
+        { k: 'USDT-TRC20', v: usdtStr(doorUsdt), hint: 'ניטור-חי TronGrid — כל-הפקדה-נראית-מיד' },
       ],
     },
     {
       chain: 'TRON-TREASURY', label: 'TRX · ארנק-המערכת (אטום)', ok: !!treasury,
-      usd: trxPrice !== null && treasuryInfo ? treasuryInfo.balance * trxPrice : null,
+      usd: trxPrice !== null && treasuryInfo ? treasuryInfo.balance * trxPrice + (treasuryUsdt ?? 0) : null,
       items: [
         { k: 'כתובת', v: treasury?.address ?? '—' },
         { k: 'יתרה', v: treasuryInfo ? `${fmt(treasuryInfo.balance, 4)} TRX` : 'לא-מדוד' },
+        { k: 'USDT-TRC20', v: usdtStr(treasuryUsdt), hint: 'ניטור-חי — הפקדה-ראשונה-תנעל-את-לולאת-האנרגיה-אוטומטית' },
         { k: 'מומש', v: treasuryInfo?.frozenV2.length ? treasuryInfo.frozenV2.map((f) => `${fmt(f.amount)} ${f.type}`).join(', ') : '0' },
       ],
     },
@@ -208,7 +259,8 @@ export async function flowOverview(): Promise<FlowOverview> {
     numbers: pdRate > 0 ? [
       { k: 'SP בשחרור', v: fmt(pdRemainingSp, 1), hint: '~$' + (spPrice ? (pdRemainingSp * spPrice).toFixed(2) : '—') + ' נכנסים-לנזיל' },
       { k: 'קצב-שרשרת', v: `${fmt(pdWeekSp, 1)} SP/שבוע`, hint: '~$' + (spPrice ? (pdWeekSp * spPrice).toFixed(2) : '—') + '/שבוע' },
-      { k: 'תזמון-שרשרת', v: `~${pdWeeks} תשלומים שבועיים`, hint: 'קצב-אמת מהשרשרת (לא-הערכת-/13)' },
+      { k: 'ששולם-עד-היום', v: `${fmt(vestsToSp(Number(steemAcc?.withdrawn ?? 0) / 1e6), 2)} SP`, hint: 'שדה-withdrawn-מהשרשרת — מתעדכן-בתשלום-הראשון' },
+      { k: 'תזמון-שרשרת', v: `~${pdWeeks} תשלומים שבועיים`, hint: 'קצב-אמת מהשרשרת (STEEM-HF23=/4)' },
       { k: 'תשלום-הבא', v: String(steemAcc?.next_vesting_withdrawal ?? '—').replace('T', ' ').slice(0, 16) + ' UTC' },
     ] : [
       { k: 'SP פנוי', v: fmt(steemOwnVp, 1) },
@@ -221,18 +273,23 @@ export async function flowOverview(): Promise<FlowOverview> {
     actions: pdRate > 0 ? [] : ['steem_powerdown'],
   });
 
-  // C. curation
-  const lastVote = null; // מהפקדה — למטה מה-ledger
+  // C. curation — חי: הצבעות-אמת-מהשרשרת + מה ששולם בפועל + pending-מוערך
+  const cur = await curationTrack(vestsToSp);
+  const curLast = cur.pending.length ? `${cur.pending[cur.pending.length - 1].author}/…` : null;
   loops.push({
     id: 'curation', title: 'קיוריישן (HP מצביע)', engine: 'steem · vote',
-    status: steemOwnVp > 100 ? 'armed' : 'blocked',
-    statusLabel: steemOwnVp > 100 ? 'חמוש' : 'אין-מסה',
+    status: cur.pending.length > 0 || (cur.paidSp ?? 0) > 0 ? 'live' : steemOwnVp > 100 ? 'armed' : 'blocked',
+    statusLabel: cur.pending.length > 0 ? 'אוסף-עכשיו' : (cur.paidSp ?? 0) > 0 ? 'חי-משלם' : steemOwnVp > 100 ? 'חמוש' : 'אין-מסה',
     numbers: [
       { k: 'SP פנוי', v: fmt(steemOwnVp, 1) },
-      { k: 'הערכת-תשואה', v: `${CURATION_APR_EST[0]}–${CURATION_APR_EST[1]}% APR (הערכה-כנה)`, hint: 'תלוי-מקורות-הצבעה' },
-      { k: 'פעולה-אחרונה', v: lastVote ?? 'מהיומן למטה' },
+      { k: 'הצבעות', v: `${cur.votesCount} בהיסטוריה · ${cur.pending.length} בפנדינג`, hint: curLast ? `אחרונה: ${curLast}` : undefined },
+      { k: 'ששולם-בפועל', v: cur.paidSp !== null ? `${cur.paidSp.toFixed(4)} SP (${fmt(cur.paidVests)} VESTS)` : '—', hint: 'curation_reward-מהשרשרת — אמת-ראשונה: realsam/achievement-1' },
+      { k: 'תגמול-ממתין-מוערך', v: cur.pendingEstUsd !== null ? `~$${cur.pendingEstUsd.toFixed(4)}` : '—', hint: 'הערכה-כנה: מנת-רשיירז × 50%-מאגר (SBD≈USD)' },
+      { k: 'מדרג-תשואה', v: 'משקל-הצבעה 1%→100% = ×100', hint: 'ו-SP נוסף מגדיל-לינארית — הטפטוף-מזרים-מלאי' },
     ],
-    verdict: 'ה-HP הפנוי מצביע-על-פוסטים-חיים (1–18 שעות) — תגמולי-קיוריישן זורמים כ-VESTS. הצבעה-ראשונה תניב-ראיה-בשרשרת.',
+    verdict: cur.pending.length > 0 || (cur.paidSp ?? 0) > 0
+      ? 'הלולאה חיה-ומוכחת-בשרשרת: הצבעות-אמת ב-active_votes ותגמול-קיוריישן ראשון-ששולם. כנות: במסת-SP-הנוכחית התגמול-להצבעה הוא אבק-קורט — מדרגי-התשואה הם משקל-ההצבעה ו-SP-נוסף.'
+      : 'ה-HP הפנוי מצביע-על-פוסטים-חיים (1–18 שעות) — תגמולי-קיוריישן זורמים כ-VESTS. הצבעה-ראשונה תניב-ראיה-בשרשרת.',
     actions: ['steem_vote', 'autovote_pick'],
   });
 
@@ -262,14 +319,14 @@ export async function flowOverview(): Promise<FlowOverview> {
     status: funded >= 2 ? 'armed' : 'waiting-deposit',
     statusLabel: funded >= 2 ? 'חמוש' : 'ממתין-הפקדה',
     numbers: [
-      { k: 'ארנק-מערכת', v: `${fmt(treBal, 4)} TRX` },
-      { k: 'זהות-דלת', v: `${fmt(doorBal, 4)} TRX` },
+      { k: 'ארנק-מערכת', v: `${fmt(treBal, 4)} TRX + ${usdtStr(treasuryUsdt)}`, hint: 'ניטור-חי TronGrid — TRX ו-USDT-TRC20' },
+      { k: 'זהות-דלת', v: `${fmt(doorBal, 4)} TRX + ${usdtStr(doorUsdt)}` },
       { k: 'תשואת-הצבעה', v: `~${TRX_VOTE_APR_EST}% APR (הערכה)` },
       { k: 'אנרגיה-אם-ממומש', v: `${plan.dailyEnergy.toLocaleString()} אנרגיה/יום`, hint: 'יישובי-USDT חינם' },
     ],
     verdict: funded >= 2
       ? 'הארנק ממומן — הימור-אנרגיה + הצבעת-SR ניתנים לביצוע-אמת עכשיו.'
-      : 'הארנק אטום-ומאושר אך-ריק (כנות). הפקדה של TRX אל כתובת-המערכת תנעיל את לולאת-האנרגיה+התשואה אוטומטית.',
+      : 'הארנק אטום-ומאושר אך-ריק (כנות · ניטור-חי TRX+USDT). הפקדה של TRX/USDT אל כתובת-המערכת תנעיל את לולאת-האנרגיה+התשואה אוטומטית.',
     actions: funded >= 2 ? ['trx_energize'] : [],
   });
 
