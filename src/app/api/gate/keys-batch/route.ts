@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { sealSecret, GateError, masterReady } from "@/lib/gate/crypto";
 import { requireOperator } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
-import { identifyKey, wifToChainPub } from "@/lib/gate/key-id";
+import { identifyKey, wifToChainPub, tokenFingerprint } from "@/lib/gate/key-id";
 import { unzipSync } from "fflate";
 
 export const runtime = "nodejs";
@@ -63,10 +63,12 @@ function scanText(text: string, origin: string, out: Candidate[]): void {
     const isEvm = /^0x[0-9a-fA-F]{64}$/.test(val);
     const isHex = /^[0-9a-fA-F]{64}$/.test(val);
     const isPat = /^(ghp_|github_pat_)[A-Za-z0-9_]+$/.test(val);
+    // r40: NVIDIA NIM keys (nvapi-…) — the fleet's brain provider rides the same intake.
+    const isNvapi = /^nvapi-[A-Za-z0-9_-]{16,}$/.test(val);
     const ws = val.toLowerCase().split(/\s+/);
     const isMnemonic = ws.length >= 12 && ws.length <= 24 && ws.length % 3 === 0 && ws.every((w) => /^[a-z]+$/.test(w));
-    if (!isWif && !isEvm && !isHex && !isPat && !isMnemonic) continue;
-    const kind = isWif ? "steem-wif" : isEvm ? "evm-key" : isHex ? "hex-priv" : isPat ? "github-pat" : "mnemonic";
+    if (!isWif && !isEvm && !isHex && !isPat && !isNvapi && !isMnemonic) continue;
+    const kind = isWif ? "steem-wif" : isEvm ? "evm-key" : isHex ? "hex-priv" : isPat ? "github-pat" : isNvapi ? "nvidia-api" : "mnemonic";
     out.push({ hash: stableId(val), kind, preview: mask(val), lines: `${origin}:${i + 1}`, secret: val });
   }
 }
@@ -106,11 +108,22 @@ async function loadZipTexts(zipUrl: string): Promise<{ texts: { name: string; te
 
 type Ctrl = { chain: string | null; account: string | null; role: string | null; pub: string | null };
 
+/** r40-truth-audit: a pasted string that merely LOOKS like a WIF must never
+ *  crash the scan (bs58 checksum throws) — degrade to "unverified" honestly. */
+function safeWifPub(secret: string): string | null {
+  try {
+    return wifToChainPub(secret);
+  } catch {
+    return null;
+  }
+}
+
 function kindOf(k: string): string {
   if (k === "steem-wif") return "steem-key";
   if (k === "evm-key" || k === "hex-priv") return "evm-key";
   if (k === "mnemonic") return "mnemonic";
   if (k === "github-pat") return "token";
+  if (k === "nvidia-api") return "token";
   return "note";
 }
 
@@ -160,8 +173,8 @@ export async function POST(req: Request) {
       const pubs = identity?.pubs || [];
       let dupOf: string | null = null;
       if (c.kind === "steem-wif") {
-        const pub = wifToChainPub(c.secret);
-        const hit = existing.find((e) => e.pub === pub);
+        const pub = safeWifPub(c.secret);
+        const hit = pub ? existing.find((e) => e.pub === pub) : undefined;
         if (hit) dupOf = [hit.chain, hit.account, hit.role].filter(Boolean).join("/");
       } else if (pubs.length) {
         const hit = existing.find((e) => e.pub && pubs.includes(e.pub));
@@ -201,13 +214,17 @@ export async function POST(req: Request) {
       const controls = (it.controls as Ctrl[]) || [];
       const targets: Ctrl[] = controls.length
         ? controls
-        : [{ chain: c.kind === "github-pat" ? "github" : null, account: null, role: c.kind === "mnemonic" ? "doors" : "wallet", pub: null }];
+        : c.kind === "nvidia-api"
+          ? // r40: NVIDIA keys anchor to the nvidia-nim slot with a non-reversible
+            // fingerprint as pub — the brain's multi-key pool and re-scan dedup both read it.
+            [{ chain: "nvidia", account: "nvidia-nim", role: "token", pub: tokenFingerprint(c.secret) }]
+          : [{ chain: c.kind === "github-pat" ? "github" : null, account: null, role: c.kind === "mnemonic" ? "doors" : "wallet", pub: null }];
       for (const t of targets) {
         const dup = existing.find((e) => e.kind === kindOf(c.kind) && e.chain === t.chain && e.account === t.account && e.role === t.role && e.pub === t.pub);
         if (dup) continue;
         const status = it.liveChecked && controls.length ? "verified" : "imported";
         const s = sealSecret(c.secret);
-        const pub = t.pub ?? (c.kind === "steem-wif" ? wifToChainPub(c.secret) : null);
+        const pub = t.pub ?? (c.kind === "steem-wif" ? safeWifPub(c.secret) : null);
         const row = await db.vaultEntry.create({
           data: {
             kind: kindOf(c.kind),
