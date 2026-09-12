@@ -31,6 +31,11 @@ interface FlowData {
 }
 interface VoteCandidate { author: string; permlink: string; ageH: number; title: string; votes: number }
 interface ActionResult { ok: boolean; dryRun?: boolean; error?: string; plan?: Record<string, unknown>; result?: Record<string, unknown>; candidates?: VoteCandidate[]; note?: string }
+interface HealResult {
+  account: string;
+  chains: Array<{ chain: string; exists: boolean; match: Record<string, boolean>; stored: number; pubKeys: Record<string, string> }>;
+  masterStored: boolean; storedTotal: number; anyMatch: boolean;
+}
 
 const STATUS_STYLE: Record<string, string> = {
   live: 'text-[color:var(--green)] border-[color:var(--green)]',
@@ -62,6 +67,12 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
   const [candsOpen, setCandsOpen] = useState(false);
   const [voteW, setVoteW] = useState(10); // משקל-הצבעה % — מדרג-תשואה (VP: 2%×משקל להצבעה)
   const [msg, setMsg] = useState<string | null>(null);
+  // 71-j: ריפוי-מפתחות-צי — state מקומי (הסיסמה לא נשמרת בשום-מקום חוץ-לגוף-הבקשה)
+  const [healAccount, setHealAccount] = useState('');
+  const [healPassword, setHealPassword] = useState('');
+  const [healBusy, setHealBusy] = useState(false);
+  const [healResult, setHealResult] = useState<HealResult | null>(null);
+  const [healErr, setHealErr] = useState<string | null>(null);
 
   const fetcher = useCallback(async (): Promise<boolean> => {
     try {
@@ -106,6 +117,24 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
     } catch { setCands([]); setCandsChain(chain); setCandsOpen(true); }
     finally { setBusy(null); }
   }, []);
+
+  // 71-j: ריפוי-מפתחות-צי — dry=בדיקה · exec=אטימה. תמיד-עם-סשן (הפעולה-מאחורי-requireOwner)
+  const runHeal = useCallback(async (execute: boolean) => {
+    if (!authed) { onNeedAuth(); return; }
+    if (!healAccount.trim() || !healPassword) { setHealErr('נדרשים שם-חשבון + סיסמת-אב'); return; }
+    setHealBusy(true); setHealErr(null);
+    try {
+      const r = await fetch('/api/saos/flow', {
+        method: 'POST', headers: { 'content-type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ action: 'fleet_heal', execute, params: { account: healAccount.trim(), password: healPassword } }),
+      });
+      const j = (await r.json()) as ActionResult;
+      if (j.ok && j.result) setHealResult(j.result as unknown as HealResult);
+      else setHealErr(j.error ?? 'ריפוי-נכשל');
+      if (execute && j.ok) { setMsg('ריפוי-בוצע — התפקידים-שעברו-הוכחה אוטמו-בכספת ✓'); setHealPassword(''); fetcher(); }
+    } catch { setHealErr('רשת לא נגישה'); }
+    finally { setHealBusy(false); }
+  }, [authed, onNeedAuth, healAccount, healPassword, fetcher]);
 
   if (!data) {
     return (
@@ -298,6 +327,79 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
             );
           })}
         </div>
+      </div>
+
+      {/* ── ריפוי-מפתחות-צי (71-j) ── */}
+      <div className="dx-card p-4">
+        <h3 className="text-sm font-bold flex items-center gap-1.5 mb-1"><ShieldCheck className="w-4 h-4 text-[color:var(--green)]" /> ריפוי-מפתחות-צי · fleet_heal</h3>
+        <p className="text-[11px] opacity-60 mb-3">
+          סיסמת-אב של חשבון-צי → גזירת ארבעת-המפתחות (owner/active/posting/memo) → הוכחה-קריפטוגרפית מול key_auths-חיות-בשלוש-השרשראות → אטימת-התואמים-בלבד-בכספת. הסוד לעולם לא נדפס/לא נרשם. אם-הסיסמה-שייכת-לחשבון-אחר-מהצפוי — הבדיקה-תגלה-זאת (הוכח-חי: סיסמה-שסומנה-"tov" התגלתה-כשל-wic).
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={healAccount}
+            onChange={(e) => setHealAccount(e.target.value)}
+            placeholder="שם-חשבון (למשל tov)"
+            className="rounded-lg border border-[color:var(--line)] bg-black/30 px-2 py-1.5 text-xs w-40"
+            aria-label="שם חשבון הצי לריפוי"
+          />
+          <input
+            value={healPassword}
+            onChange={(e) => setHealPassword(e.target.value)}
+            type="password"
+            dir="ltr"
+            placeholder="master-password / WIF"
+            autoComplete="off"
+            className="rounded-lg border border-[color:var(--line)] bg-black/30 px-2 py-1.5 text-xs w-64 font-mono"
+            aria-label="סיסמת אב או מפתח — לא נשמר ולא מוצג"
+          />
+          <button
+            onClick={() => runHeal(false)}
+            disabled={healBusy}
+            className="min-h-[32px] rounded-lg border border-[color:var(--line)] px-2.5 py-1.5 text-xs hover:bg-black/30 disabled:opacity-50"
+            aria-label="בדיקת-התאמה בלבד — בלי אטימה"
+          >
+            {healBusy ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'בדוק-התאמה'}
+          </button>
+          <button
+            onClick={() => runHeal(true)}
+            disabled={healBusy}
+            className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2.5 py-1.5 text-xs hover:bg-black/30 disabled:opacity-50"
+            aria-label="אטימת-המפתחות-שעברו-הוכחה בכספת"
+          >
+            אטום-בכספת
+          </button>
+        </div>
+        {healErr && <p className="mt-2 text-[11px] text-[color:var(--amber)]">{healErr}</p>}
+        {healResult && (
+          <div className="mt-3 space-y-2 max-h-64 overflow-y-auto" dir="ltr">
+            <div className="text-[11px] opacity-70" dir="rtl">
+              תוצאה עבור <span className="font-mono">@{healResult.account}</span> · התאמות: {healResult.chains.filter((c) => c.exists).reduce((s, c) => s + Object.values(c.match).filter(Boolean).length, 0)} · נאטמו: {healResult.storedTotal} · סיסמת-אב: {healResult.masterStored ? 'אטומה ✓' : healResult.anyMatch ? 'ממתין-לאטימה' : 'לא-נשמרה (אין-התאמה)'}
+            </div>
+            {healResult.chains.map((c) => (
+              <div key={c.chain} className="rounded-lg border border-[color:var(--line)] bg-black/30 p-2 text-[11px]">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="font-bold">{CHAIN_LABEL[c.chain] ?? c.chain}</span>
+                  <span className={c.exists ? 'text-[color:var(--green)]' : 'opacity-60'}>{c.exists ? `קיים-בשרשרת · נאטמו ${c.stored}` : 'לא-קיים'}</span>
+                </div>
+                {c.exists && (
+                  <>
+                    <div className="mt-1 flex gap-1.5 flex-wrap" dir="rtl">
+                      {['owner', 'active', 'posting', 'memo'].map((ro) => (
+                        <span key={ro} className={`rounded px-1.5 py-0.5 border text-[10px] ${c.match[ro] ? 'border-[color:var(--green)] text-[color:var(--green)]' : 'border-[color:var(--line)] opacity-50'}`}>
+                          {ro} {c.match[ro] ? '✓' : '✗'}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-1 font-mono text-[10px] opacity-60 truncate" title="מפתחות-פומביים-בלבד">
+                      {Object.entries(c.pubKeys).map(([ro, pk]) => `${ro}:${pk}`).join('  ')}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── מועמדי-קיוריישן ── */}

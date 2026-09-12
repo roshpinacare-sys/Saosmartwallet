@@ -22,12 +22,16 @@
  * fail-כנה: כל-כישלון חוזר כשגיאה-מפורשת — אף-פעם לא ok:false-מחופש להצלחה.
  */
 import { db } from '@/lib/db';
-import { decryptSecret } from '@/lib/vault';
+import { decryptSecret, encryptSecret, fingerprint } from '@/lib/vault';
 
 type SteemLib = {
   config: { set(k: string, v: string): void };
   api: { setOptions(o: { url: string }): void };
-  auth?: { wifToPublic(w: string): string; isWif(w: string): boolean };
+  auth?: {
+    wifToPublic(w: string): string;
+    isWif(w: string): boolean;
+    getPrivateKeys(name: string, password: string, roles: string[]): Record<string, string>;
+  };
   broadcast: {
     // steem 0.7.x — generic multi-op send: send(tx={extensions,operations}, privKeys, cb)
     send(ops: unknown, wif: Record<string, string>, cb: (e: Error | null, r?: unknown) => void): void;
@@ -399,6 +403,11 @@ export function fleetScanCache(): FleetScan | null {
   return fleetCache && Date.now() - fleetCache.at < FLEET_TTL ? fleetCache.data : null;
 }
 
+/** 71-j: ניקוי-מטמון-הצי — אחרי-ריפוי-מפתחות הסריקה-הבאה משקפת-מיד */
+export function fleetCacheClear(): void {
+  fleetCache = null;
+}
+
 export async function fleetAccountsFromVault(chain: Chain3): Promise<string[]> {
   const rows = await db.vaultKey.findMany({
     where: { chain },
@@ -504,4 +513,106 @@ export async function fleetScan(): Promise<FleetScan> {
   const data: FleetScan = { ts: Date.now(), ok: true, chains, signableTotal };
   fleetCache = { at: Date.now(), data };
   return data;
+}
+
+/* ══ 71-j: ריפוי-מפתחות-צי — סיסמת-אב → גזירה → הוכחה-קריפטוגרפית → אטימה ═══
+ * הפתרון-המבני-ל"מפתחות-המתים": הכספת-היסטורית הכילה מפתחות-שנגזרו-מסיסמאות
+ * שונות-מהן-שהוגדרו-בשרשרת (הוכח-ב-71-i). סיסמת-אב של גרפין מולידה את-כל-4
+ * המפתחות בנוסחה-הקנונית sha256(account+role+password) → secp256k1 → WIF.
+ * כל-תפקיד נבדק מול key_auths-החיות-בשרשרת — רק-תפקידים-שעברו-התאמה נאטמים
+ * בכספת (fail-closed: אין-התאמה → לא-נשמר-כלום). הסוד לעולם לא נדפס,
+ * לא-נשמר-בפלט, לא-יוצא-מהפונקציה — רק-בוליאנים ומפתחות-פומביים. */
+export interface FleetHealChain {
+  chain: Chain3;
+  exists: boolean;
+  match: { owner: boolean; active: boolean; posting: boolean; memo: boolean };
+  stored: number;                    // כמה-תפקידים נאטמו-בפועל (רק-עם-store=true)
+  pubKeys: Record<string, string>;   // מפתחות-פומביים בלבד — בטוחים-לתצוגה
+}
+export interface FleetHealResult {
+  account: string;
+  chains: FleetHealChain[];
+  masterStored: boolean;             // סיסמת-האב עצמה נאטמה (נכס-התאוששות-העל)
+  storedTotal: number;
+  anyMatch: boolean;
+}
+
+export async function fleetHeal(account: string, password: string, store: boolean): Promise<FleetHealResult> {
+  const acc = account.trim().toLowerCase();
+  if (!acc || !password) throw new Error('heal: account+password נדרשים');
+  if (!/^[a-z0-9\-\.]{3,20}$/.test(acc)) throw new Error('heal: שם-חשבון-לא-תקין');
+  const lib = await steemLib();
+  if (!lib.auth?.getPrivateKeys) throw new Error('heal: steem-lib auth חסר (fail-closed)');
+  const roles = ['owner', 'active', 'posting', 'memo'] as const;
+  let keys: Record<string, string>;
+  try {
+    keys = lib.auth.getPrivateKeys(acc, password, [...roles]);
+  } catch (e) {
+    throw new Error(`heal: גזירה-נכשלה — ${String(e).slice(0, 100)}`);
+  }
+  const payload = (s: string) => String(s).replace(/^STM|^TST|^BLT|^JMT/i, '').toLowerCase();
+  const out: FleetHealResult = { account: acc, chains: [], masterStored: false, storedTotal: 0, anyMatch: false };
+  for (const chain of ['steem', 'hive', 'blurt'] as Chain3[]) {
+    const a = await getAccount(chain, acc).catch(() => null);
+    if (!a) {
+      out.chains.push({ chain, exists: false, match: { owner: false, active: false, posting: false, memo: false }, stored: 0, pubKeys: {} });
+      continue;
+    }
+    const keyAuths = (role: 'owner' | 'active' | 'posting'): string[] =>
+      (Array.isArray((a[role] as { key_auths?: unknown[] })?.key_auths) ? (a[role] as { key_auths: unknown[] }).key_auths : [])
+        .map((k) => payload(String(Array.isArray(k) ? k[0] : k)));
+    const memoOnChain = payload(String(a.memo_key ?? ''));
+    const match: Record<string, boolean> = {};
+    let stored = 0;
+    const pubKeys: Record<string, string> = {};
+    for (const role of roles) {
+      const wif = String(keys[role] ?? '');
+      const pub = String(keys[`${role}Pubkey`] ?? '');
+      if (!wif || !pub) { match[role] = false; continue; }
+      pubKeys[role] = pub; // פומבי — בטוח
+      const hit = role === 'memo' ? memoOnChain === payload(pub) : keyAuths(role).includes(payload(pub));
+      match[role] = hit;
+      if (hit) {
+        out.anyMatch = true;
+        if (store) {
+          await db.vaultKey.upsert({
+            where: { account_chain_role: { account: acc, chain, role } },
+            create: {
+              account: acc, chain, role, pubKey: pub,
+              cipher: encryptSecret(wif), fingerprint: fingerprint(wif),
+              verified: true, lastVerifiedAt: new Date(), lastError: null,
+              source: 'fleet-heal-71j', note: `נגזר-מסיסמת-אב · הוכח-קריפטוגרפית מול ${chain} key_auths`,
+            },
+            update: {
+              pubKey: pub, cipher: encryptSecret(wif), fingerprint: fingerprint(wif),
+              verified: true, lastVerifiedAt: new Date(), lastError: null, source: 'fleet-heal-71j',
+            },
+          });
+          stored += 1;
+        }
+      }
+    }
+    out.chains.push({ chain, exists: true, match: match as FleetHealChain['match'], stored, pubKeys });
+    out.storedTotal += stored;
+  }
+  if (out.anyMatch && store) {
+    // סיסמת-האב עצמה — נכס-ההתאוששות: ממנה אפשר לגזור-מחדש את-כל-המפתחות
+    // גם-אחרי-סבבי-רוטציה עתידיים. אטומה-באותו-AES-256-GCM.
+    await db.vaultKey.upsert({
+      where: { account_chain_role: { account: acc, chain: 'master', role: 'master' } },
+      create: {
+        account: acc, chain: 'master', role: 'master',
+        cipher: encryptSecret(password), fingerprint: fingerprint(password),
+        verified: true, lastVerifiedAt: new Date(), lastError: null,
+        source: 'fleet-heal-71j', note: 'סיסמת-אב — מקור-הגזירה-לכל-התפקידים (התאוששות-על)',
+      },
+      update: {
+        cipher: encryptSecret(password), fingerprint: fingerprint(password),
+        verified: true, lastVerifiedAt: new Date(), lastError: null,
+      },
+    });
+    out.masterStored = true;
+  }
+  if (store && out.storedTotal > 0) fleetCacheClear();
+  return out;
 }

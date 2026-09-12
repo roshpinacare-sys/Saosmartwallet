@@ -553,7 +553,7 @@ export async function flowOverview(): Promise<FlowOverview> {
   const fleetPendingHiveCoin = fleetHive ? fleetHive.pendingCoin + fleetHive.pendingDebt : 0;
   const fleetPendingN = (fleet?.chains ?? []).filter((c) => c.pendingCoin + c.pendingDebt + c.pendingVests > 0).length;
   const fleetTop = [...(fleetSteem?.members ?? [])].filter((m) => m.exists).sort((a, b) => b.effVests - a.effVests).slice(0, 3)
-    .map((m) => `${m.account}${m.signableRole ? '✓' : ''} (${fmt(props ? vestsToChainVests(m.effVests, props) : 0, 1)})`).join(' · ');
+    .map((m) => `${m.account}${m.voteRole ? '✓' : ''} (${fmt(props ? vestsToChainVests(m.effVests, props) : 0, 1)})`).join(' · ');
   const fleetVoted = fleetExtraSignable > 0 ? await db.auditLog.findFirst({ where: { action: 'flow-fleet-vote' }, select: { id: true } }) : null;
   loops.push({
     id: 'fleet-mass', title: 'צי-הכספת (מסה-מצביעה-מצטברת)', engine: 'fleet · vote+claim',
@@ -571,7 +571,7 @@ export async function flowOverview(): Promise<FlowOverview> {
       ? 'סריקת-הצי נפלה רגעית (RPC/כספת) — מוצג-ביושר, לא-אפס-מחופש.'
       : fleetExtraSignable > 0
         ? `הצי חי: ${fleetExtraSignable} חשבונות-צי עם הוכחת-מפתח-קריפטוגרפית (${fleetExtraActive} עם active-מאומת לתביעות). ${fleetVoted ? 'הצבעת-צי-ראשונה מאומתת-בשרשרת (פקדה: flow-fleet-vote).' : 'הצבעת-צי-ראשונה תיצור-הוכחת-שרשרת.'}`
-        : `תוצאת-ביקורת-כנה: מתוך ${fleetExistsN} חשבונות-צי, אף-אחד-מעבר-לחשבון-הראשי לא עבר הוכחת-מפתח (wifToPublic↔key_auths — כל-מפתח-שמור נבדק מול-כל-רשאות). המפתחות-השמורים-בכספת עבור חברי-הצי לא-תואמים-למפתחות-החיים-בשרשרת — נגזרו-מ-סיסמאות-שונות-מהן-שהוגדרו-בחשבונות. fail-closed: המערכת לא מעמידה-פנים. דרך-הפתיחה: מפעיל מספק מפתחות-אמת (כמו headcorner.txt) → סריקה-מרפאת-את-הכספת-והצי-נפתח-אוטומטית.`,
+        : `תוצאת-ביקורת-כנה: מתוך ${fleetExistsN} חשבונות-צי, אף-אחד-מעבר-לחשבון-הראשי לא עבר הוכחת-מפתח (wifToPublic↔key_auths — כל-מפתח-שמור נבדק מול-כל-רשאות). המפתחות-השמורים-בכספת עבור חברי-הצי לא-תואמים-למפתחות-החיים-בשרשרת — נגזרו-מ-סיסמאות-שונות-מהן-שהוגדרו-בחשבונות. fail-closed: המערכת לא מעמידה-פנים. דרך-הפתיחה (71-j): ריפוי-מפתחות — פעולת fleet_heal מקבלת סיסמת-אב, גוזרת את 4 המפתחות, מוכיחה אותם מול השרשרת ואוטמת רק-את-התואמים (הוכח-חי: wic·3-שרשראות + ynet·BLURT).`,
     actions: fleetExtraSignable > 0 ? ['fleet_scan', 'fleet_vote', 'fleet_claim'] : ['fleet_scan'],
   });
 
@@ -580,7 +580,7 @@ export async function flowOverview(): Promise<FlowOverview> {
     // FIX(71-g): flow-steem-claim — route.ts רושם flow-${chain}-claim (היה-חסר-במסנן — תביעות-STEEM-לא-נראו-בפקדה)
     // FIX(71-h): flow-steem-vote — הצבעות-קיוריישן-STEEM לא-נראו-בפקדה (רק-hive/blurt) · + flow-publish · + flow-autopilot
     // 71-i: + פעולות-הצי (fleet-vote/fleet-claim) + פרסום-רב-שרשרת (hive/blurt-publish)
-    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'flow-steem-vote', 'flow-publish', 'flow-autopilot', 'flow-fleet-vote', 'flow-fleet-claim', 'flow-hive-publish', 'flow-blurt-publish', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
+    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'flow-steem-vote', 'flow-publish', 'flow-autopilot', 'flow-fleet-vote', 'flow-fleet-claim', 'flow-fleet-heal', 'flow-hive-publish', 'flow-blurt-publish', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
     orderBy: { createdAt: 'desc' }, take: 12,
   });
 

@@ -4,7 +4,7 @@ import { audit, relayBroadcast } from '@/lib/audit';
 import { flowOverview, type FlowOverview } from '@/lib/saos/flow';
 import {
   chainVote, hiveSavingsSweep, claimRewards, curationCandidates, postInfo,
-  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, chainPublish, steemRcMana, getBlurtAccount, OPERATOR, chainVoteAs, claimRewardsAs, fleetScan, type Chain3,
+  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, chainPublish, steemRcMana, getBlurtAccount, OPERATOR, chainVoteAs, claimRewardsAs, fleetScan, fleetHeal, type Chain3,
 } from '@/lib/saos/steem-ops';
 import { trxEnergize, tronAccount, treasuryWallet } from '@/lib/saos/trx-ops';
 import { readAutopilotState, readAutopilotConfig, writeAutopilotConfig } from '@/lib/saos/autopilot-state';
@@ -462,6 +462,26 @@ export async function POST(req: NextRequest) {
       case 'fleet_claim':
         return await fleetClaimAction(execute, owner.label);
 
+      /* ── 71-j: ריפוי-מפתחות-צי — סיסמת-אב → גזירה → הוכחה → אטימה-בכספת ──
+       * תמיד-מאחורי-סשן-מפעיל (מכיל-סוד בגוף-הבקשה — אין-דרי-ראן-פומבי).
+       * dry-run = בדיקה בלבד (בוליאנים, בלי-אטימה) · execute = אטימת-התפקידים-שעברו-התאמה.
+       * הסוד לעולם לא נדפס/נרשם — הביקורת מתעדת בוליאנים-בלבד. */
+      case 'fleet_heal': {
+        const account = String(p.account ?? '');
+        const password = String(p.password ?? '');
+        if (!account || !password) {
+          return NextResponse.json({ ok: false, action, error: 'account+password נדרשים — הסוד לעולם לא נדפס/לא נשמר-בפלט/לא-נרשם-בביקורת' });
+        }
+        const r = await fleetHeal(account, password, execute);
+        const matches = r.chains
+          .filter((c) => c.exists)
+          .map((c) => `${c.chain}=${(['owner', 'active', 'posting', 'memo'] as const).filter((ro) => c.match[ro]).join('+') || 'none'}`)
+          .join(' · ');
+        await audit('flow-fleet-heal', `fleet_heal[${r.account}] execute=${execute} — match: ${matches} · stored=${r.storedTotal} · master=${r.masterStored} by owner:${owner.label}`);
+        try { await relayBroadcast('vault', { type: 'flow-fleet-heal', account: r.account, stored: r.storedTotal, master: r.masterStored }); } catch { /* */ }
+        return NextResponse.json({ ok: true, action, dryRun: !execute, result: r });
+      }
+
       /* ── 71-i: פרסום-רב-שרשרת — HIVE/BLURT ── */
       case 'hive_publish':
         return await chainPublishAction('hive', action, p, execute, owner.label);
@@ -492,7 +512,7 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'hive_publish', 'blurt_publish', 'fleet_scan', 'fleet_vote', 'fleet_claim', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
+        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'hive_publish', 'blurt_publish', 'fleet_scan', 'fleet_vote', 'fleet_claim', 'fleet_heal', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
     }
   } catch (e) {
     return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'flow action failed' }, { status: 200 });
