@@ -28,7 +28,7 @@ import {
   ShieldCheck, ShieldAlert, Loader2, RefreshCw, Copy, Eye, EyeOff, CheckCircle2,
   XCircle, MinusCircle, Search, Save, Send, UserCheck, Cpu, Crosshair, Layers,
   ListChecks, Play, Plus, Trash2, Unplug, Clock, Zap, Lightbulb, Brain, Hand,
-  Activity, Wallet, Braces, ScrollText, ArrowDown, Link2,
+  Activity, Wallet, Braces, ScrollText, ArrowDown, Link2, Boxes, ScanSearch,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -40,7 +40,7 @@ import type {
   RunRow, RunDetail, AgentStat, DeviceRow, Msg, ActionRow, ScheduleRow, EventRow,
   TriggerRow, ProposalRow, ProposalPolicyRow, CheckerStatsRow, MemoryRow, PulseRow,
   HeartData, OrderRow, OrdersData, TreasuryRow, TreasuryRail, TreasurySnapshot,
-  SituationData, DigestData, KeyReport, DrillResult, ModStats, Ep,
+  SituationData, DigestData, KeyReport, DrillResult, ModStats, Ep, KeyBatchResult,
 } from "@/components/console/types";
 import { LockScene } from "@/components/console/lock-scene";
 import { Overview } from "@/components/console/overview";
@@ -789,6 +789,13 @@ function KeyInjectCard() {
   const [saveIt, setSaveIt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<KeyReport | null>(null);
+  // r39 — bulk intake: the ready door for the NEXT batch of keys (text block or zip archive)
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [zipUrl, setZipUrl] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [batch, setBatch] = useState<KeyBatchResult | null>(null);
+  const [take, setTake] = useState<Set<string>>(new Set());
 
   async function run() {
     if (!keyInput.trim()) return;
@@ -803,6 +810,39 @@ function KeyInjectCard() {
         toast.success(saveIt && r.saved?.length ? `נשמר מוצפן בכספת (${r.saved.length})` : "זוהה חי — דוח מוצג");
       } else toast.error(r?.error || "הזיהוי נכשל");
     } finally { setBusy(false); }
+  }
+
+  async function bulkScan() {
+    if (!bulkText.trim() && !zipUrl.trim()) return;
+    setBulkBusy(true);
+    try {
+      const r = await apiJson<KeyBatchResult>("/api/gate/keys-batch", {
+        method: "POST", body: JSON.stringify({ mode: "scan", text: bulkText || undefined, zipUrl: zipUrl.trim() || undefined }),
+      });
+      if (r?.ok) {
+        setBatch(r);
+        const fresh = new Set<string>();
+        for (const it of r.items || []) if (!it.dupOf) fresh.add(it.hash);
+        setTake(fresh); // pre-select the non-duplicates — the operator unchecks what they don't want
+        toast.success(r.found ? `סרוק: ${r.found} מועמדים (כלום לא נאטם עדיין)` : "לא נמצאו מועמדים שנראים כמפתחות");
+      } else if (r?.code === "vault-locked") toast.error("הכספת נעולה — פתח אותה כדי לאטום");
+      else toast.error(r?.error || "הסריקה נכשלה");
+    } finally { setBulkBusy(false); }
+  }
+
+  async function bulkSeal() {
+    if (!take.size) return;
+    setBulkBusy(true);
+    try {
+      const r = await apiJson<KeyBatchResult>("/api/gate/keys-batch", {
+        method: "POST", body: JSON.stringify({ mode: "seal", text: bulkText || undefined, zipUrl: zipUrl.trim() || undefined, take: [...take] }),
+      });
+      if (r?.ok) {
+        toast.success(r.created ? `${r.created} מפתחות נאטמו מוצפנים בכספת` : "לא נאטם כלום (כפילויות או אישורים ריקים)");
+        setBatch(r);
+        setBulkText("");
+      } else toast.error(r?.error || "האטימה נכשלה");
+    } finally { setBulkBusy(false); }
   }
 
   return (
@@ -829,10 +869,73 @@ function KeyInjectCard() {
             {saveIt ? "זהה ושמור" : "זהה חי"}
           </Button>
         </div>
-        <label className="mt-3 flex items-center gap-2.5 text-xs text-zinc-400 cursor-pointer w-fit">
-          <Switch checked={saveIt} onCheckedChange={setSaveIt} aria-label="שמירה מוצפנת בכספת" />
-          שמור מוצפן בכספת (בלי זה — רק דוח-זיהוי)
-        </label>
+        <div className="mt-3 flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-2.5 text-xs text-zinc-400 cursor-pointer">
+            <Switch checked={saveIt} onCheckedChange={setSaveIt} aria-label="שמירה מוצפנת בכספת" />
+            שמור מוצפן בכספת (בלי זה — רק דוח-זיהוי)
+          </label>
+          <button type="button" onClick={() => setBulkOpen((v) => !v)} className="text-xs text-emerald-300/90 hover:text-emerald-200 flex items-center gap-1.5" aria-expanded={bulkOpen}>
+            <Boxes className="h-3.5 w-3.5" /> יבוא-מרובה (טקסט / zip) — מוכן לגל של מפתחות {bulkOpen ? "▲" : "▼"}
+          </button>
+        </div>
+        <AnimatePresence>
+          {bulkOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+              <div className="mt-3 rounded-xl border border-emerald-500/20 bg-black/30 p-3.5 space-y-2.5">
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  הדבק גוש מפתחות (שורה = מפתח: WIF / 0x-hex / 64-hex / מנשק / ghp_ PAT) ו/או כתובת zip (למשל ארכיון-מפתחות בגיט).
+                  סריקה מזהה כל מועמד מול השרשרות, מוציאה כפילויות מול הכספת — וכלום לא נאטם עד שאתה מאשר. אפס-סודות בפלט.
+                </p>
+                <Textarea
+                  value={bulkText} onChange={(e) => setBulkText(e.target.value)}
+                  placeholder={"5K… (WIF)\n0x… (מפתח EVM)\nשתים-עשרה עד עשרים-וארבע מילים… (מנשק)"}
+                  className="min-h-[88px] font-mono text-xs bg-zinc-950/80 border-zinc-800" dir="ltr" spellCheck={false}
+                  aria-label="גוש מפתחות ליבוא-מרובה"
+                />
+                <Input
+                  value={zipUrl} onChange={(e) => setZipUrl(e.target.value)}
+                  placeholder="https://…/keys-backup.zip (אופציונלי — נסרק בזיכרון, עד 64MB)"
+                  className="font-mono text-xs bg-zinc-950/80 border-zinc-800" dir="ltr" spellCheck={false}
+                  aria-label="כתובת ארכיון-zip"
+                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={bulkScan} disabled={bulkBusy || (!bulkText.trim() && !zipUrl.trim())} className="gap-1.5 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10">
+                    {bulkBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />} סרוק חי
+                  </Button>
+                  {batch?.mode === "scan" && batch.items && (
+                    <Button size="sm" onClick={bulkSeal} disabled={bulkBusy || !take.size} className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-black font-bold">
+                      <Save className="h-3.5 w-3.5" /> אטום נבחרים ({take.size})
+                    </Button>
+                  )}
+                  {batch?.note && <span className="text-[10px] text-zinc-500">{batch.note}</span>}
+                </div>
+                {batch?.items && batch.items.length > 0 && (
+                  <div className="max-h-52 overflow-y-auto scroll-thin space-y-1.5 pl-1">
+                    {batch.items.map((it) => (
+                      <div key={it.hash} className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-2.5 py-1.5 flex items-start gap-2 flex-wrap">
+                        {!it.dupOf ? (
+                          <input
+                            type="checkbox" checked={take.has(it.hash)}
+                            onChange={() => setTake((s) => { const n = new Set(s); if (n.has(it.hash)) n.delete(it.hash); else n.add(it.hash); return n; })}
+                            className="mt-0.5 accent-emerald-500" aria-label={`אישור אטימה עבור ${it.preview}`}
+                          />
+                        ) : <span className="text-[10px] text-zinc-600 w-4 text-center" title={`כפילות של ${it.dupOf}`}>=</span>}
+                        <span className="font-mono text-[10px] text-zinc-400" dir="ltr">{it.preview}</span>
+                        <Badge variant="outline" className="text-[9px] font-mono text-zinc-400 border-zinc-700" dir="ltr">{it.kind}</Badge>
+                        {it.liveChecked && <Badge variant="outline" className="text-[9px] text-emerald-300 border-emerald-500/40">חי ✓</Badge>}
+                        {it.controls.slice(0, 2).map((c, i) => (
+                          <Badge key={i} variant="outline" className="text-[9px] font-mono text-sky-300 border-sky-500/40" dir="ltr">{c.chain}{c.account ? `·${c.account}` : ""}@{c.role}</Badge>
+                        ))}
+                        {it.dupOf && <span className="text-[9px] text-zinc-600">כבר בכספת ({it.dupOf})</span>}
+                        <span className="text-[9px] text-zinc-700 mr-auto font-mono" dir="ltr">{it.from}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {report && (
             <motion.div
@@ -1583,7 +1686,7 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
               יד-ריבונית — תור-החתימות ({orders?.orders?.filter((o) => o.status === "pending").length ?? 0} ממתינות)
             </p>
             <span className="text-[10px] text-zinc-500 font-mono" dir="ltr">
-              signed {orders?.signedToday ?? 0}/{orders?.rails.maxSignedPerDay ?? 6} today · ≤{orders?.rails.maxNotionalSteem ?? 100} per order · חשבון-הפקודה: מפתח-active מאומת מהכספת
+              signed {orders?.signedToday ?? 0}/{orders?.rails.maxSignedPerDay ?? 6} today · ≤{orders?.rails.maxNotionalSteem ?? 100} per order · חשבון-הפקודה: מפתח-active מאומת מהכספת · r39: סוכן בדרגת auto חותם-לבד בתוך-התקרות שלו
             </span>
           </div>
           {orders && !orders.vaultOpen && (orders?.orders?.some((o) => o.status === "pending") ?? false) && (
@@ -1604,6 +1707,11 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (o.status === "pending" ? "text-orange-300 border-orange-500/40" : o.status === "signed" ? "text-emerald-300 border-emerald-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">{o.status}</Badge>
                     <span className="text-[11px] font-mono text-zinc-400 shrink-0">{o.agentName}</span>
+                    {o.status === "pending" && orders?.tiers?.[o.agentName] && (
+                      <Badge variant="outline" className={"text-[9px] font-mono shrink-0 " + (orders.tiers[o.agentName].finTier === "autonomous-limited" ? "text-amber-300 border-amber-500/40" : "text-zinc-500 border-zinc-800")} dir="ltr">
+                        fin:{orders.tiers[o.agentName].finTier === "autonomous-limited" ? `auto≤${orders.tiers[o.agentName].finCaps?.maxNotionalPerOrder ?? 0.5}` : orders.tiers[o.agentName].finTier}
+                      </Badge>
+                    )}
                     <span className="text-[11px] font-mono text-zinc-500 shrink-0" dir="ltr">@{o.account}{pv.rail ? `·${pv.rail}` : ""}</span>
                     {railChip}
                     <span className="text-[10px] text-zinc-300">{what}</span>
@@ -1773,6 +1881,22 @@ function Agents() {
     else toast.error(r?.error || "החימוש נכשל");
   }
 
+  // r39 — the financial permission ladder, one click per agent (operator only)
+  const FIN_TIER_LABEL: Record<string, string> = {
+    none: "סגור — בלי ידיים",
+    build: "בונה — הכספת חותמת רק באישורך",
+    "autonomous-limited": "אוטונומי-חסום — הכספת חותמת לבד בתוך-תקרות",
+  };
+  async function setFinTier(a: AgentRow, tier: string) {
+    const r = await apiJson<{ ok: boolean; error?: string }>("/api/gate/agents", {
+      method: "PATCH", body: JSON.stringify({ name: a.name, finTier: tier }),
+    });
+    if (r?.ok) {
+      setAgents((arr) => arr.map((x) => (x.name === a.name ? { ...x, finTier: tier } : x)));
+      toast.success(`דרגת-הכסף של ${a.name}: ${FIN_TIER_LABEL[tier] ?? tier}`);
+    } else toast.error(r?.error || "השינוי נכשל");
+  }
+
   async function revoke(n: string) {
     const r = await apiJson<{ ok: boolean }>(`/api/gate/agents?name=${encodeURIComponent(n)}`, { method: "DELETE" });
     if (r?.ok) { setAgents((arr) => arr.map((x) => (x.name === n ? { ...x, active: false } : x))); toast("הסוכן נשלל"); }
@@ -1880,6 +2004,18 @@ function Agents() {
                       ? <Badge variant="outline" className="text-emerald-400 border-emerald-500/40 text-[10px]">פעיל</Badge>
                       : <Badge variant="outline" className="text-zinc-600 border-zinc-800 text-[10px]">נשלל</Badge>}
                     {a.brain && <Badge variant="outline" className="text-sky-300 border-sky-500/40 text-[10px] font-mono" dir="ltr"><Cpu className="h-3 w-3 ml-1 inline" />{a.brain}</Badge>}
+                    {a.active && (
+                      <select
+                        value={a.finTier || "build"}
+                        onChange={(e) => setFinTier(a, e.target.value)}
+                        className={"rounded-md border bg-zinc-950/80 px-1.5 py-0.5 text-[10px] font-mono " + ((a.finTier || "build") === "autonomous-limited" ? "border-amber-500/50 text-amber-300" : (a.finTier || "build") === "none" ? "border-zinc-800 text-zinc-500" : "border-emerald-500/40 text-emerald-300")}
+                        dir="ltr" aria-label={`דרגת-כסף של ${a.name}`} title={`דרגת-כסף: ${FIN_TIER_LABEL[a.finTier || "build"] ?? ""}${(a.finTier || "build") === "autonomous-limited" ? " · תקרות: ≤" + (a.finCaps?.maxNotionalPerOrder ?? 0.5) + "/פקודה · ≤" + (a.finCaps?.maxNotionalPerDay ?? 1) + "/יום · ≤" + (a.finCaps?.maxSignedPerDay ?? 2) + " חתימות/יום" : ""}`}
+                      >
+                        <option value="none">fin:none</option>
+                        <option value="build">fin:build</option>
+                        <option value="autonomous-limited">fin:auto≤{(a.finCaps?.maxNotionalPerOrder ?? 0.5).toString()}</option>
+                      </select>
+                    )}
                     {st && st.runs > 0 && (
                       <span className="font-mono text-[10px] text-zinc-500" dir="ltr" title="יעילות אמיתית מהריצות">
                         {st.runs} ריצות · {Math.round((st.done / st.runs) * 100)}% עברו · ממוצע {st.avgSteps} צעדים{st.avgMs ? ` · ${Math.round(st.avgMs / 100) / 10}s` : ""}

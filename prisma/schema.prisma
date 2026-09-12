@@ -75,6 +75,17 @@ model GateAgent {
   brain      String? // brain spec "provider:model" — nvidia:openai/gpt-oss-20b | zai:default
   active     Boolean   @default(true)
   autonomy   Boolean   @default(true) // may the heart launch this agent on its own (schedules + triggers)?
+  // r39 FINANCIAL PERMISSION MODEL (the r28 directive: "הכספת = הבנק של הרשת —
+  // הסוכן הראשי מורשה כבר כעת; בעתיד סוכנים מורשים לפעול אוטונומית בכסף"):
+  //   none                — this agent cannot even BUILD DEX orders (steem.order.build refuses).
+  //   build               — may BUILD orders; the vault signs ONLY on explicit operator decision
+  //                         (the r21 doctrine — default for every agent, nothing changed).
+  //   autonomous-limited  — the vault signs this agent's pending orders AUTOMATICALLY, but only
+  //                         inside finCaps (per-order notional, per-day signed count, per-day
+  //                         notional), only limit create/cancel (no convert), only while the
+  //                         vault is open — and every policy signature is audited + bridged.
+  finTier    String    @default("build")
+  finCaps    String? // JSON {maxNotionalPerOrder, maxSignedPerDay, maxNotionalPerDay} — null = FIN_CAPS_DEFAULTS
   createdAt  DateTime  @default(now())
   lastSeenAt DateTime  @default(now())
 }

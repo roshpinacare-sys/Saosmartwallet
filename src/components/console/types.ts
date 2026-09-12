@@ -40,6 +40,7 @@ export interface AgentRow {
   id: string; name: string; memo: string | null; active: boolean;
   createdAt: string; lastSeenAt: string;
   modules?: string[] | null; brain?: string | null; autonomy?: boolean;
+  finTier?: string; finCaps?: Record<string, number> | null;
 }
 export interface ModuleDef { id: string; name: string; kind: "skill" | "connector" | "actor"; desc: string; args: string; needsVault: boolean }
 export interface TraceStep { i: number; side: "maker" | "checker"; thought?: string; tool?: string; args?: Record<string, unknown>; ok?: boolean; result?: unknown; error?: string; ms?: number; cached?: boolean; rescued?: boolean; repair?: boolean; at: string }
@@ -67,7 +68,8 @@ export interface MemoryRow { id: string; key: string; kind: string; body: string
 export interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired?: number; marketMoves?: number; idleFired?: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
 export interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[]; proposals?: ProposalRow[]; proposalPolicy?: ProposalPolicyRow; checkerStats?: CheckerStatsRow | null }
 export interface OrderRow { id: string; agentName: string; runId: string | null; op: string; account: string; spec: string; preview: string; notionalSteem: number; status: string; decidedBy: string | null; previewTxId: string | null; broadcastId: string | null; blockNum: number | null; error: string | null; createdAt: string; decidedAt: string | null }
-export interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalSteem: number; maxSignedPerDay: number; pendingExpiryMs: number; defaultTtlSeconds: number }; account: string; signedToday: number; vaultOpen: boolean; error?: string }
+export interface OrderRowTier { finTier: string; finCaps: Record<string, number> | null }
+export interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalSteem: number; maxSignedPerDay: number; pendingExpiryMs: number; defaultTtlSeconds: number }; account: string; signedToday: number; vaultOpen: boolean; tiers?: Record<string, OrderRowTier>; error?: string }
 export interface TreasuryRow { account: string; liquid: string; debt: string; vesting: string | null; liquidNum: number; debtNum: number }
 export interface TreasuryRail { rail: string; ok: boolean; liquidSymbol: string; debtSymbol: string; accounts: TreasuryRow[]; totals: { liquid: number; debt: number }; error?: string }
 export interface TreasurySnapshot { measuredAt: string; rails: TreasuryRail[]; fleet: Record<string, number>; cached: boolean }
@@ -90,6 +92,20 @@ export interface KeyReport {
   kind: string; liveChecked: boolean;
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
   pubs: string[];
+}
+/* r39 · key intake — the ready door for the next batch of keys (text or zip) */
+export interface KeyBatchItem {
+  hash: string; kind: string; preview: string; from: string;
+  liveChecked: boolean; label: string;
+  controls: { chain: string; account: string | null; role: string; pub: string | null }[];
+  notes: string[]; dupOf: string | null;
+}
+export interface KeyBatchResult {
+  ok: boolean; mode: string; found: number; created?: number;
+  items?: KeyBatchItem[];
+  sealed?: { hash: string; id: string; chain: string | null; account: string | null; role: string | null; status: string }[];
+  note?: string; error?: string; code?: string;
+  meta?: Record<string, unknown>;
 }
 export interface Ep { method: "GET" | "POST" | "PATCH" | "PUT"; path: string; desc: string; auth: "public" | "operator"; body?: string }
 

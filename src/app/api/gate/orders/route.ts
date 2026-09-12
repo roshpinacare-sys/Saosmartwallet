@@ -14,11 +14,12 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await requireOperator();
-    const [rows, signedToday] = await Promise.all([
+    const [rows, signedToday, agents] = await Promise.all([
       db.gateOrder.findMany({ orderBy: { createdAt: "desc" }, take: 30 }),
       db.gateOrder.count({
         where: { status: "signed", decidedAt: { gte: new Date(new Date().toISOString().slice(0, 10)) } },
       }),
+      db.gateAgent.findMany({ where: { active: true }, select: { name: true, finTier: true, finCaps: true } }),
     ]);
     return ok({
       orders: rows,
@@ -26,6 +27,8 @@ export async function GET() {
       account: COMMANDER_ACCOUNT,
       signedToday,
       vaultOpen: masterReady(), // signing needs an open vault — say so BEFORE the operator clicks approve
+      // r39 — the financial permission ladder, visible where the money decisions happen
+      tiers: Object.fromEntries(agents.map((a) => [a.name, { finTier: a.finTier, finCaps: a.finCaps ? JSON.parse(a.finCaps) : null }])),
     });
   } catch (e) {
     return fail(e);

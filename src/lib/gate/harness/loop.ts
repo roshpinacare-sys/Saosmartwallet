@@ -303,16 +303,25 @@ const CHECKER_RESCUE_LIMIT = 2;
  * the r30 rescue — costs nothing and converts silence into a verdict.
  */
 async function brainChatRetry(b: ReturnType<typeof parseBrain>, messages: ChatMsg[], opts: { maxTokens: number; temperature: number }): Promise<BrainReply> {
-  try {
-    return await brainChat(b, messages, opts);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/429|rate|timeout|fetch failed|network/i.test(msg)) {
-      await new Promise((r) => setTimeout(r, 3500)); // transient — one polite backoff
+  // r39 — the audit found anchor-agent burning 6 runs on 429s within 48h: ONE
+  // polite retry (r34) was not enough for nvidia's bursty rate-limits. Now a
+  // 3-attempt ladder (4s → 10s, jittered) converts provider turbulence into
+  // progress while non-transient throws keep standing honest.
+  let delay = 4000 + Math.floor(Math.random() * 800);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
       return await brainChat(b, messages, opts);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (attempt < 3 && /429|rate|timeout|fetch failed|network/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, delay)); // transient — polite backoff, growing
+        delay = 10000 + Math.floor(Math.random() * 2000);
+        continue;
+      }
+      throw e; // non-transient (or exhausted) — the honest throw stands
     }
-    throw e; // non-transient — the honest throw stands
   }
+  throw new Error("unreachable"); // loop always returns or throws
 }
 async function runChecker(opts: {
   checkerSpec: string;
