@@ -1,0 +1,306 @@
+'use client';
+
+// ─── FlowView (Task 71-flow) — מנוע-הזרימה הריבוני ═══════════════════════════
+// איך מה שיש לנו באמת מייצר זרימה בלי-משתמשים: אוצר-חי + 5 לולאות + פקדה.
+// הכל חי מ-/api/saos/flow — אפס-הדמיה; כל-פעולה dry-run-קודם, ביצוע-מאומת.
+
+import { useCallback, useState } from 'react';
+import {
+  Waves, Wallet, Vote, Repeat, PiggyBank, Zap, Activity, ShieldCheck,
+  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText,
+} from 'lucide-react';
+import { fmtInt, usePoll, StaleChip } from './common';
+import { authHeaders } from '@/components/sv/shared';
+
+interface FlowLoop {
+  id: string; title: string; engine: string;
+  status: string; statusLabel: string;
+  numbers: Array<{ k: string; v: string; hint?: string }>;
+  verdict: string; actions: string[];
+}
+interface FlowData {
+  ok: boolean; ts: number;
+  wallet: { sealed: boolean; address: string | null; fp: string | null; verified: boolean; source: string | null; note: string };
+  treasury: {
+    rows: Array<{ chain: string; label: string; items: Array<{ k: string; v: string; hint?: string }>; usd: number | null; ok: boolean }>;
+    totalUsd: number | null; note: string;
+  };
+  loops: FlowLoop[];
+  ledger: Array<{ id: string; action: string; detail: string; createdAt: string }>;
+  note: string;
+}
+interface VoteCandidate { author: string; permlink: string; ageH: number; title: string; votes: number }
+interface ActionResult { ok: boolean; dryRun?: boolean; error?: string; plan?: Record<string, unknown>; result?: Record<string, unknown>; candidates?: VoteCandidate[]; note?: string }
+
+const STATUS_STYLE: Record<string, string> = {
+  live: 'text-[color:var(--green)] border-[color:var(--green)]',
+  armed: 'text-[color:var(--amber)] border-[color:var(--amber)]',
+  'waiting-deposit': 'text-[color:var(--amber)] border-[color:var(--amber)]',
+  blocked: 'opacity-60 border-[color:var(--line)]',
+};
+const LOOP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  'grid-steem': Activity,
+  'powerdown-drip': Repeat,
+  curation: Vote,
+  'hbd-savings': PiggyBank,
+  'trx-energize': Zap,
+};
+
+export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: () => void }) {
+  const [data, setData] = useState<FlowData | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<Record<string, ActionResult>>({});
+  const [cands, setCands] = useState<VoteCandidate[] | null>(null);
+  const [candsOpen, setCandsOpen] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const fetcher = useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/saos/flow', { cache: 'no-store' });
+      const j = (await r.json()) as FlowData;
+      if (j.ok) { setData(j); return true; }
+      return false;
+    } catch { return false; }
+  }, []);
+  const stale = usePoll(fetcher, 30_000);
+
+  const run = useCallback(async (action: string, execute: boolean, params: Record<string, unknown> = {}) => {
+    if (execute && !authed) { onNeedAuth(); return; }
+    const key = action + (params.permlink ?? '');
+    setBusy(key + (execute ? '!exec' : '!dry'));
+    setMsg(null);
+    try {
+      const r = await fetch('/api/saos/flow', {
+        method: 'POST', headers: { 'content-type': 'application/json', ...(authed ? authHeaders() : {}) },
+        body: JSON.stringify({ action, execute, params }),
+      });
+      const j = (await r.json()) as ActionResult;
+      setResult((prev) => ({ ...prev, [key]: j }));
+      if (execute && j.ok) setMsg(action === 'steem_vote' ? 'ההצבעה שודרה לשרשרת ✓' : 'בוצע ✓');
+      else if (execute && !j.ok) setMsg(`כישלון-כנה: ${j.error ?? '—'}`);
+      fetcher();
+    } catch { setResult((prev) => ({ ...prev, [key]: { ok: false, error: 'רשת לא נגישה' } })); }
+    finally { setBusy(null); }
+  }, [authed, onNeedAuth, fetcher]);
+
+  const pickCandidates = useCallback(async () => {
+    setBusy('pick');
+    try {
+      const r = await fetch('/api/saos/flow', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'autovote_pick', params: {} }),
+      });
+      const j = (await r.json()) as ActionResult;
+      setCands(j.candidates ?? []);
+      setCandsOpen(true);
+    } catch { setCands([]); setCandsOpen(true); }
+    finally { setBusy(null); }
+  }, []);
+
+  if (!data) {
+    return (
+      <div className="flex items-center justify-center py-16 text-sm opacity-60">
+        <Activity className="w-4 h-4 ml-2 animate-pulse" />
+        טוען את מנוע-הזרימה מהשרשראות החיות…
+      </div>
+    );
+  }
+
+  const d = data;
+  return (
+    <div dir="rtl" className="max-w-5xl mx-auto space-y-4 min-w-0">
+      {/* ── כותרת ── */}
+      <div className="dx-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Waves className="w-5 h-5 text-[color:var(--green)]" />
+            <h2 className="text-lg font-bold">מנוע-הזרימה הריבוני</h2>
+            <span className="text-xs opacity-60">Task 71 · זרימה-בלי-משתמשים ממה שיש באמת</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            {stale && <StaleChip />}
+            {d.wallet.sealed && (
+              <span className="rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2 py-1 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" /> ארנק-מערכת אטום
+              </span>
+            )}
+            {d.treasury.totalUsd !== null && (
+              <span className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1">
+                אוצר ≈ ${fmtInt(d.treasury.totalUsd)}
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="text-xs opacity-70 leading-relaxed">{d.wallet.note} · {d.note}</p>
+        {d.wallet.address && (
+          <p className="text-xs mt-2 opacity-60 font-mono" dir="ltr">{d.wallet.address}</p>
+        )}
+      </div>
+
+      {/* ── אוצר חי ── */}
+      <div>
+        <h3 className="label-caps flex items-center gap-1.5 mb-2"><Wallet className="w-3.5 h-3.5" /> אוצר-חי (RPC-אמת)</h3>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {d.treasury.rows.map((row) => (
+            <div key={row.chain} className="dx-card p-4 min-w-0 overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold">{row.label}</span>
+                <span className={`w-2 h-2 rounded-full ${row.ok ? 'bg-[color:var(--green)]' : 'bg-[color:var(--amber)]'}`} aria-hidden="true" />
+              </div>
+              <div className="space-y-1">
+                {row.items.map((it) => (
+                  <div key={it.k} className="flex items-baseline justify-between gap-2 text-xs min-w-0">
+                    <span className="opacity-60 shrink-0">{it.k}</span>
+                    <span className="text-left font-mono text-[11px] truncate min-w-0" title={it.hint ?? it.v} dir={/[ת-ת]/.test(it.v) ? 'rtl' : 'ltr'}>{it.v}</span>
+                  </div>
+                ))}
+              </div>
+              {row.usd !== null && row.usd > 0 && (
+                <div className="mt-2 pt-2 border-t border-[color:var(--line)] text-xs text-[color:var(--green)]">≈ ${fmtInt(row.usd)}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── לולאות-זרימה ── */}
+      <div>
+        <h3 className="label-caps flex items-center gap-1.5 mb-2"><Landmark className="w-3.5 h-3.5" /> לולאות-הזרימה (5)</h3>
+        <div className="grid gap-3 md:grid-cols-2">
+          {d.loops.map((loop) => {
+            const Icon = LOOP_ICON[loop.id] ?? Activity;
+            const key = loop.actions[0] ?? loop.id;
+            const res = result[key];
+            return (
+              <div key={loop.id} className="dx-card p-4 min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon className="w-4 h-4 shrink-0 text-[color:var(--amber)]" />
+                    <span className="text-sm font-bold truncate">{loop.title}</span>
+                  </div>
+                  <span className={`shrink-0 rounded-lg border px-2 py-0.5 text-[10px] ${STATUS_STYLE[loop.status] ?? STATUS_STYLE.blocked}`}>
+                    {loop.statusLabel}
+                  </span>
+                </div>
+                <div className="space-y-1 mb-2">
+                  {loop.numbers.map((n) => (
+                    <div key={n.k} className="flex items-baseline justify-between gap-2 text-xs min-w-0">
+                      <span className="opacity-60 shrink-0">{n.k}</span>
+                      <span className="text-left font-mono text-[11px] truncate min-w-0" title={n.hint ?? n.v}>{n.v}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] opacity-70 leading-relaxed mb-2 break-words">{loop.verdict}</p>
+                {loop.actions.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {loop.actions.includes('steem_vote') && (
+                      <button
+                        onClick={pickCandidates}
+                        className="min-h-[32px] rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                        aria-label="בחר פוסט להצבעת קיוריישן"
+                      >
+                        {busy === 'pick' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'בחר פוסט להצבעה'}
+                      </button>
+                    )}
+                    {loop.actions.filter((a) => a !== 'steem_vote').map((a) => (
+                      <button
+                        key={a}
+                        onClick={() => run(a, false)}
+                        className="min-h-[32px] rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                        aria-label={`הרץ ${a} במצב ניסיון`}
+                      >
+                        {busy === a + '!dry' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'הרץ ניסיון (dry-run)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {res && (res.plan || res.error || res.candidates) && (
+                  <div className="mt-2 rounded-lg border border-[color:var(--line)] bg-black/30 p-2 text-[11px] space-y-1 max-h-40 overflow-y-auto">
+                    {res.error ? (
+                      <span className="text-[color:var(--amber)]">{res.error}</span>
+                    ) : res.plan ? (
+                      Object.entries(res.plan).map(([k, v]) => (
+                        <div key={k} className="flex justify-between gap-2">
+                          <span className="opacity-60">{k}</span><span className="font-mono text-left truncate">{String(v)}</span>
+                        </div>
+                      ))
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── מועמדי-קיוריישן ── */}
+      {candsOpen && cands !== null && (
+        <div className="dx-card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-bold flex items-center gap-1.5"><Vote className="w-4 h-4 text-[color:var(--green)]" /> מועמדי-קיוריישן (טרנדינג · 1–18 שעות)</h3>
+            <button onClick={() => setCandsOpen(false)} className="text-xs opacity-60 hover:opacity-100" aria-label="סגור רשימה">
+              {candsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+          {cands.length === 0 ? (
+            <p className="text-xs opacity-60">אין-מועמדים כרגע (כנות) — נסה שוב מאוחר.</p>
+          ) : (
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {cands.map((c) => {
+                const key = 'steem_vote' + c.permlink;
+                const res = result[key];
+                return (
+                  <div key={c.permlink} className="rounded-lg border border-[color:var(--line)] bg-black/20 p-2.5 flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-medium truncate">{c.title || '(ללא-כותרת)'}</div>
+                      <div className="text-[10px] opacity-60 truncate">@{c.author} · {c.ageH.toFixed(1)} שעות · {c.votes} הצבעות</div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => run('steem_vote', false, { author: c.author, permlink: c.permlink, weightPct: 1 })}
+                        className="min-h-[32px] rounded-lg border border-[color:var(--line)] px-2 py-1.5 text-[11px] hover:bg-black/30"
+                        aria-label={`נסיון הצבעה על פוסט של ${c.author}`}
+                      >
+                        {busy === key + '!dry' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'בדוק'}
+                      </button>
+                      <button
+                        onClick={() => run('steem_vote', true, { author: c.author, permlink: c.permlink, weightPct: 1 })}
+                        className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2 py-1.5 text-[11px] hover:bg-black/30"
+                        aria-label={`הצבע אמת 1% על פוסט של ${c.author}`}
+                      >
+                        {busy === key + '!exec' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'הצבע 1%'}
+                      </button>
+                    </div>
+                    {res?.plan && (
+                      <div className="w-full text-[10px] opacity-70">{String((res.plan as { title?: string }).title)} — גיל {(res.plan as { ageH?: number }).ageH}h · {(res.plan as { netVotes?: number }).netVotes} הצבעות</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── הודעה ── */}
+      {msg && (
+        <div className={`dx-card p-3 text-xs ${msg.includes('כישלון') ? 'text-[color:var(--amber)]' : 'text-[color:var(--green)]'}`}>{msg}</div>
+      )}
+
+      {/* ── פקדה ── */}
+      <div className="dx-card p-4">
+        <h3 className="text-sm font-bold flex items-center gap-1.5 mb-2"><ScrollText className="w-4 h-4" /> פקדת-זרימה (ביקורת-חיה)</h3>
+        <div className="space-y-1.5 max-h-56 overflow-y-auto">
+          {d.ledger.length === 0 && <p className="text-xs opacity-60">עדיין-אין-אירועי-זרימה.</p>}
+          {d.ledger.map((l) => (
+            <div key={l.id} className="text-[11px] flex gap-2 items-baseline min-w-0">
+              <span className="shrink-0 rounded border border-[color:var(--line)] px-1.5 py-0.5 font-mono text-[10px]">{l.action}</span>
+              <span className="opacity-70 truncate min-w-0" title={l.detail}>{l.detail}</span>
+              <span className="shrink-0 opacity-40 text-[10px] mr-auto">{new Date(l.createdAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

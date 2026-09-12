@@ -8,7 +8,7 @@ import { useState } from 'react';
 import {
   ArrowLeftRight, CandlestickChart, Droplets, Wallet, Anchor, Coins,
   Fingerprint, Landmark, Zap, ScrollText, Settings2, LogIn, LogOut,
-  Menu, ChevronDown, Activity, Globe2, DoorOpen, TrendingUp,
+  Menu, ChevronDown, Activity, Globe2, DoorOpen, TrendingUp, Waves,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
@@ -20,7 +20,7 @@ import type { World } from './common';
 import { fmtInt } from './common';
 
 export type ViewId = 'swap' | 'pro' | 'pools' | 'economy' | 'revenue' | 'portfolio' | 'estate' | 'anchors' | 'door'
-  | 'vault' | 'towers' | 'ops' | 'audit' | 'settings';
+  | 'flow' | 'vault' | 'towers' | 'ops' | 'audit' | 'settings';
 
 export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'swap', label: 'בורסה', icon: ArrowLeftRight },
@@ -43,6 +43,7 @@ export const EXCHANGE_PRIMARY = EXCHANGE_NAV.filter(v => (PRIMARY_NAV as readonl
 export const EXCHANGE_SECONDARY = EXCHANGE_NAV.filter(v => !(PRIMARY_NAV as readonly string[]).includes(v.id));
 
 export const PLATFORM_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { id: 'flow', label: 'מנוע זרימה', icon: Waves },
   { id: 'vault', label: 'כספת מפתחות', icon: Fingerprint },
   { id: 'towers', label: 'מגדלי SAOS', icon: Landmark },
   { id: 'ops', label: 'מבצעים · סוכנים', icon: Zap },

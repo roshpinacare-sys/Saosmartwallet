@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  /* Task 71-flow: ספריית-steem (CJS ישן) חייבת-node-raw ב-API-routes — בלי-bundling */
+  serverExternalPackages: ["steem"],
   reactStrictMode: false,
   /* Zero-Tolerance: dev-assets חייבים לעבור דרך-השער בלי-חסימת-מוצא (HMR + chunks) */
   allowedDevOrigins: ["127.0.0.1", "localhost"],

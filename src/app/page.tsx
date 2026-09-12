@@ -29,6 +29,7 @@ import { EstateView } from '@/components/dex/estate-view';
 import { AnchorsView } from '@/components/dex/anchors-view';
 import { DoorView } from '@/components/dex/door-view';
 import { RevenueView } from '@/components/dex/revenue-view';
+import { FlowView } from '@/components/dex/flow-view';
 
 export default function SovereignDex() {
   const [booted, setBooted] = useState(false);
@@ -281,6 +282,11 @@ export default function SovereignDex() {
         )}
 
         {/* platform views — the sovereign control center, dark-skinned */}
+        {view === 'flow' && (
+          <div className="sv-theme">
+            <FlowView authed={authed} onNeedAuth={() => { setLoginMsg(null); setLoginOpen(true); }} />
+          </div>
+        )}
         {view === 'vault' && (
           <div className="sv-theme">
             <VaultView status={status} verifying={verifying} onVerifyAll={verifyAll} />

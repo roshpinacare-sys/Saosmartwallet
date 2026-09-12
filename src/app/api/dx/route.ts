@@ -30,6 +30,7 @@ const ALLOWED = new Set([
   'launchpad', // POST — Task 57/58: מסילת-ההשקות (עקומה/LBP + קנייה/מכירה — רב-משתמשי)
   'cow',      // POST — Task 58: הזמנות-אצווה CoW (מחיר-אחיד · עודף-לסוחרים)
   'door',     // POST — Task 72: דלת-המטבעות (peg-in/peg-out/open-pool/refresh-oracle — TRX/SOL)
+  'realmarket', // POST — Task 71-flow: פעולות-חייל אמת על ספר-STEEM (place/cancel/powerdown/powerup) — דרך מנוע-הזרימה
 ]);
 
 export async function POST(req: NextRequest) {
