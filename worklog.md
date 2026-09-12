@@ -2068,3 +2068,21 @@ Stage Summary:
 - **פסק-הביקורת**: כל-טענות-הדף-והדוקים (פרט-לשניים-שתוקנו-במקום) הן אמת-מדודה — הלב-והריפר היו החריגים-החמורים ותוקנו-ואומתו-בזמן-הביקורת-עצמה.
 - שינויים: package.json (dev boots heart; heart script) · db/custom.db (עמודת retryNotBefore) · node_modules/.prisma (לקוח-טרי) · overview.tsx (תווית-chains) · docs/broadcast/2026-09-12-r31-truth-audit.md.
 - פתוח ל-r32: watchdog-חיצוני-ללב (קריסה-אמצע-חיים), פעימה-יומית-אוטונומית, קליטת-מפתחות-NVIDIA.
+
+---
+Task ID: 48-b-heart-supervisor (המשך 48-truth-audit)
+Agent: main (Z.ai Code)
+Task: ריפוי-שורש-מלא של הלב — supervisor-עצמאי-מרפא-עצמו + תיקון-נעילת-singleton
+
+Work Log:
+- אימות-דפדפן חשף-הישנות: הלב-שהקמתי-מת-שוב (beat 3 קפוא, 592s-ago באדום). חקירה: **תהליכי-רקע-ממעטפת-כלים נשחטים-בגבול-הקריאה** — נמדד-חי-עם-nohup ושוב-עם-setsid; זה-מה-שהרג-גם-את-הלב-של-הסשן-הקודם (14:46:30). agent-browser (daemon מאוורר-כפול) שורד — רמז-לפתרון.
+- **heart-supervisor** (src/lib/gate/heart-supervisor.ts): ensureHeartAlive() — health-ping על-:3004 (400ms-cap, debounce-10שנ') → אם-מת: spawn detached+unref של bun run dev ב-heart-service. אפס-ייבוא-כבד (רק child_process+fetch — עמיד-ל-OOM-דוקטרינת-r29).
+- instrumentation.ts: register() מפעיל-את-ה-supervisor-באתחול-Next (ילד של תהליך-ה-boot-ששורד).
+- מסלול-הלב (GET /api/gate/heart): ensureHeartAlive() לפני-כל-קריאה — הקונסולה דוגמת-כל-20–60שנ' → קריסה-אמצע-חיים נרפאת-אוטומטית.
+- **באג-נעילה חבוי**: fs.flockSync לא-קיים-ב-bun-הזה (המגן-מעולם-לא-שמר!) וגם writeFileSync(fd,…) כתב-0-בתים-בשקט. הוחלף ב-PID-lockfile נייד: writeFileSync(path,{flag:"wx"}) + kill(pid,0)-liveness (עם-שמירה-מ-pid≤0 שהיה-מחזיר-"חי"-על-קבוצת-התהליך-שלנו!) + השתלטות-על-נעילה-של-מת.
+- הוכחות-חי: (1) spawn מה-supervisor → "spawned", נעילה-עם-pid-אמיתי; (2) שרדות-חוצה-קריאות-כלים T+45/T+105 ✓; (3) הרגה-יזומה kill -9 → דגימת-מסלול → לב-חדש-קם (pid 4640→4722) ✓; (4) beats מתקדמים, reaper קוצר (30→32), אפס-שגיאות; (5) מסך-סופי: "beat 5 · 15s ago" ירוק.
+- lint 0/0.
+
+Stage Summary:
+- הלב-הוא-עתה **מערכת-מרפאת-עצמה**: אתחול-קונטיינר (dev-script) + אתחול-Next (instrumentation) + דגימת-קונסולה (route) — שלוש-שכבות-הקמה-עצמאיות, נעילת-singleton-אמיתית-לראשונה.
+- קבצים: src/lib/gate/heart-supervisor.ts (חדש) · src/instrumentation.ts · src/app/api/gate/heart/route.ts · mini-services/heart-service/index.ts (PID-lockfile) · package.json · docs/broadcast/2026-09-12-r31-truth-audit.md (עודכן).

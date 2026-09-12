@@ -3,6 +3,7 @@ import { requireOperator, openSessionMaster } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { GateError, masterReady, setMaster } from "@/lib/gate/crypto";
 import { readPulse, HEART_CONSTANTS, tickOnce, readProposalPolicy } from "@/lib/gate/harness/heart";
+import { ensureHeartAlive } from "@/lib/gate/heart-supervisor";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,11 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     await requireOperator();
+    // r31 — self-healing supervision: the console polls this route every 20-60s;
+    // if the heart-service process died mid-life, THIS poll resurrects it
+    // (detached child of the survivor process — see heart-supervisor.ts).
+    // Healthy heart → one debounced 400ms local fetch, negligible.
+    await ensureHeartAlive().catch(() => {});
     // r19 — WAKE (same doctrine as status/inventory): the operator's own live
     // session re-lights the master from its sealed copy. The console polls
     // this route every 8s, so an open page keeps the vault warm across

@@ -1,18 +1,21 @@
 /**
- * Next.js instrumentation — r29: the Gate Heart MOVED OUT.
+ * Next.js instrumentation — r29 moved the heart OUT (OOM doctrine), r31 makes
+ * it SURVIVE: the truth-audit caught the heart dead after container reboots
+ * (nothing re-booted it) and after ad-hoc background starts (tool-shell
+ * process-group reaping — measured live twice).
  *
- * The heart used to boot here (inside the Next node process). Its module
- * graph (loop/brain/orders/steem/z-ai-sdk) made every dev-server boot a
- * ~1.7GB compile — the OOM-killer's favourite target (proven in dmesg,
- * kills at 13:xx cycle). It now lives as an independent process:
- *
- *     mini-services/heart-service  (bun run dev, health on :3004)
- *
- * Same beat loop, same SQLite, same fail-closed discipline — but it now
- * survives portal restarts, OOM cycles and dev-server revives. The portal
- * talks to the heart only through the DB (pulses/leases/orders rows), so
- * nothing else changes.
+ * The fix: the long-lived Next process adopts the heart as a DETACHED child
+ * (own process group, unref'd — zero module-graph cost, no harness imports
+ * here). The heart route repeats the same ensure on every console poll, so a
+ * mid-life crash is healed by the next poll (≤60s). The PID-lockfile inside
+ * heart-service makes double-spawn harmless.
  */
 export async function register(): Promise<void> {
-  // intentional no-op since r29 — see mini-services/heart-service/index.ts
+  try {
+    const { ensureHeartAlive } = await import("@/lib/gate/heart-supervisor");
+    const r = await ensureHeartAlive();
+    console.log(`[instrumentation] heart-supervisor: ${r}`);
+  } catch (e) {
+    console.log(`[instrumentation] heart-supervisor skipped: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
