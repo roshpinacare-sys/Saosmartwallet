@@ -16,7 +16,7 @@
  * for the checker than for the maker (see loop.ts) — "someone in your
  * crew must not believe you."
  */
-import crypto from "crypto";
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { sealSecret, openSecret, masterReady, GateError } from "@/lib/gate/crypto";
 
@@ -44,66 +44,87 @@ export const BRAIN_CATALOG = {
   checker: ["zai:default", "nvidia:openai/gpt-oss-20b", "nvidia:deepseek-ai/deepseek-v4-flash-0731"],
 } as const;
 
-/* ── NVIDIA key pool (never plaintext in repo) ──
- * r40: the pool, not a single key. Every sealed entry chain="nvidia"
- * kind="token" is a brain key; the operator's incoming keys ride the same
- * intake and become usable the moment they are sealed — zero code change.
- * Read order:
- *  1. vault open → decrypt every sealed nvidia token (multi-key pool).
- *  2. vault sealed + runtime env key → env READ-ONLY (never sealed, never git).
- *  3. vault sealed + no env → honest vault-locked (caller falls back to zai).
- *  4. no vault entry + env key → seal it on first use (requires open vault).
+/* ── NVIDIA key from the vault (never plaintext in repo) ── */
+
+const NV_ENTRY = { chain: "nvidia", kind: "token", account: "nvidia-nim" };
+
+/**
+ * Read the NIM key. Order (r27 efficiency plane):
+ *  1. vault open  → decrypt the sealed entry (existing flow).
+ *  2. vault sealed + runtime env key → use the env key READ-ONLY (never sealed,
+ *     never written to git/disk). The sealed entry stays sealed — sovereignty
+ *     untouched. Previously this case silently fell through to the weak brain
+ *     (zai 34.5% success vs nvidia 91.5% measured live r27) and burned run
+ *     budget on failures during every locked window.
+ *  3. vault sealed + no env key → honest vault-locked (caller falls back to zai).
+ *  4. no vault entry + env key → seal it on first use (existing flow, requires
+ *     an open vault — which is exactly when sealing is possible).
  */
+/* ── r30: the NIM POOL (owner mandate: "בהמשך אני אשלח לך עוד מפתחות") ──
+ * The vault may hold ANY number of verified NIM tokens (chain="nvidia",
+ * kind="token") — keys-batch (r28-distinct-slots) already seals each into its
+ * own row. The pool is read fresh per call, deduped by fingerprint, and the
+ * fetch loop rotates across it: a 429 cools ONE key for a bounded window and
+ * the next attempt rides a DIFFERENT key instead of sleeping a dead window.
+ * Honesty fix measured live r30: the r28 doc claimed "pool=4" but the vault
+ * holds exactly ONE NIM row — this code makes the pool REAL and ready the
+ * moment the operator delivers more keys (zero code change needed to grow). */
+const NV_KEY_COOLDOWN_MS = 60_000;
+const nvPoolG = globalThis as unknown as { __nvCooldown?: Map<string, number>; __nvCursor?: number };
+const nvFp = (key: string) => createHash("sha256").update(key).digest("hex").slice(0, 12);
 
-const NV_SLOT = { chain: "nvidia", kind: "token" } as const;
-
-async function nvidiaKeys(): Promise<string[]> {
-  const envKey = process.env.NVIDIA_API_KEY?.trim() || null;
-  const rows = await db.vaultEntry.findMany({ where: NV_SLOT, orderBy: { id: "asc" } });
-  if (!rows.length) {
-    if (!envKey) throw new GateError("no-brain-key", "אין מפתח NVIDIA בכספת ובסביבה — המוח לא זמין");
-    await db.vaultEntry.create({
-      data: {
-        chain: NV_SLOT.chain,
-        kind: NV_SLOT.kind,
-        account: "nvidia-nim",
-        role: "infrastructure",
-        pub: null,
-        ...sealSecret(envKey),
-        status: "verified",
-        verifyNote: "NIM key sealed on first harness use; response-verified live",
-        source: "operator-input",
-        verifiedAt: new Date(),
-      },
-    });
-    return [envKey];
-  }
-  if (!masterReady()) {
-    if (envKey) return [envKey];
-    throw new GateError("vault-locked", "הכספת נעולה ואין מפתח-סביבה — המוח-NIM לא זמין בכנות");
-  }
-  const keys: string[] = [];
-  for (const row of rows) {
-    try {
-      const k = openSecret({ encPriv: row.encPriv, privIv: row.privIv, privTag: row.privTag }).trim();
-      if (k) keys.push(k); // one dead seal must never blind the whole pool
-    } catch {
-      /* skip — counted honestly by the restore-drill, not silently here */
+async function nvidiaPool(): Promise<string[]> {
+  const envKey = process.env.NVIDIA_API_KEY?.trim();
+  const rows = await db.vaultEntry.findMany({
+    where: { chain: "nvidia", kind: "token", status: "verified" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (rows.length) {
+    if (!masterReady()) {
+      // r27 semantics preserved: sealed keys stay sealed when locked; the env
+      // key (if any) serves READ-ONLY, never cached, never written.
+      if (envKey) return [envKey];
+      throw new GateError("vault-locked", "הכספת נעולה ואין מפתח-סביבה — המוח-NIM לא זמין בכנות");
     }
+    const pool: string[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      const key = openSecret({ encPriv: row.encPriv, privIv: row.privIv, privTag: row.privTag });
+      const fp = nvFp(key);
+      if (!seen.has(fp)) { seen.add(fp); pool.push(key); }
+    }
+    if (envKey && !seen.has(nvFp(envKey))) pool.push(envKey);
+    return pool;
   }
-  if (envKey && !keys.includes(envKey)) keys.push(envKey);
-  return keys;
+  if (!envKey) throw new GateError("no-brain-key", "אין מפתח NVIDIA בכספת ובסביבה — המוח לא זמין");
+  await db.vaultEntry.create({
+    data: {
+      ...NV_ENTRY,
+      role: "infrastructure",
+      pub: null,
+      ...sealSecret(envKey),
+      status: "verified",
+      verifyNote: "NIM key sealed on first harness use; response-verified live",
+      source: "operator-input",
+      verifiedAt: new Date(),
+    },
+  });
+  return [envKey];
 }
 
-/* r40: per-key cooldown (in-process). A 429 cools ONE key for 90s while the
- * next key serves immediately (rotation); 401/403 cools 30min (likely dead).
- * The measured reality (r18 forensics): sustained 429 windows killed runs —
- * with N keys the window must outlast ALL of them, not one. */
-const NV_G = globalThis as unknown as { __nvCooldown?: Map<string, number> };
-const nvCooldown = (NV_G.__nvCooldown ??= new Map<string, number>());
-const NV_COOLDOWN_429_MS = 90_000;
-const NV_COOLDOWN_DEAD_MS = 30 * 60_000;
-const nvFp = (k: string) => crypto.createHash("sha256").update(k.trim()).digest("hex").slice(0, 12);
+/** Round-robin pick that skips keys in 429-cooldown. When EVERY key is
+ *  cooling it still advances (the ladder below keeps the pacing honest). */
+function nvPick(pool: string[]): number {
+  const cd = (nvPoolG.__nvCooldown ??= new Map<string, number>());
+  const now = Date.now();
+  const cursor = nvPoolG.__nvCursor ?? 0;
+  for (let i = 0; i < pool.length; i++) {
+    const idx = (cursor + i) % pool.length;
+    if ((cd.get(nvFp(pool[idx])) ?? 0) <= now) { nvPoolG.__nvCursor = idx + 1; return idx; }
+  }
+  nvPoolG.__nvCursor = cursor + 1;
+  return cursor % pool.length;
+}
 
 export interface BrainReply {
   content: string;
@@ -179,11 +200,11 @@ export async function brainChat(
   const temperature = opts.temperature ?? 0.2;
 
   if (spec.provider === "nvidia") {
-    let keys: string[];
+    let pool: string[];
     try {
-      keys = await nvidiaKeys();
+      pool = await nvidiaPool();
     } catch (e) {
-      // r18 — vault locked (no operator session): the NIM keys stay sealed in
+      // r18 — vault locked (no operator session): the NIM key stays sealed in
       // the vault (sovereignty untouched — nothing is decrypted or cached),
       // but autonomous employment must not die for it. Honest fallback to the
       // zai brain; the reply's model string records exactly what happened.
@@ -194,21 +215,11 @@ export async function brainChat(
       throw e;
     }
     let lastErr: unknown = null;
+    const cd = (nvPoolG.__nvCooldown ??= new Map<string, number>());
     for (let attempt = 0; attempt < BRAIN_LADDER_MS.length + 1; attempt++) {
-      const now = Date.now();
-      const key = keys.find((k) => (nvCooldown.get(nvFp(k)) ?? 0) <= now);
-      if (!key) {
-        // r40: every key is cooling. Wait out the SHORTEST cooldown only when
-        // it is rate-limit-shaped (≤2min) — dead-key cooldowns (30min) must
-        // never stall a run; fail honestly instead.
-        const shortest = Math.min(...keys.map((k) => nvCooldown.get(nvFp(k)) ?? 0));
-        const wait = shortest - Date.now();
-        if (wait > 0 && wait <= 120_000 && attempt < BRAIN_LADDER_MS.length) {
-          await new Promise((r) => setTimeout(r, wait + 250));
-          continue;
-        }
-        break;
-      }
+      const idx = nvPick(pool);
+      const key = pool[idx];
+      const fp = nvFp(key);
       try {
         return await brainGate(async () => {
           const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
@@ -219,10 +230,6 @@ export async function brainChat(
           });
           const txt = await res.text();
           if (!res.ok) {
-            // r40: the failure belongs to THIS key, not to the brain — cool it
-            // and let the next attempt rotate to a sibling key.
-            if (res.status === 429) nvCooldown.set(nvFp(key), Date.now() + NV_COOLDOWN_429_MS);
-            else if (res.status === 401 || res.status === 403) nvCooldown.set(nvFp(key), Date.now() + NV_COOLDOWN_DEAD_MS);
             lastErr = new GateError("brain-http", `NIM ${res.status}: ${txt.slice(0, 180)}`);
             throw lastErr; // the catch below classifies transient (429/5xx) vs fatal
           }
@@ -240,15 +247,18 @@ export async function brainChat(
       } catch (e) {
         lastErr = e;
         const msg = e instanceof Error ? e.message : String(e);
-        const statusMatch = /NIM (\d{3})/.exec(msg);
-        const status = statusMatch ? Number(statusMatch[1]) : null;
-        const keyLevel = status === 401 || status === 403 || status === 429;
-        const transient = /(?:^|\D)(?:429|5\d\d)(?:\D|$)|rate.?limit|too many requests|timeout|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(msg);
-        if (!transient && !keyLevel) break;
-        // r40: a sibling key still standing → rotate NOW (no idle sleep);
-        // otherwise ride the ladder as before.
-        if (keys.some((k) => (nvCooldown.get(nvFp(k)) ?? 0) <= Date.now())) continue;
-        if (attempt < BRAIN_LADDER_MS.length) await new Promise((r) => setTimeout(r, jitter(BRAIN_LADDER_MS[attempt])));
+        const isRate = /(?:^|\D)429(?:\D|$)|rate.?limit|too many requests/i.test(msg);
+        const transient = isRate || /(?:^|\D)5\d\d(?:\D|$)|timeout|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(msg);
+        if (!transient) break;
+        if (isRate) cd.set(fp, Date.now() + NV_KEY_COOLDOWN_MS); // THIS key is throttled — rotate
+        if (attempt < BRAIN_LADDER_MS.length) {
+          // r30 — a fresh pool key beats sleeping inside a dead rate window;
+          // rotate immediately only when ANOTHER key is actually available.
+          const now = Date.now();
+          const freshExists = pool.some((k, i) => i !== idx && (cd.get(nvFp(k)) ?? 0) <= now);
+          if (isRate && freshExists) continue;
+          await new Promise((r) => setTimeout(r, jitter(BRAIN_LADDER_MS[attempt])));
+        }
       }
     }
     throw lastErr instanceof Error ? lastErr : new GateError("brain-failed", "המוח (NVIDIA) לא הגיב");

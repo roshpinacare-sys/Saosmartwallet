@@ -26,7 +26,7 @@ import { getSituationSnapshot } from "@/lib/gate/situation";
 import { getBroadcastDigest } from "@/lib/gate/digest";
 import { publishPostFromAgent, interactFromAgent, editPostFromAgent, auditFleetContent, fleetRailsOverview, fleetRewardsCensus, claimRewardsFromAgent, steemTrends, SOCIAL_RAILS } from "./social";
 import { railRpc, railAccounts, railBlogPosts } from "@/lib/social/rails-server";
-import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2 } from "@/lib/gate/anchor";
+import { readAnchorHistory, verifyAnchorOnChain, vaultDigestV2, sealAnchorRound } from "@/lib/gate/anchor";
 import { runPulseCycle } from "@/lib/gate/pulse";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { fundingCensus, FUNDING_ADDRESS } from "@/lib/gate/funding-watch";
@@ -214,6 +214,42 @@ export const MODULES: HarnessModule[] = [
       }
       const verdict = JSON.parse(String(r.stdout)) as Record<string, unknown>;
       return { vectors: { d1: d1.length, wif: wif.length, digest: 1 }, engine: "ts(next)+python3-stdlib", verdict };
+    },
+  },
+  {
+    id: "vault.anchor",
+    name: "עוגן-כספת (jummper)",
+    kind: "actor",
+    desc: "מניע סבב-עיגון רב-מסילה אמיתי (steem+hive+blurt על דיגסט אחד + מסילות-הריבון) — הדוקטרינה מ-saos-jummper: עיגונים חופשיים ב-custom_json (~$0, עתודה ~5,128/יום ב-RC הנוכחי). חסם-קצב מובנה: סבב-מוצלח אחד ל-6 שעות לכל-היותר; כל-סירוב-שרשרת נרשם בכנות.",
+    args: `{}`,
+    needsVault: true,
+    cacheable: false,
+    async exec() {
+      if (!masterReady()) throw new GateError("vault-locked", "הכספת נעולה — עיגון דורש פתיחה (fail-closed)");
+      // r30 — rate gate: ONE successful anchor per 6h (the pulse plane keeps
+      // its own daily cap; this module serves SCHEDULED employment loops and
+      // must stay free both in money ($0 RC anchors) and in spam).
+      const since = new Date(Date.now() - 6 * 3600_000);
+      const recent = await db.gateAction.findFirst({
+        where: { action: "vault-anchor:saos.vault.anchor.v1", ok: true, createdAt: { gte: since } },
+        orderBy: { createdAt: "desc" },
+      });
+      if (recent) {
+        return { anchored: false, throttled: true, lastAnchorAt: recent.createdAt.toISOString(), note: "סבב-מוצלח אחרון בתוך 6 שעות — חסם-הקצב מונע עיגון-כפול (העוגן הקיים תקף)" };
+      }
+      const round = `jummper-${new Date().toISOString().slice(0, 10)}-${Date.now().toString(36).slice(-4)}`;
+      const r = await sealAnchorRound(round, "agent:vault.anchor");
+      const landed = r.rails.filter((x) => x.ok && x.onChain);
+      // summary-first — the RESULT_CLAMP keeps the verifiable head
+      return {
+        anchored: true,
+        round,
+        digest: r.digest,
+        landed: landed.length,
+        total: r.rails.length,
+        rails: r.rails.map((x) => ({ rail: x.rail, ok: x.ok, onChain: x.onChain, txId: x.txId ? `${String(x.txId).slice(0, 12)}…` : null, blockNum: x.blockNum, error: x.error?.slice(0, 140) })),
+        counts: r.counts,
+      };
     },
   },
   {

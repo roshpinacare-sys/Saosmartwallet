@@ -275,7 +275,16 @@ export async function verifyPostingKeyOnChain(
   try {
     rows = await railAccounts(rail, [account]);
   } catch (e) {
-    return { ...base, reason: `קריאת החשבון נכשלה: ${e instanceof Error ? e.message : String(e)}` };
+    // r30 — the authority read is the gate's eye. One transient node flake
+    // (live r29: blurt's SOLO endpoint flaked and fail-closed a perfectly
+    // valid key mid-anchor) must not veto an anchor. One honest retry before
+    // refusing — this is a pure read, zero broadcast risk.
+    try {
+      await new Promise((r) => setTimeout(r, 1200));
+      rows = await railAccounts(rail, [account]);
+    } catch {
+      return { ...base, reason: `קריאת החשבון נכשלה (כולל ניסיון-חוזר): ${e instanceof Error ? e.message : String(e)}` };
+    }
   }
   const raw = rows?.[0];
   if (!raw) return { ...base, reason: `אין חשבון ${account} על ${rail} בכלל` };

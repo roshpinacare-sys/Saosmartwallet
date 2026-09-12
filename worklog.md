@@ -1988,368 +1988,6 @@ Stage Summary:
 - קבצים: src/lib/gate/seal-refresh.ts (חדש) · src/app/api/gate/login/route.ts · src/lib/gate/key-id.ts · docs/broadcast/2026-09-11-login-r32.md · tools/r32-broadcast.ts · db/custom.db · worklog.md.
 
 ---
-Task ID: 49
-Agent: Z.ai Code (main)
-Task: r33 — "תמשיך ודחוף" — הפעימה חוזרת-הביתה: הפקודה-האחת (h19 תוכנית סעיף 4), h21 המחזור-השישי מהשער, ריפוי-הזומבים, והלכת-SQLITE-READONLY השישית
-
-Work Log:
-- **סנכרון**: db-settle + stash → rebase מעל bf02d24 (h20 של-ה-foundry) → pop → restart. גילוי-חי: השרת-הישן-מ-14:30 לא-מת-עולם (lsof-לא-ראה-את-ה-socket-שלו) והחזיק-inode-ישן של ה-db → SQLITE_READONLY(1032) בכל-הכתיבות בעוד-הקריאות-מחזירות-נתונים-ישנים. **ההלכה-השישית: kill לפי-PID-מוצהר בלבד, לא לפי-נמל**.
-- **מישור-הפעימה (src/lib/gate/pulse.ts חדש)**: runPulseCycle — דיגסט saos/v2 אחד → steem/hive/blurt (מישור-העוגן r20) + SOLANA (memo-נושא-שורש, מפתח-ריבוני M3, אימות-כפול: status + פענוח-RPC-בלתי-תלוי) + ETHEREUM (value-encoding מוסכמת-h19/h20 + שער-גז) + TRON (מסילת-סריקה-כנה). שער-זהות-כספת לכל-מפתח; רישום-ביקורת pulse:*; תקרה-יומית; API GET/POST (מפעיל) + only לתיקון-מסילה-בודדת.
-- **h21 חי — הראשון-מהשער**: STEEM 08c92bde blk109490011 ✓ · BLURT cb12acff blk63552575 ✓ · **SOLANA 4KQNxG6A slot446193459 ✓ (ראשון-מהשער, memo-נושא-השורש-המלא 03c9cab9…f64, אומת-מ-publicnode)** · HIVE ⛔-כן (RC 44.4M/411M) · ETH ⛔-כן (0.00000386<0.0000177) · TRON ⛔-סריקה (0.19 TRX, 581/600B). 3/6 עוגן-חי + 3 שערים-מדודים, אפס-שידורים-כושלים. תיקון-חי: שער-זהות-EVM היה-אסימטרי-0x → נכשל-כן → תוקן.
-- **ריפוי-הזומבים**: ריצות-מתות-בשקט-לפני-צעד-ראשון (JSON.parse חוץ-מוגן + dispatcher .catch(()=>{}) בולע) → שורות-זומבי → מצבות-watchdog-אילמות. אבחון-שולל-את-מחלת-המוח (zai 1.6s בתוך-התהליך, nvidia מגיב, brainChat 0.5s). הריפוי: רשת-כנה-חיצונית ל-processRun (כל-כשל-מוקדם-נרשם-בשורה) + parseSpecArray מאומת + dispatcher מתעד. אימות: ריצה-אוטונומית done ב-~30s, anchor.seal החזיר-תקרה-כנה (1/1).
-- **שידור 12/12** (tools/r33-broadcast.ts): docs/broadcast/2026-09-11-pulse-home-r33.md + SAOS-PULSE-2026-09-11-H21-SIXTH-CYCLE.md בשורש (מוסכמת-h16–h20).
-- **בדיקות**: tsc 0 · lint 0 · דפדפן: אפס-שגיאות-קונסולה, פוטר-טבעי (9940=סוף-המסמך), דלת-מזהה-טביעת-אצבע (selfEcho 6 · incoming 8).
-
-Stage Summary:
-- **הפעימה-הריבונית היא-כעת-נכס-פנימי**: הצי מעגן-את-עצמו מבפנים — מטריצה-מלאה-מהשער דורשת-רק-החלטות-בעלים (HP ל-HIVE, תדלוק-ETH, הגרת-חותם-TRON — כולם-מתועדים-במספרים).
-- **אין-עוד-מוות-שקט בצי**: כל-כשל-מוקדם-מודה-בשורה-עצמה; השומר-רואה-אמת-ולא-מצבה.
-- קבצים: src/lib/gate/pulse.ts (חדש) · src/app/api/gate/pulse/route.ts (חדש) · src/lib/gate/harness/modules.ts (anchor.seal→6-מסילות) · src/lib/gate/harness/loop.ts (רשת-כנה+מפרטים) · src/lib/gate/harness/heart.ts (dispatcher-מתעד) · tools/r33-pulse.ts · tools/r33-broadcast.ts · SAOS-PULSE-2026-09-11-H21-SIXTH-CYCLE.md · docs/broadcast/2026-09-11-pulse-home-r33.md · db/custom.db · worklog.md.
-
----
-Task ID: 50
-Agent: Z.ai Code (main)
-Task: r34 — "וודא שאתה בוקמיט האחרון ותמשיך" — ה"למה" של-רוטציית-המפתחות מוכח-על-השרשרת, שתיקת-בודק מפסיקה-לייצר-חסימות-שווא, סוכן עשירי market-rider
-
-Work Log:
-- **סנכרון**: fetch גילה 4-קומיטים-חדשים-במקביל (16b91cc..bf07bc9 — שידורי-שותפים v69–v71 + db-snapshot) → kill-שרת → commit-db → rebase-נקי (3/3) → restart → כתיבת-SQLite-חיה-אומתה. ההלכה-בפעם-הרביעית.
-- **ראיה-על-השרשרת ל"למה המפתח שלי נפל"**: סריקת-account_update-מלאה (חלונות-של-1000 עד-2026-09-07): HIVE רוטציה 2026-09-08T21:17:42 blk109745168 · STEEM רוטציה 2026-09-10T23:25:21 blk109470572 — account_update-אחד-לכל-רשת החליף-את-כל-ארבעת-המפתחות (= שורשי-D1, פעולות-הצי-עצמנו). ההשוואה-מול-הכספת: 12-חותמות (4-hive-נוכחי + 4-steem-D1 + 4-steem-ישן-לזיהוי) — המפתח-של-הבעלים הוא-מפתח-קודם-לרוטציה והדחייה-כנה.
-- **ראיה-חיה במוצר (src/app/api/gate/login/route.ts)**: rotationEvidence() — קריאת-last_owner_update משתי-הרשתות בזמן-אמת, מוצמדת-להודעות rotated-out-key ו-not-headcorner-key. אומת-חי: מפתח-אקראי-תקין → דחייה עם "(ראיה חיה: STEEM owner עודכן על-השרשרת ב-2026-09-10T23:25:21 UTC · HIVE owner עודכן על-השרשרת ב-2026-09-08T21:17:39 UTC)".
-- **חקירת-62-החסימות (בהצלבה-עם-r28/Task 44 — לא-חוזר-על-שלושת-השורשים-שם)**: 50 פסיקות-כנות של הבודק (תקין) · **12 בלי-ורדיקט-כלל** — קריאת-מוח-הבודק נפלה (מ-8-שנדגמו: 4×429 ו-4×זבל-פרוטוקול; checkerstats errors=16) → דירוג-ברירת-מחדל "blocked" האכיל-את-מרדף-התיקון בפערים-ריקים (לולאת-רעש).
-- **תיקון-דו-שכבתי (src/lib/gate/harness/loop.ts + events.ts)**: (1) brainChatRetry — ניסיון-חוזה-אחד (השהיה 3.5s) על 429/רשת, למייצר-ולבודק — תאום-מסדר-קריאה לחילוץ-r30; (2) אירוע-חדש run.ungraded — בודק-שתק-גם-אחרי-חוזר = ריצה-בלתי-מדורגת, דוח-כנה, ולא-מוגשת-למרדף. פסיקות-אמיתיות-נשארות-חסימות-אמיתיות.
-- **אוטונומיה-נבדקה-חי**: לב פועם · 33-סיורים-כולם-enabled · 19-טריגרים-כולם-enabled · כיסוי-24h-מלא (כל-שעה UTC ≥1; דליל: 17 UTC) — התיקון-הקודם-שהציג "OFF הכול" היה-קריאת-שדה-לא-קיים, תוקן-בביקורת-העצמית.
-- **סוכן עשירי**: market-rider צורף (POST /api/gate/agents — טוקן-הונפק-פעם-אחת-ולא-נשמר) — 11-מודולים, מוח nvidia, אוטונומיה; סיור-שוק-יומי 17:00 UTC (מילוי-השעה-הדלה; market.watch + השוואה-לזיכרון + דוח-עברית-אחת; budget 5 · max 2/יום). הלב-יחבר-market.move-בקצב-ההבטחה.
-- **מלאי**: כספת 234 (172 verified · 34 unverified · 11 rotated-out · 16 imported — כולם-ללא-oracle: 12-notes + 4-טוקני-תשתית, כנות-לא-עומס) · אוצר-חי 21:46 UTC: headcorner 1.281 STEEM + 8,650,853 VESTS · tov 0.449 · SBD 0 · דלת: files 19 · ours 8 · selfEcho 6 · incoming 11.
-- **תיקון-עצמי-כן**: מסמך-סיום-שהוכן-על-שם "r28" זוהה-בהצלבה-מול-ה-worklog-כהתנגשות-עם-Task-44 (המספר-כבר-נתפס; הקובץ-הקיים-על-הדיסק היה-שארית-untracked-שלא-נכללה-אף-קומיט) — הועבר-למספור-הנכון r34 לפני-השידור; הקובץ-הישן-נמחק-מהעץ.
-- **בדיקות**: tsc 0 · lint 0 · דפדפן: 10-סוכנים-חיים-בפאנל, בלוק-חי 109490011, אפס-שגיאות-קונסולה, footer-נדחף-כראוי, 390px-תקין.
-- **שידור 12/12** (tools/r34-broadcast.ts): docs/broadcast/2026-09-11-optimization-r34.md.
-
-Stage Summary:
-- **השאלה "למה" נסגרה עם-תאריכים-ובלוקים**: HIVE 2026-09-08 21:17:42 (blk 109745168) · STEEM 2026-09-10 23:25:21 (blk 109470572) — רוטציות-הצי-עצמנו; דחיית-מפתח-ישן = כנות-מערכת, והדחייה-עצמה-מלמדת (ראיה-חיה-מוצמדת).
-- **צינור-הריצות נקה-את-רעש-הדממה**: 12-חסימות-שווא-למחזור-לא-ייווצרו-עוד — חוזר-מסדר-קריאה + run.ungraded; שער-האיכות-לא-נגוע.
-- **הצי 9→10**: market-rider ממלא-הן-את-שעת-הדליל-והן-את-הוראת-הפקת-הסוכנים — סדר: תקציב, מכסה, דוח-בלי-פעולה.
-- קבצים: src/app/api/gate/login/route.ts · src/lib/gate/harness/loop.ts · src/lib/gate/harness/events.ts · docs/broadcast/2026-09-11-optimization-r34.md · tools/r34-broadcast.ts · db/custom.db (market-rider + schedule) · worklog.md.
-
----
-Task ID: 51
-Agent: Z.ai Code (main)
-Task: r35 — "אני לא קורא סינית... תמשיך ודחוף" — תעלה-נקייה-מזבל: PNG-שכמעט-הרעיל-טיוטת-תגובה, חוק-הראש-הרביעי (governance.scan), חוזי-אמת למשמרות-השומר, והבהרת-הלכת-SQLITE
-
-Work Log:
-- **סנכרון-לראש החי**: fetch גילה 2-קומיטים-חדשים-במקביל (e7b1ce5 r34-שידור + 4b48933 v72-ההמרה-הזולה — שניהם broadcasts-בלבד) → stash → rebase נקי (1/1) → pop → restart → כתיבת-SQLite-חיה אומתה (WRITE-OK). prisma-generate נדרש שוב אחרי-הריבייס (הלקח-מ-r32).
-- **המקרה-שחשף-את-הפגם**: הדיגסט-החי הציע טיוטת-תגובה אל saos-control-center שכללה **זבל-בינארי** ("לגבי \"\u0001\u0005`M)[j…\""). חקירה: השותף העלה שני PNG-ארטיפקטים אל broadcasts/ (roast-79-economy-live.png + full.png); מיון-שמות קבע את-ה-PNG "החדש-ביותר"; הדיגסט שלף, פיענח בייטים כ-UTF-8, והרגקס-של-שאלות (askRe) נתפס על רעש-בינארי. הצינור כמעט-שידר זבל אל-השותף.
-- **הריפוי — שלוש-שכבות** (src/lib/gate/situation.ts + src/lib/gate/digest.ts): (1) fetchBroadcasts סופר ובוחר "חדש-ביותר" **רק-.md** — הערוץ חוזה-פורמט; (2) הדלת: דופק-לא-טקסטואלי נספר בכנות ("נספר כדופק, לא מסווג") בלי-שליפה ובלי-פענוח; (3) classify() הגנה-בעומק: >5% בייטים-פגומים/בקרה → ירידה-כנה "(ארטיפקט לא-טקסטואלי — לא מסווג)" + humanLine() מסנן שורות-לא-אנושיות מה-asks. **הוכחה-חיה**: ה"הכי-חדש" של השותף חזר ל-SAOS-BRIEFING-ROAST-83.md, והטיוטה מצטטת עברית אמיתית ("המושל הכלכלי קיבל שכבת-אוטונומיה חדשה · fuelIfNeeded בכל tic…").
-- **חוק-הראש-הרביעי**: governance.scan — מערך-ה-rails (12×30×3) חתך את שורת-הסיכום והבודק פסק "חלקי" (שתי-פסיקות-חי-ב-21Z). תיקון: summary+meaning-ראשונים, rails-בסוף (JSON שומר-סדר-מפתחות). הוכחה-חיה (tools/r35-proof.ts): summary+meaning בתוך-1400-הראשונים ✓ · steem: 10 מצביעים · hive: 1 · blurt: לא-נגישה.
-- **חוזי-אמת למשמרות-השומר** (tools/r35-schedules.ts): 10/10 משמרות "סיור-שומר יומי" עודכנו — "וכל חריגה נבדקה **או הוכחה-כבלתי-ניתנת-לבדיקה** (רשת-כבויה שנמדדה reachable:false היא ממצא-כנה לדווח — לא פער)" + תוספת-יעד. הבודק נשאר מהודק — נדרשת ראיית-מדידה, לא הצהרה. שורש-הרעש: Blurt כבויה מזה-ימים והחוזה הבטיח בדיקה-עליה → פסיקות-blocked-כנות-על-בלתי-אפשרי.
-- **הלכת-SQLITE-READONLY — ניסוח-מדויק-חדש**: kill-של-המאזין-בלבד (lsof -t -i:3000) לא הספיק — צינור `next dev | tee` שרד/קורר-מחדש והחזיק חיבור-שבר → 1032 גם-על-עץ-נראה-חדש. **ההלכה: kill מוצהר של כל-העץ** (bun → bash → next dev → next-server). אומת: WRITE-OK + פתיחת-שער server-token 200 מיד-אחרי-ההדלקה-הנקייה. (הערה-תפעולית: השרת-בסביבה-זו מופעל-בהצלחה רק-דרך spawn-עם double-fork — ישירות-nohup נקטל-בין-קריאות-הכלי.)
-- **אימות E2E (agent-browser)**: tsc 0 · lint 0 · השער נפתח (server-token — כוונת-המפעיל מ-r32) · 234/234 סודות · 12 חותמות-מפתח · **10 סוכנים פעילים** · 710 הודעות-פיקוד · חיבורים-חיים: steem 92 מפתחות-סמכות-חיה · hive 84 · ETH 12 · TRX 4 · SOL 12 · BTC 7 · עוגנים: steem ✓ blk109490011 · blurt ? blk63552575 · hive חסום-כלכלה-RC · דלת: "12 דופקים · 🪞 7 רישום-שידור-שלנו" · אפס-שגיאות-קונסולה · מובייל 390=390 אפס-גלישה · דסקטופ 1280 נקי · פוטר נדחף-טבעי (docH 13844).
-- **שידור 12/12** (tools/r35-broadcast.ts): docs/broadcast/2026-09-11-channel-truth-r35.md — כל-11-השותפים + הדלת-שלנו.
-
-Stage Summary:
-- **הערוץ-קיבל חוזה-פורמט**: ארטיפקט-בינארי על-הערוץ נספר-כנה ולא-מפוענח — "לספור את הדופק בכנות, ולא לפענח אותו". טיוטות-תגובה לעולם לא ייבנו-עוד מזבל-פענוח.
-- **משפחת עיוורון-החיתוך נסגרת-עד-תום**: חוק-הראש הרביעי (governance.scan) — והמדידה-משולשת: מה-שהבודק-רואה = מה-שהמודול-אומר.
-- **הבודק-נגד-המציאות תוקן-בצד-החוזה**: רשת-כבויה-שנמדדה היא ממצא; רק-חריגה-ברת-בדיקה-שלא-נבדקה היא פער.
-- קבצים: src/lib/gate/situation.ts · src/lib/gate/digest.ts · src/lib/gate/harness/modules.ts · src/app/page.tsx (תווית-דלת r35) · tools/r35-schedules.ts · tools/r35-proof.ts · tools/r35-broadcast.ts · docs/broadcast/2026-09-11-channel-truth-r35.md · db/custom.db (חוזי-משמרות) · worklog.md.
-
----
-Task ID: 52
-Agent: Z.ai Code (main)
-Task: r36 — "תמשיך ודחוף" — ריפוי-פרץ-הקריסות: הפוגת-חימום לריצות-קרוסות (retry backoff), מוכח-חי ALL-PASS, והחייאה-המוכחת של השרת-אחרי-הריגה-הסביבתית
-
-Work Log:
-- **סנכרון**: origin/main כבר-r35 (24c79f7); מקומית קומיט-מצב-נתונים-אחד-לא-דחוף (16adab2) + db משתנה. השרת-נמצא-חי (HTTP 200) — לא נגעו-בו-עד-התיקון.
-- **סריקת-מצב-חי**: דיגסט 12 ריפו · 3 תכנים-ייחודיים · 0 דופקים-חדשים; כספת 234 (172 verified · 16 imported · 11 rotated-out); אוצר-חי: headcorner 1.281 STEEM + 8,650,853 VESTS · ETH 12/12 (0.0000026 אחרי-הגז) · SOL 0.0542; עוגן-אחרון h21 15:41 (steem+blurt ✓ · hive RC-חסום · ETH גז-חסום · TRX סריקה); 10 סוכנים, 38 done היום.
-- **הממצא האמיתי של הסבב**: מתוך-63-ריצות-היום (38 done · 15 blocked · 10 failed) — **8/10 הכשלים היו "watchdog: קרסה יותר מדי פעמים" מרוכזים 15:27–16:13Z = בדיוק חלון-הריבייס/ההפעלה-מחדש של r35**. המנגנון: השומר מחזיר-ריצה-קרוסה-לתור → הדיספאץ' תופס-אותה-מיד (~20 שנ') בתוך-אותה-סערה → ניסיון-2 נשרף → פסיקת-כשלון-סופי על-ריצה-בריאה שמעולם-לא-ראתה-שרת-חם.
-- **הריפוי (prisma/schema.prisma + src/lib/gate/harness/heart.ts)**: עמודה-חדשה `GateRun.retryNotBefore` (db:push, additive) · שומר: ריצה-קרוסה-מוחזרת-מקבלת הפוגה 90 שנ' × attempt (תקרה 5 דק'; יתומי-attempt-0 פטורים) · דיספאץ': ריצה-בתוך-ההפוגה בלתי-נראית · פסיקת-תשישות: ממתינה-לפקיעה; השומר-קודם-לדיספאץ' → maxAttempts נאכף-בדיוק, לעולם-לא-ניסיון-שלישי.
-- **באג-עצמי-שנתפס-לפני-שחי**: `NOT_IN_BACKOFF` יצר `new Date()`-קפוא-בטעינת-המודול → פקטורי `notInBackoff()` עם תאריך-טרי לכל-קריאה.
-- **הוכחה-חיה (tools/r36-proof.ts) — הלב-עצמו הריץ את-המבחן, אפס-קריאות-מוח**: A1 ריצה-קרוסה הוחזרה-עם-הפוגה ✓ · B דיספאץ' השאיר-אותה-בתור ✓ · C1 פסיקת-התשישות המתינה ✓ · C2 שוחררה-בפקיעה (failed, מבלי-להיתבע) ✓ · C3 אפס-ניסיון-שלישי (attempt נשאר 2) ✓ — **ALL-PASS**.
-- **אירוע-סביבתי-חי**: הסנדבוקס הרג-את-כל-עץ-השרת בין-קריאות-הכלים (הלב-פעם-אחת-ונעתק; תוצאות-המבחן-הראשונות היו-כשלי-שרת-מת, לא-כשלי-קוד). החייאה-דרך ה-spawn-המוכח מ-r7 (detached+unref — tools/r36-revive.ts חדש) + ה-watchdog הודלק-מחדש; הלב-אומת-חי-פועם-ברציפות (beats 2→3, מרווחי-20 שנ'); כתיבת-SQLite-חיה אומתה (WRITE-OK, tools/r36-writeok.ts חדש) — ואז-המבחן-נרת-מחדש: ALL-PASS.
-- **אימות-המשכיות-r35**: 10/10 משמרות-השומר נושאות את-סעיף-האמת ("הוכחה-כבלתי-ניתנת-לבדיקה" ב-doneMeans); הפסיקות-החסומות-של 21:00–21:07 פשוט-קדמו-לתיקון. הערת-כנות: ביקורת-העצמי-הראשונה חיפשה-את-הסעיף-בעמודה-הלא-נכונה (goal-במקום-doneMeans) וכמעט-הכריזה-באג — תוקן-לפני-הצהרה.
-- **בדיקות**: tsc 0 · lint 0 · דפדפן: רינדור-נקי, אפס-שגיאות-קונסולה, פוטר-נדחף-טבעי (docH 9915), מובייל 390=390 אפס-גלישה.
-- **שידור 12/12** (tools/r36-broadcast.ts): docs/broadcast/2026-09-11-crash-burst-healing-r36.md — כל-11-השותפים + הדלת-שלנו.
-
-Stage Summary:
-- **הצי כבר-לא-שורף-ניסיונות-בסערות**: ריצה-קרוסה מקבלת-הפוגת-חימום — הניסיון-החוזר ייפול-בשרת-חם או-שהפסיקה-הכנה תמתין-לו. maxAttempts נאכף-בדיוק.
-- **ה"למה" של כשלי-הסבבים-הקודמים נסגרת-ממצר**: פרץ-הכשלונות-סביב-הפעלות-מחדש לא-היה-באג-מודולים אלא-ארכיטקטורת-זמן — עתה-מתוקנת-ומוכחת.
-- **תוספת-תפעולית**: tools/r36-revive.ts — החייאה-המוכחת-היחידה (spawn detached+unref) מתועדת-ככלי-ראוי-בשם.
-- קבצים: prisma/schema.prisma · src/lib/gate/harness/heart.ts · tools/r36-proof.ts · tools/r36-revive.ts · tools/r36-writeok.ts · tools/r36-broadcast.ts · docs/broadcast/2026-09-11-crash-burst-healing-r36.md · db/custom.db (schema+מבחנים) · worklog.md.
-
----
-Task ID: 53
-Agent: Z.ai Code (main)
-Task: r37 — "הכספת כבנק-הרשת: תרגיל-שחזור מוכח, ביטוי-Coinomi נאטם, והמפתח-הראשוני נבדק-לעומק" — השלמת-הסבב-שנתקע + סגירת-פערי-המפתחות-של-המפעיל
-
-Work Log:
-- **זיהוי-התקיעה**: הסבב-הקודם נקטע באמצע — restore-drill (lib+route) נכתבו אך מעולם לא רצו; עמודת lastRestoreDrill נוספה ל-DB אך נשארה None; קומיט-db יתום לא-דחוף (f9f60fc) + 4 קבצי-r37 לא-מקומיטים.
-- **השלמת-התרגיל**: POST restore-drill הריץ חי — מצא כשל אמת: ynet·posting (רשומת-פנויה honest-null מ-r11, אפס-בייטים, ללא חומר-מפתח במתכנן — המפתח האמיתי של אותו תפקיד כבר verified בכספת). התרגיל תוקן להפריד רשומות-פנויות (placeholders) מכשלי-פענוח אמת + operatorPrimary מחושב מול חותמות מפתחות-שליטה מאומתים (owner/active verified של headcorner) במקום role-לא-קיים. ריצה-שנייה: **PASS — 236/236 סודות נפתחו בפועל · 1 פנויה · 0 כשלים · גיבוי-אטום 409KB נכתב (backups/gate-vault-*.enc)**.
-- **ביטוי-Coinomi נאטם** (upload/קונמי.txt — 24 מילים, "Coinomi recover"): import-lab הורחב בסעיף-6 — ניכוי-כפילויות בתוך-השרת (פענוח כל kind=mnemonic הקיים והשוואה מנורמלת) → **אינו כפילות** של הזרע-הריבוני/אם/tron → נאטם AES-256-GCM (mnemonic/coinomi/legacy/recovery, source=upload/קונמי.txt).
-- **סריקת-עומק של ה-Coinomi** (tools/r37-coinomi-scan.ts — BIP39→BIP32 מימוש-מקומי, אפס-סודות-בפלט): ETH m/44'/60'/0'/0/0 = 0x01Bd…8B37 — **0.0000265 ETH, nonce 11 (ארנק-פעיל-היסטורית)** · BTC (BIP44 idx0-2 + BIP49 + BIP84) אפס-יתרות · LTC idx0: 0.185 LTC נקלטו-ונשלחו (2 tx) · DOGE idx0: 420.06 DOGE נקלטו-ונשלחו (2 tx) — **הארנק-הישן שרוקן-היסטורית; הזרע מובטח לשחזור-עתידי**. הממצאים רשומים ב-verifyNote של הרשומה.
-- **בדיקת-עומק של headcorner** (API חדש POST /api/gate/key-authority): כל WIF של headcorner בכספת נפתח, נגזר למפתח-ציבורי (הוכחת-תקינות-חומר) ונבדק מול ה-authority-החי (steem+hive): **20/20 חומר-תקין · 12 מחזיקים סמכות-חיה** (steem: owner/active/posting/memo + hive: owner/active×2/posting/memo×2) · 4 תקינים-שמחוץ-לסמכות (הסט-הישן לזיהוי) · 0 פגומים.
-- **המפתח-הראשוני — החוליה-החסרה נסגרה**: upload/headcorner.txt (הניסוח "קצת-אחר" של המפעיל) נכשל-בסכום; כלי-התיקון של הסבב-הקודם (r37-key-recover) מצא את הגרסה-התקינה בניסוח-תו-אחד; **התברר שהוא מעולם לא נאטם בכספת**. נאטם עכשיו דרך /api/gate/key (steem/headcorner/primary-original, pub=STM8StTG4aes…) + בדיקת-זהות-חיה (r37-key-identity): **תקין-מכנית, CONTROLS: NONE** — איבד-סמכות ברוטציות-הצי (ראיה r34). נשמר כעוגן-שחזור; הפיכתו-למפתח-כניסה-אוניברסלי = החלטת-מפעיל להוספתו ל-authority (לא בוצע — שינוי-שרשרת).
-- **היגיינה-סודות**: WIF-מוטמע שנמצא ב-tools/r37-vault-history.ts (שריד-סבב-קודם) נמחק-מהקוד (ה-pub נקרא מהכספת); tools/r37-finalize-key.mjs נמחק לאחר-פעולתו; סריקת-רג'קס על tools/ — אפס-סודות-נותרים.
-- **UI**: כרטיס תרגיל-שחזור בסעיף-הכספת (מצב-אחרון עם תגיות עבר/נכשל + ספירה + חותמת-מפעיל + כפתור הרצה-חי) — אומת-בדפדפן: לחיצה הריצה את התרגיל והציג עבר·236/237·1-פנויות·חותמת-מפעיל.
-- **בדיקות**: tsc 0 · lint 0 · דפדפן: אפס-שגיאות-קונסולה, מובייל 390=390 אפס-גלישה, דסקטופ 1280 נקי, פוטר-תקין.
-
-Stage Summary:
-- **ההצהרה "הכספת משיבה את כל המפתחות" הפכה רישום-מכני עומד**: 237 רשומות — 236 נפתחו-בפועל מול מפתח-האב + גיבוי-אטום; התרגיל זמין-בכפתור למפעיל ומפריד כנות (פנויות) מאזעקה (כשל-פענוח).
-- **הבנק-של-הרשת הושלם**: ביטוי-Coinomi (24 מילים) + המפתח-הראשוני-המתוקן של headcorner נאטמו; 12 מפתחות חיים-בסמכות + כל-הגיבויים-המוצפנים זמינים-לפעולה-מיידית כגוף-אחד.
-- **כנות-מול-המפתח-הראשוני**: הוא תקין-אך-חסר-סמכות (הרוטציות-שלנו הוציאו-אותו) — לא בוצע-שינוי-שרשרת; ההחלטה-בידי-המפעיל.
-- קבצים: src/lib/gate/restore-drill.ts · src/app/api/gate/restore-drill/route.ts · src/app/api/gate/key-authority/route.ts (חדש) · src/app/api/gate/import-lab/route.ts · src/app/page.tsx (כרטיס-תרגיל) · tools/r37-coinomi-scan.ts · tools/r37-key-identity.ts · tools/r37-key-recover.ts · tools/r37-key-decode.ts · tools/r37-history-scan.ts · tools/r37-history-probe.ts · tools/r37-vault-history.ts · tools/r37-annotate.mjs · tools/r37-broadcast.ts · docs/broadcast/2026-09-12-vault-restore-r37.md · prisma/schema.prisma (lastRestoreDrill) · db/custom.db · worklog.md.
-
----
-Task ID: 53-b (r37 addendum — שורש-השתיקה של lastRestoreDrill)
-Agent: Z.ai Code (main)
-Task: אבחון וריפוי — סיכום-התרגיל לא נשמר ב-GateConfig אף-שהתרגיל עבר
-
-Work Log:
-- אבחון: POST-התרגיל מחזיר PASS אך lastRestoreDrill נשאר NULL — ה-`catch(() => {})` בעדכון-ה-GateConfig בלע כשל-שקט.
-- **שורש: לקוח-Prisma ישן** — השדה `lastRestoreDrill` נוסף-ל-schema בסבב-התקוע עם `db:push` (העמודה-חיה-ב-DB) אך `prisma generate` לא רץ בציות-אחריו → הלקוח-המקומפל זרק "שדה-לא-מוכר" על כל-כתיבה. אותו-דפוס-מוכר מ-r32 ("הלקוח-דורש-הדלקה-מחדש").
-- הריפוי: `prisma generate` → החלפת הבליעה ביומן-שגיאה-כנה (`console.error("restore-drill: persist failed…")`) → restart-שרת (פרוטוקול-ההלכה) → POST → **persisted: True (767 בייטים) · GET מחזיר pass·236/237·backup:true**.
-- הלקח-המוסדי: כל `db:push` מחייב `prisma generate` + restart — וכל `.catch(() => {})` על כתיבת-עדות הוא חור-שקט.
-
-Stage Summary:
-- תרגיל-השחזור שלם-ושומר: הפסק-העומד חי-ב-DB וב-API (GET ציבורי-לצורה, POST למפעיל), והכרטיס-בפורטל ניזון-ממנו.
-- קבצים: src/lib/gate/restore-drill.ts (יומן-כנה) · db/custom.db (סיכום-שמור) · worklog.md.
-
----
-Task ID: 54
-Agent: Z.ai Code (main)
-Task: r38 — "שפר את הדף — עיצוב וסדר, משהו רציני ולא דף נחיתה… תשלים פערים" — קונסולת-פיקוד ריבונית: ניווט-11-סעיפים, סקירה-חיה חדשה, ערוץ-חדש, וסגירת-שני-פערי-עמוד אמיתיים
-
-Work Log:
-- **האבחנה**: הפורטל היה גלילה-סינמטית אחת (~14,000px): Hero-נחיתה ("הכול מחובר. הכול מאומת. הכול שלך." + מונים-סופרים + חץ-מקפץ) ואז 9 סעיפים אטומים בתוכה — בלי כתובות, בלי סדר, והדיגסט קבור בחיתוך-זעיר בתוך מישור-ה-situation.
-- **סדר-הקוד לפני סדר-העמוד**: חולץ מ-page.tsx (2,888 שורות) מודול-קונסולה חדש — console/types.ts (כל צורות-ה-API), console/kit.tsx (אימות+ENDPOINTS+VaultSeal+Scramble+GlowCard+LiveDot+FilterChip+SectionHead+rise), console/lock-scene.tsx, console/overview.tsx (חדש), console/channel.tsx (חדש). המישורים-הקיימים הועברו בייט-לבייט (חילוץ sed לפי טווחי-שורות מול המקור — אפס-שכתוב-ידני).
-- **שלד-ניווט**: סרגל-צד דביק (דסקטופ, RTL-מימין: חותם-חי + 11 סעיפים ממוספרים 00-10 + סשן + אטימה) / שורת-צ'יפים role=tablist גוללת (מובייל); top-bar עם מצביע-סעיף + secrets/agents/msgs; מעבר-סעיף = רינדור-ממוקד + scrollTo(0,0); פוטר mt-auto נשמר.
-- **00 סקירה (חדשה)** — מחליף-את-ה-Hero: 6 KPI (סודות/חותמות · סוכנים+אוטונומיים+ריצות-חיות · הודעות · הצלחת-צי-24h+טקסונומיית-חסימות · נזיל-STEEM+חוב · דופק-דלת+NEW) + לב-האוטונומיה (beat/counters) + היד-הכלכלית (steem/hive/blurt+ETH+SOL+תגמולים) + הדלת-הקדמית (קולות-שותף+מוביל-לערוץ) + עוגני-אמת + ריפו-הארגון + תעסוקת-24h. רענון 60s + כפתור. כל-כשל "כשל כן".
-- **05 ערוץ (חדש)** — מישור-ההבנה במלואו: סטריפ-סטטיסטיקות (12 מאגרים · 13 דופקים · 11 קולות-שותף) · הדלת-הקדמית בפירוט-מלא (קובץ/hash8/בייטים/kind/headline/asks · 🪞 selfEcho מוצג-בנפרד r27) · **טיוטת-תשובה מלאה עם כפתור "העתק את הטיוטה"** (השליחה נשארת החלטת-מפעיל) · קולות-שורש · קולות-שותף עם NEW+mentionsUs.
-- **פער-1 שנסגר — הזרקת-מפתח הייתה קוד-מת**: KeyInject הוגדר ומעולם לא רונדר ב-Page. עתה KeyInjectCard חי בראש-סעיף-הכספת (זיהוי-חי WIF/hex/מנשק/PAT + שמירה מוצפנת + דוח-שליטה).
-- **פער-2 — מיספור ואוטונומיה**: AutonomyCard נשלף מתוך-סעיף-הסוכנים לסעיף-עצמאי 04 (fetch-סוכנים משלו); כל-הסעיפים ממוספרים-מחדש 00-10 בהתאמה לניווט.
-- **באג-הרכבה-עצמי שנתפס**: שימוש-חוזר ב-MultiEdit אחרי-הרכבה-מחדש דרך על-העריכות (KeyInjectCard לא-רונדר בבדיקה-הראשונה) — אותר, הוחל-מחדש, ואומת-בדפדפן.
-- **אימות E2E (agent-browser)**: tsc 0 · lint 0 · 11/11 סעיפים רינדרו תוכן-חי · **הודעה-אמיתית נשלחה-בגשר והופיעה (SSE live)** · KeyInjectCard+תרגיל-שחזור+237-רשומות בכספת · מובייל 390=390 אפס-גלישה · פוטר-דביק בעמוד-קצר (844=844) ונדחף-טבעי בעמוד-ארוך (4724) · אפס-שגיאות-קונסולה · dev.log נקי (ה-"Parsing failed" בלוג = המצב-הביניים-השבור שתוקן).
-- **שידור 12/12** (tools/r38-broadcast.ts): docs/broadcast/2026-09-12-console-order-r38.md — כל-11-השותפים + הדלת-שלנו.
-- **git**: sync (origin+1 = שידור-הדלת) → commit bc22571 → rebase נקי (1/1) → **push origin/main ✓** (3791e69..bc22571).
-
-Stage Summary:
-- **הפורטל הוא עתה קונסולה, לא נחיתה**: לכל מישור יש כתובת-אחת בניווט, הסקירה נותנת תמונת-מצב-מלאה במסך-אחד, והערוץ חושף את-מלוא-ההבנה עם טיוטה-בת-העתקה.
-- **שני פערי-עמוד אמיתיים נסגרו**: קוד-מת (KeyInject) חזר-לחיים; הדיגסט קיבל בית-ראוי.
-- **אפס-פגיעה**: כל-המישורים (רוטציה, תרגיל-שחזור, לולאת-מטרה, יד-ריבונית, מכשירים, חירום) נשמרו בייט-לבייט ואומתו-חי.
-- קבצים: src/app/page.tsx (שלד+מישורים) · src/components/console/{types,kit,lock-scene,overview,channel}.tsx · docs/broadcast/2026-09-12-console-order-r38.md · tools/r38-broadcast.ts · worklog.md.
-
----
-Task ID: 55
-Agent: Z.ai Code (main)
-Task: r39 — "בחן את הסוכנים: פעולות/סיכונים/יתרונות/מצב/ייעול/חסר · תתכונן לעוד מפתחות · יש לי בזיפים בגיט" — ביקורת-צי חיה, מודל-הרשאות פיננסי, צינור-קליטת-מפתחות (טקסט+zip), וריפוי-לב-עומד
-
-Work Log:
-- **ריפוי ראשון**: הביקורת נפתחה בלב-עומד (אין-פעימות 20 דק') ו-1032 חוזר ביומן ("schedule fall-behind failed: attempt to write a readonly database") → ההלכה: kill-כל-העץ (22443→22459) → r36-revive (up 10s) → WRITE-OK → הלב פועם מחדש (beats 3→4). ריצת-queued בלימבו (attempt=2, retryNotBefore 03:15:47) נשפטה כנה-אחרי-הריפוי.
-- **ביקורת-חיה מול db/APIs** (10 סוכנים × 41 מודולים · 36 סיורים · 21 טריגרים · הכול enabled): 7-ימים — 104 done · 64 blocked · 33 failed · p50 44.7 שנ'; checkerstats 144 פסקים (73 ראשון · 15 תיקון · 40 חסום); 777 הודעות-גשר; idle-employment 6/יום; proposals 1-launched-policy/1-operator/1-rejected/1-expired; orders 2-signed-operator + 2-failed + 1-expired (אפס-חתימה ללא-הכרעה); 576 פעולות-7d עם טקסונומיית-כשלים מדויקת (429×6 anchor · watchdog-crash-burst סביב-ריבייס · RC-mana · 5-min-interval · מדיניות-חשיפה חסמה base64 — כולם-כנים, רובם-היסטוריים-טרם-r34/r36).
-- **מודל-הרשאות פיננסי (פער-r28 שנסגר)**: GateAgent.finTier ("none" | "build" | "autonomous-limited") + GateAgent.finCaps JSON {maxNotionalPerOrder 0.5 · maxSignedPerDay 2 · maxNotionalPerDay 1}; "none" חוסם-אפילו-בנייה; autonomous-limited = הלב חותם אוטומטית (autoSignLicensedOrders ב-stageOrders) רק בתוך-התקרות, רק create/cancel (המרות-מפעיל-בלבד), רק כספת-פתוחה (masterReady fail-closed — פקודה-נעולה-כספת נשארת pending, לעולם לא failed-שווא), תקרות-הצי מעל-הכול, decidedBy="policy:fin-tier" + גשר; כל-10 הסוכנים default=build (אפס-שינוי-התנהגות); המתג ב-UI (select לכל-סוכן + תג fin: בתור-החתימות + counters.finAutoSigned בדופק).
-- **הוכחות-הרשאות-חי**: PATCH→autonomous-limited ✓ · finCaps 0.25 read-back ✓ · "god-mode" נדחה (דרגות: none|build|autonomous-limited) ✓ · חזרה-ל-build/null ✓.
-- **צינור-מפתחות keys-batch (מוכנות לגל-הבא)**: POST /api/gate/keys-batch (מפעיל-בלבד) — scan: זיהוי-חי של כל-מועמד (WIF/0x-hex/64-hex/מנשק/PAT + קידומות LABEL=), ניכוי-כפילויות (pub נגזר מול-הכספת), אפס-אטימה; seal: רק-hash-ים-מאושרים (take:[]); zip: הורדה+fflate פריקה-בזיכרון (תקרה 64MB · MAX 400 קבצים · NUL-probe בינארי-נדלג-בכנות); אפס-סודות-בפלט (mask 4+אורך). UI: "יבוא-מרובה (טקסט/zip)" בכרטיס-הזרקת-המפתח — textarea+zip-url+סרוק-חי+checkboxes+אטום-נבחרים.
-- **הוכחות-צינור-חי**: scan-API 2/2 מועמדים סינתטיים וסינון-שורת-רעש ✓ · seal-עם-take אטם מנשק-סינתטי (imported:doors, 238) + ניקוי-מוכח חזרה-ל-237 ✓ · seal-ללא-take ו-seal-כספת-לא-מוכנה = אפס-יצירה ✓ · דפדפן: הדבקה→סרוק-חי→שורה "5HpH…(51 chars) · steem-wif · חי ✓ · text:1" עם checkbox מסומן-וכלום-לא-נאטם ✓.
-- **בזיפים בגיט — מופו**: סריקת-עצים של 12-ריפו (API): 10-zip כולם-ב-Project-files (steem-main 23.8MB · unified-platform-v33.56 22MB · ecos_v568 5.8MB · srs_substrate 4.5MB · TITAI_v18 4.3MB · tfa 2.5MB · workspace 2.1MB · qodo 1.4MB · polyglot 0.5MB · ux_patch 0.19MB) + chain-archive-seal.jsonl.gz שלנו ב-steem; הריפו-המקומי נקי (עץ+היסטוריה). keys-batch כבר-מוכן-לקלוט-כשיצביעו.
-- **עמידות-429**: anchor-agent שרף 6-ריצות על 429 ב-48h — brainChatRetry שודרג ל-3-ניסיונות (4s→10s ג'יטר) למייצר+בודק; זריקות-שאינן-חולפות-כנות.
-- **פקודה-עצמית-שנתפסה**: /api/gate/agents GET שדרגתי-וגם-ה-DELETE הושאר-שקט — לוודא ש-patch ל-finCaps עם name לא-קיים כותב אפס-שורות (updateMany count=0 → bad-agent נשמר); אומת-חי.
-- **בדיקות**: tsc 0 · lint 0 · db:push אדיטיבי (finTier+finCaps) + prisma generate + restart-הלכה (לקח-r32/53-b) · WRITE-OK · דפדפן: 11-סעיפים · 10-combobox דרגות-כסף · אפס-שגיאות-קונסולה · מובייל 390=390 · פוטר דביק (h=innerH, stuck:true) ונדחף-טבעי בארוך (footerBottom=docH) · dev.log נקי-אחרי-ההדלקה.
-- **שידור 12/12** (tools/r39-broadcast.ts): docs/broadcast/2026-09-12-fleet-audit-financial-r39.md — כל-11-השותפים + הדלת-שלנו.
-
-Stage Summary:
-- **הביקורת הפכה-להיות-תשתית**: במקום רק-דוח — הסיכון-הפתוח הגדול (מי-מורשה-להזיז-כסף) קיבל מודל-בקוד: סולם none/build/autonomous-limited עם תקרות-קשיחות, fail-closed ואודיט-מלא. שום-סוכן לא שודרג-בעצמו — המתג בידי-המפעיל.
-- **המערכת מוכנה לגל-המפתחות**: scan→confirm→seal (טקסט או zip), זיהוי-חי, ניכוי-כפילויות, אפס-סודות-בפלט, אפס-אטימה-בלי-הכרעה — והוכח קצה-קצה כולל-ניקוי.
-- **עשרת-הבזיפים מופו וממותנים** — הדלת-אליהם בנויה.
-- קבצים: prisma/schema.prisma (finTier+finCaps) · src/lib/gate/harness/orders.ts (FIN_TIERS/parseFinCaps/autoSignLicensedOrders) · src/lib/gate/harness/heart.ts (stageOrders) · src/app/api/gate/agents/route.ts · src/app/api/gate/orders/route.ts (tiers) · src/app/api/gate/keys-batch/route.ts (חדש) · src/components/console/types.ts · src/app/page.tsx (bulk-intake+finTier-UI) · src/lib/gate/harness/loop.ts (429-סולם) · package.json (fflate) · tools/r39-broadcast.ts · docs/broadcast/2026-09-12-fleet-audit-financial-r39.md · db/custom.db · worklog.md.
-
----
-Task ID: 56
-Agent: Z.ai Code (main)
-Task: r40 — "תמשיך לחזק · תעבור על כל ההצהרות שלך בדף ותבחן אותן אל מול המציאות · בהמשך היום 2 API של NVIDIA" — סוויפת-אמת מלאה + מוכנות-NVIDIA בשלוש שכבות
-
-Work Log:
-- **מתודה**: חילוץ כל הטענות העובדתיות מ-page.tsx + console/* → הרצת 15 APIs חיים (כולל operator דרך /tmp/gate_token, אפס-דליפת-טוקן) → השוואה טענה-מול-תשובה. כלל-ברזל: od/tsc/git = אמת, פלט-טקסט עלול לבלוע סוגריים (אזהרת-שווא "digest.ts שבור" — git-diff הוכיח שהקובץ מעולם לא נפגע).
-- **ממצאים אמיתיים**: 237 סודות/12 חותמות/174 verified · restore-drill 236/237+גיבוי-409KB (רוץ חי גם מה-UI) · לב פועם (beats, finAutoSigned=0) · כיס fresh · 12 ריפו · דלת 29 קבצים=15 נכנסים+12 selfEcho+1 authored · חיבורים מגובי verifyAll. אישרור-שלישי: ריצת verifier-agent חיה מדדה בעצמה 237 רשומות.
-- **3 אי-אמת תוקנו**: ① KPI-דופק-הדלת הציג 2 (חלון-מסווג) מול תג 15 (מלוא-הדופק) — אוחד ל-door.incoming עם כנות "מסווגים-חי 2/15"; ② הצהרת-מעבדה "כל נקודת-קצה" — 6 חסרות הוכנסו (keys-batch/key-authority/restore-drill×2/pulse/rotation) + נוסח-כן עם החרגות מפורשות + "12 מאגרים" קשיח הומר לניסוח-חי; ③ תג "חי ✓" הופיע גם על נדחה — עתה חי✓/נדחה✗/לא-הוכרע + notes מוצגות בדוח-הבודד.
-- **באג-קריסה שנתפס**: WIF-פגום ביבוא-המרובה = 500 (bs58-throw מחוץ ל-try) → safeWifPub מנטרל; הוכח חי.
-- **NVIDIA שכבה-1 (זיהוי+אמת)**: nvidia-api ב-key-id (classify + identifyKey) — probe אמיתי = 1-token chat (התגלה חי ש-/v1/models ציבורי: 200 גם בלי מפתח — אימות-שווא שנמנע לפני-הטמעה) · טביעת-אצבע nv-fp:sha256 ב-pub לניכוי-כפילויות ללא-חשיפה.
-- **NVIDIA שכבה-2 (צינור)**: scanText+kindOf+seal-targets ב-keys-batch מזהים/אוטמים nvapi- (טקסט ו-zip) — הוכחה חיה ב-UI: nvapi-סינתטי → "NVIDIA · נדחה ✗ (403 אמיתי) · text:1" בלי-אטימה.
-- **NVIDIA שכבה-3 (מוח)**: nvidiaKey→nvidiaKeys — מאגר כל chain="nvidia" + env קריאה-בלבד; רוטציה: 429→קירור-90s והמפתח-הבא משרת מיד · 401/403→קירור-30min · כל-המאגר בקירור→המתנה-מוגבלת-429 או כשל-כן · seal-רקוב לא מסנוור. הכלה: ה-2 המפתחות החדשים ייכנסו לשימוש-אוטומטי באטימה, אפס-קוד.
-- **הוכחת-קצה**: ריצת verifier-agent חיה (nvidia:openai/gpt-oss-20b דרך המאגר-החדש, בודק zai) — done · כל-הקריטריונים הוכחו · 41 שנ' · הסוכן אימת 237 רשומות בעצמו.
-- **בדיקות**: tsc 0 · lint 0 · אתחול-שרת (ריפוי-מודול-מיושן של key-id) · דפדפן: KPI עקבי 15=15, מעבדה מריצה חי, יבוא-מרובה חי, אפס-שגיאות-קונסולה, מובייל 390=390, פוטר 3669=3669 נדחף-טבעי ודביק-בקצר · dev.log נקי.
-- **שידור 12/12** (tools/r40-broadcast.ts): docs/broadcast/2026-09-12-truth-audit-nvidia-r40.md — כל-11-השותפים + הדלת-שלנו.
-
-Stage Summary:
-- **הפורטל עמד בביקורת-האמת של מפעילו**: כל KPI מגובה במדידה-חיה, שלוש אי-אמת (סתירת-מספרים, הצהרה-מוגזמת, תג-מטעה) תוקנו בשורש ולא בטוש.
-- **גל-ה-NVIDIA נקלט מקצה-לקצה ברגע-ההגעה**: זיהוי nvapi- → probe-אמת (לא models-הציבורי) → אטימה-מאושרת-מפעיל → מאגר-מוח עם רוטציה אוטומטית (429-במפתח-אחד לא עוצר את הצי).
-- **שיעור-כלים שנרשם**: כל חשד-לקוד-שבור דורש הוכחת-בייטים (od) או git-diff לפני "תיקון" — אזהרת-השווא של התצוגה כמעט גרמה לשכתוב-מיותר.
-- קבצים: src/lib/gate/key-id.ts (nvidia-api+probe+fp) · src/app/api/gate/keys-batch/route.ts (nvapi+safeWifPub) · src/lib/gate/harness/brain.ts (מאגר-מפתחות+רוטציה) · src/components/console/overview.tsx (KPI-דלת) · src/components/console/kit.tsx (6 נקודות-קצה+נוסחים) · src/app/page.tsx (תגי-אמת+notes+KIND_LABEL) · src/components/console/types.ts (KeyReport.label/notes) · tools/r40-broadcast.ts · docs/broadcast/2026-09-12-truth-audit-nvidia-r40.md · worklog.md.
-
----
-Task ID: 57
-Agent: Z.ai Code (main)
-Task: r41 — "יש פה 2 תחשוב טוב טוב איך להשתמש בהם להישגים אמיתיים: בניה, אבטחה, כלכלה, פיתוח" — קליטת 2 מפתחות-NVIDIA חיים + שיגור משימות-הישג + הכרעת ממצא-האבטחה
-
-Work Log:
-- **קליטה מאובטחת**: upload/nvidia.txt זרם דרך jq ישר אל keys-batch (אפס-מפתחות-בפלט/ביומן); scan: 2 מועמדים nvidia-api, כל אחד probe חי 1-token מול integrate.api.nvidia.com → שניהם חיים, dupOf=null; seal: take=[2 hashes] → 2 נאטמו `status: verified` עם nv-fp ב-pub. אפס-קוד — הזרימה של r39/r40 עבדה כמתוכנן.
-- **המאגר=3**: 1 תשתית (env-sealed) + 2 חדשים; הרוטציה של r40 קיבלה עומק ×3. הוכחת-קצה: ריצת harness-rider (nvidia:openai/gpt-oss-20b + checker zai) הסתיימה done דקות אחרי האטימה ומדדה בעצמה 239 סודות/176 verified — הריצה ראתה את המפתחות בזמן-אמת.
-- **probe מודל**: ריצת-בדיקה קצרה עם brain `nvidia:deepseek-ai/deepseek-v4-flash-0731` דרך המאגר → done — גם המודל-השני בקטלוג משרת בפועל (הצהרת-קטלוג אומתה).
-- **5 משימות-הישג** שוגרו לצי: כלכלה (market-rider) → done: תדריך עם מספרי-אוצר אמיתיים + 3 המלצות + דיווח לגשר; אבטחה (verifier-agent) → דוח 3 ממצאים מדורגים עם הוכחות-מה-trace (45 סודות-לא-אומתו, חוסר-עיגון saos.id.v1, הזזת-3-שניות) + ריצת-השלמה שדיווחה לגשר → done; בניה/פיתוח (zai-code) → הצעה אמיתית "אימות מלא של 35 סודות שלא אומתו" שהוכרעה והושקה לריצה; חוק הצעה-פתוחה-אחת נאכף (מערכת-ההצעות עובדת כמתוכנן); בודק-עצמאי פסל ריצה שניסתה לחרוג מסמכות-הכלים — גבולות-הסמכות חיים.
-- **הכרעת ממצא-האבטחה**: סריקת inventory חיה: total 239 · verified 161 · failed 45 · rotatedOut 11 · noLive 33; הצלבה ידנית: 34=דור-ישן (11 חשבונות steem × active/memo/posting + primary-original), pubs שונים מהסט-החי, מחוץ-ל-authorities בכל-3-הרשתות; לכל אחד מ-11 החשבונות סט מאומת-חי מלא (owner/active/posting/memo) → **אפס-אובדן-שליטה**; סיווג-מחדש עובדתי 34 רשומות unverified→rotated-out עם ראיה בהערה (הפיך, אפס-מחיקה) + רישום לגשר; תוצאה: failed=45 · rotatedOut=45 → **realFailed=0**.
-- **תיקוני-אמת בדף**: ① דלת-קדמית — כנות "דגימת X מתוך Y (חלון-קריאה מוגבל, חוק-האפס-עומס)" על הפער בין הספירה (15) לרשימה (3); ② "176 verified" → "verified (status-col)" לבידול סטטוס-DB מאימות-חי (161 עברו · 0 נכשלו · 45 היסטוריה) במקטע-החיבורים.
-- **בדיקות**: lint 0 · dev.log נקי (רק שאילתות-לב) · tsc דרך-lint · שידור 12/12 (tools/r41-broadcast.ts) → docs/broadcast/2026-09-12-nvidia-live-fleet-security-r41.md.
-
-Stage Summary:
-- **הבטחה של r40 התממשת בדקה-שהגיעה**: שני מפתחות-NVIDIA אמיתיים נכנסו לעבודה מלאה בלי שורת-קוד — זיהוי→probe→אטימה→מאגר→רוטציה, והצי כבר עבד עליהם באותה ריצה.
-- **המוח הפיק הישגים**: תדריך-כלכלי עם 3 המלצות, דוח-אבטחה עם ממצאים-מדורגים, והצעת-בניה שהושקה — כל-אחד עם ראיות-כלים ב-trace, והבודק-העצמאי שומר על-הכנות.
-- **ממצא-האבטחה הוכרע בראיה**: 34 מפתחות-דור-ישן לא-מסוכנים (שליטה-מלאה בכל-החשבונות), המספרים-האמת עכשיו עקביים קצה-קצה: 161 חיים-עוברים · 0 נכשלו-אמיתי · 45 היסטוריה.
-- קבצים: src/app/page.tsx (2 תיקוני-אמת) · docs/broadcast/2026-09-12-nvidia-live-fleet-security-r41.md · tools/r41-broadcast.ts · db/custom.db (סיווג-מחדש 34 רשומות + הודעת-גשר) · worklog.md.
-
-Addendum (Task 57, סיום-אימות-דפדפן):
-- תיקון-אמת שלישי: components/console/channel.tsx (טאב 05) — גם שם כנות-הדגימה "מוצגות X דוגמאות מתוך Y דופקים (חלון-הקריאה מוגבל — חוק-האפס-עומס)"; התברר שקיימות שתי תצוגות-דלת (טאב 01 ב-page.tsx + טאב 05 ב-channel.tsx) — שתיהן מתוקנות ועקביות.
-- overview.tsx שורת-הכספת קיבלה גם-היא "verified (status-col)" — עקביות מלאה בשלוש התצוגות.
-- SQLITE_READONLY(1032) אחרי rebase הופיע שוב (inventory 500) — ריסטרט dev-server לפי-המוסכמה → ריפוי מלא, inventory HTTP 200, verified 163 וממשיך-לעלות.
-- אימות-דפדפן סופי: overview "239 · 176 verified (status-col) · 45 rotated-out" ✓ · ערוץ: כנות-הדגימה ✓ · מראה-עצמי ✓ · פירוק 31/16/15 ✓ · אפס-שגיאות-קונסולה ✓ · פוטר נוכח ✓.
-
----
-Task ID: 1-a
-Agent: Explore
-Task: ניתוח עמוק של TFA Evolution Studio v32.0.0 (upload/extracted/tfa-evolution-studio-validated/tasks/, 454 קבצים) — מיפוי מודולים, יכולות אוטונומיות, בדיקות סטטיות בלי מפתחות LLM, תוכנית אינטגרציה לרשת רושפינה, סיכונים. מחקר בלבד — לא שונה שום קוד מקור של הפרויקט המנותח.
-
-Work Log:
-- נקרא worklog.md במלואו (57 משימות, r1–r41) — הקשר: רשת-רושפינה (roshpinacare-sys, 12 ריפו), 10 סוכנים, Gate/כספת, keys-batch (zip import עם fflate), שידורי STEEM/HIVE, פורטל Next.js; ב-r39 מופו 10 בזיפים ב-repo Project-files ביניהם "tfa 2.5MB" — הפרויקט המנותח כאן הוא ככל-הנראה תוכנו.
-- מיפוי מבנה: 454 קבצים, 147 TS/TSX, 27 תיקיות ב-src/lib, 42 API routes (src/app/api/**), 10 עמודי UI, 14 סקריפטים ב-scripts/. package.json: Next 15 + React 19 + adm-zip + fast-glob + uuid + openai (לא בשימוש בקוד). אין git, אין node_modules, קיים bun.lock + package-lock.
-- בדיקת tasks/.env: קיים, 29 בייטים, מכיל משתנה יחיד VITE_APP_ID (ערך 16 תווים, סגנון app_*) — לא מפתח LLM; הערך לא צוטט ולא נשמר. אין OPENAI_API_KEY/ANTHROPIC_API_KEY בקובץ.
-- קריאת עומק של המנועים: evolution-engine.ts (10 פאזות — פאזות 3–6 "חוזה מבני", fileCount=0 ו-step שנרשם בלי לעשות), compiler-orchestrator.ts (10 פאזות עם durable jobs + retries + resource pool — אמיתי), sandbox-runtime.ts (sandbox מבודד + ingestZipIntoSandbox עם הגנת Zip Slip — אמיתי), project-ir.ts (פרסינג ZIP ל-IR עם imports/hashes — אמיתי), compiler-intelligence.ts (8 שלבים על ה-IR — אמיתי), workflow-engine.ts (checkpoint/replay/idempotency — אמיתי), durable-job-store.ts (NDJSON file-backed — אמיתי), adapters/exec-helper.ts (spawn עם timeout/retry — אמיתי), node/nextjs/python/static adapters (npm install/build אמיתיים).
-- זוהו סטאבים מפורשים (ממצא קריטי לאמת): agents/provider.ts מחזיר תשובות LLM מזויפות ("OpenAI response to: …") — אין קריאת LLM אמיתית בקוד כולו (package openai מיובא בשום מקום); integrations/connectors/* (github/gitlab/slack/jira/notion/rest/webhook/cicd) מחזירים echo; api/artifacts/[version]/download מחזיר "Artifact body"; trace/cost/sla מינימליים. גם: אין route /api/projects אף-על-פי ש-smoke-test מתייג אותו כ-live — הצינור האמיתי הוא POST /api/compiler/compile (multipart, מקס 250MB).
-- בדיקות סטטיות שרצו בפועל (בלי npm install): node scripts/self-audit.mjs → clean (316 קבצים, exit 0); node scripts/smoke-test.mjs --coherence-only → 182 עברו / 1 נכשל — "RELEASE_NOTES.md לא מסמן 32.0.0 כ-current" (באג תיעודי קל, exit 1); node scripts/v32-tests.mjs (certify) → 40/40 עברו, exit 0.
-- מיפוי 63 EvidenceNodeKind ב-types.ts + מודולי הראיות: evidence-chain/evidence-emitter, governance/audit-trail + approval-gate + rbac, event-store (append-only + replay), release/release-gate + release-governor + release-verifier (AdmZip + sha256 + provenance אמיתי).
-- אינטליגנציה: sovereign-orchestrator.ts — debate 6 תפקידים ב-7 שלבים עם quorum מבוסס-משקל-ראיות (runDebateV2, runSovereignBatch, selectWork); memory-graph.ts (8 סוגי צמתים/7 קשתות, file-backed, ingestCycleOutcome + findBestRecovery); learning-engine/outcome-tracker; distillation/pattern-promoter + playbook-engine; intelligence/cross-project-engine; self-critique (7 מימדים, כימור עד 80); fitness-functions (5 מימדים); soak-harness (8 תרחישים); chaos-harness (ספריית תקלות).
-- נבנתה תוכנית אינטגרציה קונקרטית לרשת רושפינה (בדוח הסופי): קבצים להעתקה, APIs לחשיפה מאחורי operator-token, ושילוב EvidenceNode בגשר וב-broadcast.
-
-Stage Summary:
-- TFA Evolution Studio = פלטפורמת "שחרור-עם-ראיות": zip→sandbox→IR→adapter/build→release.zip+sha256, עם 63 סוגי ראיות, durable jobs עם checkpoint/replay (NDJSON, בלי DB), ו-gates עצמאיים לחלוטין ממפתחות LLM (self-audit + coherence-only + certify רצו כאן ועברו/כמעט).
-- אמת-מול-הצהרות: מנוע ה-אבולוציה המרכזי סטאבי בפאזות הביצוע; אין LLM אמיתי (provider פיקטיבי); connectors echo. הערך האמיתי נמצא ב-compiler/sandbox/workflow/job-engine/release-verifier/memory-graph ובסוויטות ה-gates — בדיוק השכבות שהרשת צריכה (זיפים→שחרור מאומת, ראיות לסוכנים, ריפוי-זומבים מבוסס checkpoint).
-- אינטגרציה מומלצת בשלוש שכבות: (א) מיידי — העתקת scripts/self-audit.mjs + מצב --coherence-only כ-gates לכל שחרור של הרשת; (ב) שירות — הרצת הפלטפורמה כ-side-service עם POST /api/compiler/compile ופרוקסי מהפורטל; (ג) מלא — צינור "בזיפים-בגיט → שחרור מאומת" שמזרים EvidenceNodes לגשר ול-docs/broadcast, והחלפת provider.ts במוח הרשת (NVIDIA/zai) דרך ה-interface המוכן SovereignInput.voices.
-- סיכונים עיקריים: פער הצהרות-מימוש, אין auth על ה-APIs (חובה operator-token), התמדה קובצית בלבד, חוסר-עקביות תיעודית אחת (RELEASE_NOTES current), ומשקל מודולרי עם חפיפה רעיונית.
-
----
-Task ID: 1-b
-Agent: Explore
-Task: ניתוח עמוק של ארכיון SRS Sovereign Runtime Substrate v8.2.0 (upload/extracted/srs_sovereign_runtime_substrate_v8.2.0) — ארכיטקטורה, מנגנוני אבטחה, TemporalBankerScheduler, הרצה מקומית, ותוכנית אינטגרציה לרשת רושפינה. מחקר-בלבד, אפס-שינוי קוד המקור המנותח.
-
-Work Log:
-- נקרא worklog (משימות 1-57) להקשר: רשת רושפינה — Gate, כספת, finTier/finCaps, שידורי STEEM/HIVE, פורטל Next.js.
-- מופו מבני-העץ: kernel/ (omnivisor.py+smpu_sppu.py+ebpf_telemetry.py+c/+rust/), cognition/ (agemem_controller, agemem_adm_trainer, adm_intent_mapper, grpo_advantage_map, esr_schema.json), verification/ (z3_power_proof.py, saarthi_sva_generator.py, TemporalBankerScheduler.tla/.cfg/Cfg.tla, TLC_VERIFICATION_LOG.txt), governance/ (policy, identity, audit, persistence, cost, bls_signatures, seg_controller, sqa_aggregator), self_healing/ (digital_dna, antibody_maturation), simulation/ (adaqc_compiler, photonic_bus, qiskit_adapter), bpf/ (2 קבצי .bpf.c לא מקומפלים), srs/ (הריצה המאוחדת stdlib-only: runtime 914 ש', persistence 1576 ש', types 567, pipeline, planner, cli, primitives/×8), srs_runtime/ (עותק עצמאי — סיכון-סטייה), api/ (FastAPI + SDKs py/ts/go), tests/ (100+ קבצים), fuzz_work/ (6 הרנסים), deploy/ (k8s+helm), r17_*.py ×5 בשורש.
-- נקראו בעומק מנגנוני האבטחה ב-srs/persistence.py: _get_secret_key (0600, os.urandom(32), cache), _compute_snapshot_hash/_compute_seq_hash/_compute_inflight_hash (HMAC-SHA256 על canonical JSON sort_keys), _high_water_mirror_path (מראה high-water ב-<root>/secret_key.seq מחוץ-ל-snapshots), _get_high_water_sequence (max בין sequence.json למראה), _atomic_write_json (mkstemp+fsync+os.replace+dir-fsync+ניסיון-חוזה Windows), SafeJSONDecoder (MAX_DEPTH=100, size-gate 4KB, סריקת-סוגריים ב-regex), MAX_SNAPSHOT_SIZE=10MB, _sanitize_id ([a-zA-Z0-9_-]{1,64}), file_lock (fcntl.flock עם ירידה-חיננית ב-Windows), בקרת-הכלה של latest.json (resolve().relative_to).
-- נקראו srs/types.py (_sanitize_task_id עם __setattr__ שנדלק על-כל-השמה — R18 C4; שמות-שמורים של Windows CON/PRN/AUX/NUL/COM1-9/LPT1-9 עם קידומת srs_), srs/primitives/advice.py (fingerprint באורך-מוקדם struct.pack ">I" — סגירת r17_collision; מפתח מודע-מטרה "fp:target"; from_dict דוחה לא-str/לא-int/bool/שלילי).
-- נקראו 5 קבצי ההתקפה r17_*.py: advice_poisoning (אימות-שווא של sha256 ציבורי — נסגר ב-HMAC), collision_attack (פיצול בייט 0x7c — נסגר באורך-מוקדם), fingerprint_collision, path_traversal, latest_path_attack (symlink/TOCTOU). נמצא: כולם עם sys.path.insert('/home/z/my-project/download') קשיח — לא ירוצו מהארכיון כמות-שהוא.
-- נקרא TemporalBankerScheduler.tla (241 ש'): TIB token-budget לדומיינים APU/RPU/FPGA, Refill לפי-epoch עם תקרה, מענקי-FIFO בניכוי-עלות (עלות א-סימטרית 3/2/1), BudgetInvariant (budget≥0), NoDeadlock תחת AdmCostCheck, NoStarvation תחת WF/SF; TLC log: 220,584 מצבים, 0 הפרות (BMC — לא הוכחה מלאה; NoStarvation מוערה ב-cfg). נמצא היישום הפייתוני המקביל: kernel/omnivisor.py (TIBBudget/refill_tib/grant_hypercall) + governance/cost.py (CostTracker/Budget עם תקופה ו-reset).
-- נקראו governance/audit.py (שרשרת-גיבוב SHA-256 prev_hash/event_hash + verify), governance/persistence.py (SQLite-backed audit/identity/cost), ENTERPRISE_VALUE.md, ENGINEERING_REPORT.md (כנות: מה אמת/מה מדומה/מה חסר), SECURITY.md (STRIDE, מחזור-חיים BLS, מגבלות מוצהרות).
-- הרצה מקומית: venv מקומי כולל pytest/fastapi/numpy/PIL/uvicorn; חסרים z3/torch/hypothesis/py_ecc. 123 בדיקות-אבטחה (test_v7_7_security, test_v7_7_dos, test_v7_8_security, test_v7_8_logging) — עוברות ב-~5 שנ'. תת-הסוויטה המרכזית (9 קבצים כולל test_srs_runtime, test_concurrency, test_integration_v7) — 256 עוברות ב-~13 שנ'. סוויטה רחבה: 337 עוברות / 33 נכשלות — כל הכשלים תלות-חסרה בלבד (py_ecc/z3/torch). איסוף-מלא נכשל: 7 קבצים דורשים z3/hypothesis, וקבצי test_rce2_* מייבאים מודולי-שורש שלא-קיימים במבנה-הארכיון.
-- רישיון: Apache 2.0 — העתקה/התאמה מותרת עם ייחוס. THIRD_PARTY_LICENSES.md קיים.
-- מופו נקודות-האינטגרציה ברושפינה: src/lib/gate/{backup,crypto,key-seal,restore-drill,seal-refresh,verify,treasury}.ts, src/lib/gate/harness/orders.ts (FIN_TIERS/parseFinCaps/autoSignLicensedOrders), src/lib/rate-limit.ts, db/custom.db.
-
-Stage Summary:
-- SRS v8.2.0 הוא מעבדה אמיתית של "עמידות-עוינת לדיסק": ליבת srs/ (stdlib-בלבד) מוכחת-חיה מקומית — 256 בדיקות ליבה עוברות ב-13 שנ' בלי שום-תלות כבדה.
-- חמשת הרכיבים בעלי-הערך המיידי לרושפינה: ① HMAC-סנאפשוטים מלאי-שדות + כתיבה אטומית (srs/persistence.py) לכספת; ② מונה-רולבק high-water עם מראה מחוץ-לתיקייה (עצם המראה = תיקון החולשה שנמצאה ב-R17) ל-WAL/chain-archive-seal שלנו; ③ בנקאי-הזמן TIB (kernel/omnivisor.py + verification/TemporalBankerScheduler.tla + governance/cost.py) — מודל-הרשאות פיננסי מוכח בלי-מוות, הרחבה טבעית של finTier/finCaps; ④ ערכת-קשיחות קלט (SanitizeId/SafeLogValue/SafeJSONDecoder/תקרת-גודל) לכל-קלט-חוץ; ⑤ שרשרת-אודיט מגובבת (governance/audit.py) לגשר ולפקודות.
-- סיכונים: תיעוד-לא-עקבי (253 מול 399 בדיקות; v8.2.0 מול v4.9.0), עותק-כפול srs/ מול srs_runtime/, בדיקות-rce2 שבורות-מבנה, r17 עם נתיב-קשיח, BMC במקום הוכחה-מלאה, תלות-כבדות אופציונליות (torch/z3/py_ecc).
-- הערך בשורה: המתכון המוכח ל"כספת שעמידה לדיסק-עוין + בנקאי-תקציב מוכח-בטיחות" קיים בקוד נקי וקצר (~600 ש' רלוונטיות), Apache-2.0, ורץ מקומית עכשיו.
-
----
-Task ID: 1-c
-Agent: Explore
-Task: ניתוח עמוק (RESEARCH ONLY) של הארכיון upload/extracted/axiomstate-phase2-queryexec — AxiomState Phase 2 (LSS kernel + AST-Graph + Query DSL + Bundle generator) — מיפוי מודולים, הרצת דמו חי, הערכת אינטגרציה לרשת רושפינה (Next.js /api), סיכונים, וערך.
-
-Work Log:
-- נקראו כל 15 קובצי המקור (src/phase0/phase1/phase2, cli.ts, bench.ts, ~1,811 שורות), README, NEXT_AGENT.md, docs (API/PHASE2/ARCHITECTURE/PROTOCOL/GRAPH_MODEL/PHASE1), package.json, tsconfig, Makefile, examples, tests.
-- מיפוי מלא: phase0/kernel.ts = LSSKernel (WAL immutable בינארי: seq u64/op/keyLen/valLen/key/value/crc32 + checkpoints "AXCP" v1 + rollback + recovery; אפס תלות חוץ). phase1 = AST-Graph: providers (typescript.ts עם TS-Compiler-API, regex.ts fallback), ids.ts (file:/symbol: + resolveImport), project-parser.ts, writer.ts (מפתחות ast://node/ ast://edge/ ast://meta), loader.ts, traversal.ts (sliceForward/sliceReverse BFS). phase2 = incremental.ts (IncrementalEngine: SHA-256 ב-hash://, מקור ב-source://, אינדקס ב-file-index://, מחיקת-קברים), query.ts (DSL: node/deps/rdeps/kind/name/and/or/not + parseQuery מחרוזת), bundle.ts (Kahn topological + זיהוי מעגלים). cli.ts = 10 פקודות.
-- הרצה חיה מול dist קיים (dist/ כבר בנוי, node v24.19.0): sync examples/sample-project --checkpoint → {scanned:3, changed:3, currentSeq:20}; sync שני → {unchanged:3, changed:0} (אינקרמנטלי אמיתי, seq לא זז); query 'and(kind:file, deps(file:src/index.ts))' → [file:src/index.ts, file:src/utils.ts]; rdeps/name/or/not/deps(…,1) עבדו; bundle src/index.ts → סדר טופולוגי [utils.ts, index.ts], cycles:0, והפלט דטרמיניסטי (SHA-256 זהה בשתי ריצות: 1718067236e6…).
-- בדיקת 29 הבדיקות: 23 עוברות; recovery 4/5 (הכשל = ENOTEMPTY ב-cleanup); fuzz 0/1. חקירה: העתקת לוגיקת ה-fuzz במדויק (tmp-analysis/fuzz-repro/repro3.mjs) — 0/10 כשלים על דיסק-מקומי (overlay) מול 10/10 כשלים כשה-store על הר-האפס של ה-upload (fuse.ossfs). מסקנה מבוססת: אין באג-לוגיקה ב-kernel — הכשלים הם ארטיפקט של ossfs (קריאות-סטייל אחרי ftruncate+append). אימות ידני: זיהוי CRC עובד ("CRC mismatch at offset 0").
-- בדיקת אינטגרציה: העתקת dist בלבד לתיקיית ביניים + symlink ל-node_modules של הפורטל → API תכנותי עבד קצה-קצה (sync כפול, query, bundle, checkpoint, stats). TypeScriptProvider אומת מול typescript 5.9.3 של הפורטל (package דורש ^6 אך ה-APIs בשימוש יציבים). תלות-חוץ יחידה בכל החבילה: typescript (רק phase1/providers/typescript.ts); phase0 = אפס תלות.
-- זוהו פגמים משניים בקוד: דליפת fd בקונסטרקטור אם recover() זורק; rollback() מוחק checkpoints לפני ולידציית גבול ה-truncate (מוטציה חלקית בנתיב-שגיאה). לא תוקנו (RESEARCH ONLY).
-- נבנה דוח ערך בעברית עם תוכנית אינטגרציה קונקרטית (src/lib/axiom/ + /api/code/query|bundle|sync).
-
-Stage Summary:
-- AxiomState Phase 2 הוא "מוח-קוד" דטרמיניסטי מוכן-לשימוש: 3 פקודות CLI חיות הוכיחו sync-אינקרמנטלי, שאילתות-תלויות מדויקות (deps/rdeps/and/or/not) ו-bundle דטרמיניסטי להקשר-סוכן.
-- האינטגרציה לרשת זולה: 15 קובצי TS (~1,570 שורות) להעתקה ל-src/lib/axiom/, תלות-חוץ יחידה typescript (כבר קיים בפורטל 5.9.3 ועובד), ללא vector search וללא DB.
-- סיכון-מפתח שנתגלה ונחקר: ה-kernel חייב store על דיסק-מקומי — על ה-upload (ossfs) ה-WAL מתקלקל שקטות (stale reads אחרי truncate) — ה-store שלנו יהיה תחת הפורטל (overlay) ולכן בטוח.
-- קבצים: worklog.md (רשומה זו) · tmp-analysis/fuzz-repro/repro3.mjs+repro2.mjs (כלי-אימות, מחוץ לפרויקט המנותח) · upload/extracted/axiomstate-phase2-queryexec/tmp/demo (תוצרי דמו-הרצה, gitignored). לא שונה שום קוד-מקור של הפרויקט המנותח.
-
----
-Task ID: 2-a
-Agent: full-stack-developer
-Task: פיצול console-shell.tsx (2,647 שורות) למודולי-סעיפים עצלים (next/dynamic) — רפקטור מכני טהור, אפס שינוי-התנהגות, בתגובה ל-OOM-killer (dmesg: "Out of memory: Killed process next-server, anon-rss ~2GB"). אסור היה להרים dev-server ואסור bun run build.
-
-Work Log:
-- מיפוי מלא של המונוליט: זוהו 18 רכיבי-על בקובץ — Page (default, שורה 85) · Backdrop · Connections · RotationPanel · VaultGrid · KeyInjectCard · RestoreDrillCard · ModuleChip · TraceStepView · EmploymentStrip · AutonomyCard · AutonomySection · Agents · Bridge · Audit · ApiConsole · TrustedDevices · EmergencyZone, ועוד 4 קבועי-מודול (KIND_LABEL · BRAIN_MAKER_DEFAULT+KIND_META · HEART_TICK_MS_CLIENT) ו-SECTIONS/SectionId.
-- ניתוח-צרכנות לכל עוזר: כל עוזר-פרטי משרת סעיף אחד בלבד → לא נדרש shared.tsx כלל. הועברו לתוך קובץ-הסעיף של צרכנם היחיד: vault-grid (RotationPanel+KeyInjectCard+RestoreDrillCard+KIND_LABEL) · agents (ModuleChip+TraceStepView+BRAIN_MAKER_DEFAULT+KIND_META) · autonomy-section (AutonomyCard+EmploymentStrip+HEART_TICK_MS_CLIENT). Backdrop נשאר ב-shell (צרכן יחיד: Page — מסך-נעילה + קונסולה).
-- פיצול מכני באמצעות סקריפט-bun (חיתוך-טווחי-שורות מדויקים מהמקור, לא הקלדה-ידנית): 9 קבצים חדשים ב-src/components/console/sections/ (connections · vault-grid · agents · autonomy-section · bridge · audit · api-console · trusted-devices · emergency-zone), כל אחד "use client" + מספרי-יבוא מינימליים מ-kit/types/ui/lucide + קוד ורבטימי + named export לסעיף.
-- console-shell.tsx נכתב מחדש: 2,647→323 שורות (-88%). נשמרו: דוק-קומנט, SectionId, SECTIONS, Page() default, Backdrop, כל-חיווט-המצב. הוסרו: כל הגדרות-הסעיפים, KIND_LABEL (צרכנו היחיד KeyInjectCard עבר), יבואים מתים (useMemo/useRef/framer-motion/Textarea/Switch/רוב-האייקונים/Entry/ENDPOINTS/api/copyText/GlowCard/Scramble/LiveDot/FilterChip/SectionHead).
-- 12 צ'אנקים-עצלים: Overview · Channel · ToolsLab (ממודולים קיימים — הומרו ל-dynamic) + 9 הסעיפים החדשים — הכל dynamic(..., { ssr: false }) דרך .then(m => m.<Name>); שימושי-JSX והפרופס זהים (EmergencyZone ממשיך לקבל onAfter={refreshStatus}). LockScene נשאר יבוא-רגיל בכוונה — מסך-הנעילה חייב לצייר מיד. src/app/page.tsx לא נגע (כבר טוען-עצל את ה-shell).
-- הוכחת-ורבטים (סקריפט-אימות ביטים): גוף-כל-קובץ-חדש מול טווחי-המקור — 9/9 VERBATIM ✓ + זנב-ה-shell (SectionId→Backdrop) VERBATIM ✓. ההבדל היחיד בקוד-הריצה: "function X(" → "export function X(" ב-9 נקודות-הכניסה.
-- אימות-טיפוסים מול מכשול-סביבה: bunx tsc --noEmit מלא (כולל packages/ · tmp-analysis/ · download/ שלא ב-exclude) מתרסק OOM גם-על-הקוד-המקורי — נבדק על 2GB/2.8GB/3GB heap עד SIGKILL(137): אין לתיבת-4GB זיכרון-פנוי מספיק (~3.1GB available, chrome-אוטומציה אוכל ~0.5GB) — בעיה-סביבתית קדם-קיימת, לא-תוצר-הרפקטור. מנגנון-גיבוי: tsconfig מוקף זמני (extends מלא, include = src/** + .next/types) שרץ פעמיים — לפני (מקור) ואחרי (רפקטור): **קבוצת-השגיאות זהה ביט-ביט** (diff ריק) → הרפקטור מוסיף אפס שגיאות-טיפוס. תיקון-יחיד במהלך האימות: CheckCircle2 שנשכח ביבוא lucide של agents.tsx (נתפס ותוקן לפני-ההשוואה).
-- ממצא-כנות: קיימות 10 שגיאות-טיפוס קדם-קיימות מעבודת-סוכנים-מקבילים שלא-נדחפה (git status: עשרות קבצים חד-מקומעים) — src/lib/gate/banker.ts (7) · src/lib/axiom/runtime.ts (1) · src/components/console/tools-lab.tsx (1) — אף-אחת לא בקבצים שלי ולא טופלה כאן (מחוץ לסמכות-הרפקטור-המכני).
-- bun run lint: **0 שגיאות** (אזהרה-אחת קדם-קיימת ב-tools-lab.tsx — לא נגעתי). בדיקות-מבנה: 9/9 קבצים פותחים "use client"; אפס-אזכורי console-shell ב-sections (אין-ייבוא-מעגלי); page.tsx לא-שונה.
-
-Stage Summary:
-- המונוליט חדל להתקיים: 2,647 שורות → 323 שורות shell + 9 מודולי-סעיף (479+88+56+703+132+103+72+156+642), כל סעיף צ'אנק עצמאי שנטען רק בלחיצת-ניווט — קומפילציית-עריכה של סעיף אחד כבר לא גוררת את כל-הקונסולה, וזה-הטיפול-השורשי ב-OOM (הקונסולה-כולה כבר לא מתקמפלת כיחידה-אחת).
-- אפס שינוי-התנהגות מוכח בכלים: ורבטים ביטים 10/10 טווחים · קבוצת-שגיאות-tsc זהה לפני/אחרי · lint 0 · אותם-יבואים, אותם-הוקס, אותם-פרופסים, אותו-JSX.
-- שיתוף-פעולה: אין צורך ב-shared.tsx — כל עוזר שירת סעיף אחד בלבד ונשאר פרטי בקובץ-הסעיף; KIND_LABEL עזב את ה-shell (מוצהר-כאן כחריג-מהוגן מההוראה "keep if still used" — הוא כבר לא-בשימוש ב-shell).
-- לסוכן-הבא שיאמת בדפדפן: להרים dev-server ולעבור על 12 הסעיפים (00-11) — הציפייה: אפס שינוי ויזואלי/פונקציונלי; צ'אנקים נטענים בלחיצה-ראשונה על כל סעיף.
-- קבצים: src/components/console/console-shell.tsx (נכתב-מחדש 323 ש') · src/components/console/sections/{connections,vault-grid,agents,autonomy-section,bridge,audit,api-console,trusted-devices,emergency-zone}.tsx (חדשים) · worklog.md (רשומה זו). לא-נגע: src/app/page.tsx · tsconfig.json · kit.tsx · types.ts · overview/channel/tools-lab/lock-scene.
-
----
-Task ID: 2-b
-Agent: Z.ai Code (main)
-Task: המשך-ישר מנקודת-העצירה — סגירת מלאי-האימות של שילוב-הפרויקטים-הישנים (AxiomState + SRS + TFA), תיקוני-קצה, אימות-חי קצה-לקצה, ו-commit+push.
-
-Work Log:
-- אימות-טיפוסים מלא: tsconfig מוקף (baseUrl מוחלט + include src/** + next-env) — tsc --noEmit על 252 קבצי-src כולל banker.ts/runtime.ts/tools-lab: **0 שגיאות** (10 השגיאות מדוח 2-a תוקנו כבר בקבצים עד 09:14; אומת שוב מאפס).
-- אבחון-עומק של תמותת-שרת-ה-dev: dmesg מראה OOM-kill של next-server (2.5GB RSS, ~09:49) + הריגות-שקט של קבוצות-תהליכים בסיום קריאות-כלים; הלקח המבצעי: כל-חלון-אימות חייב להכיל שרת+בדיקות בקריאה-אחת (ה-watchdog הוחזר).
-- אימות-דפדפן (agent-browser על המארח): `/` נטען — כותרת "SAOS — Sovereign Identity Network"; הקונסולה נפתחה כ-operator (סשן-זכור) עם 12 סעיפים; סקירה חיה: secrets 239 · agents 10 · msgs 843; **מעבדה (11) מלאה**: AxiomState src seq 5065 · keys 4818 · files 253 · symbols 1903; בנקאי-TIB מוצג; שער-עקביות TFA: "241 קבצי-src, 77 routes — CLEAN (0 findings)".
-- אימות-API חי (curl בתוך חלון-חי): POST /api/code/sync → 200 {scanned:253, unchanged:253, seq:5065} (אינקרמנטלי אמיתי); GET /api/code/query?status=1 → 200 ארבעת-השורשים; GET query `rdeps(file:lib/hardening.ts)` → 200 תוצאות-תלויות מדויקות (routes+banker+runtime); GET /api/code/bundle file:lib/hardening.ts → 200 {order, cycles:[], totalBytes:14636, truncated:false} דטרמיניסטי; GET /api/gate/banker → 200 []; POST banker ללא x-banker-token → **fail-closed** "requires BANKER_TOKEN" (בדיוק-כמתוכנן).
-- heart-service (mini-service, פורט 3004) חי: GET /health → {"ok":true,"service":"heart-service"}.
-- תיקון-1: `scripts/` לא היה קיים בדיסק אף-על-פי שהוא שורש-AXIOM_ROOTS → sync החזיר 500 "root missing"; נוצר scripts/README.md (הסכם-מקומות: tools/ = מבצעי-לא-מאונדקס, scripts/ = מאונדקס-לסוכנים); אימות-חוזר: sync scripts → 200 {scanned:1, changed:1, seq:4, checkpointed:true}.
-- תיקון-2: אזהרת-eslint יחידה (directive מיותר ב-tools-lab.tsx) — הוסרה; bun run lint → **0 שגיאות, 0 אזהרות**.
-- תיקון-3 (.gitignore): /db/axiom/ · /db/banker/ (מחזיק .secret-0600!) · /db/.banker-mirror/ · /db/*.lock · /tmp-analysis/ — מצב-ריצה וסודות-מקומיים מחוץ-לגיט לנצח.
-- ביקורת-סודות-לפני-push: db/custom.db (עוקב-מראש, קונבנציה-קיימת) — סריקת-strings מחמירה: **0** תבניות-WIF ממוקדות, **0** תבניות nvapi-; הערכים אטומים (scan→seal מ-r41). adm_intent_mapping.json = אוצר-מילים של ADM (בלי-סודות).
-
-Stage Summary:
-- מלאי-האימות של "הפרויקטים-הישנים ברשת" נסגר: שלושת-הארכיונים (TFA 1-a · SRS 1-b · AxiomState 1-c) לא רק-נותחו אלא **משולבים ומאומתים-חיים**: מוח-קוד (sync/query/bundle) · בנקאי-TIB (fail-closed) · שער-עקביות (CLEAN) · hardening.ts (SignedFileStore+TIBBudget) · heart-service 24/7.
-- tsc 0 · lint 0 · 7 מולדות-API מאומתות-200 · fail-closed מאומת · אפס-סודות-בגיט.
-- הישג-משני: אבחון-תמותת-השרת עודכן (OOM-מוכח + קונבנציית-חלונות-אימות) — ישמש את כל-הסוכנים-הבאים.
-
----
-Task ID: 2-b (addendum — push-time)
-Agent: Z.ai Code (main)
-Task: רישום-תוצאות-ה-push של r42.
-
-Work Log:
-- push ראשון נדחה (origin התקדם 9 commits — דוחות create-only של סוכנים-מקבילים, docs/reports/, אפס-חפיפת-קוד).
-- טופל בשלושה-שלבים: stash -u (db/custom.db בלבד) → rebase origin/main (2/2 נקי, אפס-קונפליקטים) → stash pop.
-- push שני: 77a68f2..7d06315 main→main — **הצלחה**; origin/main = 7d06315 = r42 (88 קבצים, +6110/−2662).
-
-Stage Summary:
-- הרשת מסונכרנת: r42 (שילוב-הפרויקטים-הישנים מאומת-חי) על-גבי 9 פעימות-הדוחות של הצי; עץ-עבודה נקי מלבד db/custom.db (מצב-ריצה, מקובל).
-
----
-Task ID: 45
-Agent: main (Z.ai Code)
-Task: קליטת 2 מפתחות NVIDIA מ-upload/nvidia.txt + הפעלה להישגים אמיתיים + סקר הפרויקטים הישנים (הנחיית בעלים: "הנה" / "תבחן תעבוד ודחוף")
-
-Work Log:
-- אבחון מוות-חוזר של dev-server: dmesg — 3× OOM kill (~2.9GB RSS); מוות-שקט נוסף = חיסול צאצאי-shell בגבול קריאת-כלי. פתרון: scripts/dae.py — fork-כפול (התייתמות אל PID-1) + supervisor-loop + heap-cap 1536. השרת יציב מאז.
-- פתיחת כספת במסלול המעוצב: POST /api/gate/unlock-key עם מפתח-owner מהקבצים שהעלה הבעלים → אימות חי HIVE → hive/headcorner@owner ✓.
-- סריקת keys-batch (scan) על 98 קבצי-upload באצוות תחת תקרת 2MB → 22 מועמדים ייחודיים, כל מועמד אומת live (NIM 1-token completion / GitHub /user / נגזרות EVM+TRON).
-- תיקון מעלה (r28-distinct-slots) ב-src/app/api/gate/keys-batch/route.ts: יעדי fallback גנריים התנגשו על pub=null (רק ארנק-hex אחד ומנטרה אחת אפשריים); עכשיו hex/evm → pubkey נגזר, מנטרה → mn-fp: sha256. items חושף pubs (ציבורי).
-- אטימה: 10 סודות חדשים (1× NVIDIA חדש — השני התגלה כדדופ; 2× GitHub PAT — אחד verified כ-roshpinacare-sys; 4× EVM/hex; 3× מנטרות). WIF-ים של headcorner: דדופ תקין. כספת = 249 רשומות (178 verified).
-- הוכחות חיות: run#1 vault-rider על nvidia:openai/gpt-oss-20b — 7 צעדים, 25,792+1,068 טוקנים, 91שנ', blocked כנה (המטרה חרגה מיכולות הכלים; הבודק צדק). run#2 מכויל — DONE "עבר את שער-המעבר, כל הקריטריונים הוכחו". pool-4 משרת maker חי מהכספת החתומה.
-- סקר פרויקטים ישנים: reveal של PAT בזיכרון-בלבד → GitHub כ-roshpinacare-sys → 13 ריפו (מערכת SAOS): steem/SAOS 237MB, saos-jummper (עיגון HIVE חינם ~5,128/יום, custom_json saos-dex.anchor.v1 + תובנת RC stale-read), saos-dex (orderbook דטרמיניסטי + AMM 30bps + stateRoot), foundry (external-signer :3033), platform (Twin-Parity 401 וקטורים). ה-zip-ים המקומיים כבר נבלעו ב-r42.
-- דוק: docs/broadcast/2026-09-12-keys-r28.md; כלי-תפעול ב-scripts/ ללא סודות; אפס סודות בפלט/גיט כל-הדרך.
-
-Stage Summary:
-- pool-מוח NVIDIA = 4 מפתחות מאומתים חתומים בכספת; הרצה חיה done מוכיחה את השרשרת כולה (unlock→seal→brain→checker).
-- כספת: 249 רשומות; keys-batch תוקן ל-slots נבדלים; dev-server יציב דרך daemon כפול- fork.
-- 13 ריפו מוסקרו עם טבלת-ערך ניתן-לבליעה; מועמדי-r29: בליעת jummper, twin-parity לבודק, תיקון אי-עקביות stats/map.
-
----
 Task ID: 46-r29
 Agent: main (Z.ai Code)
 Task: r29 — בליעת jummper (שער-RC + פתיחת-מסילת-HIVE), twin-parity לבודק, סגירת אי-עקביות stats/map (המשך ישיר מ-Task 45: "תמשיך ודחוף")
@@ -2370,3 +2008,42 @@ Stage Summary:
 - מסילת-HIVE חוברה-חיה למטוס-העיגון — עוגן-רב-מסילה אמיתי (steem+hive+solana על דיגסט אחד 951a4704…), הישג-הרשת-הגדול מאז-r20; העתודה-הכלכלית: RC 3.0B מול ~387M ל-op → עד ~5,128 עיגונים/יום ב-$0 (jummper).
 - הבודק קיבל את שלושת-הדרישות שלו: ספירה-לפי-סוג (entriesByKind), התאמה stats↔map (totalAll/byStatusAll/truncated), ובודק-בלתי-תלוי (parity.twin, 37/37).
 - פתוח ל-r30: חקירת-blurt (סמכות-ריקה מה-chain), מימון-גז ל-ethereum, 429-rotation על pool-4, עיגון-jummper מתוזמן.
+
+---
+Task ID: 49
+Agent: Z.ai Code (main)
+Task: r33 — "תמשיך ודחוף" — הפעימה חוזרת-הביתה: הפקודה-האחת (h19 תוכנית סעיף 4), h21 המחזור-השישי מהשער, ריפוי-הזומבים, והלכת-SQLITE-READONLY השישית
+
+Work Log:
+- **סנכרון**: db-settle + stash → rebase מעל bf02d24 (h20 של-ה-foundry) → pop → restart. גילוי-חי: השרת-הישן-מ-14:30 לא-מת-עולם (lsof-לא-ראה-את-ה-socket-שלו) והחזיק-inode-ישן של ה-db → SQLITE_READONLY(1032) בכל-הכתיבות בעוד-הקריאות-מחזירות-נתונים-ישנים. **ההלכה-השישית: kill לפי-PID-מוצהר בלבד, לא לפי-נמל**.
+- **מישור-הפעימה (src/lib/gate/pulse.ts חדש)**: runPulseCycle — דיגסט saos/v2 אחד → steem/hive/blurt (מישור-העוגן r20) + SOLANA (memo-נושא-שורש, מפתח-ריבוני M3, אימות-כפול: status + פענוח-RPC-בלתי-תלוי) + ETHEREUM (value-encoding מוסכמת-h19/h20 + שער-גז) + TRON (מסילת-סריקה-כנה). שער-זהות-כספת לכל-מפתח; רישום-ביקורת pulse:*; תקרה-יומית; API GET/POST (מפעיל) + only לתיקון-מסילה-בודדת.
+- **h21 חי — הראשון-מהשער**: STEEM 08c92bde blk109490011 ✓ · BLURT cb12acff blk63552575 ✓ · **SOLANA 4KQNxG6A slot446193459 ✓ (ראשון-מהשער, memo-נושא-השורש-המלא 03c9cab9…f64, אומת-מ-publicnode)** · HIVE ⛔-כן (RC 44.4M/411M) · ETH ⛔-כן (0.00000386<0.0000177) · TRON ⛔-סריקה (0.19 TRX, 581/600B). 3/6 עוגן-חי + 3 שערים-מדודים, אפס-שידורים-כושלים. תיקון-חי: שער-זהות-EVM היה-אסימטרי-0x → נכשל-כן → תוקן.
+- **ריפוי-הזומבים**: ריצות-מתות-בשקט-לפני-צעד-ראשון (JSON.parse חוץ-מוגן + dispatcher .catch(()=>{}) בולע) → שורות-זומבי → מצבות-watchdog-אילמות. אבחון-שולל-את-מחלת-המוח (zai 1.6s בתוך-התהליך, nvidia מגיב, brainChat 0.5s). הריפוי: רשת-כנה-חיצונית ל-processRun (כל-כשל-מוקדם-נרשם-בשורה) + parseSpecArray מאומת + dispatcher מתעד. אימות: ריצה-אוטונומית done ב-~30s, anchor.seal החזיר-תקרה-כנה (1/1).
+- **שידור 12/12** (tools/r33-broadcast.ts): docs/broadcast/2026-09-11-pulse-home-r33.md + SAOS-PULSE-2026-09-11-H21-SIXTH-CYCLE.md בשורש (מוסכמת-h16–h20).
+- **בדיקות**: tsc 0 · lint 0 · דפדפן: אפס-שגיאות-קונסולה, פוטר-טבעי (9940=סוף-המסמך), דלת-מזהה-טביעת-אצבע (selfEcho 6 · incoming 8).
+
+Stage Summary:
+- **הפעימה-הריבונית היא-כעת-נכס-פנימי**: הצי מעגן-את-עצמו מבפנים — מטריצה-מלאה-מהשער דורשת-רק-החלטות-בעלים (HP ל-HIVE, תדלוק-ETH, הגרת-חותם-TRON — כולם-מתועדים-במספרים).
+- **אין-עוד-מוות-שקט בצי**: כל-כשל-מוקדם-מודה-בשורה-עצמה; השומר-רואה-אמת-ולא-מצבה.
+- קבצים: src/lib/gate/pulse.ts (חדש) · src/app/api/gate/pulse/route.ts (חדש) · src/lib/gate/harness/modules.ts (anchor.seal→6-מסילות) · src/lib/gate/harness/loop.ts (רשת-כנה+מפרטים) · src/lib/gate/harness/heart.ts (dispatcher-מתעד) · tools/r33-pulse.ts · tools/r33-broadcast.ts · SAOS-PULSE-2026-09-11-H21-SIXTH-CYCLE.md · docs/broadcast/2026-09-11-pulse-home-r33.md · db/custom.db · worklog.md.
+
+---
+Task ID: 47-r30
+Agent: main (Z.ai Code)
+Task: r30 — סגירת-גרף-העיגון (blurt), pool-NVIDIA אמיתי עם 429-rotation, מודול vault.anchor לתעסוקה, אבחון-הצי (המשך ישיר מ-46-r29: "תמשיך ודחוף")
+
+Work Log:
+- אבחון-blurt: השורה-בכספת זהה-ביט-ביט לסמכות-החיה (BLT8m3r…, threshold 1) — כישלון-r29 היה node-flake חולף בקריאת-הסמכות (endpoint-יחיד ל-blurt) וה-assert הסתיר את הסיבה. תיקונים: (1) הסיבה נוסעת-עם-הסירוב (cause: …) ב-anchor.ts; (2) retry אחד לקריאת-הסמכות ב-rails-server.ts (קריאה-טהורה, אפס-סיכון-שידור).
+- פעימה-חיה r30-blurt-retry: הגרף המלא 3/3 על-השרשרת סונכרני — steem 3576c757 · hive 56c40103 · blurt 45af0d03, דיגסט אחד 03c9cab9.
+- דיוק-כנות: דוק-r28 טען "pool=4" — הכספת מכילה רשומת-NIM אחת בלבד (אין nv-fp כרשומות, אין env-key). תוקן בדוק-r30 והמכונה נבנתה: nvidiaPool() קוראת כל-verified NIM row, מדלגת-כפילויות לפי-טביעת-אצבע (sha256-12), env כסלוט-נוסף כשפתוח / קריאה-בלבד כשנעול; 429 → cooldown 60שנ' למפתח + רכיבה-מיידית-על-מפתח-טרי כשיש; הישנון-הסולם כשאין-חלופה. צמיחה-אפס-קוד למפתחות-עתידיים.
+- הוכחות-pool: רגרסיה-קרה vault-locked → fallback כנה ✓ (tmp-analysis/brain_proof.ts); ריצה-חיה דרך-השער (vault-rider, מוח NIM על-ה-pool) → done, הבודק: "עבר את שער-המעבר" — 3 צעדים, 45.8שנ', 3151→797 טוקנים.
+- מודול vault.anchor (actor) — סבב-רב-מסילה ללופי-תעסוקה עם חסם-קצב 1/6שע' (GateAction check); הוכחה-חיה: throttled:true עם lastAnchorAt=14:41:18Z (תפס את עיגון-ה-pulse של אותה-דקה).
+- eslint: upload/** (פרויקט-עבר-שחולץ על-ידי סוכן-מקביל) נוסף ל-ignores — 33 רעשים-זרים; lint 0/0.
+- אבחון-הצי (במקום "49 blocked"): הלב חי (לוחות-מרווח דלקו 14:41Z; יומיים בחלונות h=13…23 + לילה h=1…4); 62 blocked = מלאי-היסטורי; 24שע': 6 done/5 blocked/8 failed; ממצא: anchor-agent נפל על 401 missing X-Token (כלי-רשת-חסר-אסימון) — רשום ל-r31; הכספת מישור-חי (249→234 בין-מדידות, הצי מסובב סטטוסים) — אינווריאנטת stats↔map נשמרת-בבנייה.
+- דוק: docs/broadcast/2026-09-12-r30-graphene-full.md; סריקת-סודות על-ה-diff לפני-push.
+
+Stage Summary:
+- מטוס-העיגון הרב-מסילה מחובר במלואו: steem+hive+blurt על-דיגסט אחד, שלושתן מאומתות-סונכרני — היעד-שהיה-חסום מאז-r20.
+- pool-המוח אמיתי ומוכן-לצמיחה: הבעלים שולח מפתחות → keys-batch אוטם → ה-pool מסתובב אוטומטית; 429-rotation כבר-קיים.
+- vault.anchor פותח עיגון-יומי-חופשי לתעסוקה-מתוזמנת (עד ~5,128/יום ב-$0) עם חסם-קצב.
+- פתוח ל-r31: אסימון-כלי-הרשת, מימון-גז ל-ethereum, schedule-row רשמי ל-עיגון-jummper, קליטת מפתחות-נוספים.

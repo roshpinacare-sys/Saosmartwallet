@@ -119,7 +119,10 @@ export async function anchorPostingKey(rail: Rail): Promise<{ wif: string; priv:
 async function assertPostingAuthority(rail: Rail, priv: PrivateKey): Promise<void> {
   const proof = await verifyPostingKeyOnChain(rail, ANCHOR_ACCOUNT, { pub33: priv.publicKey.bytes });
   if (!proof.match) {
-    throw new Error(`the vault key is not the current posting authority of ${ANCHOR_ACCOUNT}@${rail} (chain: ${proof.chainPub ?? "—"}) — fail-closed`);
+    // r30 — the cause travels with the refusal (r29 live: blurt flaked with a
+    // bare "chain: —" and the real reason — a failed account read — was hidden,
+    // costing a diagnosis round-trip).
+    throw new Error(`the vault key is not the current posting authority of ${ANCHOR_ACCOUNT}@${rail} (chain: ${proof.chainPub ?? "—"}${proof.reason ? `; cause: ${proof.reason}` : ""}) — fail-closed`);
   }
 }
 
