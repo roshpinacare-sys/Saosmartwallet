@@ -2094,3 +2094,18 @@ Stage Summary:
 - **הבנק-של-הרשת הושלם**: ביטוי-Coinomi (24 מילים) + המפתח-הראשוני-המתוקן של headcorner נאטמו; 12 מפתחות חיים-בסמכות + כל-הגיבויים-המוצפנים זמינים-לפעולה-מיידית כגוף-אחד.
 - **כנות-מול-המפתח-הראשוני**: הוא תקין-אך-חסר-סמכות (הרוטציות-שלנו הוציאו-אותו) — לא בוצע-שינוי-שרשרת; ההחלטה-בידי-המפעיל.
 - קבצים: src/lib/gate/restore-drill.ts · src/app/api/gate/restore-drill/route.ts · src/app/api/gate/key-authority/route.ts (חדש) · src/app/api/gate/import-lab/route.ts · src/app/page.tsx (כרטיס-תרגיל) · tools/r37-coinomi-scan.ts · tools/r37-key-identity.ts · tools/r37-key-recover.ts · tools/r37-key-decode.ts · tools/r37-history-scan.ts · tools/r37-history-probe.ts · tools/r37-vault-history.ts · tools/r37-annotate.mjs · tools/r37-broadcast.ts · docs/broadcast/2026-09-12-vault-restore-r37.md · prisma/schema.prisma (lastRestoreDrill) · db/custom.db · worklog.md.
+
+---
+Task ID: 53-b (r37 addendum — שורש-השתיקה של lastRestoreDrill)
+Agent: Z.ai Code (main)
+Task: אבחון וריפוי — סיכום-התרגיל לא נשמר ב-GateConfig אף-שהתרגיל עבר
+
+Work Log:
+- אבחון: POST-התרגיל מחזיר PASS אך lastRestoreDrill נשאר NULL — ה-`catch(() => {})` בעדכון-ה-GateConfig בלע כשל-שקט.
+- **שורש: לקוח-Prisma ישן** — השדה `lastRestoreDrill` נוסף-ל-schema בסבב-התקוע עם `db:push` (העמודה-חיה-ב-DB) אך `prisma generate` לא רץ בציות-אחריו → הלקוח-המקומפל זרק "שדה-לא-מוכר" על כל-כתיבה. אותו-דפוס-מוכר מ-r32 ("הלקוח-דורש-הדלקה-מחדש").
+- הריפוי: `prisma generate` → החלפת הבליעה ביומן-שגיאה-כנה (`console.error("restore-drill: persist failed…")`) → restart-שרת (פרוטוקול-ההלכה) → POST → **persisted: True (767 בייטים) · GET מחזיר pass·236/237·backup:true**.
+- הלקח-המוסדי: כל `db:push` מחייב `prisma generate` + restart — וכל `.catch(() => {})` על כתיבת-עדות הוא חור-שקט.
+
+Stage Summary:
+- תרגיל-השחזור שלם-ושומר: הפסק-העומד חי-ב-DB וב-API (GET ציבורי-לצורה, POST למפעיל), והכרטיס-בפורטל ניזון-ממנו.
+- קבצים: src/lib/gate/restore-drill.ts (יומן-כנה) · db/custom.db (סיכום-שמור) · worklog.md.

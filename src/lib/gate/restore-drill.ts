@@ -108,6 +108,6 @@ export async function runRestoreDrill(withBackup = true): Promise<DrillResult> {
     total, restored, failed: failures.length, placeholders, failures: [...failures, ...placeholderRows], seals: { count: seals.length, operatorPrimary, roles: seals.map((s) => s.role) },
     backup, verdict, meaning,
   };
-  await db.gateConfig.update({ where: { id: "gate" }, data: { lastRestoreDrill: JSON.stringify(result) } }).catch(() => {});
+  await db.gateConfig.update({ where: { id: "gate" }, data: { lastRestoreDrill: JSON.stringify(result) } }).catch((e) => console.error("restore-drill: persist failed (הסיכום לא נשמר — חובה לראות את זה):", String(e).slice(0, 300)));
   return result;
 }
