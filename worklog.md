@@ -2315,3 +2315,16 @@ Stage Summary:
 - מלאי-האימות של "הפרויקטים-הישנים ברשת" נסגר: שלושת-הארכיונים (TFA 1-a · SRS 1-b · AxiomState 1-c) לא רק-נותחו אלא **משולבים ומאומתים-חיים**: מוח-קוד (sync/query/bundle) · בנקאי-TIB (fail-closed) · שער-עקביות (CLEAN) · hardening.ts (SignedFileStore+TIBBudget) · heart-service 24/7.
 - tsc 0 · lint 0 · 7 מולדות-API מאומתות-200 · fail-closed מאומת · אפס-סודות-בגיט.
 - הישג-משני: אבחון-תמותת-השרת עודכן (OOM-מוכח + קונבנציית-חלונות-אימות) — ישמש את כל-הסוכנים-הבאים.
+
+---
+Task ID: 2-b (addendum — push-time)
+Agent: Z.ai Code (main)
+Task: רישום-תוצאות-ה-push של r42.
+
+Work Log:
+- push ראשון נדחה (origin התקדם 9 commits — דוחות create-only של סוכנים-מקבילים, docs/reports/, אפס-חפיפת-קוד).
+- טופל בשלושה-שלבים: stash -u (db/custom.db בלבד) → rebase origin/main (2/2 נקי, אפס-קונפליקטים) → stash pop.
+- push שני: 77a68f2..7d06315 main→main — **הצלחה**; origin/main = 7d06315 = r42 (88 קבצים, +6110/−2662).
+
+Stage Summary:
+- הרשת מסונכרנת: r42 (שילוב-הפרויקטים-הישנים מאומת-חי) על-גבי 9 פעימות-הדוחות של הצי; עץ-עבודה נקי מלבד db/custom.db (מצב-ריצה, מקובל).
