@@ -40,17 +40,53 @@ const ROOT = path.resolve(import.meta.dir, "..", "..");
 })();
 
 // ── singleton lock (two hearts would double-sign orders) ─────────────────────
+// r31 fix: fs.flockSync does not exist in this Bun version (live-audit catch —
+// the guard silently never guarded). Portable PID-lockfile instead: O_EXCL
+// create + PID liveness; a stale lock (dead PID) is taken over honestly.
 const LOCK = path.join(ROOT, "db", "heart-service.lock");
-try {
-  const fd = fs.openSync(LOCK, "w");
-  // Bun extends node:fs with flockSync; EXNB = exclusive, non-blocking.
-  if (!fs.flockSync(fd, "EXNB")) {
-    console.log("[heart-service] another heart holds the lock — exiting");
-    process.exit(0);
+(function acquireSingletonLock(): void {
+  const alive = (pid: number): boolean => {
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+    try { process.kill(pid, 0); return true; } catch (e) {
+      const c = e as NodeJS.ErrnoException;
+      if (c?.code === "EPERM") return true; // exists, not ours
+      return false; // ESRCH — dead
+    }
+  };
+  // r31: bun's writeFileSync(fd, …) silently wrote NOTHING (live-proven — the
+  // lock stayed 0 bytes) — write by PATH with the atomic "wx" flag instead.
+  const take = (): boolean => {
+    try {
+      fs.writeFileSync(LOCK, String(process.pid), { flag: "wx" });
+      return true;
+    } catch (e) {
+      const c = e as NodeJS.ErrnoException;
+      if (c?.code !== "EEXIST") {
+        console.log("[heart-service] lock error:", e instanceof Error ? e.message : e);
+        return true; // can't even check — better to run than to silently die
+      }
+      return false; // lock exists — liveness checked by caller
+    }
+  };
+  try {
+    if (take()) return; // fresh lock acquired
+    const raw = fs.readFileSync(LOCK, "utf8").trim();
+    const pid = Number(raw);
+    if (alive(pid)) {
+      console.log(`[heart-service] another heart holds the lock (pid ${pid}) — exiting`);
+      process.exit(0);
+    }
+    // stale lock from a dead process — take over
+    console.log(`[heart-service] stale lock (pid ${raw || "?"} dead) — taking over`);
+    fs.rmSync(LOCK);
+    if (!take()) {
+      console.log("[heart-service] lost the takeover race — exiting");
+      process.exit(0);
+    }
+  } catch (e) {
+    console.log("[heart-service] lock error:", e instanceof Error ? e.message : e);
   }
-} catch (e) {
-  console.log("[heart-service] lock error:", e instanceof Error ? e.message : e);
-}
+})();
 
 // ── boot the heart (same beat loop that used to live inside Next) ────────────
 async function main(): Promise<void> {
