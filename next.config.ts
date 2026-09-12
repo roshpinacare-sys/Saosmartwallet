@@ -51,10 +51,31 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  /* r29 OOM-DEFENSE (proven live): the sandbox OOM-kills next-server when the
+   * dev compiler + watcher balloon past the 4GB cgroup ceiling. The upload/
+   * tree (user zip extractions, ~25k files) and the local axiom/banker stores
+   * must never be watched or compiled. */
+  webpack: (config) => {
+    config.watchOptions = {
+      ...(config.watchOptions ?? {}),
+      ignored: [
+        "**/node_modules/**",
+        "**/.next/**",
+        "**/upload/**",
+        "**/db/axiom/**",
+        "**/db/banker/**",
+        "**/db/.banker-mirror/**",
+        "**/dev.log",
+        "**/tool-results/**",
+        "**/engineering/**",
+      ],
+    };
+    return config;
+  },
+  reactStrictMode: false,
   /* NET-AUDIT round 2: type errors were driven to 0 (tsc --noEmit, excluding
    * examples/skills) — the safety mask comes OFF so future type regressions
    * fail the build instead of shipping silently. */
-  reactStrictMode: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

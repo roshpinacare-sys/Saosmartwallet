@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/steem/trade/cancel — DEX order-cancel builder (M3+, lifecycle)
  * =========================================================================

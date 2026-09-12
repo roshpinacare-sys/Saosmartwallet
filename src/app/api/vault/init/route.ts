@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/init — first-boot ceremony (M2)
  * ===============================================

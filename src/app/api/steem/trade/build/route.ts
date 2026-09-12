@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/steem/trade/build — DEX terminal order builder (M1, refactored 4-a)
  * ===========================================================================

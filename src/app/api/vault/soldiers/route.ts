@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/soldiers — bulk soldier permission upsert (M2)
  * ==============================================================

@@ -1,0 +1,13 @@
+{
+  "name": "heart-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SOVEREIGN GATE Heart — the 24/7 autonomy loop as an independent process (r29). Survives portal restarts and OOM cycles; writes pulses/leases/orders to the shared SQLite via Prisma.",
+  "scripts": {
+    "dev": "bun --hot index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6",
+    "z-ai-web-dev-sdk": "latest"
+  }
+}

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/sign-cancel — DEX order cancel (M3+, money path)
  * ================================================================

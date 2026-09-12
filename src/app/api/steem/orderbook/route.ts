@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/steem/orderbook?limit=25 — live STEEM/SBD order book.
  */

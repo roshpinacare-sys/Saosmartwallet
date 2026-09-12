@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/vault/audit — the tamper-evident trail (M2)
  * ====================================================

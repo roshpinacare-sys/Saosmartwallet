@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/vault/status — secret-free vault snapshot (M2)
  * =======================================================

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * PUT /api/vault/deadman — dead-man switch configuration (M2)
  * ===========================================================

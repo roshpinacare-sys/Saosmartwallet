@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * /api/vault/policy — the policy rule surface (M2)
  * ================================================
