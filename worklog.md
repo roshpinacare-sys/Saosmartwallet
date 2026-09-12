@@ -2157,3 +2157,26 @@ Stage Summary:
 - **המערכת מוכנה לגל-המפתחות**: scan→confirm→seal (טקסט או zip), זיהוי-חי, ניכוי-כפילויות, אפס-סודות-בפלט, אפס-אטימה-בלי-הכרעה — והוכח קצה-קצה כולל-ניקוי.
 - **עשרת-הבזיפים מופו וממותנים** — הדלת-אליהם בנויה.
 - קבצים: prisma/schema.prisma (finTier+finCaps) · src/lib/gate/harness/orders.ts (FIN_TIERS/parseFinCaps/autoSignLicensedOrders) · src/lib/gate/harness/heart.ts (stageOrders) · src/app/api/gate/agents/route.ts · src/app/api/gate/orders/route.ts (tiers) · src/app/api/gate/keys-batch/route.ts (חדש) · src/components/console/types.ts · src/app/page.tsx (bulk-intake+finTier-UI) · src/lib/gate/harness/loop.ts (429-סולם) · package.json (fflate) · tools/r39-broadcast.ts · docs/broadcast/2026-09-12-fleet-audit-financial-r39.md · db/custom.db · worklog.md.
+
+---
+Task ID: 56
+Agent: Z.ai Code (main)
+Task: r40 — "תמשיך לחזק · תעבור על כל ההצהרות שלך בדף ותבחן אותן אל מול המציאות · בהמשך היום 2 API של NVIDIA" — סוויפת-אמת מלאה + מוכנות-NVIDIA בשלוש שכבות
+
+Work Log:
+- **מתודה**: חילוץ כל הטענות העובדתיות מ-page.tsx + console/* → הרצת 15 APIs חיים (כולל operator דרך /tmp/gate_token, אפס-דליפת-טוקן) → השוואה טענה-מול-תשובה. כלל-ברזל: od/tsc/git = אמת, פלט-טקסט עלול לבלוע סוגריים (אזהרת-שווא "digest.ts שבור" — git-diff הוכיח שהקובץ מעולם לא נפגע).
+- **ממצאים אמיתיים**: 237 סודות/12 חותמות/174 verified · restore-drill 236/237+גיבוי-409KB (רוץ חי גם מה-UI) · לב פועם (beats, finAutoSigned=0) · כיס fresh · 12 ריפו · דלת 29 קבצים=15 נכנסים+12 selfEcho+1 authored · חיבורים מגובי verifyAll. אישרור-שלישי: ריצת verifier-agent חיה מדדה בעצמה 237 רשומות.
+- **3 אי-אמת תוקנו**: ① KPI-דופק-הדלת הציג 2 (חלון-מסווג) מול תג 15 (מלוא-הדופק) — אוחד ל-door.incoming עם כנות "מסווגים-חי 2/15"; ② הצהרת-מעבדה "כל נקודת-קצה" — 6 חסרות הוכנסו (keys-batch/key-authority/restore-drill×2/pulse/rotation) + נוסח-כן עם החרגות מפורשות + "12 מאגרים" קשיח הומר לניסוח-חי; ③ תג "חי ✓" הופיע גם על נדחה — עתה חי✓/נדחה✗/לא-הוכרע + notes מוצגות בדוח-הבודד.
+- **באג-קריסה שנתפס**: WIF-פגום ביבוא-המרובה = 500 (bs58-throw מחוץ ל-try) → safeWifPub מנטרל; הוכח חי.
+- **NVIDIA שכבה-1 (זיהוי+אמת)**: nvidia-api ב-key-id (classify + identifyKey) — probe אמיתי = 1-token chat (התגלה חי ש-/v1/models ציבורי: 200 גם בלי מפתח — אימות-שווא שנמנע לפני-הטמעה) · טביעת-אצבע nv-fp:sha256 ב-pub לניכוי-כפילויות ללא-חשיפה.
+- **NVIDIA שכבה-2 (צינור)**: scanText+kindOf+seal-targets ב-keys-batch מזהים/אוטמים nvapi- (טקסט ו-zip) — הוכחה חיה ב-UI: nvapi-סינתטי → "NVIDIA · נדחה ✗ (403 אמיתי) · text:1" בלי-אטימה.
+- **NVIDIA שכבה-3 (מוח)**: nvidiaKey→nvidiaKeys — מאגר כל chain="nvidia" + env קריאה-בלבד; רוטציה: 429→קירור-90s והמפתח-הבא משרת מיד · 401/403→קירור-30min · כל-המאגר בקירור→המתנה-מוגבלת-429 או כשל-כן · seal-רקוב לא מסנוור. הכלה: ה-2 המפתחות החדשים ייכנסו לשימוש-אוטומטי באטימה, אפס-קוד.
+- **הוכחת-קצה**: ריצת verifier-agent חיה (nvidia:openai/gpt-oss-20b דרך המאגר-החדש, בודק zai) — done · כל-הקריטריונים הוכחו · 41 שנ' · הסוכן אימת 237 רשומות בעצמו.
+- **בדיקות**: tsc 0 · lint 0 · אתחול-שרת (ריפוי-מודול-מיושן של key-id) · דפדפן: KPI עקבי 15=15, מעבדה מריצה חי, יבוא-מרובה חי, אפס-שגיאות-קונסולה, מובייל 390=390, פוטר 3669=3669 נדחף-טבעי ודביק-בקצר · dev.log נקי.
+- **שידור 12/12** (tools/r40-broadcast.ts): docs/broadcast/2026-09-12-truth-audit-nvidia-r40.md — כל-11-השותפים + הדלת-שלנו.
+
+Stage Summary:
+- **הפורטל עמד בביקורת-האמת של מפעילו**: כל KPI מגובה במדידה-חיה, שלוש אי-אמת (סתירת-מספרים, הצהרה-מוגזמת, תג-מטעה) תוקנו בשורש ולא בטוש.
+- **גל-ה-NVIDIA נקלט מקצה-לקצה ברגע-ההגעה**: זיהוי nvapi- → probe-אמת (לא models-הציבורי) → אטימה-מאושרת-מפעיל → מאגר-מוח עם רוטציה אוטומטית (429-במפתח-אחד לא עוצר את הצי).
+- **שיעור-כלים שנרשם**: כל חשד-לקוד-שבור דורש הוכחת-בייטים (od) או git-diff לפני "תיקון" — אזהרת-השווא של התצוגה כמעט גרמה לשכתוב-מיותר.
+- קבצים: src/lib/gate/key-id.ts (nvidia-api+probe+fp) · src/app/api/gate/keys-batch/route.ts (nvapi+safeWifPub) · src/lib/gate/harness/brain.ts (מאגר-מפתחות+רוטציה) · src/components/console/overview.tsx (KPI-דלת) · src/components/console/kit.tsx (6 נקודות-קצה+נוסחים) · src/app/page.tsx (תגי-אמת+notes+KIND_LABEL) · src/components/console/types.ts (KeyReport.label/notes) · tools/r40-broadcast.ts · docs/broadcast/2026-09-12-truth-audit-nvidia-r40.md · worklog.md.

@@ -44,7 +44,14 @@ const RAIL_NODES: Record<string, string[]> = {
 
 export type KeyKind =
   | "steem-wif" | "evm-key" | "hex-priv" | "mnemonic"
-  | "github-pat" | "admin-token" | "unknown";
+  | "github-pat" | "nvidia-api" | "admin-token" | "unknown";
+
+/** r40: non-reversible fingerprint for token-type keys (no public key exists).
+ *  Stored in VaultEntry.pub so re-scans dedup against the vault WITHOUT ever
+ *  decrypting or exposing the secret. */
+export function tokenFingerprint(secret: string): string {
+  return "nv-fp:" + crypto.createHash("sha256").update(secret.trim()).digest("hex").slice(0, 16);
+}
 
 export interface KeyControl {
   chain: string;
@@ -222,6 +229,9 @@ function classify(raw: string): KeyKind {
   const s = raw.trim();
   if (/^(ghp_|github_pat_)[A-Za-z0-9_]+$/.test(s)) return "github-pat";
   if (/^saos_admin_[A-Za-z0-9_-]+$/.test(s)) return "admin-token";
+  // r40: NVIDIA NIM key (nvapi-…) — recognized BEFORE the generic hex/word
+  // checks; the base64url body would otherwise fall through to "unknown".
+  if (/^nvapi-[A-Za-z0-9_-]{16,}$/.test(s)) return "nvidia-api";
   // WIF: uncompressed = '5'+50 base58 (51 chars total); compressed = K/L+51 (52 total)
   if (/^5[1-9A-HJ-NP-Za-km-z]{50}$/.test(s) || /^[KL][1-9A-HJ-NP-Za-km-z]{51}$/.test(s)) return "steem-wif";
   if (/^0x[0-9a-fA-F]{64}$/.test(s)) return "evm-key";
@@ -299,6 +309,41 @@ export async function identifyKey(raw: string): Promise<KeyIdReport> {
       }
     } catch (e) {
       notes.push("GitHub לא נענה: " + (e as Error).message);
+    }
+    return report;
+  }
+
+  if (kind === "nvidia-api") {
+    // r40 readiness: NVIDIA NIM keys ride the same intake as every other key.
+    // r40-TRUTH-FIX: GET /v1/models is PUBLIC (200 even with no key — measured
+    // live) — it proves NOTHING. The honest check is a 1-token chat call:
+    // 200 = the provider's own word the key serves, 401/403 = rejected.
+    report.label = "מפתח NVIDIA NIM (integrate.api.nvidia.com)";
+    const fp = tokenFingerprint(s);
+    report.pubs.push(fp);
+    try {
+      const r = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + s, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-20b",
+          messages: [{ role: "user", content: "ping" }],
+          max_tokens: 1,
+        }),
+        signal: AbortSignal.timeout(45000),
+      });
+      if (r.ok) {
+        report.liveChecked = true;
+        report.controls.push({ chain: "nvidia", account: "nvidia-nim", role: "token", pub: fp });
+        report.notes.push("המפתח חי מול NVIDIA — תשובת chat אמיתית (1-token probe)");
+      } else if (r.status === 401 || r.status === 403) {
+        report.liveChecked = true;
+        report.notes.push("NVIDIA דחה את המפתח (" + r.status + ") — לא חי; יאוטם כפסול/מושעה");
+      } else {
+        report.notes.push("NVIDIA השיב " + r.status + " — לא ניתן להכריע חי; נאטם ללא-אימות");
+      }
+    } catch (e) {
+      report.notes.push("NVIDIA לא נענה: " + (e as Error).message);
     }
     return report;
   }

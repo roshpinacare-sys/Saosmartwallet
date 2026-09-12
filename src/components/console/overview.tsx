@@ -56,7 +56,8 @@ export function Overview({ status }: { status: GateStatus }) {
   const rateColor = rate === null ? "text-zinc-500" : rate >= 70 ? "text-emerald-400" : rate >= 40 ? "text-amber-400" : "text-rose-400";
 
   const door = dig?.door;
-  const doorIncoming = door?.checked ? door.voices.filter((v) => v.ok && !v.selfEcho).length : null;
+  const doorIncoming = door?.checked ? door.incoming : null; // r40: the FULL door count — the fetched voices are only the bounded window
+  const doorClassified = door?.checked ? door.voices.filter((v) => v.ok && !v.selfEcho).length : null;
   const doorNew = door?.checked ? door.voices.filter((v) => v.ok && !v.selfEcho && v.isNew).length : 0;
   const pendingAsks = door?.checked ? door.voices.filter((v) => v.ok && !v.selfEcho).reduce((n, v) => n + v.asks.length, 0) : null;
   const anchorsOk = sit?.anchors.ok ? sit.anchors.latest.filter((a) => true) : [];
@@ -67,7 +68,7 @@ export function Overview({ status }: { status: GateStatus }) {
     { label: "הודעות-פיקוד", v: status.counts.messages, sub: "גשר חי · SSE" },
     { label: "הצלחת-הצי 24h", v: rate === null ? "–" : `${rate}%`, sub: emp ? `${emp.done} done · ${emp.blocked} blocked · ${emp.failed} failed` : "אין ריצות ב-24h", cls: rateColor },
     { label: "נזיל STEEM", v: steemRail?.ok ? steemRail.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 }) : "כשל כן", sub: steemRail?.ok ? `${steemRail.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} SBD חוב` : "מדידה נכשלה", cls: steemRail?.ok ? "text-emerald-300" : "text-rose-300/80" },
-    { label: "דופק-הדלת", v: doorIncoming === null ? "–" : doorIncoming, sub: doorNew > 0 ? `${doorNew} חדש · ${pendingAsks ?? 0} שאלות-פתוחות` : `${pendingAsks ?? 0} שאלות-פתוחות`, cls: doorNew > 0 ? "text-amber-300" : undefined },
+    { label: "דופק-הדלת", v: doorIncoming === null ? "–" : doorIncoming, sub: `${doorNew > 0 ? `${doorNew} חדש · ` : ""}${pendingAsks ?? 0} שאלות-פתוחות · מסווגים-חי ${doorClassified ?? 0}/${doorIncoming ?? 0}`, cls: doorNew > 0 ? "text-amber-300" : undefined },
   ];
 
   return (
@@ -205,7 +206,7 @@ export function Overview({ status }: { status: GateStatus }) {
                   )}
                 </div>
                 <p className="mt-2 text-[10px] text-zinc-600">
-                  {pendingAsks ?? 0} שאלות-פתוחות שהוצבו-לנו · {(door.selfEchoVoices ?? 0)} 🪞 הד-שידור-שלנו (זוהה בטביעת-אצבע)
+                  {pendingAsks ?? 0} שאלות-פתוחות שהוצבו-לנו (מסווגים-חי {doorClassified ?? 0} מה-{door.incoming}) · {(door.selfEchoVoices ?? 0)} 🪞 הד-שידור-שלנו (זוהה בטביעת-אצבע)
                   {" "}· הפירוט המלא וטיוטת-התשובה — בסעיף ערוץ
                 </p>
               </>

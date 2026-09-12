@@ -46,6 +46,18 @@ import { LockScene } from "@/components/console/lock-scene";
 import { Overview } from "@/components/console/overview";
 import { Channel } from "@/components/console/channel";
 
+/* r40: friendly kind labels for the intake reports (raw kinds stay in the payload) */
+const KIND_LABEL: Record<string, string> = {
+  "steem-wif": "WIF",
+  "evm-key": "EVM",
+  "hex-priv": "HEX",
+  "mnemonic": "מנשק",
+  "github-pat": "PAT",
+  "nvidia-api": "NVIDIA",
+  "admin-token": "ADMIN",
+  "unknown": "לא-מזוהה",
+};
+
 /* ══════════════════════════ console navigation (r38) ══════════════════════════ */
 
 type SectionId =
@@ -921,8 +933,10 @@ function KeyInjectCard() {
                           />
                         ) : <span className="text-[10px] text-zinc-600 w-4 text-center" title={`כפילות של ${it.dupOf}`}>=</span>}
                         <span className="font-mono text-[10px] text-zinc-400" dir="ltr">{it.preview}</span>
-                        <Badge variant="outline" className="text-[9px] font-mono text-zinc-400 border-zinc-700" dir="ltr">{it.kind}</Badge>
-                        {it.liveChecked && <Badge variant="outline" className="text-[9px] text-emerald-300 border-emerald-500/40">חי ✓</Badge>}
+                        <Badge variant="outline" className="text-[9px] font-mono text-zinc-400 border-zinc-700" dir="ltr">{KIND_LABEL[it.kind] ?? it.kind}</Badge>
+                        {it.liveChecked && it.controls.length > 0 && <Badge variant="outline" className="text-[9px] text-emerald-300 border-emerald-500/40">חי ✓</Badge>}
+                        {it.liveChecked && it.controls.length === 0 && <Badge variant="outline" className="text-[9px] text-rose-300 border-rose-500/40">נדחה ✗</Badge>}
+                        {!it.liveChecked && it.notes.length > 0 && <Badge variant="outline" className="text-[9px] text-amber-300 border-amber-500/40">לא-הוכרע</Badge>}
                         {it.controls.slice(0, 2).map((c, i) => (
                           <Badge key={i} variant="outline" className="text-[9px] font-mono text-sky-300 border-sky-500/40" dir="ltr">{c.chain}{c.account ? `·${c.account}` : ""}@{c.role}</Badge>
                         ))}
@@ -942,8 +956,14 @@ function KeyInjectCard() {
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/80 p-4 text-xs space-y-2"
             >
-              <p><span className="text-zinc-500">סוג:</span> <span className="font-mono text-emerald-400 font-bold">{report.kind}</span>
-                <span className="text-zinc-600"> · אימות-חי: {report.liveChecked ? "כן ✓" : "לא"}</span></p>
+              <p><span className="text-zinc-500">סוג:</span> <span className="font-mono text-emerald-400 font-bold">{KIND_LABEL[report.kind] ?? report.kind}</span>
+                <span className="text-zinc-600"> · אימות-חי: {report.liveChecked ? "כן ✓" : "לא"}{report.liveChecked && report.controls.length === 0 ? " (המפתח נדחה/לא-שולט — ראה הערות)" : ""}</span></p>
+              {report.label && <p className="text-zinc-400">{report.label}</p>}
+              {(report.notes?.length ?? 0) > 0 && (
+                <ul className="text-[11px] text-zinc-500 space-y-0.5">
+                  {report.notes?.map((n, i) => <li key={i}>· {n}</li>)}
+                </ul>
+              )}
               {report.controls.length > 0 && (
                 <p className="break-all leading-relaxed">
                   <span className="text-zinc-500">שליטה נוכחית:</span>{" "}
@@ -2361,7 +2381,7 @@ function ApiConsole() {
 
   return (
     <section className="py-14">
-      <SectionHead num="08" title="מסוף-API חי" sub="כל נקודת-קצה שקיימת בקוד — מוכנה להרצה אמיתית. הטוקן מצורף אוטומטית." />
+      <SectionHead num="08" title="מסוף-API חי" sub="נקודות-הקצה להרצה חיה — הטוקן מצורף אוטומטית. זרמי-האימות, האיפוס והנעילה מוחרגים בכוונה מהמעבדה." />
       <div className="grid gap-4 lg:grid-cols-5">
         <motion.div {...rise} className="lg:col-span-2">
           <GlowCard className="p-2 max-h-[60vh] overflow-y-auto scroll-thin">

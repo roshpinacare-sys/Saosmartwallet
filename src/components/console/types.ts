@@ -89,7 +89,7 @@ export interface DoorVoiceRow { file: string; ok: boolean; error?: string; bytes
 export interface RootVoiceRow { file: string; ok: boolean; error?: string; hash8: string; looksLikeReport: boolean; isNew: boolean; headline: string; mentionsUs: boolean }
 export interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; selfEchoVoices?: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
 export interface KeyReport {
-  kind: string; liveChecked: boolean;
+  kind: string; liveChecked: boolean; label?: string; notes?: string[];
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
   pubs: string[];
 }
