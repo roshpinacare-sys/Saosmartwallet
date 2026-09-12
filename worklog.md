@@ -2180,3 +2180,23 @@ Stage Summary:
 - **גל-ה-NVIDIA נקלט מקצה-לקצה ברגע-ההגעה**: זיהוי nvapi- → probe-אמת (לא models-הציבורי) → אטימה-מאושרת-מפעיל → מאגר-מוח עם רוטציה אוטומטית (429-במפתח-אחד לא עוצר את הצי).
 - **שיעור-כלים שנרשם**: כל חשד-לקוד-שבור דורש הוכחת-בייטים (od) או git-diff לפני "תיקון" — אזהרת-השווא של התצוגה כמעט גרמה לשכתוב-מיותר.
 - קבצים: src/lib/gate/key-id.ts (nvidia-api+probe+fp) · src/app/api/gate/keys-batch/route.ts (nvapi+safeWifPub) · src/lib/gate/harness/brain.ts (מאגר-מפתחות+רוטציה) · src/components/console/overview.tsx (KPI-דלת) · src/components/console/kit.tsx (6 נקודות-קצה+נוסחים) · src/app/page.tsx (תגי-אמת+notes+KIND_LABEL) · src/components/console/types.ts (KeyReport.label/notes) · tools/r40-broadcast.ts · docs/broadcast/2026-09-12-truth-audit-nvidia-r40.md · worklog.md.
+
+---
+Task ID: 57
+Agent: Z.ai Code (main)
+Task: r41 — "יש פה 2 תחשוב טוב טוב איך להשתמש בהם להישגים אמיתיים: בניה, אבטחה, כלכלה, פיתוח" — קליטת 2 מפתחות-NVIDIA חיים + שיגור משימות-הישג + הכרעת ממצא-האבטחה
+
+Work Log:
+- **קליטה מאובטחת**: upload/nvidia.txt זרם דרך jq ישר אל keys-batch (אפס-מפתחות-בפלט/ביומן); scan: 2 מועמדים nvidia-api, כל אחד probe חי 1-token מול integrate.api.nvidia.com → שניהם חיים, dupOf=null; seal: take=[2 hashes] → 2 נאטמו `status: verified` עם nv-fp ב-pub. אפס-קוד — הזרימה של r39/r40 עבדה כמתוכנן.
+- **המאגר=3**: 1 תשתית (env-sealed) + 2 חדשים; הרוטציה של r40 קיבלה עומק ×3. הוכחת-קצה: ריצת harness-rider (nvidia:openai/gpt-oss-20b + checker zai) הסתיימה done דקות אחרי האטימה ומדדה בעצמה 239 סודות/176 verified — הריצה ראתה את המפתחות בזמן-אמת.
+- **probe מודל**: ריצת-בדיקה קצרה עם brain `nvidia:deepseek-ai/deepseek-v4-flash-0731` דרך המאגר → done — גם המודל-השני בקטלוג משרת בפועל (הצהרת-קטלוג אומתה).
+- **5 משימות-הישג** שוגרו לצי: כלכלה (market-rider) → done: תדריך עם מספרי-אוצר אמיתיים + 3 המלצות + דיווח לגשר; אבטחה (verifier-agent) → דוח 3 ממצאים מדורגים עם הוכחות-מה-trace (45 סודות-לא-אומתו, חוסר-עיגון saos.id.v1, הזזת-3-שניות) + ריצת-השלמה שדיווחה לגשר → done; בניה/פיתוח (zai-code) → הצעה אמיתית "אימות מלא של 35 סודות שלא אומתו" שהוכרעה והושקה לריצה; חוק הצעה-פתוחה-אחת נאכף (מערכת-ההצעות עובדת כמתוכנן); בודק-עצמאי פסל ריצה שניסתה לחרוג מסמכות-הכלים — גבולות-הסמכות חיים.
+- **הכרעת ממצא-האבטחה**: סריקת inventory חיה: total 239 · verified 161 · failed 45 · rotatedOut 11 · noLive 33; הצלבה ידנית: 34=דור-ישן (11 חשבונות steem × active/memo/posting + primary-original), pubs שונים מהסט-החי, מחוץ-ל-authorities בכל-3-הרשתות; לכל אחד מ-11 החשבונות סט מאומת-חי מלא (owner/active/posting/memo) → **אפס-אובדן-שליטה**; סיווג-מחדש עובדתי 34 רשומות unverified→rotated-out עם ראיה בהערה (הפיך, אפס-מחיקה) + רישום לגשר; תוצאה: failed=45 · rotatedOut=45 → **realFailed=0**.
+- **תיקוני-אמת בדף**: ① דלת-קדמית — כנות "דגימת X מתוך Y (חלון-קריאה מוגבל, חוק-האפס-עומס)" על הפער בין הספירה (15) לרשימה (3); ② "176 verified" → "verified (status-col)" לבידול סטטוס-DB מאימות-חי (161 עברו · 0 נכשלו · 45 היסטוריה) במקטע-החיבורים.
+- **בדיקות**: lint 0 · dev.log נקי (רק שאילתות-לב) · tsc דרך-lint · שידור 12/12 (tools/r41-broadcast.ts) → docs/broadcast/2026-09-12-nvidia-live-fleet-security-r41.md.
+
+Stage Summary:
+- **הבטחה של r40 התממשת בדקה-שהגיעה**: שני מפתחות-NVIDIA אמיתיים נכנסו לעבודה מלאה בלי שורת-קוד — זיהוי→probe→אטימה→מאגר→רוטציה, והצי כבר עבד עליהם באותה ריצה.
+- **המוח הפיק הישגים**: תדריך-כלכלי עם 3 המלצות, דוח-אבטחה עם ממצאים-מדורגים, והצעת-בניה שהושקה — כל-אחד עם ראיות-כלים ב-trace, והבודק-העצמאי שומר על-הכנות.
+- **ממצא-האבטחה הוכרע בראיה**: 34 מפתחות-דור-ישן לא-מסוכנים (שליטה-מלאה בכל-החשבונות), המספרים-האמת עכשיו עקביים קצה-קצה: 161 חיים-עוברים · 0 נכשלו-אמיתי · 45 היסטוריה.
+- קבצים: src/app/page.tsx (2 תיקוני-אמת) · docs/broadcast/2026-09-12-nvidia-live-fleet-security-r41.md · tools/r41-broadcast.ts · db/custom.db (סיווג-מחדש 34 רשומות + הודעת-גשר) · worklog.md.
