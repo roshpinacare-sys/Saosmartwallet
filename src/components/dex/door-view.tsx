@@ -11,7 +11,7 @@ import {
   ShieldCheck, RefreshCw, Droplets, ExternalLink,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { usePoll, dxPost, TokenMedallion, fmtInt, fmtAgoMs } from './common';
+import { usePoll, dxPost, TokenMedallion, fmtInt, fmtAgoMs, StaleChip } from './common';
 
 // ── engine contract (mirror of /api/dex/door) ──
 type PegRow = {
@@ -126,11 +126,8 @@ export function DoorView({ onNeedAuth, onNavigate, onDone }: {
         </button>
       </div>
 
-      {stale && (
-        <div className="dx-chip px-3 py-1.5 text-[10.5px] text-[color:var(--amber)] w-fit" role="status">
-          נתוני-הדלת ישנים — הרענון נכשל זמנית
-        </div>
-      )}
+      {/* FIX(70-a ·9): היה-שבב-ישן-משוכפל — עתה StaleChip הקנוני מ-common */}
+      <StaleChip show={stale} />
 
       {/* oracle truth strip */}
       <div className="dx-card p-4" data-testid="oracle-strip">

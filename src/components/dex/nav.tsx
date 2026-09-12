@@ -34,6 +34,14 @@ export const EXCHANGE_NAV: Array<{ id: ViewId; label: string; icon: React.Compon
   { id: 'anchors', label: 'עיגונים', icon: Anchor },
 ];
 
+// FIX(70-a ·1): פיזור-עומס הכותרת — 9 בליטות-בשורה-אחת גלשו בכל-רוחב-ביניים
+// (768–1300px) וחתכו את כפתור-ההתחברות ב-RTL. מעתה: 5 ראשיות-בלבד כבליטות,
+// השאר מקופלות בתפריט-הפלטפורמה ונחשפות-כבליטות רק מ-xl. הרשימה-המלאה
+// נשארת EXCHANGE_NAV (המובייל והמצבים-האחרים משתמשים בה).
+export const PRIMARY_NAV = ['swap', 'pro', 'pools', 'portfolio', 'anchors'] as const;
+export const EXCHANGE_PRIMARY = EXCHANGE_NAV.filter(v => (PRIMARY_NAV as readonly string[]).includes(v.id));
+export const EXCHANGE_SECONDARY = EXCHANGE_NAV.filter(v => !(PRIMARY_NAV as readonly string[]).includes(v.id));
+
 export const PLATFORM_NAV: Array<{ id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: 'vault', label: 'כספת מפתחות', icon: Fingerprint },
   { id: 'towers', label: 'מגדלי SAOS', icon: Landmark },
@@ -41,6 +49,10 @@ export const PLATFORM_NAV: Array<{ id: ViewId; label: string; icon: React.Compon
   { id: 'audit', label: 'יומן ביקורת', icon: ScrollText },
   { id: 'settings', label: 'הגדרות', icon: Settings2 },
 ];
+
+// כל-התצוגות — מקור-אמת למצב-פעיל של "עוד" במובייל (בלי-מערך-קשיח)
+export const MORE_SHEET_IDS: Array<ViewId> = [...EXCHANGE_NAV.map(v => v.id), ...PLATFORM_NAV.map(v => v.id)]
+  .filter((id, i, arr) => arr.indexOf(id) === i);
 
 export function TopNav({ view, onNavigate, status, world, online, relay, authed, onLogin, onLogout }: {
   view: ViewId;
@@ -55,36 +67,43 @@ export function TopNav({ view, onNavigate, status, world, online, relay, authed,
 }) {
   return (
     <header className="sticky top-0 z-40 hidden md:block bg-[color:var(--canvas)]/85 backdrop-blur-md border-b border-[color:var(--line)]">
-      <div className="max-w-[1400px] mx-auto px-4 h-16 flex items-center gap-4">
+      <div className="max-w-[1400px] mx-auto px-4 h-16 flex items-center gap-3 min-w-0">
         {/* brand — RTL start */}
         <button onClick={() => onNavigate('swap')} className="flex items-center gap-2.5 shrink-0" aria-label="SAOS DEX — בית">
           <span className="w-8 h-8 rounded-full bg-[color:var(--pink)] text-white font-black text-sm flex items-center justify-center shadow-[0_0_24px_-4px_rgba(255,55,199,0.7)]">S</span>
           <span className="hidden sm:block font-extrabold text-[15px] tracking-tight">SAOS DEX</span>
         </button>
 
-        {/* exchange nav */}
-        <nav className="hidden md:flex items-center gap-1" aria-label="ניווט בורסה">
-          {EXCHANGE_NAV.map(v => {
-            const Icon = v.icon;
-            return (
-              <button
-                key={v.id} onClick={() => onNavigate(v.id)}
-                aria-current={view === v.id ? 'page' : undefined}
-                className={`dx-nav h-9 px-3.5 text-[13px] font-medium flex items-center gap-1.5 ${view === v.id ? 'dx-nav-active' : ''}`}
-              >
-                <Icon className="w-[15px] h-[15px]" /> {v.label}
-              </button>
-            );
-          })}
+        {/* exchange nav — FIX(70-a ·2): חוסן-גלישה. הקונטיינר מתכווץ-וגולל במקום
+            למשוך-את-העמוד-כולו; הזהות-וכדור-השרשרת לעולם לא נחתכים (shrink-0). */}
+        <nav className="hidden md:flex items-center gap-1 min-w-0 overflow-x-auto scroll-slim" aria-label="ניווט בורסה">
+          {EXCHANGE_PRIMARY.map(v => (
+            <NavPill key={v.id} v={v} view={view} onNavigate={onNavigate} />
+          ))}
+          {/* משניות — בליטות רק ברוחב-xl; מתחת-כך הן חיות בתפריט-הפלטפורמה */}
+          {EXCHANGE_SECONDARY.map(v => (
+            <NavPill key={v.id} v={v} view={view} onNavigate={onNavigate} className="hidden xl:flex" />
+          ))}
         </nav>
 
-        {/* platform dropdown */}
+        {/* platform dropdown — מקבל גם את בליטות-המשנה מתחת-ל-xl */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="hidden md:flex dx-nav h-9 px-3.5 text-[13px] font-medium items-center gap-1.5 outline-none">
+          <DropdownMenuTrigger className="hidden md:flex dx-nav h-9 px-3.5 text-[13px] font-medium items-center gap-1.5 outline-none shrink-0">
             <Menu className="w-[15px] h-[15px]" /> פלטפורמה
             <ChevronDown className="w-3.5 h-3.5 opacity-60" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="dx-card border-[color:var(--line)] rounded-2xl">
+            <DropdownMenuLabel className="text-[11px] text-[color:var(--text-3)]">בורסה · תצוגות-נוספות</DropdownMenuLabel>
+            {EXCHANGE_SECONDARY.map(v => {
+              const Icon = v.icon;
+              return (
+                <DropdownMenuItem key={v.id} onClick={() => onNavigate(v.id)}
+                  className="gap-2.5 py-2.5 rounded-xl cursor-pointer text-[13px] xl:hidden">
+                  <Icon className="w-4 h-4 text-[color:var(--text-2)]" /> {v.label}
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator className="bg-[color:var(--line)] xl:hidden" />
             <DropdownMenuLabel className="text-[11px] text-[color:var(--text-3)]">מרכז-השליטה הריבוני</DropdownMenuLabel>
             {PLATFORM_NAV.map(v => {
               const Icon = v.icon;
@@ -99,12 +118,12 @@ export function TopNav({ view, onNavigate, status, world, online, relay, authed,
         </DropdownMenu>
 
         {/* spacer */}
-        <div className="flex-1" />
+        <div className="flex-1 min-w-2" />
 
         {/* chain status pill */}
         <button
           onClick={() => onNavigate('anchors')}
-          className="dx-chip h-9 px-3 hidden sm:flex items-center gap-2 text-[11px] hover:border-[color:var(--line-strong)] transition-colors"
+          className="dx-chip h-9 px-3 hidden sm:flex shrink-0 items-center gap-2 text-[11px] hover:border-[color:var(--line-strong)] transition-colors"
           title="גובה-השרשרת החי · חותם הבא"
           data-testid="chain-pill"
         >
@@ -119,14 +138,14 @@ export function TopNav({ view, onNavigate, status, world, online, relay, authed,
         </button>
 
         {/* relay mini-pill */}
-        <span className={`dx-chip h-9 px-2.5 hidden lg:flex items-center gap-1.5 text-[10px] font-data ${relay ? 'text-[color:var(--green)]' : 'text-[color:var(--amber)]'}`}>
+        <span className={`dx-chip h-9 px-2.5 hidden lg:flex shrink-0 items-center gap-1.5 text-[10px] font-data ${relay ? 'text-[color:var(--green)]' : 'text-[color:var(--amber)]'}`}>
           {relay ? 'RELAY LIVE' : 'RELAY POLL'}
         </span>
 
         {/* identity */}
         {authed ? (
           <DropdownMenu>
-            <DropdownMenuTrigger className="dx-chip h-9 pl-3 pr-2 flex items-center gap-2 outline-none hover:border-[color:var(--line-strong)] transition-colors" data-testid="identity-badge">
+            <DropdownMenuTrigger className="dx-chip h-9 pl-3 pr-2 shrink-0 flex items-center gap-2 outline-none hover:border-[color:var(--line-strong)] transition-colors" data-testid="identity-badge">
               <span className="w-5 h-5 rounded-full bg-[color:var(--green-soft)] border border-[color:var(--green)]/40 flex items-center justify-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--green)] pulse-ring" />
               </span>
@@ -147,12 +166,31 @@ export function TopNav({ view, onNavigate, status, world, online, relay, authed,
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <button onClick={onLogin} className="dx-cta h-9 px-4 text-[13px] flex items-center gap-1.5" data-testid="login-btn">
+          <button onClick={onLogin} className="dx-cta h-9 px-4 shrink-0 text-[13px] flex items-center gap-1.5" data-testid="login-btn">
             <LogIn className="w-3.5 h-3.5" /> התחברות
           </button>
         )}
       </div>
     </header>
+  );
+}
+
+// בליטת-ניווט משותפת — FIX(70-a): shrink-0 כדי-שהגלילה-תמיד תשאיר את-הכפתור-שלם
+function NavPill({ v, view, onNavigate, className = '' }: {
+  v: { id: ViewId; label: string; icon: React.ComponentType<{ className?: string }> };
+  view: ViewId;
+  onNavigate: (v: ViewId) => void;
+  className?: string;
+}) {
+  const Icon = v.icon;
+  return (
+    <button
+      key={v.id} onClick={() => onNavigate(v.id)}
+      aria-current={view === v.id ? 'page' : undefined}
+      className={`dx-nav h-9 px-3.5 text-[13px] font-medium flex items-center gap-1.5 shrink-0 ${className} ${view === v.id ? 'dx-nav-active' : ''}`}
+    >
+      <Icon className="w-[15px] h-[15px]" /> {v.label}
+    </button>
   );
 }
 
@@ -168,6 +206,7 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const bottomItems = EXCHANGE_NAV.filter(v => v.id !== 'anchors' && v.id !== 'estate' && v.id !== 'door').slice(0, 4);
+  const moreActive = MORE_SHEET_IDS.includes(view);
 
   return (
     <>
@@ -196,16 +235,16 @@ export function MobileNav({ view, onNavigate, authed, onLogin, onLogout, world, 
             return (
               <button key={v.id} onClick={() => onNavigate(v.id)} aria-current={active ? 'page' : undefined}
                 className="flex flex-col items-center gap-0.5 py-1.5">
-                <Icon className={`w-[18px] h-[18px] ${active ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
-                <span className={`text-[8.5px] font-medium ${active ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>{v.label}</span>
+                <Icon className={`w-[19px] h-[19px] ${active ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
+                <span className={`text-[10px] font-medium ${active ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>{v.label}</span>
               </button>
             );
           })}
           {/* more sheet */}
           <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
             <SheetTrigger className="flex flex-col items-center gap-0.5 py-1.5">
-              <Menu className={`w-[18px] h-[18px] ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate', 'door'].includes(view) ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
-              <span className={`text-[8.5px] font-medium ${['vault', 'towers', 'ops', 'audit', 'settings', 'anchors', 'economy', 'estate', 'door'].includes(view) ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
+              <Menu className={`w-[19px] h-[19px] ${moreActive ? 'text-[color:var(--pink)]' : 'text-[color:var(--text-3)]'}`} />
+              <span className={`text-[10px] font-medium ${moreActive ? 'text-[color:var(--text-1)]' : 'text-[color:var(--text-3)]'}`}>עוד</span>
             </SheetTrigger>
             <SheetContent side="bottom" className="dx-card border-[color:var(--line)] rounded-t-3xl px-4 pt-3 pb-8" dir="rtl">
               <SheetHeader className="p-0 mb-2">

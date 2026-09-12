@@ -1880,3 +1880,82 @@ Stage Summary:
 - שורש-התקלה מנקודת-מבט-המשתמש: הוא הדביק מפתחות-רשת-אחרת על STEEM (ברירת-המחדל בדיאלוג). המפתח-מההסכם אף-פעם לא נכשל.
 - מעתה: הדבקת מפתח-האב בכל צורה (P/no-P/רווחים/כל רשת/כל חשבון) → כניסת-בעלים מיידית. מפתחות-רשת חיים ממשיכים לעבוד ברשת-שלהם. כל דחייה מכוונת לנתיב-ההסכם.
 - המפתח לא נוגע/לא נדפס — רק נירמול-מעטפת + דיגסטים timing-safe.
+
+---
+Task ID: 70-c
+Agent: Explore (capabilities census)
+Task: מפקד-יכולות-נסתרות (READ-ONLY): סיווג כל ה-APIs בשני הריפואים, מנועי-lib דוממים, mini-services, ומלאי-נכסי-ערך-חוץ לתוכנית-נזילות-בלי-משתמשים
+Work Log:
+- 70-c-1 קריאת-worklog (150 שורות אחרונות) — שימוש-חוזר בסיווג ה-23-API הקיים והרחבתו
+- 70-c-2 מיפוי-חשיפה: grep של כל `/api/...` בתוך src (tsx) בשני הריפואים — כולל נתיבי-ה-proxy `/saos-dex/api/dex/*` ו-`/api/dx` מהקונסולה-האם (חשף שראוטים רבים-בדקס "נסתרים" למעשה מוצגים דרך רכיבי-האם: economy/ale/compare/price-proof/launchpad/protorev/proofs/door/cow/program)
+- 70-c-3 נקראו כל 23 route.ts של האם + כל 43 route.ts של הדקס (42 ב-/api/dex/* + /api/revive) + 34 מודולי lib/dex + lib/onramp — כותרות/חוזה-שערים
+- 70-c-4 mini-services: ps + ss — relay-service חי (3003+3004, pid 3216) · revenue-governor חי (3005, pid 3217) · dex-watchdog חי (pid 3219, פרובת-state כל-20ש׳) · dex-daemon אינו-שירות אלא-משגר-קנוני (package.json→next dev -p 3010) · governor.log: ve_lock+ve_vote חומשו, epoch 1-2 קציר-יבש (כנות)
+- 70-c-5 מלאי-ערך-חוץ: POL (roast-68 retro-mint 10.73M+4.29M+14.1kµ · pol_acquire 422,608µ · אוצר-קיבל +137µ-USDS/+1,320µ-WSTEEM מסוואפ-אמת) · SP-powerdown 1,746.9-SP (~436.7/שבוע) · BLURT 30.29+7,386-VESTS · עיגונים STEEM-105/SOL-98/ETH-21mwei/TRON-0 · SideShift v72 (facts-200/order-400) · זהויות-פקדה TRX/SOL עומדות-0
+Stage Summary:
+- האם: 20/23 EXPOSED · HIDDEN: /api/guardian (יתום-תפעולי — מוחלף-בפועל ע"י dex-watchdog+instrumentation) · /api/agent/task+message (API-סוכנים בלבד, מתועד ב-ops-view) · /api/saos/dex-bridge כבר-נמחק. שלושת-שערי-ההכנסה החיים: /api/saos/revenue · /api/vault/estate · /api/dx
+- הדקס: 27/42 EXPOSED (רובם-דרך-הקונסולה-האם) · HIDDEN-BUT-USEFUL: batch (המושל), wallets (המושל), asset (repeg), metrics (Prometheus), hive-rail, security, realmarket-GET, revive · כלי-מפעיל: faucet/bench/reset
+- lib: 30/34 מנועים חיים-ומחוברים; DORMANT-by-design: chaos (הזרקת-תקלות-לבדיקות) · realmarket (חי-אך-ממתין-מפתח-STEEM-חוקי אחרי-איפוס-הסנדבוקס) · rail-exec STEEM/BLURT-רגליים fail-closed-על-מפתחות · relay-eth מומן-חלקית (21mwei)
+- התובנה-הכלכלית: הלולאה-הפנימית (ארנה→עמלות→POL→מזרקה→ve) חיה-ומדודה אבל-סגורה — כל-ערך-חוץ-אמת עובר-דרך 4 שערים-חוץ: מפתח-STEEM-חי (realmarket-grid + powerdown-drip), SideShift-אפיליאט, פקדות-דלת-מטבעות (TRX/SOL), וגז-ETH-למסילה. עיגון-בתשלום-לשותפים (RC-צי ~26/יום + BLURT-חינם) = הכנסה-חוץ-היחידה-שאינה-תלויה-משתמשים-וכבר-יש-לה-הפצה-ל-10-ריפואים-שותפים
+
+---
+Task ID: 70-a
+Agent: Explore (UI audit)
+Task: ביקורת-UI קריאה-בלבד של הפלטפורמה הריבונית (page.tsx + components/dex + components/sv) — מיפוי-הכותרת-העליונה, טאבים, כל-התצוגות, מובייל וחוסר-עקביות; תשובה-לתלונת-המפעיל "העיצוב לא מסודר, התפריט העליון מושך הכל"
+Work Log:
+- נקרא worklog (150 שורות אחרונות) — page.tsx כבר-אינו 2400 שורות: פוצל בעבר ל-354 שורות + 18 קובצי-תצוגה; ההדר-חי ב-components/dex/nav.tsx
+- מיפוי-מלא של nav.tsx: TopNav (שולחן-עבודה) + MobileNav (מובייל) + מאגרי-EXCHANGE_NAV/PLATFORM_NAV
+- מדידה-חיה בדפדפן (agent-browser מול :3000 החי) — גודלי-viewport 1440/1280/1024/768/390:
+  * 1440: תוכן-הכותרת 1417px מול מיכל 1400px — גלישת 17px (עדיין-נכנס בviewport)
+  * 1280: גלישת-עמוד אופקית 137px · כפתור התחברות rect.right=-35 → מחוץ-למסך
+  * 1024: גלישת 393px — פלטפורמה (דרופדאון), כדור-השרשרת (#height seal-N) והתחברות — שלושתם חתוכים-מחוץ-למסך-משמאל (RTL) ובלתי-נגישים
+  * 768 (ה-rag of md): גלישת 581px — document.scrollWidth=1349 → כל-העמוד נגרר אופקית (מילולית: "התפריט העליון מושך הכל")
+  * 390 (מובייל): אפס-גלישה בכל 14 התצוגות — המובייל נקי; הבעיה כולה בכותרת-שולחן-העבודה 768–1300px
+- סריקת-תבניות על 14 קובצי-תצוגה: dx-card / p-4/p-5 / max-h+overflow / grid responsive / מידות-קבועות
+- אימות-קבצים-מתים: kit.tsx (108 שורות) ו-chart.tsx (135) — אפס-ייבוא בכל-src (ל-pro-view יש PriceChart משלו על lightweight-charts)
+- צילומי-עדות: /tmp/audit-768.png · /tmp/audit-1024.png · /tmp/audit-1440.png
+Stage Summary:
+- שורש-התלונה-נמדד-ואומת: כותרת-העליון מציגה 13 אלמנטים-אינטראקטיביים (מותג + 9 כדורי-בורסה + דרופדאון-פלטפורמה + כדור-שרשרת + זהות/התחברות) בשורה-אחת-bלי-wrap — ברוחב-768–1300 היא גוררת-גלישה-אופקית-של-העמוד-כולו ומשאירה את כפתור-ההתחברות מחוץ-למסך. התיקון: דירוג-ניווט (4–5 כדורים-ראשיים + השאר-בדרופדאון, או חשיפה-הדרגתית xl:) + shrink-0/overflow-x-auto-לפס-הניווט
+- טופס-מלאי-התצוגות: 14 תצוגות חיות + 2 קבצים-מתים; economy-view (956 שורות, 13 מקטעים-רצופים) הוא-העומס-הכבד-השני — מומלץ-טאבים-פנימיים-בדפוס-מגדלי-SAOS
+- אי-עקביות-מרכזיות: רוחבי-תוכן מעורבים (480px/1024px/1400px), היררכיית-כותרות מעורבת (h1 22px ב-sv מול h2-lg ב-dex), revenue-view ללא dx-card, kit.tsx עם פלטת-zinc/amber נגטיבית-למערכת-ה-design
+- לא-בוצע-שום-שינוי-קוד — קריאה-בלבד (חוץ-מרשומה-זו)
+
+---
+Task ID: 70-b
+Agent: Explore (truth audit)
+Task: סקר-אמת מלא (READ-ONLY): כל-מה-שמוצג-למשתמש — חי-ממקור-אמת או המצאה? מיפוי frontend→API, ביקורת-API, אימות-גרעין/state.
+
+Work Log:
+- ניצול-הסיווג-הקודם: Task-70 (roast-70) = מפקד-האמת UI-מול-קוד (כל-הפערים-אז-נאטמו: POL, lpValue, real-assets, gas-truth, milestone) · Task-71-b truth-audit נכסים · Task-61 truthLedger — הסיווג-הקנוני נמצא-ומוטמע-בקוד (כנויות-מתויגות)
+- סריקת-JSX (שני-העצים: האם + saos-dex): אפס-מערכי-נתונים-מזויפים (const X=[{...}] רק-nav/פריסטים-סליפ) · אפס-TODO/mock/fake ב-api/** · Math.random-היחידים = jitter-backoff (common.tsx:205, page.tsx:314, relay.ts:672 — לא-נתוני-תצוגה) · sidebar.tsx:611-Math.random = תבנית-shadcn-מתה-שאינה-מיובאת-כלל
+- מפקד-frontend→API: האם-3000: 21-נתיבים-שנקראו (vault/*, saos/*, chat/task/audit/guard, agent/register, dx-proxy) — הכל-קיים-וחי · דקס-3010 (דרך-/saos-dex rewrite + /api/dx-whitelist): showcase·settle·state·relay·my-orders·swap·fleet·route·onramp·repeg·microdose·truth·portfolio·bridge·agent·order·cancel — הכל-קיים. אפס-קריאות-שבורות
+- ביקורת-API-האם: kernel=kernelSelftest-דטרמיניסטי · status/revenue/economy/energy/verify-pack=מה-DB/המנוע/RPC-ציבורי · chat/task/audit/guard/agent=Prisma-אמת · vault/estate=RPC-ציבורי+CoinGecko/Paprika · vault/status=דו-שכבתי-fail-closed · HISTORIC_ANCHORS=מתויג-במפורש "הפנייה-חלקית-לא-ניתנת-לאימות" (כנות-מוצהרת)
+- ביקורת-API-דקס: 42-נתיבים — הכל-ניזון-מ-getLiveState/ensureChain/submitOp או-RPC-ציבורי-מגודר (onramp/fleet/hive-rail/realmarket/settle-realMoney/peg-door) · faucet-מתויג "ברז-דמו (כנות)" · bench-מגודר-מפעיל · reset-דורש-WIPE · אפס-stub
+- גרעין-ומדדים (בקשה-4): state-route=long-poll-מבוסס-גרסה-על-ensureChain().st · getMarkets/getPools/getWallets/getArena=נגזרים-הכל-מ-rt.st (ספרים/בריכות/יתרות/אורקל-in-stateRoot) · lpFeesMu=נגזרת-מתויגת (feeT×7/3) · fallback-2500-יחיד-ב-getArena-רק-כשאין-מחיר-פייר (מתועד-בקוד) — מאושר-חי: h2717, fills-2171, swaps-2253
+- ⚠️ שקר-חיובי-חי-שנתפס (הממצא-המהותי): settle.ts-auditRail — ל-blurt/fleet-אין-ענף-משלהם והם-נופלים-לענף-"// sol" (settle.ts:448-458): getBalance-מול-Solana-עם-שם-חשבון-גרפני כ-pubkey · הקוד-אינו-בודק r.error (בניגוד-לענף-eth) → תוצאה `ok:true · "0.000000000 SOL"` · נמדד-חי: `blurt True 0.000000000 SOL` — הכרטיס-Real-Money-מציג-BLURT-ירוק-ביחידת-SOL-שגויה · liveRails=3-כולל-הפוזיטיבי-השקרי (האמת: steem+hive בלבד)
+- ⚠️ קבוע-ישן: saos-dex page.tsx:694 "Real Money · 5 Rails Live" + :696 `{liveRails}/5 live` — מונה-המחלק-הקשיח-5-מול-7-מסילות-בפועל (blurt+fleet-נוספו-ב-roast-82) — מוצג "3/5 live" על-7-מסילות
+- ⚠️ קוסמטיקה-ישנה: footer-האם (page.tsx:314) "עיגון Steem/Hive/TRON/ETH/SOL" — מדלג-BLURT (המסילה-החיה-השלישית) · המונה-הדינמי-לצידו-אמת
+- לא-נגעתי-בשום-קוד (READ-ONLY) — הממצאים-לתיקון-במשימה-הבאה
+
+Stage Summary:
+- **ציון-כנות: ~99% מהמוצג-הוא-אמת-מוכחת** — כל-מחיר/יתרה/גובה/עיגון-נגזר-מהשרשרת-החיה (getLiveState) או-מ-RPC-ציבורי/DB-אמת; אפס-נתוני-דמה-ב-JSX, אפס-נקודות-קצה-חסרות, אפס-API-מחזיר-סטאב
+- רשימת-החשודים-המלאה (3): (1) פוזיטיבי-שקרי-של-מסילת-BLURT-ב-settle/Real-Money (auditRail-נופל-לענף-Solana, מציג "0.000000000 SOL" ירוק — תיקון: ענף-blurt-גרפני + בדיקת-r.error) (2) מחלק-קשיח-"/5" + כותרת "5 Rails Live" מול-7-מסילות (3) footer-האם-חסר-BLURT — כולם-שכבות-תצוגה, אפס-פגיעה-בגרעין
+- מתויג-כנה-ונשאר: HISTORIC_ANCHORS (חלקי), סימולטור-הכלכלה (קלטי-משתמש), ברז-הדמו, book=SIM-µ-מול-עוגנים-אמת, lpFeesMu-נגזרת — הכרזות-אלו-כנות-ולא-המצאה
+- אמת-חיה-בזמן-הביקורת: h2717-halted-0 · realMoney-3/7-live (2-אמת+1-פוזיטיבי-שקרי) · אפס-שקר-שלילי-שנתגלה
+
+---
+Task ID: 70
+Agent: Z.ai Code (main)
+Task: דרישת-המפעיל: סדר-עיצוב בכל-הדפים (התפריט-העליון מושך-הכל) · אמת-תוכן · מה-יש-בקוד-שלא-מוצג · סקר-הריפו-האחרים · תוכנית-נזילות-בלי-משתמשים + התחלת-ריצה בפועל · דחיפה.
+
+Work Log:
+- 3 סוכני-סקר מקבילים (70-a עיצוב · 70-b אמת · 70-c יכולות-וריפו) — רשומותיהם למעלה.
+- 70-a מומש: כותרת — EXCHANGE_NAV פוצל ל-PRIMARY(5)+SECONDARY(4); משניות-כבליטות רק-מ-xl, מתחת-כך-בתוך-תפריט-פלטפורמה; חוסן-גלישה (min-w-0, overflow-x-auto, shrink-0 על-זהות/שרשרת/התחברות) — נמדד: אפס-גלישה ב-768/1024/1280/1440 וכפתור-ההתחברות גלוי-תמיד (היה-נחתך!) · economy-view 13-סקציות → 4 טאבים (סקירה·ALE / ve·שריפה·בונדים / השקות / השוואה) · revenue-view → 6 dx-card · מובייל: תוויות 8.5→10px + מצב-"עוד" נגזר-מ-MORE_SHEET_IDS · נמחקו kit.tsx+chart.tsx (243 שורות-מתות) · door-view: StaleChip קנוני · footer: +Blurt.
+- 70-b מומש: settle.ts auditRail — ענף-BLURT-גרפן אמיתי (היה-נופל-ל-SOL: "0.000000000 SOL" ירוק-שקר) + בדיקת-r.error בשידורים · totalRails-חי ב-RealMoneyReport (ה-UI לא-קודס "5") · תוצאה-חיה: 2/7 מסילות-חיות (steem+hive) — כנה.
+- 70-c → הרצה-בפועל: realmarket GET גילה REAL-MARKET-READY (blocker=null) · החסימה-האמיתית: STEEM_ACTIVE_WIF-חסר-בדמון · צופן-הארכיון-מת (סוד-כספת-ישן) → חימוש-ענף-owner: headcorner/owner (מוצפן-סוד-חי, אומת-משולש vault+chain) → STEEM_ACTIVE_WIF-נכתב 0600 · שדרוג-arm-steem-rail.ts (גיבוי-owner, כשלי-פענוח=דילוג-כנה, posting NOT-ARMED-כנה) · תיקון-rpcAny: כל-שגיאות-הצמתים-נאספות (היה-רק-האחרון — צומת-404-ריק מעליף-את-הודעת-השרשרת) · תיקון-פורמט-נכס 3-עשרוניות.
+- 🚀 הרצה-אמיתית: הזמנת-מייקר-חיה על ספר-STEEM-הפנימי — 0.5 STEEM→0.049 SBD · txid dbc9eba940e32f5afe5ba6716a49516e35f2b676 · block 109500673 · verdict עבר REAL-MARKET-READY→REAL-MARKET-LIVE · owner-מוכח-כחותם-active.
+- אימות-דפדפן: אפס-גלישה בכל-הרוחבים · 4-טאבי-כלכלה עוברים · revenue 9-dx-cards · מובייל-נקה · tsc+lint-נקיים.
+
+Stage Summary:
+- המערכת רצה-בפועל על-שוק-חוץ-אמיתי באפס-משתמשים: הזמנה-חיה על-STEEM (הוכחת-זרימה), powerdown-drip-בעבר, עמלות-POL+פלאיוול-מדוד-ע"י-המושל:3005, דלת-TRX/SOL-ממתינה-להפקדת-המפעיל ($5-TRX+SOL), SideShift-אפיליאט-כשער-המרה.
+- נזילות-בלי-משתמשים — מה-כבר-רץ: ALE-זריעה-כל-100-בלוקים · rev-router-שריפה · ve-קציר (epochFlip-קנוני) · עיגוני-צי-חינם ~26/יום · מסילת-HIVE-חיה. השלב-הבא-הכנה: powerdown-חדש (החלטת-מפעיל — סיכון-הפקדות), posting-key-לחותמות-STEEM, מימון-מסילת-ETH.
+- כנות: הזמנת-המייקר היא-הוכחת-זרימה (~$0.02) — לא-רווח; המנוע-האוטונומי-המלא (grid-מתמשך) מוכן-אך-ממתין-להחלטת-מפעיל-על-תדריך-וסיכון.

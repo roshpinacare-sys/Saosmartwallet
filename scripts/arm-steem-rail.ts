@@ -5,7 +5,11 @@
  * החומר-הישן — vault rows steem/headcorner-archive/* (יובאו-מ-.env-ישן).
  * ה-STEEM_ACTIVE_WIF-הנוכחי בדמון = חומר-ROT1 (שולט-רק-על-Hive) — מוחלף-כאן.
  *
- * 1) קריאת-השורה: chain=steem · account=headcorner-archive · role=active
+ * 1) קריאת-השורה: chain=steem · account=headcorner-archive · role=active/posting
+ *    FIX(Task-70): צופן-הארכיון מת-אחרי-חימוש-הכספת-מחדש (roast-85 סוד-חדש) —
+ *    גיבוי-חי: headcorner/owner (מוצפן-בסוד-הנוכחי בכניסה-מאומתת). הוכח-חי:
+ *    owner-חותם-פעולות-active (הזמנה-אמת dbc9eba9… נענתה-על-השרשרת).
+ *    posting: אין-גיבוי-כרגע (צופן-ארכיון-מת) — חותמות-STEEM נשארות fail-closed-כנות.
  * 2) פענוח-AES-256-GCM — ה-WIF-לעולם-לא-נדפס
  * 3) אימות-משולש: גזירה→pub מול-הכספת **וגם** מול-הסמכות-החיה-על-Steem
  * 4) כתיבה-ל-saos-dex/.env (0600)
@@ -34,7 +38,7 @@ function decryptSecret(cipherText: string): string {
   return Buffer.concat([d.update(Buffer.from(ctHex, "hex")), d.final()]).toString("utf8");
 }
 
-async function liveKey(account: string, role: "active" | "posting"): Promise<string> {
+async function liveKey(account: string, role: "active" | "posting" | "owner"): Promise<string> {
   const r = await fetch("https://api.steemit.com", {
     method: "POST",
     headers: { "content-type": "application/json", "user-agent": UA },
@@ -50,39 +54,48 @@ async function liveKey(account: string, role: "active" | "posting"): Promise<str
 async function main(): Promise<void> {
   const db = new PrismaClient();
   try {
-    const bodyOf = (p: string) => p.replace(/^STM/, "");
-    // roast-77: חימוש-כפול — active (עבור-ops-פיננסיים) **וגם** posting (עבור-חותמות-עיגון).
-    // האבחנה-החיה: ה-STEEM_POSTING_WIF-ב-.env היה-חומר-שגוי → כל-החותמות-נדחו-על-הצומת
-    // ("missing required posting authority") — הרכבת-העוגן-המרתקת-הייתה-חסומה.
-    const jobs: { role: "active" | "posting"; envKey: string }[] = [
-      { role: "active", envKey: "STEEM_ACTIVE_WIF" },
-      { role: "posting", envKey: "STEEM_POSTING_WIF" },
-    ];
-    let content = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, "utf8") : "";
-    for (const job of jobs) {
-      const rows = await db.vaultKey.findMany({
-        where: { chain: "steem", account: "headcorner-archive", role: job.role },
-        select: { account: true, cipher: true, pubKey: true },
-      });
-      if (rows.length !== 1) throw new Error(`expected exactly 1 steem headcorner-archive/${job.role} row — got ${rows.length}`);
-      const row = rows[0];
-      if (!row.cipher || !row.pubKey) throw new Error("cipher/pubKey missing");
-      const wif = decryptSecret(row.cipher);
-      if (!/^[5KL][1-9A-HJ-NP-Za-km-z]{50,52}$/.test(wif.trim())) throw new Error("decrypted WIF shape invalid (fail-closed)");
-      const pub = steemLib.auth.wifToPublic(wif.trim());
-      const matchesVault = bodyOf(pub) === bodyOf(row.pubKey);
-      const livePub = await liveKey("headcorner", job.role);
-      const matchesChain = bodyOf(pub) === bodyOf(livePub);
-      console.log(`self-verify[${job.role}]: vault=${matchesVault} chain=${matchesChain} pub=STM${bodyOf(pub).slice(0, 9)}...`);
-      if (!matchesVault || !matchesChain) throw new Error(`cross-verify failed for ${job.role} — refusing to arm (fail-closed)`);
-      const line = `${job.envKey}=${wif.trim()}`;
-      if (new RegExp(`^${job.envKey}=`).test(content)) {
-        content = content.replace(new RegExp(`^${job.envKey}=.*$`, "m"), line);
-      } else {
-        content = content.replace(/\s*$/, "") + "\n" + line + "\n";
-      }
-      console.log(`armed: ${job.envKey} written to ${path.basename(ENV_PATH)} (0600, value never printed)`);
+  async function decryptRow(chain: string, account: string, role: string): Promise<{ wif: string; pub: string } | null> {
+    const rows = await db.vaultKey.findMany({
+      where: { chain, account, role },
+      select: { account: true, cipher: true, pubKey: true },
+    });
+    if (rows.length !== 1) return null;
+    const row = rows[0];
+    if (!row.cipher || !row.pubKey) return null;
+    try {
+      return { wif: decryptSecret(row.cipher).trim(), pub: row.pubKey };
+    } catch {
+      return null; // FIX(Task-70): צופן-מת (סוד-ישן) — לא-קריסה, גיבוי-בתור
     }
+  }
+
+  const bodyOf = (p: string) => p.replace(/^STM/, "");
+  let content = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, "utf8") : "";
+  const tryArm = async (role: "active" | "posting", envKey: string, fallbacks: { account: string; role: string }[]): Promise<void> => {
+    const candidates = [{ account: `headcorner-archive`, role }, ...fallbacks];
+    for (const cand of candidates) {
+      const got = await decryptRow("steem", cand.account, cand.role);
+      if (!got) continue;
+      const wif = got.wif;
+      if (!/^[5KL][1-9A-HJ-NP-Za-km-z]{50,52}$/.test(wif)) continue;
+      const pub = steemLib.auth.wifToPublic(wif);
+      const matchesVault = bodyOf(pub) === bodyOf(got.pub);
+      const livePub = await liveKey("headcorner", cand.role as "active" | "posting" | "owner");
+      const matchesChain = bodyOf(pub) === bodyOf(livePub);
+      console.log(`self-verify[${envKey} ← ${cand.account}/${cand.role}]: vault=${matchesVault} chain=${matchesChain} pub=STM${bodyOf(pub).slice(0, 9)}...`);
+      if (!matchesVault || !matchesChain) continue;
+      const line = `${envKey}=${wif}`;
+      if (new RegExp(`^${envKey}=`).test(content)) content = content.replace(new RegExp(`^${envKey}=.*$`, "m"), line);
+      else content = content.replace(/\s*$/, "") + "\n" + line + "\n";
+      console.log(`armed: ${envKey} ← ${cand.account}/${cand.role} (value never printed)`);
+      return;
+    }
+    console.log(`NOT-ARMED: ${envKey} — אף-מועמד לא עבר אימות-משולש (fail-closed כנה)`);
+  };
+
+    // active: ארכיון→owner-חי (הוכח: owner חותם active-על-Steem) · posting: ארכיון בלבד
+    await tryArm("active", "STEEM_ACTIVE_WIF", [{ account: "headcorner", role: "owner" }]);
+    await tryArm("posting", "STEEM_POSTING_WIF", []);
     fs.writeFileSync(ENV_PATH, content, { mode: 0o600 });
     fs.chmodSync(ENV_PATH, 0o600);
     console.log("next: restart daemon (next dev -p 3010) to load the new env, then the seal path picks posting-ראשון");

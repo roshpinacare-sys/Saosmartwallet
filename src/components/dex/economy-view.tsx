@@ -126,6 +126,8 @@ export function EconomyView({ onNeedAuth, onDone }: {
   const [newTicker, setNewTicker] = useState('');
   const [newName, setNewName] = useState('');
   const [newMode, setNewMode] = useState<'curve' | 'lbp'>('curve');
+  // FIX(70-a ·3): 13-סקציות בעמוד-אחד = העומס-השני שדיווח המפעיל — חלוקה-לטאבים
+  const [tab, setTab] = useState<'overview' | 've' | 'launch' | 'compare'>('overview');
 
   // ── FIX(Roast-65-e4 · F7): 6-לולאות-הסקירה עברו ל-usePoll משותף — השהיה-בהסתרת-טאב,
   // backoff-עם-jitter בכישלון, ושבב "נתונים-ישנים" במקום catch-שקט (היה ≈88-req/min + נתון-ישן-שנראה-חי).
@@ -260,6 +262,17 @@ export function EconomyView({ onNeedAuth, onDone }: {
         )}
       </div>
 
+      {/* FIX(70-a ·3): טאבי-כלכלה — סקירה/ALE · ve-ושריפה-ובונדים · השקות · השוואה */}
+      <div className="flex gap-1.5 flex-wrap" role="tablist" aria-label="מקטעי-כלכלה" data-testid="economy-tabs">
+        {([['overview', 'סקירה · מנוע-נזילות'], ['ve', 've · שריפה · בונדים'], ['launch', 'השקות'], ['compare', 'השוואה-חיה']] as const).map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+            className={`dx-nav h-9 px-4 text-[12.5px] font-medium ${tab === id ? 'dx-nav-active' : ''}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (<>
       {/* ── מנוע-הוכחת-המחיר (Task 56) — התשובה-ל"מה-המחיר-הזה-אמיתי" ── */}
       <PriceProofPanel proof={proof} />
 
@@ -339,10 +352,25 @@ export function EconomyView({ onNeedAuth, onDone }: {
         </div>
       </section>
 
-      {/* ── מסילת-ההשקות + ProtoRev (Task 57) ── */}
-      <LaunchpadPanel lpad={lpad} prv={prv} newTicker={newTicker} setNewTicker={setNewTicker} newName={newName} setNewName={setNewName} newMode={newMode} setNewMode={setNewMode} mutateLaunch={mutateLaunch} busy={busy} />
+      {/* how it works — שייך-לסקירה: זה-הסיפור-המלא של-הפלאיהול */}
+      <section className="dx-card p-5">
+        <h2 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-[color:var(--text-2)]" />איך זה מסתדר יחד</h2>
+        <div className="grid md:grid-cols-5 gap-3 text-[11.5px] leading-relaxed">
+          <Step n="1" title="עמלים זורמים" body="כל סוואפ/מילוי בספר מייצר עמלה-אמת: 70% ל-LP, 30% לאוצר — מדידה חתומה." />
+          <Step n="2" title="אוצר מפריש" body={`כל ${eco?.revenue.every ?? 600} בלוקים: 40% קנייה-ושריפה · 40% לקרן-ve · 20% נשאר.`} />
+          <Step n="3" title="מצביעים מרוויחים" body={`בכל אפוק (${eco?.epoch.every ?? 1200} בלוקים) הקרן מתחלקת לפי כוח-ve — נשלם ישירות לארנק.`} />
+          <Step n="4" title="ההיצע מתכווץ" body="שריפה מורידה ΣSAOS מהמצב-עצמו; בונדים מוסיפים נזילות-אוצר. המעגל מחזק את עצמו." />
+          <Step n="5" title="ALE זורע נזילות" body={`כל ${ale?.policy.every ?? 100} בלוקים האוצר רוכש צד-שני וזורע POL מהעמלות — נזילות שצומחת בלי משתמשים.`} />
+        </div>
+      </section>
+      </>)}
 
-      <div className="grid lg:grid-cols-2 gap-5">
+      {/* ── מסילת-ההשקות + ProtoRev (Task 57) ── */}
+      {tab === 'launch' && (
+        <LaunchpadPanel lpad={lpad} prv={prv} newTicker={newTicker} setNewTicker={setNewTicker} newName={newName} setNewName={setNewName} newMode={newMode} setNewMode={setNewMode} mutateLaunch={mutateLaunch} busy={busy} />
+      )}
+
+      {tab === 've' && (<div className="grid lg:grid-cols-2 gap-5">
         {/* ── veSAOS ── */}
         <section className="dx-card p-5" data-testid="ve-panel">
           <header className="flex items-center gap-2 mb-4">
@@ -547,9 +575,10 @@ export function EconomyView({ onNeedAuth, onDone }: {
             ספקי-הנזילות על LVR; בשקט — חוזרת לרצפה. ציטוט = ביצוע, תמיד.
           </p>
         </section>
-      </div>
+      </div>)}
 
       {/* ── השוואה-חיה מול-העולם (Task 55) ── */}
+      {tab === 'compare' && (
       <section className="dx-card p-5" data-testid="compare-panel">
         <header className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="w-8 h-8 rounded-xl bg-[color:var(--pink)]/15 border border-[color:var(--pink)]/30 flex items-center justify-center">
@@ -597,18 +626,7 @@ export function EconomyView({ onNeedAuth, onDone }: {
           ))}
         </div>
       </section>
-
-      {/* how it works */}
-      <section className="dx-card p-5">
-        <h2 className="text-[14px] font-bold mb-3 flex items-center gap-2"><Wallet className="w-4 h-4 text-[color:var(--text-2)]" />איך זה מסתדר יחד</h2>
-        <div className="grid md:grid-cols-5 gap-3 text-[11.5px] leading-relaxed">
-          <Step n="1" title="עמלים זורמים" body="כל סוואפ/מילוי בספר מייצר עמלה-אמת: 70% ל-LP, 30% לאוצר — מדידה חתומה." />
-          <Step n="2" title="אוצר מפריש" body={`כל ${eco?.revenue.every ?? 600} בלוקים: 40% קנייה-ושריפה · 40% לקרן-ve · 20% נשאר.`} />
-          <Step n="3" title="מצביעים מרוויחים" body={`בכל אפוק (${eco?.epoch.every ?? 1200} בלוקים) הקרן מתחלקת לפי כוח-ve — נשלם ישירות לארנק.`} />
-          <Step n="4" title="ההיצע מתכווץ" body="שריפה מורידה ΣSAOS מהמצב-עצמו; בונדים מוסיפים נזילות-אוצר. המעגל מחזק את עצמו." />
-          <Step n="5" title="ALE זורע נזילות" body={`כל ${ale?.policy.every ?? 100} בלוקים האוצר רוכש צד-שני וזורע POL מהעמלות — נזילות שצומחת בלי משתמשים.`} />
-        </div>
-      </section>
+      )}
     </div>
   );
 }

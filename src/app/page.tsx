@@ -311,7 +311,7 @@ export default function SovereignDex() {
       <footer className="hidden md:block mt-auto border-t border-[color:var(--line)] bg-[color:var(--canvas-deep)] px-7 py-3.5">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between flex-wrap gap-2 text-[11px] text-[color:var(--text-3)]">
           <span>
-            SAOS DEX · מנוע-קונצנזוס חתום-מרקל · עיגון Steem/Hive/TRON/ETH/SOL · כספת AES-256-GCM · relay בזמן-אמת
+            SAOS DEX · מנוע-קונצנזוס חתום-מרקל · עיגון Steem/Hive/Blurt/TRON/ETH/SOL · כספת AES-256-GCM · relay בזמן-אמת
           </span>
           <span className="dx-num" dir="ltr">
             {world ? `#${fmtInt(world.state.height)} · ${fmtInt(world.state.fills)} fills · ${fmtInt(world.state.swaps)} swaps` : ''}

@@ -96,7 +96,7 @@ export function RevenueView() {
   return (
     <div dir="rtl" className="max-w-5xl mx-auto space-y-4">
       {/* ── כותרת + קצב-חיים ── */}
-      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4">
+      <div className="dx-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-[color:var(--green)]" />
@@ -125,7 +125,7 @@ export function RevenueView() {
           const Icon = STREAM_ICON[s.id] ?? Sparkles;
           const st = STATUS_STYLE[s.status] ?? STATUS_STYLE.idle;
           return (
-            <div key={s.id} className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4">
+            <div key={s.id} className="dx-card p-4">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <Icon className="w-4 h-4 text-[color:var(--pink)]" />
@@ -147,7 +147,7 @@ export function RevenueView() {
       </div>
 
       {/* ── המושל האוטונומי ── */}
-      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4">
+      <div className="dx-card p-4">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2">
             <Bot className="w-4 h-4 text-[color:var(--green)]" />
@@ -180,7 +180,7 @@ export function RevenueView() {
       </div>
 
       {/* ── מה יש ביד ── */}
-      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4">
+      <div className="dx-card p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
             <Wallet className="w-4 h-4 text-[color:var(--pink)]" />
@@ -217,7 +217,7 @@ export function RevenueView() {
       </div>
 
       {/* ── חסום-בכנות ── */}
-      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4">
+      <div className="dx-card p-4">
         <div className="flex items-center gap-2 mb-2">
           <Ban className="w-4 h-4 text-[color:var(--amber)]" />
           <span className="font-semibold text-sm">חסום-בכנות (לא-מדומה — עם-הסיבה והפתיחה)</span>
@@ -242,7 +242,7 @@ export function RevenueView() {
       </div>
 
       {/* ── לוק-ההצבעה (הוכחת-הציוד) ── */}
-      <div className="rounded-xl border border-[color:var(--line)] bg-black/20 p-4">
+      <div className="dx-card p-4">
         <div className="flex items-center gap-2 mb-2">
           <Lock className="w-4 h-4 text-[color:var(--green)]" />
           <span className="font-semibold text-sm">הוכחת-הציוד — עמדת-ה-ve של האוצר (על-השרשרת)</span>
