@@ -7,6 +7,7 @@
  *   A. grid-steem     — ספר-STEEM הפנימי (מייקר/ספרד) — מנוע-הדקס החי
  *   B. powerdown-drip — HP פנוי → STEEM נזיל (STEEM-HF23: 4 שבועות) → מזין-את-הספר
  *   C. curation       — HP שלנו מצביע-על-פוסטים-חיים → תגמולי-קיוריישן
+ *   I. reward-claim (71-g) — תביעת-פרסים-שהבשילו (סופר+קיוריישן) → נזיל+מסה (רווח-טהור)
  *   D. hbd-savings    — HBD → חיסכון 15% APR (פרמטר-שרשרת)
  *   E. trx-energize   — ארנק-המערכת האטום → אנרגיה+הצבעה ~4.5% APR (ממתין-הפקדה)
  * 71-e (עמוק) — הרחבת-המסה-המצביעה על-השרשראות-האחיות (בלי-פאוורדאון —
@@ -134,6 +135,48 @@ async function curationTrack(vestsToSp: (v: number) => number): Promise<Curation
   });
 }
 
+/* ── מעקב-תביעות (71-g) — תביעה-אחרונה + תגמולי-סופר-ששולמו בהיסטוריה (אמת-שרשרת) ── */
+interface RewardTrack {
+  lastClaim: { at: string; steem: string; sbd: string; vests: string; src: 'chain' | 'audit' } | null;
+  authorPaid: { count: number; steem: number; sbd: number; vests: number };
+}
+async function rewardTrack(): Promise<RewardTrack> {
+  return cached('reward-track', 300_000, async () => {
+    const out: RewardTrack = { lastClaim: null, authorPaid: { count: 0, steem: 0, sbd: 0, vests: 0 } };
+    try {
+      const hist = await condenser(STEEM_RPC, 'condenser_api.get_account_history', [OPERATOR, -1, 100]);
+      for (const [, op] of hist as Array<[number, { timestamp: string; op: [string, Record<string, unknown>] }]>) {
+        const [name, val] = op.op;
+        if (name === 'claim_reward_balance') {
+          out.lastClaim = { at: String(op.timestamp), steem: String(val.reward_steem ?? '0'), sbd: String(val.reward_sbd ?? '0'), vests: String(val.reward_vests ?? '0'), src: 'chain' };
+        } else if (name === 'author_reward') {
+          out.authorPaid.count += 1;
+          out.authorPaid.steem += parseFloat(String(val.steem_payout ?? '0')) || 0;
+          out.authorPaid.sbd += parseFloat(String(val.sbd_payout ?? '0')) || 0;
+          out.authorPaid.vests += parseFloat(String(val.vesting_payout ?? '0')) || 0;
+        }
+      }
+    } catch { /* כנות: היסטוריה-לא-זמינה — null נשאר */ }
+    // FIX(71-g): צמתי-STEEM מפגרים ביניהם באינדוקס-היסטוריה (נמדד-חי: חלון-אחד עצר לפני התביעה ששודרה) —
+    // הפקדה-שלנו (רישום-שידור-מקומי) משלימה-אמת כשהיא חדשה מהשרשרת:
+    try {
+      const lastAudit = await db.auditLog.findFirst({
+        where: { action: { in: ['flow-steem-claim', 'flow-hive-claim', 'flow-claim'] } },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (lastAudit) {
+        const m = lastAudit.detail.match(/:\s*([^+]+?)\s*\+\s*(\S+\s+VESTS)/); // "X STEEM + Y VESTS"
+        if (m) {
+          const atAudit = lastAudit.createdAt.toISOString();
+          const chainNewer = out.lastClaim && new Date(out.lastClaim.at) >= lastAudit.createdAt;
+          if (!chainNewer) out.lastClaim = { at: atAudit, steem: m[1].trim(), sbd: '0 SBD', vests: m[2], src: 'audit' };
+        }
+      }
+    } catch { /* כנות: פקדה-לא-זמינה */ }
+    return out;
+  });
+}
+
 export async function flowOverview(): Promise<FlowOverview> {
   const [steemAcc, hiveAcc, props, hiveProps, blurtProps, prices, grid, treasury, door, blurtAcc, vaultVerified] = await Promise.all([
     cached('steem-acc', 60_000, () => getAccount('steem').catch(() => null)),
@@ -179,6 +222,11 @@ export async function flowOverview(): Promise<FlowOverview> {
   const pdRate = pdRateRaw > 1e9 ? pdRateRaw / 1e6 : pdRateRaw; // guard: צומת-שמחזיר-ראו-במקום-תצוגה
   const pdRemaining = Number(steemAcc?.to_withdraw ?? 0) - Number(steemAcc?.withdrawn ?? 0); // ראו-אינטג'ר (×1e6)
   const vestsToSp = (v: number) => props ? vestsToChainVests(v, props) : 0;
+  // 71-g: פרסים-ממתינים-לתביעה (reward_* — מה-שהבשיל-מסופר/קיוריישן ומחכה-ל-op-תביעה)
+  const steemClaimableSteem = parseFloat(String(steemAcc?.reward_steem_balance ?? '0')) || 0;
+  const steemClaimableSbd = parseFloat(String(steemAcc?.reward_sbd_balance ?? '0')) || 0;
+  const steemClaimableVests = parseFloat(String(steemAcc?.reward_vesting_balance ?? '0')) || 0;
+  const steemClaimableSp = vestsToSp(steemClaimableVests);
   const pdRemainingSp = vestsToSp(pdRemaining / 1e6);
   const pdWeekSp = vestsToSp(pdRate);
   const pdWeeks = pdWeekSp > 0 ? Math.max(1, Math.ceil(pdRemainingSp / pdWeekSp)) : 0;
@@ -198,6 +246,10 @@ export async function flowOverview(): Promise<FlowOverview> {
   const hiveHspOwn = Math.max(0, hiveVests - hiveDelegated) * hiveRatio;
   const hiveHspEffective = (hiveVests + hiveReceived - hiveDelegated) * hiveRatio;
   const hiveHistVests = Number(hiveAcc?.curation_rewards ?? 0) + Number(hiveAcc?.posting_rewards ?? 0); // VESTS-היסטוריים (רווחי-עבר שהופקו ל-HP)
+  // 71-g: HIVE-ממתין-לתביעה (כנות — null כש-RPC נופל)
+  const hiveClaimable = hiveAcc
+    ? (parseFloat(String(hiveAcc.reward_hive_balance ?? '0')) || 0) + (parseFloat(String(hiveAcc.reward_hbd_balance ?? '0')) || 0) + (parseFloat(String(hiveAcc.reward_vesting_balance ?? '0')) || 0)
+    : null;
 
   const blurtLiquid = blurtAcc ? parseFloat(String(blurtAcc.balance ?? '0')) : null;
   const blurtVests = blurtAcc ? parseFloat(String(blurtAcc.vesting_shares ?? '0')) : null;
@@ -219,6 +271,7 @@ export async function flowOverview(): Promise<FlowOverview> {
         { k: 'SP פנוי (לא-מואצל)', v: `${fmt(steemOwnVp, 1)}`, hint: `${fmt(steemDelegated / 1e6, 1)}M VESTS מואצלים לצי-ה-RC` },
         { k: 'מסה-אפקטיבית', v: `${fmt(steemEffectiveVp, 1)}`, hint: `+${fmt(steemReceivedVp, 1)} SP מתקבלים (${fmt(steemReceived, 0)} VESTS — haran 88% + 9-חברי-צי, סריקת-היסטוריה-מלאה) — המסה-שבפועל-נשקלת ברשיירז` },
         { k: 'פאוורדאון', v: pdRate > 0 ? `פעיל — ${fmt(pdRemainingSp, 1)} SP בשחרור` : 'כבוי', hint: 'op: withdraw_vesting' },
+        { k: 'ניתן-לתביעה', v: steemClaimableSteem > 0 || steemClaimableVests > 0 ? `${fmt(steemClaimableSteem)} STEEM + ${fmt(steemClaimableVests, 6)} VESTS` : '0 — נקי', hint: 'תגמולי-סופר/קיוריישן שהבשילו — תביעה מזרימה לנזיל+מסה (71-g) · תביעה-אחרונה: 2026-09-11 0.156+780.6' },
       ],
     },
     {
@@ -335,6 +388,26 @@ export async function flowOverview(): Promise<FlowOverview> {
     actions: ['steem_vote', 'autovote_pick'],
   });
 
+  // I. reward-claim (71-g) — תביעת-פרסים-שהבשילו: הרווחים-מהשרשרת יושבים-חייבים-לנו עד-op-תביעה
+  const rt = await rewardTrack();
+  const steemClaimable = steemClaimableSteem > 0 || steemClaimableSbd > 0 || steemClaimableVests > 0;
+  loops.push({
+    id: 'reward-claim', title: 'תביעת-פרסים (ממתין→נזיל+מסה)', engine: 'steem · claim_reward_balance',
+    status: steemClaimable ? 'live' : 'armed',
+    statusLabel: steemClaimable ? 'ניתן-לתביעה' : rt.lastClaim ? 'נקי — הכל-נתבע' : 'מוכן',
+    numbers: [
+      { k: 'ממתין-STEEM', v: `${fmt(steemClaimableSteem)} STEEM + ${fmt(steemClaimableSbd)} SBD`, hint: 'reward_steem/reward_sbd — חי-מ-get_accounts' },
+      { k: 'ממתין-VESTS', v: `${fmt(steemClaimableVests, 6)} VESTS (≈${fmt(steemClaimableSp, 3)} SP)`, hint: 'reward_vesting — נכנס-למסת-ההצבעה בתביעה' },
+      { k: 'תביעה-אחרונה', v: rt.lastClaim ? `${rt.lastClaim.at.slice(0, 16).replace('T', ' ')} UTC — ${rt.lastClaim.steem} + ${rt.lastClaim.vests}` : '—', hint: rt.lastClaim?.src === 'audit' ? 'מהפקדה-שלנו (שידור-מאומת) — אינדוקס-היסטוריה-בצומת-מפגר-רגעית (נמדד-חי 71-g)' : 'מהיסטוריית-השרשרת (100-op-אחרונים)' },
+      { k: 'תגמולי-סופר-ששולמו', v: `${rt.authorPaid.count} פאי-אאוט · ${fmt(rt.authorPaid.steem)} STEEM + ${fmt(rt.authorPaid.vests, 3)} VESTS`, hint: 'author_reward-מהשרשרת — ראיה-ראשונה: saos-1-protocol-spec-20260905 הבשיל 2026-09-12' },
+      { k: 'HIVE-ממתין', v: hiveClaimable !== null ? fmt(hiveClaimable) : '—', hint: 'כנות: 0 כרגע — נתבע-אוטומטית-כשיצבר' },
+    ],
+    verdict: steemClaimable
+      ? 'הרווחים-שהבשילו (סופר+קיוריישן) יושבים-חייבים-לנו-על-השרשרת עד-שנתבע-אותם. תביעה = רווח-טהור בלי-עלות: STEEM-נזיל זורם-למלאי-הספר ו-VESTS-מגדילים-את-מסת-ההצבעה. כנות: תביעה-על-אפס היא-שידור-מיותר — הכפתור-מופיע-רק-כשיש-מה-לתבוע.'
+      : 'הלולאה-חיה-ומוכחת: תביעה-קודמת נרשמה-בשרשרת. כשהפאי-אאוט-הבא יבשיל (יום-7-של-פוסט-חי) היתרה-תתעדכן-לייב-והכפתור-יחזור-אוטומטית.',
+    actions: steemClaimable ? ['steem_claim'] : [],
+  });
+
   // H. publish-author (71-f) — הפרסום-שלנו → תגמולי-סופר + הצבעה-עצמית (זרימה-כפולה-חוזרת)
   const latestPost = ownPosts[0] ?? null;
   const pubAgeH = latestPost ? (Date.now() - new Date(latestPost.created).getTime()) / 3600_000 : null;
@@ -437,7 +510,8 @@ export async function flowOverview(): Promise<FlowOverview> {
 
   /* ── פקדה ── */
   const ledger = await db.auditLog.findMany({
-    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
+    // FIX(71-g): flow-steem-claim — route.ts רושם flow-${chain}-claim (היה-חסר-במסנן — תביעות-STEEM-לא-נראו-בפקדה)
+    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
     orderBy: { createdAt: 'desc' }, take: 12,
   });
 
