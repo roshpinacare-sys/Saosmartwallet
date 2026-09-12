@@ -84,8 +84,6 @@ docs/org-scan.json
 # run artifacts (r25)
 docs/broadcast-seen.json
 
-# ── r29 runtime stores (state-on-disk, never source) ──
-# db/banker/ holds the banker HMAC secret (.secret, 0600) — NEVER commit
 /db/axiom/
 /db/banker/
 /db/.banker-mirror/
