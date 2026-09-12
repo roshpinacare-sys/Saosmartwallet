@@ -95,6 +95,9 @@ export function Channel() {
                 </p>
                 <span className="font-mono text-[10px] text-zinc-600" dir="ltr">{door.files} קבצים · {door.oursFiles} שלנו · {door.incoming} נכנסים</span>
               </div>
+              {incoming.length < door.incoming && (
+                <p className="text-[9px] font-mono text-zinc-500 mt-1" dir="rtl">מוצגות {incoming.length} דוגמאות מתוך {door.incoming} דופקים — חלון-הקריאה מוגבל בכוונה (חוק-האפס-עומס); השאר נספרים ונשמרים בזיכרון-הנצפו</p>
+              )}
 
               <div className="space-y-2 max-h-72 overflow-y-auto scroll-thin">
                 {incoming.map((v) => (
