@@ -322,7 +322,7 @@ export function Overview({ status }: { status: GateStatus }) {
             <div className="space-y-1 text-[10px] font-mono">
               <div className="flex items-center justify-between" dir="ltr">
                 <span className="text-zinc-400">vault</span>
-                <span className="text-zinc-200">{sit.vault.total} · {sit.vault.verified} verified{sit.vault.rotatedOut > 0 ? ` · ${sit.vault.rotatedOut} rotated-out` : ""}</span>
+                <span className="text-zinc-200">{sit.vault.total} · {sit.vault.verified} verified (status-col){sit.vault.rotatedOut > 0 ? ` · ${sit.vault.rotatedOut} rotated-out` : ""}</span>
               </div>
               <div className="flex items-center justify-between" dir="ltr">
                 <span className="text-zinc-400">fleet</span>
