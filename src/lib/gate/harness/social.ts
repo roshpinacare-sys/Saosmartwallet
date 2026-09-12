@@ -24,6 +24,7 @@ import { PrivateKey } from "../../../../packages/crypto/src/index";
 import { toSigningKey, COMMANDER_ACCOUNT } from "./orders";
 import { renewLease } from "./lease";
 import { assertPublishable, scanExposure } from "./exposure";
+import { requirePublicContent } from "./social-guard";
 import {
   blurtAdapter,
   blurtBroadcastAdapter,
@@ -186,6 +187,9 @@ export async function publishPostFromAgent(input: {
   // ── exposure policy: the cards stay home (tags scanned too) ──────────
   const tags = (input.tags || []).slice(0, SOCIAL_RAILS.maxTags);
   const exposure = assertPublishable(input.title, body, tags);
+  // ── r33 style gate: nothing machine-smelling, Hebrew, dash-ridden,
+  // money-exposing or report-toned ever reaches a key (operator decree) ─
+  requirePublicContent({ title: input.title, body, tags });
   // ── chain-polite root-post pacing ─────────────────────────────────────
   // The chain itself enforces STEEM_MIN_ROOT_COMMENT_INTERVAL: a root post
   // is allowed only once every 5 minutes per account (live-learned 2026-09-10:
@@ -312,6 +316,8 @@ export async function editPostFromAgent(input: {
   }
   // ── exposure policy applies to edits too (tags scanned too) ───────────
   const exposure = assertPublishable(input.title, newBody, tags);
+  // ── r33 style gate on edits as well (remediation must not re-offend) ──
+  requirePublicContent({ title: String(input.title || original.title), body: newBody, tags });
   const built = await buildSteemPostTx(
     {
       author: COMMANDER_ACCOUNT,
@@ -972,17 +978,20 @@ export async function steemTrends(): Promise<TrendsReport> {
   }
   const rankedCats = [...catMass.entries()].sort((a, b) => b[1].payout - a[1].payout).slice(0, 5);
   const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+  // r33 doctrine: the radar is CONTEXT, never a topic order. The junk posts
+  // ("Exploring the Latest Trends in KR") were born from treating demand
+  // signals as titles. Now the candidate demands first-hand substance: the
+  // tag may ride along, the topic must be OUR real work, and payout figures
+  // never leak into the prompt (they leaked into the posts).
   const candidates: TopicCandidate[] = rankedCats.map(([cat, v]) => ({
-    titleIdeaEn: `${cap(cat)} in practice: what the chain's top-ranked posts this week reveal`,
+    titleIdeaEn: `One real thing we built or measured this week, told from inside ${cap(cat)}: first-hand evidence only, no trend summary`,
     tags: [...new Set([cat, topTags[0]?.tag, topTags[1]?.tag, "howto"].filter((x): x is string => !!x))].slice(0, 5),
-    why: `הקטגוריה "${cat}" מופיעה ${v.n} פעמים ברשימה-החמה החיה עם ~${v.payout.toFixed(1)} SBD תשלומים-מצטברים — ביקוש מהשרשרת, לא ניחוש`,
+    why: `הקטגוריה "${cat}" מופיעה ${v.n} פעמים ברשימה-החמה החיה — ביקוש-קוראים אמיתי. זו הקשר-לכתיבה, לא-פקודת-נושא: פרסם רק-עבודה-אמיתית-שלנו-מגוף-ראשון, השתמש-בתגית, ואסור-לסכם-את-הטרנד`,
   }));
 
-  const hottest = hot[0];
   const summary =
-    `מכ"ם-נושאים חי מהשרשרת: ${topTags.length} תגיות-חמות (ראשונה: ${topTags[0]?.tag || "—"} עם ~${topTags[0]?.payoutSteem.toFixed(1) ?? "—"} SBD), ` +
-    `${hot.length} דיונים-חמים${hottest ? ` (החם ביותר: "${hottest.title}" של @${hottest.author}, ${hottest.comments} תגובות)` : ""}. ` +
-    `${candidates.length} מועמדויות-נושא נגזרו מהביקוש-החי — הבונים כותבים מה שהרשת קוראת באמת, באנגלית (ניתוב-שפה).`;
+    `מכ"ם-נושאים חי מהשרשרת: ${topTags.length} תגיות-חמות, ${hot.length} דיונים-חמים. ` +
+    `${candidates.length} הערות-הקשר נגזרו מהביקוש-החי. דוקטרינת-r33: המכ"ם הוא הקשר, לא-פקודת-נושא — פוסט-חייב-לספר-עבודה-אמיתית-שלנו-מגוף-ראשון באנגלית, בלי-סיכום-טרנדים, בלי-מספרי-תגמולים, ועובר-שער-סגנון-מכני-לפני-חתימה.`;
 
   return { generatedAt: new Date().toISOString(), topTags, hot, candidates, summary };
 }

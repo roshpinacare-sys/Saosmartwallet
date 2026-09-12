@@ -2110,3 +2110,86 @@ Stage Summary:
 - **כל-4-מפתחות-ה-NVIDIA-של-המפעיל-שוחזרו-ומוכחים-חיים** (דריל-248/248-ללא-כישלונות) + 12-רשומות-אבודות-נוספות.
 - זמינות-חדשה: הלב-מחיה-את-הפורטל-בעצמו (הוכח-חי); instrumentation-מוגן-מ-edge-compile; ה-500-הגורף-נפתר.
 - פתוח-ל-r33: watermark-מונוטוני-לכספת-באתחול (זיהוי-rollback-אוטומטי), תיקון-דוקים-היסטוריים-בשדה-ה-open, המשך-רשימת-r30 (jummper/ethereum-funding/blurt-flake).
+
+---
+Task ID: 53-c
+Agent: content-translator (articles)
+Task: translate 4 Hebrew SAOS articles to English
+
+Work Log:
+- Read worklog tail for project context; read the 3 English reference articles (01-what-is-saos, 03-the-sub-cent-notary, 07-key-guardianship) to match voice: story-driven, short paragraphs, bold key lines, real numbers, italic reading-time header and italic disclaimer footer, zero hype.
+- Read the 4 Hebrew sources. Note: two task-description labels were inaccurate vs. actual content (04 is "the machine that admits its mistakes", honesty-as-a-function, not "hears everything"; 05 is the old Steem/Hive 2017-account identity-bridge story, not a treasury/rewards story). Slugs and titles were derived from the actual content.
+- Translated and wrote 4 English articles into tmp-analysis/ads-en-staging/content/articles/en/, preserving structure (title, reading-time line, sections, footer disclaimer) and all source numbers: 52x resources, 36-second stamp/heartbeat, 383,000 refused transactions, row 4,117, hundred agorot (< 1 shekel), ten thousand records for less than a dollar, 2016-2018/2017, ten-year identity, 23:58/23:59/00:22:50/00:27, 8/10-minute frozen-chain rule, v26, 2026-09-08 23:58. Currency translated naturally (agora/shekel kept).
+- Style compliance pass: no em/en dashes, no exclamation marks, no emoji, zero Hebrew characters, banned-word list avoided (delve/tapestry/landscape/realm/ever-evolving/game-changer/revolutionize/seamless/robust/leverage/unlock/journey/crucial/vital/pivotal/furthermore/moreover/in conclusion/it is worth noting/dive deep/navigate/embrace/foster/testament to).
+- Verification: rg scan for [\u0590-\u05FF], em-dash, en-dash on each output file returned empty; extra scans for exclamation marks, banned words, and "landscape" all clean; key-number spot-check confirmed all figures present.
+- Did not touch any other file; did not read or print any tokens/secrets.
+
+Stage Summary:
+- en/02-why-everyone-claims-and-nobody-proves.md (4,290 chars) "Why the Internet Lies to You, and How to Fix It Once and for All"
+- en/04-the-machine-that-admits-mistakes.md (3,657 chars) "The Machine That Admits Mistakes"
+- en/05-your-2017-account-is-worth-more.md (3,643 chars) "That Old Account from 2017 Is Worth More Than You Think"
+- en/06-the-machine-that-healed-itself.md (3,124 chars) "The Machine That Healed Itself"
+- All 4 staged under tmp-analysis/ads-en-staging/content/articles/en/, banned-pattern scan clean on every file.
+
+---
+Task ID: 53-b
+Agent: content-translator (ads+brand)
+Task: translate Adsmarket marketing material to English
+
+Work Log:
+- Read last ~80 lines of worklog for context; read both sources in full: /tmp/ads_content_ads_ads-pack.md (ads pack) and /tmp/ads_brand.md (brand guide).
+- Translated the ads pack to English with structure and labels preserved: sections A (versions A1, A2, A4, A3, same order and parentheticals), B (B1-B5), C (Campaigns 1-2 with headlines/descriptions), D (community long post), E (LinkedIn B2B), plus the closing visual directions list (items 1-5).
+- Translated the brand guide: identity one-liner, tone-of-voice table, three key words, language policy, color palette table, allowed/forbidden lists, uniform disclaimer, assets, dash rule (owner directive 2026-09-11).
+- Style compliance: zero em/en dashes, zero exclamation marks, zero emoji, zero Hebrew characters; banned-word list avoided. Source anti-example "game-changing" in the do-not-say column rendered as "it changes everything" to keep the banned string out of output. Numbers kept exactly as in source ($0.0000081, 383,836, 36 seconds, 23:58/23:59, factor 52); per task spec, "₪400" rendered as "about 400 shekels" and "a hundredth of an agura" as "a hundredth of an agora".
+- Wrote outputs only at the two required paths: /home/z/my-project/tmp-analysis/ads-en-staging/content/ads/ads-pack.md and /home/z/my-project/tmp-analysis/ads-en-staging/brand.md. No other files touched.
+- Verification: rg -n '[\u0590-\u05FF]|—|–' on both outputs returns nothing (exit 1). Positive control on the Hebrew sources fires 97 and 52 matches, proving the pattern compiles and the empty result is real. Extra scans clean: no exclamation marks, no emoji, no banned words.
+
+Stage Summary:
+- ads-pack.md (EN): 6,822 chars, banned-pattern scan clean.
+- brand.md (EN): 3,732 chars, banned-pattern scan clean.
+- Faithful, punchy translations with all original section labels, claims, and numbers intact; no invented claims, no return promises added.
+
+---
+Task ID: 53-d
+Agent: content-translator (core-marketing)
+Task: fetch 6 Hebrew core marketing docs from private repo roshpinacare-sys/Adsmarket (main) via GitHub API and translate them to English
+
+Work Log:
+- Read worklog tail for context (53-b ads+brand, 53-c articles: voice, style conventions, verification drills).
+- Fetched all 6 files (faq.md, glossary.md, ecosystem.md, pitch.md, compare.md, disclosure-policy.md) with HTTP 200 using the PAT from /tmp/gh_token_hidden strictly as an Authorization header (Accept: application/vnd.github.raw+json, ref=main); token never printed, echoed, or copied; raw Hebrew sources saved to tmp-analysis/ads-en-staging/src-he/ for traceability.
+- Translated all 6 into English at the required staging paths, preserving structure: FAQ Q/A sections and section headings (including the unheaded Q&A block after the money section), glossary 46-row term table plus the 4 writing rules, ecosystem layered table + 5 breakthroughs with honest limits + audience table + v2 update list, pitch (30s/2min/5min structures with timings, per-audience one-liners, existing English 30s + one-liner kept as-is), compare 8-row main table + when-NOT-to-use list + 3 challenge questions, disclosure policy 2 tables + reveal-level + phrasing laws + 3+1 rules + retroactive note.
+- All numbers kept exactly: 74,907+, 1,507+, 32,603 tx/s, 383,836, 130,499, 109,919µ, 5,606, 9,935,250µ, $0.0000081, $0.08, $13.91, 5.04%, +459% to +24.7%, 16 TWAP, 133kµ, 52.6, 73.2M RC, 21 anchors/22 hours/00:29Z, 5,128/day, 30,920 gas, 32,493,358,294,280 wei, block 25,929,672, 77/77, 250B to 51B (-79.6%), 15.9ms/6.8ms/435B, root 0896c3c6..., 5 witness block numbers, cp#33612/1db5006b.../86,019,974, wog +163,295µ, 13/13 soldiers, 23 loops, 7/11, 30bps/70%, 65/65 legs p50 88ms, 400 shekels and up, Wormhole ~$320M, Ronin ~$600M, >$2B, 10 to 90 minutes, 7 EVM doors for 94 cents, 0 keys in 32 commits, 14/14, 3 homes, quota 1,000/day, 10 targets, 10 repos, v28, 2026-09-08/09/10 dates.
+- Source emoji (warning tag in disclosure-policy) rendered as plain text "tagged internally as warning items"; ellipses normalized to three ASCII dots; source arrows/middots kept where structural; "b'karov!" exclamation rendered as plain "soon" per zero-exclamation rule.
+- Style compliance: zero Hebrew characters, zero em/en dashes (commas/colons/parentheses instead), zero emoji, zero exclamation marks; full banned-word list avoided (delve/tapestry/landscape/realm/ever-evolving/game-changer/revolutionize/seamless/robust/leverage/unlock/journey/crucial/vital/pivotal/furthermore/moreover/in conclusion/it is worth noting/dive deep/navigate/embrace/foster/testament to).
+- Verification: required rg scan for [\u0590-\u05FF]|—|– returned empty on all 6 files; positive control on the 6 Hebrew sources fired 27-54 matches per file, proving the pattern compiles; extra scans clean (no "!", no banned words, no unexpected non-ASCII); key-number spot-check confirmed every tracked figure present (initial three "missing" were shell-mangling false negatives: $0.08, -79.6%, re-verified literally, all present).
+- Did not touch any other file; no tokens or secrets read or printed beyond the authorized header use.
+
+Stage Summary:
+- /home/z/my-project/tmp-analysis/ads-en-staging/faq.md (9,054 chars), banned-pattern scan clean.
+- /home/z/my-project/tmp-analysis/ads-en-staging/glossary.md (6,244 chars), banned-pattern scan clean.
+- /home/z/my-project/tmp-analysis/ads-en-staging/ecosystem.md (6,798 chars), banned-pattern scan clean.
+- /home/z/my-project/tmp-analysis/ads-en-staging/pitch.md (6,509 chars), banned-pattern scan clean.
+- /home/z/my-project/tmp-analysis/ads-en-staging/compare.md (5,484 chars), banned-pattern scan clean.
+- /home/z/my-project/tmp-analysis/ads-en-staging/disclosure-policy.md (4,962 chars), banned-pattern scan clean.
+- All 6 core marketing docs staged with structure, claims, and numbers intact; honest, no-hype tone matching the 53-b/53-c voice.
+---
+Task ID: 53-e
+Agent: content-translator (press+media)
+Task: fetch 4 Hebrew marketing files from private GitHub repo roshpinacare-sys/Adsmarket (press/press-kit.md, content/email/drip-3.md, content/video/scripts.md, social.md) and translate them to English
+
+Work Log:
+- Read worklog tail for context. PAT from /tmp/gh_token_hidden used only as an HTTP Authorization header (never printed, logged, or copied); fetched all 4 files via the GitHub contents API (ref=main, Accept: application/vnd.github.raw+json), all HTTP 200: press-kit 15,083 chars, drip-3 2,881, scripts 4,202, social 46,145.
+- Translated press/press-kit.md: Hebrew boilerplate, headline-numbers table (55 rows), sample receipts, visual assets, hard-questions Q&A, quoting rules; the English boilerplate and EN content kept verbatim; all numbers exact ($0.0000081, 32,603 tx/s, 65,238, 15.9 ms, 383,836, 74,907+, 52.6x, 36s, 9/9, 153 -> 8, $0.40/$0.94, 831 bytes, 10.1%, 30,032 -> 0, 687 -> 0, 1481s -> 238s, +459% -> +24.7%, $258.46, etc.); U+2212 minus signs normalized to ASCII hyphens, RTL/LRM marks stripped.
+- Translated content/email/drip-3.md: 3 letters (day 0/3/7) with subjects, CTA buttons, {name}/{sender name} placeholders and embedding notes; "less than a hundredth of an agora" per the convention set in 53-b; source exclamation-mark chat quotes ("I did it!" etc.) rendered without exclamation marks.
+- Translated content/video/scripts.md: 3 shot tables (30s Reel/TikTok, 60s explainer, 90s reputation) with Time/Visual/Voiceover columns plus 6 production directions; 400-shekel notary price tag kept exactly.
+- Translated social.md (20 ready posts + launch campaign L1-L43 + publishing guidelines v2): all Hebrew snippets translated faithfully; all existing EN snippets kept verbatim; post labels (X/Telegram/LinkedIn, Hebrew/EN), numbering, links, txids, section separators and the disclaimer kept; the two standalone em-dash separator lines in L42/L43 dropped (banned char).
+- Style compliance on all 4 outputs: zero Hebrew characters, zero em/en dashes, zero emoji, zero exclamation marks; banned-word list avoided in translated AND kept EN text (only raw-substring hit is the technical flag identifier "realMoney" in the press-kit table, kept for fidelity; word-boundary scan clean).
+- Verification: rg -n "[\u0590-\u05FF]|—|–" empty (exit 1) on all 4 outputs; positive control on the 4 Hebrew sources fires 93/55/35/317 matching lines, proving the pattern compiles and the empty results are real. Extra scans clean: no "!", no banned words as words, no bidi/control marks. Number-integrity script: every numeric token in each source appears in its translation (197/11/32/193 tokens; the single flagged "1481" is present as "1,481", matching the source's own EN block formatting).
+- Wrote only the 4 required output paths; no other files touched; sources kept in /tmp/53e-src.
+
+Stage Summary:
+- press/press-kit.md (EN): 18,479 chars, banned-pattern scan clean.
+- content/email/drip-3.md (EN): 3,867 chars, banned-pattern scan clean.
+- content/video/scripts.md (EN): 5,577 chars, banned-pattern scan clean.
+- social.md (EN): 54,178 chars, banned-pattern scan clean.
+- Faithful translations with all numbers, txids, structure and snippet labels intact, staged under tmp-analysis/ads-en-staging/ for review/merge.
