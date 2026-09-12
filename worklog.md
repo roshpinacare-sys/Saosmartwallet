@@ -2047,3 +2047,24 @@ Stage Summary:
 - pool-המוח אמיתי ומוכן-לצמיחה: הבעלים שולח מפתחות → keys-batch אוטם → ה-pool מסתובב אוטומטית; 429-rotation כבר-קיים.
 - vault.anchor פותח עיגון-יומי-חופשי לתעסוקה-מתוזמנת (עד ~5,128/יום ב-$0) עם חסם-קצב.
 - פתוח ל-r31: אסימון-כלי-הרשת, מימון-גז ל-ethereum, schedule-row רשמי ל-עיגון-jummper, קליטת מפתחות-נוספים.
+
+---
+Task ID: 48-truth-audit
+Agent: main (Z.ai Code)
+Task: r31 — ביקורת-אמת מלאה: כל-הצהרות-הדף והדוקים מול הקוד/DB/שרשרת (הנחיית-הבעלים: "בחן את כל הטענות — אמיתי או שקר")
+
+Work Log:
+- סריקת-הדף: page.tsx → console-shell (12 סעיפים) → overview (6 KPIs + לב + כסף + דלת + עוגנים + ריפו + תעסוקה); מיפוי-29 מסלולי-API.
+- **ממצא-קריטי 1 — הלב היה מת**: heart-service לא-רץ (קונטיינר-ריבוט 14:21:21Z; הלב מת 14:46:30Z; אף-מנגנון-אתחול לא הקים-אותו). הוכחה: שתי-בדיקות-בהפרש-25שנ' — beats=75 קפוא, lastTick זהה.
+- **ממצא-קריטי 2 — הריפר שבור מאז-r36 (schema drift)**: הקוד כותב `retryNotBefore` ל-GateRun — העמודה חסרה-ב-DB החי ולקוח-הפריזמה המחולל מיושן (0 הופעות ב-schema.prisma המחולל) → `Unknown argument` בכל-פעימה. ה-backoff של-r36 מעולם-לא-רץ. שתי-ריצות-יתומות running מ-14:44 הוכיחו-את-הנזק.
+- תיקונים: (1) prisma generate + db:push — עמודה-נוספה, אפס-אובדן (234/184 שורות-שלמות); (2) heart-service הוקם — beats מתקדמים, הריפר קצר-את-היתומות לתור (running 2→0, queued 2), כל-9 הלולאות ok; (3) **boot-resilience**: package.json dev מקים-את-הלב-אוטומטית (singleton-lock מונע-כפילות) + סקריפט `heart` ידני; (4) תווית-כנות "(ללא rotated-out)" לשורת-chains ב-overview (steem 99=110−11).
+- צליבת-הדף מול-ה-DB (SQL ישיר): 234 סודות ✓ · 707 הודעות ✓ · 9 סוכנים ✓ · 12 חותמות ✓ · תעסוקה-24h 25=8done+7blocked+8failed+2running+idle5 ✓ (epoch-ms נכון).
+- אימות-עצמאי-על-השרשרת (בלי-ה-API-שלנו): steem blk 109517510 + hive blk 109852171 + blurt blk 63579287 — שלושת-העוגנים של r30-blurt-retry נמצאו עם custom_json saos.vault.anchor.v1 ודיגסט-אחד 03c9cab9 ✓✓✓; treasury steem: סיכום-עצמאי-של-12-חשבונות = 1.633 STEEM/0.041 SBD — ביט-ביט-מול-ה-KPI ✓.
+- צליבת-הדוקים מול-הקוד: r29 (RC [[headcorner]] / max-of-nodes / ETA / map totalAll+truncated / stats entriesByKind) — הכל-אמת; r30 (blurt retry 1.2שנ' + cause-travel + כל-key_auths / nvidiaPool fp-dedupe+cooldown-60שנ'+רוטציה / vault.anchor חסם-1/6שע' / funding-watch קיים) — הכל-אמת.
+- parity.twin נבדק-חי-מחדש: וקטורים-מנוסחת-TS (bun) → stdin → תאומת-פייתון: 11/11 ok (6 D1 + 4 WIF + 1 digest), אפס-סודות (זרעים-סינתטיים).
+- lint 0/0.
+
+Stage Summary:
+- **פסק-הביקורת**: כל-טענות-הדף-והדוקים (פרט-לשניים-שתוקנו-במקום) הן אמת-מדודה — הלב-והריפר היו החריגים-החמורים ותוקנו-ואומתו-בזמן-הביקורת-עצמה.
+- שינויים: package.json (dev boots heart; heart script) · db/custom.db (עמודת retryNotBefore) · node_modules/.prisma (לקוח-טרי) · overview.tsx (תווית-chains) · docs/broadcast/2026-09-12-r31-truth-audit.md.
+- פתוח ל-r32: watchdog-חיצוני-ללב (קריסה-אמצע-חיים), פעימה-יומית-אוטונומית, קליטת-מפתחות-NVIDIA.

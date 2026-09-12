@@ -330,7 +330,11 @@ export function Overview({ status }: { status: GateStatus }) {
               </div>
               <div className="flex items-center justify-between gap-2" dir="ltr">
                 <span className="text-zinc-400 shrink-0">chains</span>
-                <span className="text-zinc-500 truncate">{Object.entries(sit.vault.chains).map(([ch, n]) => `${ch}:${n}`).join(" · ")}</span>
+                {/* r31 honesty: chains counts EXCLUDE rotated-out rows (vault total includes
+                 * them — 234 total vs 233+11) — the label says so, no mixed accounting. */}
+                <span className="text-zinc-500 truncate" title="ספירת-השרשרות מחריגה שורות-rotated-out">
+                  {Object.entries(sit.vault.chains).map(([ch, n]) => `${ch}:${n}`).join(" · ")} (ללא rotated-out)
+                </span>
               </div>
               <div className="flex items-center justify-between" dir="ltr">
                 <span className="text-zinc-400">bots</span>
