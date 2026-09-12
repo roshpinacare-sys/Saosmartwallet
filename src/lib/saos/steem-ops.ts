@@ -214,8 +214,9 @@ export async function hiveSavingsSweep(): Promise<{ ok: true; amount: string; ap
   return { ok: true, amount, apr: '15%' };
 }
 
-/** מועמד-אוטו-קיוריישן: פוסט-חי מהטרנדינג (צעיר-מ-18h, תמיכה-חיובית, לא שלנו) — כל-שרשרת */
-export async function curationCandidates(chain: Chain3, tag = ''): Promise<Array<{ author: string; permlink: string; created: string; ageH: number; title: string; votes: number }>> {
+/** מועמד-אוטו-קיוריישן: פוסט-חי מהטרנדינג (צעיר-מ-18h, תמיכה-חיובית, לא שלנו) — כל-שרשרת
+ * 71-h: שדה-voted (הצבענו-כבר?) — דה-דופ לאוטופיילוט + ל-UI (אמת מ-active_votes) */
+export async function curationCandidates(chain: Chain3, tag = ''): Promise<Array<{ author: string; permlink: string; created: string; ageH: number; title: string; votes: number; voted: boolean }>> {
   const q: Record<string, unknown> = { limit: 20 };
   if (tag) q.tag = tag;
   const rows = chain === 'hive'
@@ -231,8 +232,28 @@ export async function curationCandidates(chain: Chain3, tag = ''): Promise<Array
       title: String(d.title ?? '').slice(0, 60),
       // BLURT מוריד את net_votes — ספירה מ-active_votes (אמת-שדה, נבדק-חי 71-e)
       votes: Number.isFinite(Number(d.net_votes)) ? Number(d.net_votes) : (Array.isArray(d.active_votes) ? d.active_votes.length : 0),
+      voted: Array.isArray(d.active_votes) ? (d.active_votes as Array<{ voter: string }>).some((v) => v.voter === OPERATOR) : false,
     }))
     .filter((c: { author: string; ageH: number }) => c.author && c.author !== OPERATOR && c.ageH > 1 && c.ageH < 18);
+}
+
+/** פרסום-פוסט-שורש (מנוע-התוכן · 71-h) — op-comment חותם posting-קודם/owner-גיבוי (אותו-דפוס-הצבעה) */
+export async function steemPublish(opts: { title: string; body: string; tags: string[]; permlink: string }): Promise<{ ok: true; permlink: string; author: string }> {
+  if (!opts.title.trim() || !opts.body.trim()) throw new Error('publish: title/body נדרשים (fail-honest)');
+  if (!/^[\w-]{3,96}$/.test(opts.permlink)) throw new Error('publish: permlink לא-תקין (a-z0-9-)');
+  const tags = opts.tags.filter((t) => /^[\w-]{2,24}$/.test(t)).slice(0, 5);
+  let wif: string;
+  try { wif = await vaultWif('steem', 'posting'); } catch { wif = await vaultOwnerWif('steem'); }
+  await sendOps('steem', [['comment', {
+    parent_author: '',
+    parent_permlink: tags[0] || 'saos',
+    author: OPERATOR,
+    permlink: opts.permlink,
+    title: opts.title.slice(0, 200),
+    body: opts.body.slice(0, 60000),
+    json_metadata: JSON.stringify({ tags, app: 'saos-flow/71h', format: 'markdown' }),
+  }]], wif);
+  return { ok: true, permlink: opts.permlink, author: OPERATOR };
 }
 
 /** פוסטים-שורש-אחרונים שלנו (publish-desk) — מקור-אמת ללולאת-הפרסום (71-f) */

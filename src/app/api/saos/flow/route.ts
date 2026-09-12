@@ -1,12 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/auth';
 import { audit, relayBroadcast } from '@/lib/audit';
-import { flowOverview } from '@/lib/saos/flow';
+import { flowOverview, type FlowOverview } from '@/lib/saos/flow';
 import {
   chainVote, hiveSavingsSweep, claimRewards, curationCandidates, postInfo,
-  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, OPERATOR, type Chain3,
+  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, steemRcMana, getBlurtAccount, OPERATOR, type Chain3,
 } from '@/lib/saos/steem-ops';
 import { trxEnergize, tronAccount, treasuryWallet } from '@/lib/saos/trx-ops';
+import { readAutopilotState, readAutopilotConfig, writeAutopilotConfig } from '@/lib/saos/autopilot-state';
+
+/** דוח-מערכת-חי לפרסום (מנוע-התוכן · 71-h) — כל-מספר מתוך flowOverview (אפס-המצאה) */
+function buildFlowReport(o: FlowOverview): { title: string; body: string; permlink: string } {
+  const now = new Date();
+  const ymd = now.toISOString().slice(0, 10);
+  const t = now.toISOString().slice(11, 16);
+  const lines: string[] = [];
+  lines.push(`# SAOS Flow Report — ${ymd} ${t} UTC`);
+  lines.push('');
+  lines.push('Autonomous flow-engine telemetry. Every number below is read live from public chain RPC / vault — nothing invented. Reports are published by the engine itself (autopilot, 71-h).');
+  lines.push('');
+  lines.push(`## Treasury (live)`);
+  lines.push(`- Total USD (priced, CoinGecko): ${o.treasury.totalUsd ?? '—'} · in release: ${o.treasury.inReleaseUsd ?? '—'} USD`);
+  for (const r of o.treasury.rows) {
+    const parts = r.items.map((i) => `${i.k}: ${i.v}`).join(' · ');
+    lines.push(`- **${r.chain}** (${r.ok ? 'rpc-ok' : 'rpc-down'}) — ${parts}`);
+  }
+  lines.push('');
+  lines.push(`## Flow loops (${o.loops.length}) — status`);
+  for (const l of o.loops) lines.push(`- **${l.id}** — ${l.statusLabel} · engine: ${l.engine}`);
+  lines.push('');
+  lines.push('## Recent on-chain ledger (audit trail)');
+  for (const e of o.ledger.slice(0, 6)) lines.push(`- ${e.createdAt.slice(0, 16).replace('T', ' ')} UTC · ${e.action} · ${e.detail.slice(0, 90)}`);
+  lines.push('');
+  lines.push('> Honesty policy: null stays null, zero stays zero, estimates are tagged. The machine runs its own claim → curation → selfvote → publish loop and reports itself on-chain.');
+  return { title: `SAOS Flow Report — ${ymd} (live engine telemetry)`, body: lines.join('\n'), permlink: `flow-report-${ymd}` };
+}
+
+/** אותות-אוטופיילוט (71-h) — קריא-בלבד · טרי (בלי-מטמון) — המקור-שהשירות-נשען-עליו */
+async function autopilotSignals() {
+  const [steemAcc, hiveAcc, blurtAcc, rc] = await Promise.all([
+    getAccount('steem').catch(() => null),
+    getAccount('hive').catch(() => null),
+    getBlurtAccount().catch(() => null),
+    steemRcMana().catch(() => null),
+  ]);
+  const posts = await ownBlogPosts('steem', 1).catch(() => []);
+  const latest = posts[0] ?? null;
+  const num = (v: unknown): number => (parseFloat(String(v ?? '0')) || 0);
+  const vp = (acc: { voting_power?: number } | null): number | null => (acc ? Number(acc.voting_power ?? 0) / 100 : null);
+  return NextResponse.json({
+    ok: true, action: 'autopilot_signals', ts: Date.now(),
+    steem: {
+      vpPct: vp(steemAcc), rcPct: rc ? Number(rc.pct.toFixed(1)) : null,
+      claimable: steemAcc ? { steem: num(steemAcc.reward_steem_balance), sbd: num(steemAcc.reward_sbd_balance), vests: num(steemAcc.reward_vesting_balance) } : null,
+    },
+    latestPost: latest ? { permlink: latest.permlink, title: latest.title, created: latest.created, ageH: Math.round((Date.now() - new Date(latest.created).getTime()) / 360e4) / 10, hasSelfVote: latest.hasSelfVote, pendingSbd: latest.pendingSbd } : null,
+    hive: { vpPct: vp(hiveAcc), claimable: hiveAcc ? num(hiveAcc.reward_hive_balance) + num(hiveAcc.reward_hbd_balance) + num(hiveAcc.reward_vesting_balance) : null },
+    blurt: { vpPct: vp(blurtAcc), claimable: blurtAcc ? num(blurtAcc.reward_blurt_balance) + num(blurtAcc.reward_bbd_balance) + num(blurtAcc.reward_vesting_balance) : null },
+  });
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -119,6 +171,34 @@ export async function POST(req: NextRequest) {
     return await selfVoteAction(p, false, '');
   }
 
+  // 71-h: autopilot_signals — public telemetry, open read-only.
+  if (action === 'autopilot_signals') {
+    try { return await autopilotSignals(); }
+    catch (e) { return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'signals failed' }, { status: 200 }); }
+  }
+
+  // 71-h: steem_publish dry-run — generated report preview (public data), open.
+  if (action === 'steem_publish' && execute !== true) {
+    try {
+      const o = await flowOverview();
+      const rep = buildFlowReport(o);
+      const latestOwn = (await ownBlogPosts('steem', 1).catch(() => []))[0] ?? null;
+      const ageH = latestOwn ? (Date.now() - new Date(latestOwn.created).getTime()) / 360e4 : null;
+      const exists = await postInfo('steem', OPERATOR, rep.permlink).catch(() => null);
+      return NextResponse.json({
+        ok: true, action, dryRun: true,
+        plan: {
+          permlink: rep.permlink, title: rep.title, bodyChars: rep.body.length,
+          lastPostAgeH: ageH === null ? '-' : ageH.toFixed(1), guard: '>=20h since last post + free permlink',
+          permlinkFree: exists ? 'taken — will refuse' : 'free',
+          note: 'live telemetry report from flowOverview — execute requires operator session',
+        },
+      });
+    } catch (e) {
+      return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'publish dry-run failed' }, { status: 200 });
+    }
+  }
+
   const owner = await requireOwner(req);
   if (!owner) return NextResponse.json({ ok: false, error: 'auth-required', note: 'התחבר כמפעיל כדי להריץ פעולות-זרימה' }, { status: 401 });
 
@@ -188,6 +268,50 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, action, dryRun: true, plan: { note: `תביעת-כל-הפרסים-הממתינים ב-${chain.toUpperCase()} (כנה אם 0)` } });
       }
 
+      /* 71-h: publish engine — honest telemetry report on-chain */
+      case 'steem_publish': {
+        try {
+          const latestOwn = (await ownBlogPosts('steem', 1).catch(() => []))[0] ?? null;
+          const ageH = latestOwn ? (Date.now() - new Date(latestOwn.created).getTime()) / 360e4 : null;
+          if (ageH !== null && ageH < 20) {
+            return NextResponse.json({ ok: false, action, error: `last post age ${ageH.toFixed(1)}h - publish policy: min 20h gap (anti-spam, fail-honest)` });
+          }
+          const o = await flowOverview();
+          const rep = buildFlowReport(o);
+          const exists = await postInfo('steem', OPERATOR, rep.permlink).catch(() => null);
+          if (exists) return NextResponse.json({ ok: false, action, error: `permlink ${rep.permlink} already exists on-chain (fail-honest - no duplicates)` });
+          const body = typeof p.body === 'string' && p.body.trim().length > 40 ? String(p.body) : rep.body;
+          const title = typeof p.title === 'string' && p.title.trim().length > 3 ? String(p.title) : rep.title;
+          const r = await steemPublish({ title, body, tags: ['saos', 'steem', 'report', 'flow'], permlink: rep.permlink });
+          await audit('flow-publish', `steem_publish: ${r.permlink} - report bodyChars=${body.length} by owner:${owner.label}`);
+          try { await relayBroadcast('vault', { type: 'flow-publish', permlink: r.permlink }); } catch { /* */ }
+          return NextResponse.json({ ok: true, action, dryRun: false, result: r });
+        } catch (e) {
+          return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'publish failed' }, { status: 200 });
+        }
+      }
+
+      /* 71-h: operator control of the autopilot - pause/resume (clamped config) */
+      case 'autopilot_pause':
+      case 'autopilot_resume': {
+        if (!execute) {
+          const cfg = readAutopilotConfig();
+          const st = readAutopilotState();
+          return NextResponse.json({
+            ok: true, action, dryRun: true,
+            plan: {
+              enabledNow: String(cfg?.enabled ?? '-'), cycles: String(st?.cycles ?? 0),
+              intervalMin: String(st?.intervalMin ?? cfg?.intervalMin ?? '-'), weightPct: String(st?.weightPct ?? cfg?.weightPct ?? '-'),
+              note: action === 'autopilot_resume' ? 'execute:true re-enables autonomous cycles (claim-curation-selfvote-publish)' : 'execute:true stops new cycles (state kept honestly)',
+            },
+          });
+        }
+        const cfg = writeAutopilotConfig({ enabled: action === 'autopilot_resume' });
+        await audit('flow-autopilot', `${action} by owner:${owner.label} - enabled=${cfg.enabled}`);
+        try { await relayBroadcast('vault', { type: 'flow-autopilot', enabled: cfg.enabled }); } catch { /* */ }
+        return NextResponse.json({ ok: true, action, dryRun: false, config: cfg });
+      }
+
       /* ── אנרגיז-TRX ── */
       case 'trx_energize': {
         const w = await treasuryWallet();
@@ -211,7 +335,7 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'autovote_pick'] }, { status: 200 });
+        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
     }
   } catch (e) {
     return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'flow action failed' }, { status: 200 });

@@ -19,6 +19,7 @@ import { db } from '@/lib/db';
 import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser, getBlurtAccount, getBlurtProps, ownBlogPosts, steemRcMana } from '@/lib/saos/steem-ops';
 import { treasuryWallet, doorWallet, tronAccount } from '@/lib/saos/trx-ops';
 import { planEnergize } from '@/lib/saos/tron-energize';
+import { readAutopilotState, readAutopilotConfig } from '@/lib/saos/autopilot-state';
 
 const STEEM_RPC = 'https://api.steemit.com';
 const USDT_TRC20 = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'; // USDT-TRC20 חוזה-קנוני
@@ -508,10 +509,37 @@ export async function flowOverview(): Promise<FlowOverview> {
     actions: funded >= 2 ? ['trx_energize'] : [],
   });
 
+  // J. autopilot (71-h) — המנוע-האוטונומי: claim→curation→selfvote→publish בעצמו
+  const ap = readAutopilotState();
+  const apCfg = readAutopilotConfig();
+  const apAgeMs = ap?.lastCycleAt ? Date.now() - ap.lastCycleAt : null;
+  const apStaleMs = ((ap?.intervalMin ?? 60) * 2 + 5) * 60_000;
+  const apLive = !!ap?.enabled && apAgeMs !== null && apAgeMs < apStaleMs;
+  const apLast = ap?.lastActions?.[0] ?? null;
+  const apLastErr = ap?.errors?.[0] ?? null;
+  loops.push({
+    id: 'autopilot', title: 'אוטופיילוט (מריץ-את-הלולאות בעצמו)', engine: 'flow-autopilot · :3020',
+    status: apLive ? 'live' : 'blocked',
+    statusLabel: apLive ? 'חי — מעגלים-אוטונומיים' : ap ? (ap.enabled ? `שקט ${apAgeMs !== null ? Math.round(apAgeMs / 60000) : '?'}-דק׳` : 'כבוי-ע״י-מפעיל') : 'אין-דיווח',
+    numbers: ap ? [
+      { k: 'מעגלים', v: String(ap.cycles), hint: `boot ${new Date(ap.bootTs).toISOString().slice(0, 16).replace('T', ' ')} UTC` },
+      { k: 'מעגל-אחרון', v: ap.lastCycleAt ? `${Math.round((Date.now() - ap.lastCycleAt) / 60000)}-דק׳ זמין` : '—', hint: apLast ? `${apLast.kind}: ${apLast.detail}` : undefined },
+      { k: 'מעגל-הבא', v: ap.nextCycleAt ? `בעוד ${Math.max(0, Math.round((ap.nextCycleAt - Date.now()) / 60000))}-דק׳` : '—' },
+      { k: 'קצב-ומשקל', v: `כל-${ap.intervalMin}-דק׳ · משקל-${ap.weightPct}%`, hint: `HIVE ${apCfg?.hiveWeightPct ?? '—'}% · BLURT ${apCfg?.blurtWeightPct ?? '—'}% · selfvote ${apCfg?.selfvoteEnabled ? 'פעיל' : 'כבוי'} · publish ${apCfg?.publishEnabled ? 'פעיל' : 'כבוי'}` },
+      { k: 'פעולות-במספרים', v: `תביעות ${ap.totals.claims} · הצבעות ${ap.totals.votes} · עצמיות ${ap.totals.selfvotes} · פרסומים ${ap.totals.publishes}`, hint: 'מאז-עליית-השירות — כל-פעולה עוברת-ביקורת-בשרת' },
+      ...(apLastErr ? [{ k: 'שגיאה-אחרונה', v: apLastErr.kind, hint: apLastErr.detail }] : []),
+    ] : [{ k: 'מצב', v: 'השירות לא מדווח — כנות (לא אפס)' }],
+    verdict: apLive
+      ? 'האוטופיילוט חי: כל-מעגל — אותות-טריים מהשרשרת → תביעה → קיוריישן (משקל-מהקונפיג) → הצבעה-עצמית → פרסום-דוח. גאטים: VP≥90 לקיוריישן · מרווח-3h-בין-הצבעות · דה-דופ-מהשרשרת · מרווח-פרסום-24h. כל-ביצוע עובר-אימות-מפעיל-וביקורת — אותו-שער-כמו-קונסולה.'
+      : ap ? 'השירות רשום אך-הדיווח-מיושן/כבוי — המצב-מוצג-ביושר. כפתור-הפעלה/עצירה למפעיל למטה.' : 'שירות-האוטופיילוט לא מדווח (לא-רץ/נופל) — כנות, לא-אפסים. הפעלה מחדש של mini-services/flow-autopilot.',
+    actions: ap ? (ap.enabled ? ['autopilot_pause'] : ['autopilot_resume']) : [],
+  });
+
   /* ── פקדה ── */
   const ledger = await db.auditLog.findMany({
     // FIX(71-g): flow-steem-claim — route.ts רושם flow-${chain}-claim (היה-חסר-במסנן — תביעות-STEEM-לא-נראו-בפקדה)
-    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
+    // FIX(71-h): flow-steem-vote — הצבעות-קיוריישן-STEEM לא-נראו-בפקדה (רק-hive/blurt) · + flow-publish · + flow-autopilot
+    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'flow-steem-vote', 'flow-publish', 'flow-autopilot', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
     orderBy: { createdAt: 'desc' }, take: 12,
   });
 

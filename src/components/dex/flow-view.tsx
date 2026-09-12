@@ -7,7 +7,7 @@
 import { useCallback, useState } from 'react';
 import {
   Waves, Wallet, Vote, Repeat, PiggyBank, Zap, Activity, ShieldCheck,
-  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText, FileText, Coins,
+  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText, FileText, Coins, Bot,
 } from 'lucide-react';
 import { fmtInt, usePoll, StaleChip } from './common';
 import { authHeaders } from '@/components/sv/shared';
@@ -48,6 +48,7 @@ const LOOP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   'trx-energize': Zap,
   'publish-author': FileText,
   'reward-claim': Coins,
+  autopilot: Bot,
 };
 const CHAIN_LABEL: Record<string, string> = { steem: 'STEEM', hive: 'HIVE', blurt: 'BLURT' };
 
@@ -246,6 +247,15 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                             aria-label="תביעת-כל-הפרסים-הממתינים — שידור-אמת-על-השרשרת"
                           >
                             {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'תביעת-אמת'}
+                          </button>
+                        )}
+                        {(a === 'autopilot_pause' || a === 'autopilot_resume') && (
+                          <button
+                            onClick={() => run(a, true)}
+                            className={`min-h-[32px] rounded-lg border px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors ${a === 'autopilot_pause' ? 'border-[color:var(--amber)] text-[color:var(--amber)]' : 'border-[color:var(--green)] text-[color:var(--green)]'}`}
+                            aria-label={a === 'autopilot_pause' ? 'עצירת-מעגלי-האוטופיילוט' : 'הפעלת-מעגלי-האוטופיילוט'}
+                          >
+                            {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : a === 'autopilot_pause' ? 'עצור-אוטופיילוט' : 'הפעל-אוטופיילוט'}
                           </button>
                         )}
                       </span>

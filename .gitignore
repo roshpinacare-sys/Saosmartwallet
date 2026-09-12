@@ -68,3 +68,6 @@ agent/keys/
 .secrets/
 tool-results/
 # FIX(Roast-63 · C1): כספת-המפתחות-המוצפנת — אף-פעם-לא-בגיט (היה-עוקב למרות *.db — נוסף-אחרי-המעקב)
+
+# autopilot runtime state (71-h) — state/config regenerate at runtime
+data/
