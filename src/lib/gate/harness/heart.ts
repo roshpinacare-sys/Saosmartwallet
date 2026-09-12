@@ -1115,7 +1115,7 @@ async function ensureTriggerPolicy(): Promise<void> {
           label: `builder:${a.name}`,
           agentName: a.name,
           goal:
-            "תור-הבונה היומי: בחר שיפור אמיתי אחד לרשת ובצע אותו מקצה-לקצה — הערך הגבוה ביותר קודם: (1) פרסם לשרשרת תוכן בעל-ערך (steem.post — דוח/ממצא/ניתוח), או (2) רשום ממצא מוכח חדש לזיכרון-הצי (memory.write), או (3) הצע יעד מוצדק (goal.propose), או (4) הכן הצעת-פקודת DEX מושכלת (steem.order.build — רחוקה מהספר, ממתינה לאישור-מפעיל). בצע אחד היטב — לא ארבעה במקרה.",
+            "תור-הבונה היומי (v4): בחר שיפור אמיתי אחד לרשת ובצע אותו מקצה-לקצה — הערך הגבוה ביותר קודם: (1) פרסם לשרשרת תוכן בעל-ערך (steem.post — עבודה-אמיתית-שלנו מגוף-ראשון באנגלית; אסור-דוחות-פנימיים/מספרי-תגמולים/סיכום-טרנדים), או (2) רשום ממצא מוכח חדש לזיכרון-הצי (memory.write), או (3) הצע יעד מוצדק (goal.propose), או (4) הכן הצעת-פקודת DEX מושכלת (steem.order.build — רחוקה מהספר, ממתינה לאישור-מפעיל). בצע אחד היטב — לא ארבעה במקרה.",
           doneMeans: builderMeans,
           budget: 6,
           kind: "daily",
@@ -1146,23 +1146,23 @@ async function ensureTriggerPolicy(): Promise<void> {
    * near-duplicate posts on one account. Builder goals older than the
    * policy are REFRESHED in place (marker-based, idempotent): publishing is
    * now exposure-gated, audit-first, duplicate-aware. */
-  const POLICY_MARKER = "מדיניות-חשיפה";
-  const LANG_MARKER = "ניתוב-שפה";
-  const builderV3 =
-    "תור-הבונה היומי (v3): בחר שיפור אמיתי אחד לרשת ובצע אותו מקצה-לקצה. " +
-    "steem.trends — מכ\"ם-נושאים חי: ראה מה הרשת קוראת עכשיו (תגיות לפי תשלום, דיונים חמים) ובחר נושא שיש עליו ביקוש אמיתי. " +
-    "ניתוב-שפה: כל תוכן שיוצא החוצה (פוסטים, תגובות) נכתב באנגלית — הקהל ברשת דובר-אנגלית; עברית נשארת בפנים בלבד (דוחות לגשר, זיכרון). " +
-    "לפני כל פרסום: social.audit — מה כבר פורסם ומה מדוגל; אל תשכפל תוכן קיים (תוכן כפול פוגע בחשבון וב-SEO). " +
-    "מדיניות-חשיפה מוכתבת: אסור לפרסם סודות, מפתחות, נתיבים/תשתית, שמות-קוד פנימיים, תוכניות-מוצר שלא יצאו לאור ודוחות מבצעיים — הקלפים נשארים בבית; " +
-    "טיוטה חשופה תיחסם על-ידי השער — אל תנסה לעקוף, תקן והגש שוב. " +
+  const STYLE_MARKER = "שער-סגנון";
+  const builderV4 =
+    "תור-הבונה היומי (v4, שער-סגנון): בחר שיפור אמיתי אחד לרשת ובצע אותו מקצה-לקצה. " +
+    "steem.trends — הקשר-בלבד: מה הרשת קוראת עכשיו. אסור-לחלוטין לכתוב פוסט-סיכום-טרנד או פוסט-על-תגית-חמה בלי-עבודה-אמיתית-שלנו בתוכו — הפוסטים-הגרועים-בהיסטוריה-שלנו נולדו-מזה. " +
+    "דוקטרינת-תוכן: כל-פוסט-מספר דבר-אחד-אמיתי שבנינו/מדדנו/למדנו, מגוף-ראשון, עם-ראייה-קונקרטית (מספר-שנמדד, רגע-בזמן, כלי-נקוב, או הודאה-קטנה). " +
+    "ניתוב-שפה: אנגלית-בלבד החוצה (הקהל-דובר-אנגלית); עברית-נשארת-בפנים. " +
+    "שער-סגנון מכני (social-guard) דוחה-לפני-חתימה: עברית, מקפים (—/–), מרכאות-חכמות, קלישאות-AI (dive into / landscape / stay tuned / testament וכו'), מספרי-תגמולים-או-יתרות, טון-דוח-פנימי, תוכן-רזה מתחת-400 תווים. אם-נדחית: שכתב-אנושי-ובשר-והגש-שוב — אל-תנסה-לעקוף. " +
+    "מדיניות-חשיפה מוכתבת: אסור לפרסם סודות, מפתחות, נתיבים/תשתית, שמות-קוד פנימיים, תוכניות-מוצר שלא יצאו לאור ודוחות מבצעיים — הקלפים נשארים בבית. " +
+    "לפני כל פרסום: social.audit — אל תשכפל תוכן קיים. " +
     "בחר אחת: (1) פרסום ערך ציבורי נקי באנגלית (steem.post — rail=steem או rail=hive), (2) תיקון פוסט מדוגל (steem.edit לפי social.audit), " +
     "(3) memory.write עם ממצא מוכח, (4) goal.propose מוצדק. אחד היטב — לא ארבעה במקרה.";
   const staleBuilders = await db.gateSchedule.findMany({
-    where: { label: { startsWith: "builder:" }, goal: { not: { contains: LANG_MARKER } } },
+    where: { label: { startsWith: "builder:" }, goal: { not: { contains: STYLE_MARKER } } },
     select: { id: true },
   });
   for (const s of staleBuilders) {
-    await db.gateSchedule.update({ where: { id: s.id }, data: { goal: builderV3 } }).catch(() => {});
+    await db.gateSchedule.update({ where: { id: s.id }, data: { goal: builderV4 } }).catch(() => {});
   }
   /* ── the editor — one daily AUDIT+REMEDIATE duty, single-lane ──
    * roast-2026-09-10: v3 gave the editor 4 jobs and 6 modules — EVERY editor
