@@ -16,7 +16,7 @@
  *   G. blurt-curation — ~8.5K BLP מצביעים על BLURT
  */
 import { db } from '@/lib/db';
-import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser, getBlurtAccount, getBlurtProps, ownBlogPosts, steemRcMana } from '@/lib/saos/steem-ops';
+import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser, getBlurtAccount, getBlurtProps, ownBlogPosts, steemRcMana, fleetScan } from '@/lib/saos/steem-ops';
 import { treasuryWallet, doorWallet, tronAccount } from '@/lib/saos/trx-ops';
 import { planEnergize } from '@/lib/saos/tron-energize';
 import { readAutopilotState, readAutopilotConfig } from '@/lib/saos/autopilot-state';
@@ -414,7 +414,7 @@ export async function flowOverview(): Promise<FlowOverview> {
   const pubAgeH = latestPost ? (Date.now() - new Date(latestPost.created).getTime()) / 3600_000 : null;
   const inPayoutWindow = pubAgeH !== null && pubAgeH < 168;
   loops.push({
-    id: 'publish-author', title: 'פרסום→תגמול-סופר (publish-desk)', engine: 'steem · comment',
+    id: 'publish-author', title: 'פרסום→תגמול-סופר (רב-שרשרת)', engine: 'steem/hive/blurt · comment',
     status: latestPost && inPayoutWindow ? 'live' : latestPost ? 'armed' : 'blocked',
     statusLabel: latestPost && inPayoutWindow ? (latestPost.hasSelfVote ? 'חי — הוצבע-עצמית' : 'חי — בחלון-תגמול') : latestPost ? 'מחוץ-לחלון' : 'אין-פוסט',
     numbers: latestPost ? [
@@ -424,7 +424,7 @@ export async function flowOverview(): Promise<FlowOverview> {
       { k: 'הצבעות', v: String(latestPost.votes), hint: latestPost.hasSelfVote ? 'כולל-הצבעה-עצמית-שלנו' : 'אין-הצבעה-עצמית-עדיין' },
     ] : [{ k: 'מצב', v: 'אין-פוסט-שורש-חי — publish-desk מוכן' }],
     verdict: 'הפרסום-עצמו מייצר זרימה: תגמולי-סופר 50% (SBD+SP) + הצבעה-עצמית קולטת עוד 50% קיוריישן חזרה-אלינו — כל-הפאי-אאוט נשאר-במערכת. כנות: במסה-הנוכחית זה אבק-קורט שגדל-לינארית-עם-ה-SP (המסה-האפקטיבית 2,144 SP — לולאת-קיוריישן).',
-    actions: latestPost && inPayoutWindow && !latestPost.hasSelfVote ? ['steem_selfvote'] : [],
+    actions: [...(latestPost && inPayoutWindow && !latestPost.hasSelfVote ? ['steem_selfvote'] : []), 'hive_publish', 'blurt_publish'],
   });
 
   const [hiveVoted, blurtVoted] = await Promise.all([
@@ -535,11 +535,52 @@ export async function flowOverview(): Promise<FlowOverview> {
     actions: ap ? (ap.enabled ? ['autopilot_pause'] : ['autopilot_resume']) : [],
   });
 
+  // K. fleet-mass (71-i) — צי-הכספת: הכספת מחזיקה מפתחות לכל-החשבונות — מה-המסה-המצביעה-האמתית-שלהם
+  const fleet = await fleetScan().catch(() => null);
+  const fleetSteem = fleet?.chains.find((c) => c.chain === 'steem') ?? null;
+  const fleetHive = fleet?.chains.find((c) => c.chain === 'hive') ?? null;
+  const fleetBlurt = fleet?.chains.find((c) => c.chain === 'blurt') ?? null;
+  const fleetSteemSp = fleetSteem && props ? vestsToChainVests(fleetSteem.effVests, props) : 0;
+  const fleetHiveHp = fleetHive ? fleetHive.effVests * hiveRatio : 0;
+  const fleetBlurtBlp = fleetBlurt ? fleetBlurt.effVests * blurtRatio : 0;
+  const fleetAccountsN = (fleetSteem?.accounts ?? 0) + (fleetHive?.accounts ?? 0) + (fleetBlurt?.accounts ?? 0);
+  const fleetExistsN = (fleetSteem?.exists ?? 0) + (fleetHive?.exists ?? 0) + (fleetBlurt?.exists ?? 0);
+  const fleetSignable = fleet?.signableTotal ?? 0;
+  const fleetExtraSignable = (fleet?.chains ?? []).reduce((acc, c) => acc + c.members.filter((m) => m.exists && m.voteRole && m.account !== OPERATOR).length, 0);
+  const fleetExtraActive = (fleet?.chains ?? []).reduce((acc, c) => acc + c.members.filter((m) => m.exists && m.activeVerified && m.account !== OPERATOR).length, 0);
+  const fleetLiquidSum = (fleet?.chains ?? []).reduce((acc, c) => acc + c.liquidCoin + c.liquidDebt, 0);
+  const fleetPendingSteem = fleetSteem ? fleetSteem.pendingCoin + fleetSteem.pendingDebt : 0;
+  const fleetPendingHiveCoin = fleetHive ? fleetHive.pendingCoin + fleetHive.pendingDebt : 0;
+  const fleetPendingN = (fleet?.chains ?? []).filter((c) => c.pendingCoin + c.pendingDebt + c.pendingVests > 0).length;
+  const fleetTop = [...(fleetSteem?.members ?? [])].filter((m) => m.exists).sort((a, b) => b.effVests - a.effVests).slice(0, 3)
+    .map((m) => `${m.account}${m.signableRole ? '✓' : ''} (${fmt(props ? vestsToChainVests(m.effVests, props) : 0, 1)})`).join(' · ');
+  const fleetVoted = fleetExtraSignable > 0 ? await db.auditLog.findFirst({ where: { action: 'flow-fleet-vote' }, select: { id: true } }) : null;
+  loops.push({
+    id: 'fleet-mass', title: 'צי-הכספת (מסה-מצביעה-מצטברת)', engine: 'fleet · vote+claim',
+    status: !fleet ? 'blocked' : fleetExtraSignable > 0 ? (fleetVoted ? 'live' : 'armed') : 'blocked',
+    statusLabel: !fleet ? 'RPC-רגעית' : fleetExtraSignable > 0 ? (fleetVoted ? 'חי — הוכח-בשרשרת' : 'חמוש — חתימות-מאומתות') : 'חסום-מפתחות-לא-תואמים',
+    numbers: !fleet ? [{ k: 'מצב', v: 'סריקת-הצי נכשלה רגעית — כנות (לא אפס)' }] : [
+      { k: 'חשבונות-צי', v: `${fleetExistsN}/${fleetAccountsN} קיימים-בשרשרת`, hint: `STEEM ${fleetSteem?.exists ?? 0}/${fleetSteem?.accounts ?? 0} · HIVE ${fleetHive?.exists ?? 0}/${fleetHive?.accounts ?? 0} · BLURT ${fleetBlurt?.exists ?? 0}/${fleetBlurt?.accounts ?? 0} — מקור: כספת+get_accounts-מרובה` },
+      { k: 'חתימה-מאומתת', v: `${fleetSignable} (${fleetSignable - fleetExtraSignable} ראשי + ${fleetExtraSignable} צי)`, hint: 'wifToPublic↔key_auths — בדיקה-מלאה: כל-מפתח-שמור (posting/active/owner) מול-כל-רשאות-השרשרת · אימות-מוצלח מרפא את עמודת-verified-בכספת' },
+      { k: 'נזיל-בחשבונות-הצי', v: `${fmt(fleetLiquidSum, 3)} (Σ נזיל+חוב-שקלי)`, hint: 'סריקת-נזילות-מלאה לכל-חשבון — כל-שקל-נזיל-בצי נספר-כאן (אמת-מ-get_accounts)' },
+      { k: 'מסה-אפקטיבית-מצטברת', v: `${fmt(fleetSteemSp, 1)} SP + ${fmt(fleetHiveHp, 1)} HP + ${fmt(fleetBlurtBlp, 0)} BLP`, hint: 'Σ(vesting−delegated+received) לכל-חשבון — מה-שבפועל-נשקל-ברשיירז. רוב-ה-VESTS-של-חברי-הצי מואצל-ל-headcorner-ומנוצל-שם (לולאת-קיוריישן)' },
+      { k: 'ממתין-לתביעה-בצי', v: fleetPendingN > 0 ? `${fmt(fleetPendingSteem)} STEEM + ${fmt(fleetPendingHiveCoin, 3)} HBD-שק׳` : 'אפס-בכל-החשבונות (כנות)', hint: fleetPendingN > 0 ? `${fleetPendingN} חשבונות-עם-פרסים-שהבשילו — תביעת-צי זורמת-לנזיל-של-כל-חשבון` : 'פרסים-בצי ייתבעו-אוטומטית-כשיצברו (fleet_claim · אוטופיילוט)' },
+      { k: 'ראשי-המסה', v: fleetTop || '—', hint: 'שלושת-החשבונות-הגדולים ב-SP-אפקטיבי · ✓ = מפתח-מאומת-קריפטוגרפית' },
+    ],
+    verdict: !fleet
+      ? 'סריקת-הצי נפלה רגעית (RPC/כספת) — מוצג-ביושר, לא-אפס-מחופש.'
+      : fleetExtraSignable > 0
+        ? `הצי חי: ${fleetExtraSignable} חשבונות-צי עם הוכחת-מפתח-קריפטוגרפית (${fleetExtraActive} עם active-מאומת לתביעות). ${fleetVoted ? 'הצבעת-צי-ראשונה מאומתת-בשרשרת (פקדה: flow-fleet-vote).' : 'הצבעת-צי-ראשונה תיצור-הוכחת-שרשרת.'}`
+        : `תוצאת-ביקורת-כנה: מתוך ${fleetExistsN} חשבונות-צי, אף-אחד-מעבר-לחשבון-הראשי לא עבר הוכחת-מפתח (wifToPublic↔key_auths — כל-מפתח-שמור נבדק מול-כל-רשאות). המפתחות-השמורים-בכספת עבור חברי-הצי לא-תואמים-למפתחות-החיים-בשרשרת — נגזרו-מ-סיסמאות-שונות-מהן-שהוגדרו-בחשבונות. fail-closed: המערכת לא מעמידה-פנים. דרך-הפתיחה: מפעיל מספק מפתחות-אמת (כמו headcorner.txt) → סריקה-מרפאת-את-הכספת-והצי-נפתח-אוטומטית.`,
+    actions: fleetExtraSignable > 0 ? ['fleet_scan', 'fleet_vote', 'fleet_claim'] : ['fleet_scan'],
+  });
+
   /* ── פקדה ── */
   const ledger = await db.auditLog.findMany({
     // FIX(71-g): flow-steem-claim — route.ts רושם flow-${chain}-claim (היה-חסר-במסנן — תביעות-STEEM-לא-נראו-בפקדה)
     // FIX(71-h): flow-steem-vote — הצבעות-קיוריישן-STEEM לא-נראו-בפקדה (רק-hive/blurt) · + flow-publish · + flow-autopilot
-    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'flow-steem-vote', 'flow-publish', 'flow-autopilot', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
+    // 71-i: + פעולות-הצי (fleet-vote/fleet-claim) + פרסום-רב-שרשרת (hive/blurt-publish)
+    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'flow-steem-claim', 'flow-steem-vote', 'flow-publish', 'flow-autopilot', 'flow-fleet-vote', 'flow-fleet-claim', 'flow-hive-publish', 'flow-blurt-publish', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
     orderBy: { createdAt: 'desc' }, take: 12,
   });
 

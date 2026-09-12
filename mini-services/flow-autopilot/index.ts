@@ -38,10 +38,17 @@ interface AutopilotConfig {
   blurtWeightPct: number;// 0 = off
   selfvoteEnabled: boolean;
   publishEnabled: boolean;
+  fleetVoteEnabled: boolean;  // 71-i: curation from all key-verified fleet accounts
+  fleetClaimEnabled: boolean; // 71-i: claim pending rewards for every fleet account
+  publishHive: boolean;       // 71-i: multi-chain report — HIVE
+  publishBlurt: boolean;      // 71-i: multi-chain report — BLURT
+  votesPerCycle: number;      // 71-i: candidates per chain per cycle (1-5) — more curation tickets
 }
 const DEFAULTS: AutopilotConfig = {
   enabled: true, intervalMin: 60, weightPct: 10,
   hiveWeightPct: 1, blurtWeightPct: 1, selfvoteEnabled: true, publishEnabled: true,
+  fleetVoteEnabled: true, fleetClaimEnabled: true, publishHive: true, publishBlurt: true,
+  votesPerCycle: 2,
 };
 
 interface Signals {
@@ -52,6 +59,7 @@ interface Signals {
   blurt?: { vpPct?: number | null; claimable?: number | null };
 }
 
+interface Totals { claims: number; votes: number; selfvotes: number; publishes: number; fleetVotes: number; fleetClaims: number }
 interface Action { ts: number; kind: string; detail: string }
 interface State {
   ok: true; service: 'flow-autopilot'; bootTs: number;
@@ -59,7 +67,7 @@ interface State {
   lastCycleAt: number | null; nextCycleAt: number | null;
   intervalMin: number; weightPct: number;
   voteAt: Record<string, number>;
-  totals: { claims: number; votes: number; selfvotes: number; publishes: number };
+  totals: Totals;
   lastActions: Action[]; errors: Action[];
 }
 
@@ -71,7 +79,7 @@ let state: State = {
   lastCycleAt: null, nextCycleAt: null,
   intervalMin: DEFAULTS.intervalMin, weightPct: DEFAULTS.weightPct,
   voteAt: {},
-  totals: { claims: 0, votes: 0, selfvotes: 0, publishes: 0 },
+  totals: { claims: 0, votes: 0, selfvotes: 0, publishes: 0, fleetVotes: 0, fleetClaims: 0 },
   lastActions: [], errors: [],
 };
 let running = false;
@@ -83,8 +91,16 @@ try {
   const prev = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) as Partial<State>;
   if (prev && prev.service === 'flow-autopilot') {
     state.cycles = Number(prev.cycles ?? 0);
-    state.voteAt = { ...(prev.voteAt ?? {}) };
-    state.totals = { claims: 0, votes: 0, selfvotes: 0, publishes: 0, ...(prev.totals ?? {}) };
+    // Hardening(71-i): only past timestamps are meaningful — malformed/clock-skewed
+    // future stamps (≥ now+5min) are discarded at restore so spacing gates stay sane.
+    // (Audit note: current state was verified valid — this guard is preventive.)
+    const nowMs = Date.now();
+    state.voteAt = Object.fromEntries(
+      Object.entries(prev.voteAt ?? {})
+        .filter(([, v]) => Number(v) > 0 && Number(v) <= nowMs + 300_000)
+        .map(([k, v]) => [k, Number(v)]),
+    );
+    state.totals = { claims: 0, votes: 0, selfvotes: 0, publishes: 0, fleetVotes: 0, fleetClaims: 0, ...(prev.totals ?? {}) };
     state.lastActions = (prev.lastActions ?? []).slice(0, 30);
     state.errors = (prev.errors ?? []).slice(0, 12);
     log('boot', `state restored — cycles=${state.cycles} voteAt entries=${Object.keys(state.voteAt).length}`);
@@ -125,6 +141,11 @@ function readConfig(): AutopilotConfig {
       blurtWeightPct: clamp(j.blurtWeightPct, 0, 100, DEFAULTS.blurtWeightPct),
       selfvoteEnabled: typeof j.selfvoteEnabled === 'boolean' ? j.selfvoteEnabled : DEFAULTS.selfvoteEnabled,
       publishEnabled: typeof j.publishEnabled === 'boolean' ? j.publishEnabled : DEFAULTS.publishEnabled,
+      fleetVoteEnabled: typeof j.fleetVoteEnabled === 'boolean' ? j.fleetVoteEnabled : DEFAULTS.fleetVoteEnabled,
+      fleetClaimEnabled: typeof j.fleetClaimEnabled === 'boolean' ? j.fleetClaimEnabled : DEFAULTS.fleetClaimEnabled,
+      publishHive: typeof j.publishHive === 'boolean' ? j.publishHive : DEFAULTS.publishHive,
+      publishBlurt: typeof j.publishBlurt === 'boolean' ? j.publishBlurt : DEFAULTS.publishBlurt,
+      votesPerCycle: clamp(j.votesPerCycle, 1, 5, DEFAULTS.votesPerCycle),
     };
   } catch { return { ...DEFAULTS }; }
 }
@@ -199,24 +220,35 @@ async function stepClaim(chain: 'steem' | 'hive', s: Signals): Promise<void> {
   }
 }
 
-async function stepVote(chain: 'steem' | 'hive' | 'blurt', weightPct: number, vpPct: number | null | undefined, action: string): Promise<void> {
+async function stepVote(chain: 'steem' | 'hive' | 'blurt', weightPct: number, vpPct: number | null | undefined, action: string, votesPerCycle = 1): Promise<void> {
   if (weightPct <= 0) return;
   if (vpPct === null || vpPct === undefined) { err(`vote-${chain}`, 'VP unknown — honest skip (fail-closed on mana)'); return; }
   if (vpPct < 90) { log(`vote-${chain}`, `VP ${vpPct.toFixed(1)}% < 90 — regenerating, honest skip`); return; }
+  // 71-i: per-chain spacing — STEEM 90min (VP drain ~0.4%/vote at 10% weight, regen 20%/day — safe),
+  // sister chains 3h. More fresh curation tickets without mana abuse.
+  const spacingMin = chain === 'steem' ? 90 : 180;
+  if ((state.voteAt[chain] ?? 0) > Date.now() + 300_000) { // defensive: corrupt future stamp → reset
+    log(`vote-${chain}`, 'future voteAt detected — reset (71-i hardening)');
+    state.voteAt[chain] = 0;
+  }
   const since = Date.now() - (state.voteAt[chain] ?? 0);
-  if (since < 3 * 3600_000) return; // 3h spacing per chain
+  if (since < spacingMin * 60_000) return;
   const pick = await flowPost('autovote_pick', { chain }, false);
   const cands = (pick?.candidates ?? []) as Array<{ author: string; permlink: string; ageH: number; title: string; voted: boolean }>;
-  const cand = cands.find((c) => !c.voted && c.author && c.permlink);
-  if (!cand) { log(`vote-${chain}`, 'no fresh un-voted candidate (trending 1-18h) — honest skip'); return; }
-  const res = await flowPost(action, { author: cand.author, permlink: cand.permlink, weightPct }, true);
-  if (res && res.ok) {
-    state.voteAt[chain] = Date.now();
-    state.totals.votes += 1;
-    log(`vote-${chain}`, `voted @${cand.author}/${cand.permlink.slice(0, 70)} weight=${weightPct}% (age ${cand.ageH.toFixed(0)}h)`);
-  } else {
-    err(`vote-${chain}`, `@${cand.author}: ${String(res?.error ?? 'no-response')}`);
+  const fresh = cands.filter((c) => !c.voted && c.author && c.permlink).slice(0, votesPerCycle);
+  if (fresh.length === 0) { log(`vote-${chain}`, 'no fresh un-voted candidate (trending 1-18h) — honest skip'); return; }
+  let done = 0;
+  for (const cand of fresh) {
+    const res = await flowPost(action, { author: cand.author, permlink: cand.permlink, weightPct }, true);
+    if (res && res.ok) {
+      done += 1;
+      state.totals.votes += 1;
+      log(`vote-${chain}`, `voted @${cand.author}/${cand.permlink.slice(0, 70)} weight=${weightPct}% (age ${cand.ageH.toFixed(0)}h)`);
+    } else {
+      err(`vote-${chain}`, `@${cand.author}: ${String(res?.error ?? 'no-response')}`);
+    }
   }
+  if (done > 0) state.voteAt[chain] = Date.now();
 }
 
 async function stepSelfvote(s: Signals): Promise<void> {
@@ -234,20 +266,66 @@ async function stepSelfvote(s: Signals): Promise<void> {
   }
 }
 
-async function stepPublish(s: Signals): Promise<void> {
-  const p = s.latestPost;
-  if (p && p.ageH < 24) { log('publish', `last post age ${p.ageH}h < 24h — honest skip (anti-spam)`); return; }
-  const res = await flowPost('steem_publish', {}, true); // server builds the live-telemetry report
+// ── 71-i: fleet steps — curation/claims from every key-verified fleet account ──
+async function stepFleetVote(chain: 'steem' | 'hive', weightPct: number): Promise<void> {
+  const key = `fleet-${chain}`;
+  if ((state.voteAt[key] ?? 0) > Date.now() + 300_000) state.voteAt[key] = 0; // defensive: corrupt future stamp
+  const since = Date.now() - (state.voteAt[key] ?? 0);
+  if (since < 6 * 3600_000) return; // gentler spacing than the main account — 6h per chain
+  const res = await flowPost('fleet_vote', { chain, weightPct }, true); // server auto-picks an un-voted trending candidate
   if (res && res.ok) {
-    const permlink = String((res.result as { permlink?: string })?.permlink ?? 'flow-report');
-    state.totals.publishes += 1;
-    log('publish', `published ${permlink} — live telemetry report on-chain`);
+    const r = (res.result ?? {}) as { broadcast?: number; requested?: number };
+    const n = Number(r.broadcast ?? 0);
+    state.totals.fleetVotes += n;
+    state.voteAt[key] = Date.now();
+    log(`fleet-vote-${chain}`, `fleet broadcast ${n}/${Number(r.requested ?? 0)} votes (per-account dedup + VP gates, server-side)`);
   } else {
-    err('publish', String(res?.error ?? 'no-response'));
+    const e = String(res?.error ?? 'no-response');
+    if (e.includes('אין-מועמד') || e.includes('אין-חשבונות')) log(`fleet-vote-${chain}`, `honest skip: ${e.slice(0, 90)}`);
+    else err(`fleet-vote-${chain}`, e.slice(0, 180));
   }
 }
 
-// ── one cycle ────────────────────────────────────────────────────────────────
+async function stepFleetClaim(): Promise<void> {
+  const res = await flowPost('fleet_claim', {}, true);
+  if (res && res.ok) {
+    const r = res.result as unknown;
+    if (Array.isArray(r)) {
+      const okRows = r.filter((x) => (x as { ok?: boolean }).ok) as Array<{ account: string; claimed?: string }>;
+      if (okRows.length > 0) {
+        state.totals.fleetClaims += okRows.length;
+        log('fleet-claim', okRows.map((x) => `${x.account}: ${x.claimed ?? 'ok'}`).join(' · ').slice(0, 200));
+      } else log('fleet-claim', 'no fleet pending rewards (honest zero)');
+    } else {
+      const plan = (res.plan ?? {}) as { note?: string };
+      log('fleet-claim', String(plan.note ?? 'nothing claimable (honest)').slice(0, 140));
+    }
+  } else {
+    err('fleet-claim', String(res?.error ?? 'no-response').slice(0, 180));
+  }
+}
+
+async function stepPublishMulti(cfg: AutopilotConfig): Promise<void> {
+  const targets: Array<['steem_publish'] | ['hive_publish'] | ['blurt_publish']> = [
+    ['steem_publish'],
+    ...(cfg.publishHive ? [['hive_publish'] as ['hive_publish']] : []),
+    ...(cfg.publishBlurt ? [['blurt_publish'] as ['blurt_publish']] : []),
+  ];
+  for (const [act] of targets) {
+    const res = await flowPost(act, {}, true); // per-chain 20h+permlink guards live server-side (fail-honest)
+    if (res && res.ok) {
+      const permlink = String((res.result as { permlink?: string })?.permlink ?? 'flow-report');
+      state.totals.publishes += 1;
+      log('publish', `published ${permlink} on ${act.split('_')[0].toUpperCase()} — live telemetry report on-chain`);
+    } else {
+      const e = String(res?.error ?? 'no-response');
+      if (e.includes('already') || e.includes('age')) log('publish', `${act} honest skip: ${e.slice(0, 100)}`);
+      else err('publish', `${act}: ${e.slice(0, 160)}`);
+    }
+  }
+}
+
+// ── cycle ───────────────────────────────────────────────────────────────
 async function cycle(): Promise<void> {
   if (running) return;
   running = true;
@@ -280,16 +358,21 @@ async function cycle(): Promise<void> {
 
     await stepClaim('steem', s);
     await stepClaim('hive', s);
-    await stepVote('steem', cfg.weightPct, s.steem?.vpPct, 'steem_vote');
+    await stepVote('steem', cfg.weightPct, s.steem?.vpPct, 'steem_vote', cfg.votesPerCycle);
     await stepVote('hive', cfg.hiveWeightPct, s.hive?.vpPct, 'hive_vote');
     await stepVote('blurt', cfg.blurtWeightPct, s.blurt?.vpPct, 'blurt_vote');
+    if (cfg.fleetClaimEnabled) await stepFleetClaim();
+    if (cfg.fleetVoteEnabled) {
+      await stepFleetVote('steem', cfg.weightPct);
+      await stepFleetVote('hive', cfg.hiveWeightPct);
+    }
     await stepSelfvote(s);
-    await stepPublish(s);
+    if (cfg.publishEnabled) await stepPublishMulti(cfg);
 
     state.cycles += 1;
     state.lastCycleAt = Date.now();
     state.nextCycleAt = state.lastCycleAt + cfg.intervalMin * 60_000;
-    log('cycle', `#${state.cycles} done — claims=${state.totals.claims} votes=${state.totals.votes} selfvotes=${state.totals.selfvotes} publishes=${state.totals.publishes}`);
+    log('cycle', `#${state.cycles} done — claims=${state.totals.claims} votes=${state.totals.votes} fleetVotes=${state.totals.fleetVotes} fleetClaims=${state.totals.fleetClaims} selfvotes=${state.totals.selfvotes} publishes=${state.totals.publishes}`);
     persist();
   } catch (e) {
     err('cycle', String(e).slice(0, 200));

@@ -4,7 +4,7 @@ import { audit, relayBroadcast } from '@/lib/audit';
 import { flowOverview, type FlowOverview } from '@/lib/saos/flow';
 import {
   chainVote, hiveSavingsSweep, claimRewards, curationCandidates, postInfo,
-  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, steemRcMana, getBlurtAccount, OPERATOR, type Chain3,
+  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, steemPublish, chainPublish, steemRcMana, getBlurtAccount, OPERATOR, chainVoteAs, claimRewardsAs, fleetScan, type Chain3,
 } from '@/lib/saos/steem-ops';
 import { trxEnergize, tronAccount, treasuryWallet } from '@/lib/saos/trx-ops';
 import { readAutopilotState, readAutopilotConfig, writeAutopilotConfig } from '@/lib/saos/autopilot-state';
@@ -118,6 +118,128 @@ async function voteAction(chain: Chain3, action: string, p: Record<string, unkno
   });
 }
 
+/* ══ 71-i: פעולות-הצי ════════════════════════════════════════════════════════
+ * fleet_scan   — קריאה-פתוחה: סריקת-כל-חשבונות-הכספת (הוכחת-מפתח-קריפטוגרפית + טלמטריה).
+ * fleet_vote   — dry-run פתוח · execute-מאומת: הצבעה-מכל-חשבון-מאומת (דה-דופ-פר-חשבון · גאט-VP≥80).
+ * fleet_claim  — execute-מאומת: תביעת-פרסים-לכל-חשבון-עם-ממתין>0 (STEEM+HIVE · BLURT-לא-מוכח).
+ * hive/blurt_publish — dry-run פתוח · execute-מאומת: דוח-הטלמטריה גם-על-HIVE/BLURT (chain_id-נכון). */
+
+async function fleetScanAction() {
+  const scan = await fleetScan().catch(() => null);
+  if (!scan) return NextResponse.json({ ok: false, action: 'fleet_scan', error: 'fleet-scan failed (rpc/vault) — honest' });
+  return NextResponse.json({
+    ok: true, action: 'fleet_scan', dryRun: true, ts: scan.ts, signableTotal: scan.signableTotal,
+    chains: scan.chains.map((c) => ({
+      chain: c.chain, accounts: c.accounts, exists: c.exists, signable: c.signable, effVests: Math.round(c.effVests),
+      pending: { coin: Number(c.pendingCoin.toFixed(6)), debt: Number(c.pendingDebt.toFixed(6)), vests: Math.round(c.pendingVests) },
+      liquid: { coin: Number(c.liquidCoin.toFixed(3)), debt: Number(c.liquidDebt.toFixed(3)) },
+      avgVpPct: c.avgVpPct === null ? null : Number(c.avgVpPct.toFixed(1)),
+      members: c.members.map((m) => ({
+        account: m.account, exists: m.exists, voteRole: m.voteRole, activeVerified: m.activeVerified, crossMatch: m.crossMatch,
+        effVests: Math.round(m.effVests), delegatedOut: Math.round(m.delegatedOut), receivedIn: Math.round(m.receivedIn),
+        vpPct: m.vpPct === null ? null : Number(m.vpPct.toFixed(1)), rcPct: m.rcPct === null ? null : Number(m.rcPct.toFixed(1)),
+        pending: m.pending ? { coin: Number(m.pending.coin.toFixed(6)), debt: Number(m.pending.debt.toFixed(6)), vests: Math.round(m.pending.vests) } : null,
+        liquid: { coin: Number(m.liquid.coin.toFixed(6)), debt: Number(m.liquid.debt.toFixed(6)) },
+      })),
+    })),
+  });
+}
+
+async function fleetVoteAction(p: Record<string, unknown>, execute: boolean, ownerLabel: string) {
+  const chain: Chain3 = p.chain === 'hive' ? 'hive' : p.chain === 'blurt' ? 'blurt' : 'steem';
+  const weightPct = Math.min(100, Math.max(0.1, Number(p.weightPct ?? 1) || 1));
+  let author = String(p.author ?? '');
+  let permlink = String(p.permlink ?? '');
+  const scan = await fleetScan().catch(() => null);
+  const cs = scan?.chains.find((c) => c.chain === chain) ?? null;
+  const voters = (cs?.members ?? []).filter((m) => m.exists && m.voteRole && m.account !== OPERATOR);
+  if (voters.length === 0) return NextResponse.json({ ok: false, action: 'fleet_vote', error: 'אין-חשבונות-צי-עם-הוכחת-מפתח-מעבר-לחשבון-הראשי (fail-closed — כנות)' });
+  if (!author || !permlink) {
+    const cands = await curationCandidates(chain).catch(() => []);
+    const cand = cands.find((c) => !c.voted);
+    if (!cand) return NextResponse.json({ ok: true, action: 'fleet_vote', dryRun: true, plan: { note: 'אין-מועמד-טרי-שלא-הצבענו-בו (כנות) · 1–18h trending', voters: voters.length, weightPct } });
+    author = cand.author; permlink = cand.permlink;
+  }
+  const post = await postInfo(chain, author, permlink).catch(() => null);
+  if (!post) return NextResponse.json({ ok: false, action: 'fleet_vote', error: `post @${author}/${permlink.slice(0, 40)} לא-נמצא ב-${chain.toUpperCase()}` });
+  const ageH = (Date.now() - new Date(String(post.created)).getTime()) / 3600_000;
+  if (ageH < 0.5 || ageH > 24) return NextResponse.json({ ok: false, action: 'fleet_vote', error: `גיל-הפוסט ${ageH.toFixed(1)}h מחוץ-לחלון 0.5–24h (הגנת-תשואה-קיוריישן)` });
+  const voted = (Array.isArray(post.active_votes) ? post.active_votes : []).map((v) => String((v as { voter?: string }).voter ?? ''));
+  const targets = voters.filter((m) => !voted.includes(m.account) && (m.vpPct ?? 0) >= 80);
+  const skipped = voters
+    .filter((m) => !targets.some((t) => t.account === m.account))
+    .map((m) => ({ account: m.account, why: voted.includes(m.account) ? 'already-voted' : `VP ${(m.vpPct ?? 0).toFixed(0)}% < 80 (מתאושש)` }));
+  const plan = {
+    chain: chain.toUpperCase(), post: `@${author}/${permlink.slice(0, 40)}`, ageH: Number(ageH.toFixed(1)),
+    signable: voters.length, willVote: targets.map((t) => t.account), skipped, weightPct,
+    gate: 'דה-דופ-פר-חשבון מ-active_votes · VP≥80 · חלון 0.5–24h',
+  };
+  if (!execute) return NextResponse.json({ ok: true, action: 'fleet_vote', dryRun: true, plan });
+  const results: Array<{ account: string; ok: boolean; error?: string }> = [];
+  for (const t of targets) {
+    try { await chainVoteAs(t.account, chain, { author, permlink, weightPct }); results.push({ account: t.account, ok: true }); }
+    catch (e) { results.push({ account: t.account, ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 110) }); }
+  }
+  const okN = results.filter((r) => r.ok).length;
+  await audit('flow-fleet-vote', `fleet-vote[${chain}]: @${author}/${permlink.slice(0, 50)} weight=${weightPct}% — ${okN}/${targets.length} broadcast (signable=${voters.length}) by owner:${ownerLabel}`);
+  try { await relayBroadcast('vault', { type: 'flow-fleet-vote', chain, author, permlink, broadcast: okN }); } catch { /* */ }
+  return NextResponse.json({ ok: true, action: 'fleet_vote', dryRun: false, result: { broadcast: okN, requested: targets.length, results } });
+}
+
+async function fleetClaimAction(execute: boolean, ownerLabel: string) {
+  const scan = await fleetScan().catch(() => null);
+  if (!scan) return NextResponse.json({ ok: false, action: 'fleet_claim', error: 'fleet-scan failed — honest' });
+  const targets: Array<{ account: string; chain: 'steem' | 'hive'; role: 'owner' | 'posting' | 'active' }> = [];
+  for (const c of scan.chains) {
+    if (c.chain === 'blurt') continue; // claim-op-לא-הוכח-על-BLURT — לא-מומש עד-ראיה (כנות)
+    for (const m of c.members) {
+      if (!m.exists) continue;
+      const claimRole = m.voteRole ?? (m.activeVerified ? 'active' : null);
+      if (claimRole && (m.pending?.coin ?? 0) + (m.pending?.debt ?? 0) + (m.pending?.vests ?? 0) > 0) targets.push({ account: m.account, chain: c.chain as 'steem' | 'hive', role: claimRole as 'owner' | 'posting' | 'active' });
+    }
+  }
+  if (targets.length === 0) {
+    return NextResponse.json({ ok: true, action: 'fleet_claim', dryRun: !execute, plan: { note: 'אף-חשבון-צי-אינו-מחזיק-פרסים-ממתינים (כנות — תביעת-אפס = שידור-מיותר, נמנע)', scanned: scan.chains.reduce((s, c) => s + c.exists, 0) } });
+  }
+  if (!execute) return NextResponse.json({ ok: true, action: 'fleet_claim', dryRun: true, plan: { willClaim: targets.map((t) => `${t.account}@${t.chain}`) } });
+  const results: Array<{ account: string; chain: string; ok: boolean; claimed?: string; error?: string }> = [];
+  for (const t of targets) {
+    try { const r = await claimRewardsAs(t.account, t.chain, t.role); results.push({ account: t.account, chain: t.chain, ok: true, claimed: r.claimed }); }
+    catch (e) { results.push({ account: t.account, chain: t.chain, ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 110) }); }
+  }
+  const okN = results.filter((r) => r.ok).length;
+  await audit('flow-fleet-claim', `fleet-claim: ${okN}/${targets.length} — ${results.map((r) => `${r.account}@${r.chain}: ${r.ok ? r.claimed : 'fail:' + String(r.error).slice(0, 40)}`).join(' · ')} by owner:${ownerLabel}`.slice(0, 300));
+  try { await relayBroadcast('vault', { type: 'flow-fleet-claim', claimed: okN }); } catch { /* */ }
+  return NextResponse.json({ ok: true, action: 'fleet_claim', dryRun: false, result: results });
+}
+
+/** פרסום-רב-שרשרת (71-i) — אותו-דוח-טלמטריה על HIVE/BLURT · chain_id-נכון-ב-sendOps */
+async function chainPublishAction(chain: 'hive' | 'blurt', action: string, p: Record<string, unknown>, execute: boolean, ownerLabel: string) {
+  const latestOwn = (await ownBlogPosts(chain, 1).catch(() => []))[0] ?? null;
+  const ageH = latestOwn ? (Date.now() - new Date(latestOwn.created).getTime()) / 360e4 : null;
+  if (ageH !== null && ageH < 20) return NextResponse.json({ ok: false, action, error: `last ${chain.toUpperCase()} post age ${ageH.toFixed(1)}h < 20h (anti-spam, fail-honest)` });
+  const o = await flowOverview();
+  const rep = buildFlowReport(o);
+  const exists = await postInfo(chain, OPERATOR, rep.permlink).catch(() => null);
+  if (exists) return NextResponse.json({ ok: false, action, error: `permlink ${rep.permlink} already on ${chain.toUpperCase()} (fail-honest — no duplicates)` });
+  const body = typeof p.body === 'string' && p.body.trim().length > 40 ? String(p.body) : rep.body;
+  const title = typeof p.title === 'string' && p.title.trim().length > 3 ? String(p.title) : rep.title;
+  if (!execute) {
+    return NextResponse.json({
+      ok: true, action, dryRun: true,
+      plan: {
+        chain: chain.toUpperCase(), permlink: rep.permlink, title: rep.title.slice(0, 60), bodyChars: body.length,
+        lastPostAgeH: ageH === null ? 'none-yet (first)' : ageH.toFixed(1), guard: '>=20h since last post + free permlink',
+        note: 'execute broadcasts comment-op — chain_id מהספרייה-הרשמית (hive-js/blurtjs)',
+      },
+    });
+  }
+  const r = await chainPublish(chain, { title, body, tags: [chain, 'saos', 'report', 'flow'], permlink: rep.permlink });
+  await audit(`flow-${chain}-publish`, `${chain}_publish: ${r.permlink} — multi-chain telemetry report (bodyChars=${body.length}) by owner:${ownerLabel}`);
+  try { await relayBroadcast('vault', { type: `flow-${chain}-publish`, permlink: r.permlink }); } catch { /* */ }
+  return NextResponse.json({ ok: true, action, dryRun: false, result: r });
+}
+
 /** הצבעה-עצמית על הפוסט-החי-האחרון שלנו (publish-author · 71-f) — dry-run פתוח, execute-מאומת */
 async function selfVoteAction(p: Record<string, unknown>, execute: boolean, ownerLabel: string) {
   const posts = await ownBlogPosts('steem', 3).catch(() => []);
@@ -175,6 +297,27 @@ export async function POST(req: NextRequest) {
   if (action === 'autopilot_signals') {
     try { return await autopilotSignals(); }
     catch (e) { return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'signals failed' }, { status: 200 }); }
+  }
+
+  // 71-i: fleet_scan — open read-only (public on-chain data + cryptographically proven booleans).
+  if (action === 'fleet_scan') {
+    try { return await fleetScanAction(); }
+    catch (e) { return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'fleet scan failed' }, { status: 200 }); }
+  }
+  // 71-i: fleet_vote dry-run — public data (trending + active_votes). execute requires operator.
+  if (action === 'fleet_vote' && execute !== true) {
+    try { return await fleetVoteAction(p, false, ''); }
+    catch (e) { return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'fleet-vote dry-run failed' }, { status: 200 }); }
+  }
+  // 71-i: fleet_claim dry-run — public data (pending reward balances). execute requires operator.
+  if (action === 'fleet_claim' && execute !== true) {
+    try { return await fleetClaimAction(false, ''); }
+    catch (e) { return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'fleet-claim dry-run failed' }, { status: 200 }); }
+  }
+  // 71-i: multi-chain publish dry-run — open (public report preview).
+  if ((action === 'hive_publish' || action === 'blurt_publish') && execute !== true) {
+    try { return await chainPublishAction(action === 'hive_publish' ? 'hive' : 'blurt', action, p, false, ''); }
+    catch (e) { return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'publish dry-run failed' }, { status: 200 }); }
   }
 
   // 71-h: steem_publish dry-run — generated report preview (public data), open.
@@ -312,6 +455,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, action, dryRun: false, config: cfg });
       }
 
+      /* ── 71-i: פעולות-הצי — הצבעה/תביעה מכל-חשבון-מאומת ── */
+      case 'fleet_vote':
+        return await fleetVoteAction(p, execute, owner.label);
+
+      case 'fleet_claim':
+        return await fleetClaimAction(execute, owner.label);
+
+      /* ── 71-i: פרסום-רב-שרשרת — HIVE/BLURT ── */
+      case 'hive_publish':
+        return await chainPublishAction('hive', action, p, execute, owner.label);
+
+      case 'blurt_publish':
+        return await chainPublishAction('blurt', action, p, execute, owner.label);
+
       /* ── אנרגיז-TRX ── */
       case 'trx_energize': {
         const w = await treasuryWallet();
@@ -335,7 +492,7 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
+        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'steem_publish', 'hive_publish', 'blurt_publish', 'fleet_scan', 'fleet_vote', 'fleet_claim', 'autopilot_pause', 'autopilot_resume', 'autovote_pick', 'autopilot_signals'] }, { status: 200 });
     }
   } catch (e) {
     return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'flow action failed' }, { status: 200 });

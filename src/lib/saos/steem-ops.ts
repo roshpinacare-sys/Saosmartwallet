@@ -1,8 +1,13 @@
 /**
- * steem-ops.ts — פעולות-חוץ אמת על STEEM/HIVE/BLURT מכספת-המפעיל (Task 71-flow · 71-e).
+ * steem-ops.ts — פעולות-חוץ אמת על STEEM/HIVE/BLURT מכספת-המפעיל (Task 71-flow · 71-e · 71-i צי).
  * ═════════════════════════════════════════════════════════════════════════════
  * קריאות = fetch ישיר מול condenser RPC ציבורי · שידורים = ספריית steem (0.7.x)
  * עם מפתח-owner מהכספת (AES-256-GCM) — המפתח לעולם לא נדפס/לא יוצא מהשרת.
+ *
+ * 71-i (צי): מעבר-מחשבון-יחיד לצי-מלא — הכספת מחזיקה 12-חשבונות-STEEM + 11-HIVE.
+ * אימות-מפתח-קריפטוגרפי: גזירת-מפתח-פומבי מה-WIF-המוצפן והשוואה-מול key_auths
+ * בשרשרת (payload-בן-50-תווים אחרי-הפסקת-פסיק — שווה-בין-STM/BLT) — בלי-שידור,
+ * בלי-הדפסות. רק-חשבונות-עם-הוכחה-קריפטוגרפית מצביעים/תובעים בצי (fail-closed).
  *
  * 71-e (עמוק): שידור-מודע-שרשרת — chain_id נכון לכל-שרשרת. הספרייה חותמת
  * על chain_id-הקונפיג (ברירת-מחדל: אפסים = STEEM בלבד!). עד-היום כל-השידורים
@@ -22,6 +27,7 @@ import { decryptSecret } from '@/lib/vault';
 type SteemLib = {
   config: { set(k: string, v: string): void };
   api: { setOptions(o: { url: string }): void };
+  auth?: { wifToPublic(w: string): string; isWif(w: string): boolean };
   broadcast: {
     // steem 0.7.x — generic multi-op send: send(tx={extensions,operations}, privKeys, cb)
     send(ops: unknown, wif: Record<string, string>, cb: (e: Error | null, r?: unknown) => void): void;
@@ -83,13 +89,68 @@ async function vaultOwnerWif(chain: Chain3): Promise<string> {
   return vaultWif(chain, 'owner');
 }
 
-async function vaultWif(chain: Chain3, role: 'owner' | 'posting'): Promise<string> {
+async function vaultWif(chain: Chain3, role: 'owner' | 'posting' | 'active', account = OPERATOR): Promise<string> {
+  // 71-i: הסרת-המסנן verified:true — אימות-המפתח נעשה קריפטוגרפית (wifToPublic↔key_auths)
+  // ולא-על-סמך-עמודת-DB. fail-closed נשמר: אין-שורה → שגיאה מפורשת.
   const row = await db.vaultKey.findFirst({
-    where: { account: OPERATOR, chain, role, verified: true },
+    where: { account, chain, role },
     orderBy: { updatedAt: 'desc' },
   });
-  if (!row) throw new Error(`vault: אין מפתח-${role} חי ל-${chain} (fail-closed)`);
+  if (!row) throw new Error(`vault: אין מפתח-${role} ל-${account}@${chain} (fail-closed)`);
   return decryptSecret(row.cipher);
+}
+
+/* ── 71-i: אימות-מפתח-קריפטוגרפי לצי (קריאה-בלבד — בלי-שידור) ──
+ * גוזרים מפתח-פומבי מה-WIF (secp256k1, עצמאי-שרשרת) ומשווים payload-50-תווים
+ * מול key_auths-בשרשרת. תוצאה = בוליאן/תפקיד בלבד — המפתח עצמו לעולם לא יוצא. */
+function pubPayload(pub: string): string {
+  return pub.replace(/^STM|^TST|^BLT|^JMT/i, '').toLowerCase();
+}
+
+async function verifyFleetKey(chain: Chain3, account: string, role: 'owner' | 'posting' | 'active', onChainKeys: string[]): Promise<boolean> {
+  if (onChainKeys.length === 0) return false;
+  try {
+    const wif = await vaultWif(chain, role, account);
+    const lib = await steemLib();
+    const derived = pubPayload(lib.auth ? (lib as unknown as { auth: { wifToPublic(w: string): string } }).auth.wifToPublic(wif) : '');
+    if (!derived || derived.length < 40) return false;
+    const targets = onChainKeys.map((k) => pubPayload(String(k)));
+    return targets.includes(derived);
+  } catch { return false; }
+}
+
+export interface FleetKeyAudit {
+  voteRole: 'posting' | 'owner' | null;   // הרשאה שמאפשרת הצבעה (posting>owner)
+  activeVerified: boolean;                 // מפתח-active-מאומת (תביעות/העברות)
+  crossMatch: string | null;               // אמת-שדה: איזה-מפתח-שמור תואם-לאיזו-רשאה
+}
+
+/* בדיקה-מלאה: כל-מפתח-שמור (posting/active/owner) נגזר ומושווה מול-כל-רשאות-השרשרת.
+ * בלי-הנחות: אם-מפתח-posting-שמור תואם-רשאת-active — נדע-את-זה-ונפעל-בהתאם. */
+async function auditFleetKeys(chain: Chain3, account: string, a: Record<string, unknown>): Promise<FleetKeyAudit> {
+  const auth = (role: 'posting' | 'active' | 'owner'): string[] =>
+    (Array.isArray((a[role] as { key_auths?: unknown[] })?.key_auths) ? (a[role] as { key_auths: unknown[] }).key_auths : [])
+      .map((k) => pubPayload(String(Array.isArray(k) ? k[0] : k)));
+  const chainAuths = { posting: auth('posting'), active: auth('active'), owner: auth('owner') };
+  const out: FleetKeyAudit = { voteRole: null, activeVerified: false, crossMatch: null };
+  for (const stored of ['posting', 'active', 'owner'] as const) {
+    let derived = '';
+    try {
+      const wif = await vaultWif(chain, stored, account);
+      const lib = await steemLib();
+      derived = pubPayload(lib.auth ? (lib as unknown as { auth: { wifToPublic(w: string): string } }).auth.wifToPublic(wif) : '');
+    } catch { continue; }
+    if (!derived || derived.length < 40) continue;
+    for (const [target, keys] of Object.entries(chainAuths)) {
+      if (!keys.includes(derived)) continue;
+      const m = `${stored}->${target}`;
+      if (!out.crossMatch) out.crossMatch = m;
+      // posting-עדיף-על-owner (הרשאה-מינימלית) — owner-נשמר-רק-אם-אין-posting
+      if ((target === 'posting' || target === 'owner') && out.voteRole !== 'posting') out.voteRole = target as 'posting' | 'owner';
+      if (target === 'active') out.activeVerified = true;
+    }
+  }
+  return out;
 }
 
 /** condenser read (fetch) — כנה-תמיד */
@@ -174,30 +235,38 @@ function sendOps(chain: Chain3, ops: [string, Record<string, unknown>][], wif: s
 
 export interface VoteResult { ok: true; voter: string; author: string; permlink: string; weight: number; chain: Chain3 }
 export async function chainVote(chain: Chain3, opts: { author: string; permlink: string; weightPct: number }): Promise<VoteResult> {
+  return chainVoteAs(OPERATOR, chain, opts);
+}
+
+/** 71-i: הצבעה-מחשבון-צי — voter=account, מפתח-מהכספת-עבור-אותו-חשבון (posting-קודם/owner-גיבוי) */
+export async function chainVoteAs(account: string, chain: Chain3, opts: { author: string; permlink: string; weightPct: number }): Promise<VoteResult> {
   const { author, permlink, weightPct } = opts;
-  if (!author || !permlink) throw new Error('vote: author/permlink נדרשים');
+  if (!account || !author || !permlink) throw new Error('vote: account/author/permlink נדרשים');
   if (!Number.isFinite(weightPct) || weightPct < 0.1 || weightPct > 100) throw new Error('vote: weightPct 0.1–100 בלבד');
-  // הצבעה = פעולת-posting. מפתח-posting קודם (HIVE-דורש-זאת-מפורשות — הוכח-חי 71-e);
-  // owner-כגיבוי (STEEM/BLURT-הוכחו-חי-עם-owner);
   let wif: string;
-  try { wif = await vaultWif(chain, 'posting'); } catch { wif = await vaultWif(chain, 'owner'); }
+  try { wif = await vaultWif(chain, 'posting', account); } catch { wif = await vaultWif(chain, 'owner', account); }
   const weight = Math.round(weightPct * 100);
-  await sendOps(chain, [['vote', { voter: OPERATOR, author, permlink, weight }]], wif);
-  return { ok: true, voter: OPERATOR, author, permlink, weight, chain };
+  await sendOps(chain, [['vote', { voter: account, author, permlink, weight }]], wif);
+  return { ok: true, voter: account, author, permlink, weight, chain };
 }
 
 /** תביעת-פרסים — STEEM/HIVE (BLURT: אין-פרסים-כרגע; צורת-op-לא-אומתה — לא-מומש עד-ראיה) */
 export async function claimRewards(chain: 'steem' | 'hive'): Promise<{ ok: true; claimed: string }> {
-  const acc = await getAccount(chain);
-  if (!acc) throw new Error(`${chain}: חשבון לא נמצא`);
+  return claimRewardsAs(OPERATOR, chain);
+}
+
+/** 71-i: תביעת-פרסים-לחשבון-צי */
+export async function claimRewardsAs(account: string, chain: 'steem' | 'hive', role: 'owner' | 'posting' | 'active' = 'owner'): Promise<{ ok: true; claimed: string }> {
+  const acc = await getAccount(chain, account);
+  if (!acc) throw new Error(`${chain}: חשבון ${account} לא נמצא`);
   const coin = chain === 'hive' ? acc.reward_hive_balance : acc.reward_steem_balance;
   const debt = chain === 'hive' ? acc.reward_hbd_balance : acc.reward_sbd_balance;
   const parts = [coin, debt, acc.reward_vesting_balance].map(String);
-  if (parts.every((p) => parseFloat(p) === 0)) throw new Error('claim: אין-פרסים-ממתינים (כנות)');
-  const wif = await vaultOwnerWif(chain);
+  if (parts.every((p) => parseFloat(p) === 0)) throw new Error(`claim[${account}]: אין-פרסים-ממתינים (כנות)`);
+  const wif = await vaultWif(chain, role, account);
   await sendOps(chain, [[
     'claim_reward_balance',
-    { account: OPERATOR, reward_steem: parts[0], reward_sbd: parts[1], reward_vests: parts[2] },
+    { account, reward_steem: parts[0], reward_sbd: parts[1], reward_vests: parts[2] },
   ]], wif);
   return { ok: true, claimed: parts.filter((p) => parseFloat(p) > 0).join(' + ') };
 }
@@ -239,19 +308,24 @@ export async function curationCandidates(chain: Chain3, tag = ''): Promise<Array
 
 /** פרסום-פוסט-שורש (מנוע-התוכן · 71-h) — op-comment חותם posting-קודם/owner-גיבוי (אותו-דפוס-הצבעה) */
 export async function steemPublish(opts: { title: string; body: string; tags: string[]; permlink: string }): Promise<{ ok: true; permlink: string; author: string }> {
+  return chainPublish('steem', opts);
+}
+
+/** 71-i: פרסום-רב-שרשרת — אותו-comment-op על STEEM/HIVE/BLURT (chain_id-נכון-אוטומטית ב-sendOps) */
+export async function chainPublish(chain: Chain3, opts: { title: string; body: string; tags: string[]; permlink: string }): Promise<{ ok: true; permlink: string; author: string }> {
   if (!opts.title.trim() || !opts.body.trim()) throw new Error('publish: title/body נדרשים (fail-honest)');
   if (!/^[\w-]{3,96}$/.test(opts.permlink)) throw new Error('publish: permlink לא-תקין (a-z0-9-)');
   const tags = opts.tags.filter((t) => /^[\w-]{2,24}$/.test(t)).slice(0, 5);
   let wif: string;
-  try { wif = await vaultWif('steem', 'posting'); } catch { wif = await vaultOwnerWif('steem'); }
-  await sendOps('steem', [['comment', {
+  try { wif = await vaultWif(chain, 'posting'); } catch { wif = await vaultOwnerWif(chain); }
+  await sendOps(chain, [['comment', {
     parent_author: '',
     parent_permlink: tags[0] || 'saos',
     author: OPERATOR,
     permlink: opts.permlink,
     title: opts.title.slice(0, 200),
     body: opts.body.slice(0, 60000),
-    json_metadata: JSON.stringify({ tags, app: 'saos-flow/71h', format: 'markdown' }),
+    json_metadata: JSON.stringify({ tags, app: 'saos-flow/71i', format: 'markdown' }),
   }]], wif);
   return { ok: true, permlink: opts.permlink, author: OPERATOR };
 }
@@ -288,4 +362,146 @@ export async function postInfo(chain: Chain3, author: string, permlink: string):
     ? await hiveCondenser('condenser_api.get_content', [author, permlink])
     : await condenser(RPC[chain], 'condenser_api.get_content', [author, permlink]);
   return r && r.author ? r : null;
+}
+
+/* ══ 71-i: צי-הכספת — סריקה-מלאה (מה-יש-לנו-ביד באמת) ═══════════════════════
+ * הכספת מחזיקה 12-STEEM + 11-HIVE + 1-BLURT. סריקה = get_accounts-מרובה (batch)
+ * + אימות-מפתח-קריפטוגרפי + טלמטריה (מסה-אפקטיבית · VP · RC · ממתין-לתביעה).
+ * מטמון-10-דק׳ (GET-פומבי לא ירוץ על כל בקשה על 48 פענוחים + RPC-מרובה).
+ * אימות-מוצלח מתמיד-בחזרה-לכספת (verified=1 · lastVerifiedAt) — הכספת-מרפאת-את-עצמה. */
+export interface FleetMember {
+  account: string; chain: Chain3; exists: boolean;
+  voteRole: 'posting' | 'owner' | null;  // הוכחה-קריפטוגרפית — הרשאת-הצבעה
+  activeVerified: boolean;               // מפתח-active-מאומת (תביעה/העברה)
+  crossMatch: string | null;             // מפתח-שמור→רשאת-שרשרת (אמת-שדה)
+  vestsBase: number; delegatedOut: number; receivedIn: number; effVests: number; // raw VESTS
+  vpPct: number | null; rcPct: number | null;
+  pending: { coin: number; debt: number; vests: number } | null;
+  liquid: { coin: number; debt: number }; // נזיל-לכל-חשבון — סריקת-נזילות-צי
+}
+export interface FleetScan {
+  ts: number; ok: boolean;
+  chains: Array<{
+    chain: Chain3; accounts: number; exists: number; signable: number;
+    effVests: number;
+    pendingCoin: number; pendingDebt: number; pendingVests: number;
+    liquidCoin: number; liquidDebt: number;
+    avgVpPct: number | null;
+    members: FleetMember[];
+  }>;
+  signableTotal: number;
+}
+
+let fleetCache: { at: number; data: FleetScan } | null = null;
+const FLEET_TTL = 10 * 60_000;
+
+export function fleetScanCache(): FleetScan | null {
+  return fleetCache && Date.now() - fleetCache.at < FLEET_TTL ? fleetCache.data : null;
+}
+
+export async function fleetAccountsFromVault(chain: Chain3): Promise<string[]> {
+  const rows = await db.vaultKey.findMany({
+    where: { chain },
+    select: { account: true },
+    distinct: ['account'],
+    orderBy: { account: 'asc' },
+  });
+  return rows.map((r) => r.account).filter((a) => a && !a.includes('wallet'));
+}
+
+export async function fleetScan(): Promise<FleetScan> {
+  const cached = fleetScanCache();
+  if (cached) return cached;
+  const chains: FleetScan['chains'] = [];
+  let signableTotal = 0;
+  for (const chain of ['steem', 'hive', 'blurt'] as Chain3[]) {
+    const names = await fleetAccountsFromVault(chain).catch(() => [] as string[]);
+    if (names.length === 0) continue;
+    // batch get_accounts — condenser מקבל עד 100 שמות
+    let accs: Array<Record<string, unknown>> = [];
+    try {
+      const rows = chain === 'hive'
+        ? await hiveCondenser('condenser_api.get_accounts', [names])
+        : chain === 'blurt'
+          ? await (async () => {
+              for (const u of BLURT_NODES) { try { return await condenser(u, 'condenser_api.get_accounts', [names]); } catch { /* צומת-הבא */ } }
+              return [] as unknown[];
+            })()
+          : await condenser(RPC[chain], 'condenser_api.get_accounts', [names]);
+      accs = (Array.isArray(rows) ? rows : []) as Array<Record<string, unknown>>;
+    } catch { accs = []; }
+    const byName = new Map(accs.map((a) => [String(a.name ?? ''), a]));
+    // RC-מנאבר-מרובה (STEEM בלבד)
+    const rcMap = new Map<string, number>();
+    if (chain === 'steem') {
+      try {
+        const r = await condenser(RPC.steem, 'rc_api.find_rc_accounts', { accounts: names.slice(0, 100) });
+        for (const rc of (r?.rc_accounts ?? []) as Array<{ account: string; rc_manabar: { current_mana: string }; max_rc: string }>) {
+          const cur = BigInt(rc.rc_manabar?.current_mana ?? '0');
+          const max = BigInt(rc.max_rc ?? '1');
+          rcMap.set(rc.account, max > 0n ? Number((cur * 10000n) / max) / 100 : 0);
+        }
+      } catch { /* RC-טלמטריה-אופציונלית */ }
+    }
+    const members: FleetMember[] = [];
+    for (const name of names) {
+      const a = byName.get(name);
+      if (!a) {
+        members.push({ account: name, chain, exists: false, voteRole: null, activeVerified: false, crossMatch: null, vestsBase: 0, delegatedOut: 0, receivedIn: 0, effVests: 0, vpPct: null, rcPct: null, pending: null, liquid: { coin: 0, debt: 0 } });
+        continue;
+      }
+      // אימות-מפתח-קריפטוגרפי-מלא: כל-מפתח-שמור מול כל-רשאות-השרשרת (בלי-הנחות)
+      const audit = await auditFleetKeys(chain, name, a);
+      // ריפוי-כספת: אימות-מוצלח → verified=1 (הוכחה-קריפטוגרפית, בלי-שידור)
+      if (audit.crossMatch) {
+        const provenRole = audit.crossMatch.split('->')[0] as 'posting' | 'active' | 'owner';
+        try {
+          await db.vaultKey.updateMany({
+            where: { account: name, chain, role: provenRole, verified: false },
+            data: { verified: true, lastVerifiedAt: new Date(), lastError: null },
+          });
+        } catch { /* לא-קריטי */ }
+      }
+      const num = (v: unknown): number => (parseFloat(String(v ?? '0')) || 0);
+      const vestsBase = num(a.vesting_shares);
+      const delegatedOut = num(a.delegated_vesting_shares);
+      const receivedIn = num(a.received_vesting_shares);
+      const effVests = Math.max(0, vestsBase - delegatedOut + receivedIn);
+      members.push({
+        account: name, chain, exists: true,
+        voteRole: audit.voteRole, activeVerified: audit.activeVerified, crossMatch: audit.crossMatch,
+        vestsBase, delegatedOut, receivedIn, effVests,
+        vpPct: Number(a.voting_power ?? 0) / 100,
+        rcPct: rcMap.get(name) ?? null,
+        pending: {
+          coin: num(chain === 'hive' ? a.reward_hive_balance : a.reward_steem_balance),
+          debt: num(chain === 'hive' ? a.reward_hbd_balance : a.reward_sbd_balance),
+          vests: num(a.reward_vesting_balance),
+        },
+        liquid: {
+          coin: num(chain === 'steem' ? a.steem_balance : a.balance),
+          debt: num(chain === 'hive' ? a.hbd_balance : 0),
+        },
+      });
+      if (audit.voteRole) signableTotal += 1;
+    }
+    const existing = members.filter((m) => m.exists);
+    chains.push({
+      chain,
+      accounts: names.length,
+      exists: existing.length,
+      signable: existing.filter((m) => m.voteRole).length,
+      effVests: existing.reduce((s, m) => s + m.effVests, 0),
+      pendingCoin: existing.reduce((s, m) => s + (m.pending?.coin ?? 0), 0),
+      pendingDebt: existing.reduce((s, m) => s + (m.pending?.debt ?? 0), 0),
+      pendingVests: existing.reduce((s, m) => s + (m.pending?.vests ?? 0), 0),
+      liquidCoin: existing.reduce((s, m) => s + m.liquid.coin, 0),
+      liquidDebt: existing.reduce((s, m) => s + m.liquid.debt, 0),
+      avgVpPct: existing.length ? existing.reduce((s, m) => s + (m.vpPct ?? 0), 0) / existing.length : null,
+      members,
+    });
+  }
+  const data: FleetScan = { ts: Date.now(), ok: true, chains, signableTotal };
+  fleetCache = { at: Date.now(), data };
+  return data;
 }

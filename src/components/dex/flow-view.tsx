@@ -7,7 +7,7 @@
 import { useCallback, useState } from 'react';
 import {
   Waves, Wallet, Vote, Repeat, PiggyBank, Zap, Activity, ShieldCheck,
-  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText, FileText, Coins, Bot,
+  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText, FileText, Coins, Bot, Users,
 } from 'lucide-react';
 import { fmtInt, usePoll, StaleChip } from './common';
 import { authHeaders } from '@/components/sv/shared';
@@ -49,6 +49,7 @@ const LOOP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   'publish-author': FileText,
   'reward-claim': Coins,
   autopilot: Bot,
+  'fleet-mass': Users,
 };
 const CHAIN_LABEL: Record<string, string> = { steem: 'STEEM', hive: 'HIVE', blurt: 'BLURT' };
 
@@ -240,13 +241,13 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                             {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'הצבעה-עצמית 100%'}
                           </button>
                         )}
-                        {(a === 'steem_claim' || a === 'hive_claim') && (
+                        {(a === 'steem_claim' || a === 'hive_claim' || a === 'fleet_claim') && (
                           <button
                             onClick={() => run(a, true)}
                             className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
                             aria-label="תביעת-כל-הפרסים-הממתינים — שידור-אמת-על-השרשרת"
                           >
-                            {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'תביעת-אמת'}
+                            {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : a === 'fleet_claim' ? 'תביעת-צי-אמת' : 'תביעת-אמת'}
                           </button>
                         )}
                         {(a === 'autopilot_pause' || a === 'autopilot_resume') && (
@@ -256,6 +257,24 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                             aria-label={a === 'autopilot_pause' ? 'עצירת-מעגלי-האוטופיילוט' : 'הפעלת-מעגלי-האוטופיילוט'}
                           >
                             {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : a === 'autopilot_pause' ? 'עצור-אוטופיילוט' : 'הפעל-אוטופיילוט'}
+                          </button>
+                        )}
+                        {a === 'fleet_vote' && (
+                          <button
+                            onClick={() => run(a, true)}
+                            className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                            aria-label="הצבעת-צי אמת — כל-החשבונות-המאומתים על מועמד-טרי-שלא-הצבענו-בו"
+                          >
+                            {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'הצבעת-צי-אמת'}
+                          </button>
+                        )}
+                        {(a === 'hive_publish' || a === 'blurt_publish') && (
+                          <button
+                            onClick={() => run(a, true)}
+                            className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                            aria-label={`פרסום-דוח-הטלמטריה על ${a === 'hive_publish' ? 'HIVE' : 'BLURT'} — שידור-אמת`}
+                          >
+                            {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : `פרסום-אמת ${a === 'hive_publish' ? 'HIVE' : 'BLURT'}`}
                           </button>
                         )}
                       </span>
@@ -336,6 +355,15 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                       >
                         {busy === key + '!exec' ? <Loader2 className="w-3 h-3 animate-spin" /> : `הצבע ${voteW}%`}
                       </button>
+                      {candsChain !== 'blurt' && (
+                        <button
+                          onClick={() => run('fleet_vote', true, { chain: candsChain, author: c.author, permlink: c.permlink, weightPct: Math.min(voteW, 10) })}
+                          className="min-h-[32px] rounded-lg border border-[color:var(--amber)] text-[color:var(--amber)] px-2 py-1.5 text-[11px] hover:bg-black/30"
+                          aria-label={`הצבת-צי מכל-החשבונות-המאומתים על פוסט של ${c.author}`}
+                        >
+                          {busy === 'fleet_vote' + (c.author + c.permlink) + '!exec' || busy === 'fleet_vote!exec' ? <Loader2 className="w-3 h-3 animate-spin" /> : 'הצבע-צי'}
+                        </button>
+                      )}
                     </div>
                     {res?.plan && (
                       <div className="w-full text-[10px] opacity-70">{String((res.plan as { title?: string }).title)} — גיל {(res.plan as { ageH?: number }).ageH}h · {(res.plan as { netVotes?: number }).netVotes} הצבעות</div>
