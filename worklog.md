@@ -2086,3 +2086,27 @@ Work Log:
 Stage Summary:
 - הלב-הוא-עתה **מערכת-מרפאת-עצמה**: אתחול-קונטיינר (dev-script) + אתחול-Next (instrumentation) + דגימת-קונסולה (route) — שלוש-שכבות-הקמה-עצמאיות, נעילת-singleton-אמיתית-לראשונה.
 - קבצים: src/lib/gate/heart-supervisor.ts (חדש) · src/instrumentation.ts · src/app/api/gate/heart/route.ts · mini-services/heart-service/index.ts (PID-lockfile) · package.json · docs/broadcast/2026-09-12-r31-truth-audit.md (עודכן).
+
+---
+Task ID: 50-r32
+Agent: main (Z.ai Code)
+Task: "שלחתי לך כבר פעמיים את המפתחות של נבידיה תבדוק מה עשית עם זה ולמה אתה שואל שוב אולי שוב נפלת לגרסה ישנה או שנדפקת אני לא מבן מה קרה פה תבדוק שוב הכל" — פורנזיה מלאה + שחזור + תיקון-שורש
+
+Work Log:
+- פורנזיה-גיט: עיקבוב db/custom.db לכל-commit-מגיע-שמירה — 2890366..7d06315: 239/nvidia:3 → 83936ec (r45): 249/nvidia:4 → 0db603a+89d10fb (r29): 249/4 → **4dcea8e (r30): 234/1, newest=2026-09-10T23:54** — ה-DB על-הדיסק הוחלף-בצילום-בן-~36שע' (restore-סביבה-אחרי-reboot-מכולה), ו-r30/r31/r31b חיברו-את-המצב-הפגום לגיט.
+- אימות: גם-HEAD-המחויב-הכיל-234/1 — האובדן-נכנס-להיסטוריה; גרסת-ה-249/4-שורדת-ב-0db603a/89d10fb בלבד.
+- רשימת-אבודות-מדויקת (15): 3×nvidia-nim (keys-batch 05:59×2 + 11:26×1), github PAT (operator-pat), מנמוניק-קונמי (recovery), steem headcorner primary-original (rotated-out), github wallet token, roshpinacare-sys token, mnemonic-doors, evm-wallet ×4, mnemonic ×2.
+- וידור-journal_mode=delete (אין-wal) — לא-WAL; מקור-שני-אומת: upload/nvidia.txt-קיים-על-הדיסק.
+- **שחזור**: INSERT-OR-IGNORE-של-15-השורות-מ-89d10fb:db/custom.db-אל-ה-DB-החי → 249/4-מיד.
+- **תיקון-תקלת-500-גורפת**: קומפילציה-קרה-של-Next-16-כשלה-על-`child_process`-ב-instrumentation (edge-bundle) → guard-קנוני `NEXT_RUNTIME === 'nodejs'` + rm -rf .next → GET / 200.
+- **תיקון-שורש-הזמינות**: שרת-ה-dev-מת-אחרי-סגירת-המעטפת (reaping-ידוע-מ-r31, setsid-לא-עזר-שוב) → **היפוך-פיקוח**: הלב-משגיח-עכשיו-על-הפורטל (ping-15שנ', respawn-כילד-מנותק-של-הלב, backoff-45שנ', quiet-10דק'-אחרי-6-כישלונות) — **הוכח-חי**: `portal was DOWN — respawned next dev (pid 2504)` → GET / 200.
+- הארכת-לב: guard-pid-עצמי-ב-hot-reload-של-הנעילה (pid===process.pid→return).
+- **הוכחת-שחזור-מכנית**: POST /api/gate/restore-drill → **verdict: pass, total: 249, restored: 248, failed: 0, placeholders: 1** (ynet-posting-r11-מוכר) — כל-הצופנים-כולל-15-המשוחזרים-נפתחו-מול-ה-master → ה-master-לא-התחלף-על-פני-ה-rollback.
+- **pool=4-מוכח-טביעות-אצבע**: afjf32 (operator-input 09-09) · 0f6ies+gnzcss (05:59) · 2q89kp (11:26) — 4-טביעות-sha256-12-נפרדות → 429-rotation-חוזר-לתפוקה-מלאה.
+- lint 0/0 · סריקת-סודות-על-הדלתא-נקייה · גיבוי-אטום-חדש-נכתב (backups/, gitignored).
+
+Stage Summary:
+- **שורש**: ה-DB-נוטר-בגיט; restore-סביבה-החליף-אותו-בצילום-ישן-בין-r29-ל-r30, ו-r30/r31-חיברו-את-המצב-הפגום — ה"תיקון-הכן" של-r30 ("pool=1")-היה-בעצמו-רישום-שקר-שנגרם-מהשחיתות; ה-claim-האמיתי-היה-ונשאר pool=4.
+- **כל-4-מפתחות-ה-NVIDIA-של-המפעיל-שוחזרו-ומוכחים-חיים** (דריל-248/248-ללא-כישלונות) + 12-רשומות-אבודות-נוספות.
+- זמינות-חדשה: הלב-מחיה-את-הפורטל-בעצמו (הוכח-חי); instrumentation-מוגן-מ-edge-compile; ה-500-הגורף-נפתר.
+- פתוח-ל-r33: watermark-מונוטוני-לכספת-באתחול (זיהוי-rollback-אוטומטי), תיקון-דוקים-היסטוריים-בשדה-ה-open, המשך-רשימת-r30 (jummper/ethereum-funding/blurt-flake).
