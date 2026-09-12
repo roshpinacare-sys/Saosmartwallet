@@ -31,7 +31,7 @@ import { processRun, buildLessons } from "./loop";
 import { parseBrain, pickCheckerBrain } from "./brain";
 import { revokeDeviceRows, DEVICE_WARN_DAYS } from "@/lib/gate/device";
 import { workerId, claimRun, LEASE_MS } from "./lease";
-import { expireStaleOrders } from "./orders";
+import { expireStaleOrders, autoSignLicensedOrders } from "./orders";
 import { steemMarket } from "@/lib/steem-server";
 import { MODULES } from "./modules";
 
@@ -71,7 +71,7 @@ interface HeartPulse {
   // process-local (never carried across restarts) so the operator can SEE
   // which code the heart actually executes, right now.
   boot?: { pid: number; bootedAt: string; codeSha: string };
-  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number; idleFired: number };
+  counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired: number; marketMoves: number; idleFired: number; finAutoSigned?: number };
   // r15 — idle self-employment observability: what the fleet does with its
   // free time, and which rotation slot it is on (visible to the operator).
   // ROAST r9 gap-37 — the heart now SEES the trust surface it manages:
@@ -885,10 +885,15 @@ async function stageDispatch(p: HeartPulse): Promise<void> {
 
 /**
  * stageOrders — the signing queue's watchman: a pending order nobody decided
- * on dies honestly after its TTL. The heart NEVER signs — the vault signs
- * only on an explicit operator decision (SOVEREIGN-HAND contract).
+ * on dies honestly after its TTL. r39: BEFORE expiry, the FINANCIAL
+ * PERMISSION MODEL runs — an agent whose finTier is "autonomous-limited"
+ * gets its in-caps pending orders signed by the vault automatically
+ * (decidedBy="policy:fin-tier", fully audited); everything else stays in the
+ * operator's queue. A locked vault signs nothing, either way (fail closed).
  */
 async function stageOrders(p: HeartPulse): Promise<void> {
+  const licensed = await autoSignLicensedOrders();
+  p.counters.finAutoSigned = (p.counters.finAutoSigned ?? 0) + licensed;
   const expired = await expireStaleOrders();
   p.counters.ordersExpired += expired;
   p.loops.orders = { lastAt: new Date().toISOString(), ok: true, fired: expired };

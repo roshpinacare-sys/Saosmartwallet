@@ -2133,3 +2133,27 @@ Stage Summary:
 - **שני פערי-עמוד אמיתיים נסגרו**: קוד-מת (KeyInject) חזר-לחיים; הדיגסט קיבל בית-ראוי.
 - **אפס-פגיעה**: כל-המישורים (רוטציה, תרגיל-שחזור, לולאת-מטרה, יד-ריבונית, מכשירים, חירום) נשמרו בייט-לבייט ואומתו-חי.
 - קבצים: src/app/page.tsx (שלד+מישורים) · src/components/console/{types,kit,lock-scene,overview,channel}.tsx · docs/broadcast/2026-09-12-console-order-r38.md · tools/r38-broadcast.ts · worklog.md.
+
+---
+Task ID: 55
+Agent: Z.ai Code (main)
+Task: r39 — "בחן את הסוכנים: פעולות/סיכונים/יתרונות/מצב/ייעול/חסר · תתכונן לעוד מפתחות · יש לי בזיפים בגיט" — ביקורת-צי חיה, מודל-הרשאות פיננסי, צינור-קליטת-מפתחות (טקסט+zip), וריפוי-לב-עומד
+
+Work Log:
+- **ריפוי ראשון**: הביקורת נפתחה בלב-עומד (אין-פעימות 20 דק') ו-1032 חוזר ביומן ("schedule fall-behind failed: attempt to write a readonly database") → ההלכה: kill-כל-העץ (22443→22459) → r36-revive (up 10s) → WRITE-OK → הלב פועם מחדש (beats 3→4). ריצת-queued בלימבו (attempt=2, retryNotBefore 03:15:47) נשפטה כנה-אחרי-הריפוי.
+- **ביקורת-חיה מול db/APIs** (10 סוכנים × 41 מודולים · 36 סיורים · 21 טריגרים · הכול enabled): 7-ימים — 104 done · 64 blocked · 33 failed · p50 44.7 שנ'; checkerstats 144 פסקים (73 ראשון · 15 תיקון · 40 חסום); 777 הודעות-גשר; idle-employment 6/יום; proposals 1-launched-policy/1-operator/1-rejected/1-expired; orders 2-signed-operator + 2-failed + 1-expired (אפס-חתימה ללא-הכרעה); 576 פעולות-7d עם טקסונומיית-כשלים מדויקת (429×6 anchor · watchdog-crash-burst סביב-ריבייס · RC-mana · 5-min-interval · מדיניות-חשיפה חסמה base64 — כולם-כנים, רובם-היסטוריים-טרם-r34/r36).
+- **מודל-הרשאות פיננסי (פער-r28 שנסגר)**: GateAgent.finTier ("none" | "build" | "autonomous-limited") + GateAgent.finCaps JSON {maxNotionalPerOrder 0.5 · maxSignedPerDay 2 · maxNotionalPerDay 1}; "none" חוסם-אפילו-בנייה; autonomous-limited = הלב חותם אוטומטית (autoSignLicensedOrders ב-stageOrders) רק בתוך-התקרות, רק create/cancel (המרות-מפעיל-בלבד), רק כספת-פתוחה (masterReady fail-closed — פקודה-נעולה-כספת נשארת pending, לעולם לא failed-שווא), תקרות-הצי מעל-הכול, decidedBy="policy:fin-tier" + גשר; כל-10 הסוכנים default=build (אפס-שינוי-התנהגות); המתג ב-UI (select לכל-סוכן + תג fin: בתור-החתימות + counters.finAutoSigned בדופק).
+- **הוכחות-הרשאות-חי**: PATCH→autonomous-limited ✓ · finCaps 0.25 read-back ✓ · "god-mode" נדחה (דרגות: none|build|autonomous-limited) ✓ · חזרה-ל-build/null ✓.
+- **צינור-מפתחות keys-batch (מוכנות לגל-הבא)**: POST /api/gate/keys-batch (מפעיל-בלבד) — scan: זיהוי-חי של כל-מועמד (WIF/0x-hex/64-hex/מנשק/PAT + קידומות LABEL=), ניכוי-כפילויות (pub נגזר מול-הכספת), אפס-אטימה; seal: רק-hash-ים-מאושרים (take:[]); zip: הורדה+fflate פריקה-בזיכרון (תקרה 64MB · MAX 400 קבצים · NUL-probe בינארי-נדלג-בכנות); אפס-סודות-בפלט (mask 4+אורך). UI: "יבוא-מרובה (טקסט/zip)" בכרטיס-הזרקת-המפתח — textarea+zip-url+סרוק-חי+checkboxes+אטום-נבחרים.
+- **הוכחות-צינור-חי**: scan-API 2/2 מועמדים סינתטיים וסינון-שורת-רעש ✓ · seal-עם-take אטם מנשק-סינתטי (imported:doors, 238) + ניקוי-מוכח חזרה-ל-237 ✓ · seal-ללא-take ו-seal-כספת-לא-מוכנה = אפס-יצירה ✓ · דפדפן: הדבקה→סרוק-חי→שורה "5HpH…(51 chars) · steem-wif · חי ✓ · text:1" עם checkbox מסומן-וכלום-לא-נאטם ✓.
+- **בזיפים בגיט — מופו**: סריקת-עצים של 12-ריפו (API): 10-zip כולם-ב-Project-files (steem-main 23.8MB · unified-platform-v33.56 22MB · ecos_v568 5.8MB · srs_substrate 4.5MB · TITAI_v18 4.3MB · tfa 2.5MB · workspace 2.1MB · qodo 1.4MB · polyglot 0.5MB · ux_patch 0.19MB) + chain-archive-seal.jsonl.gz שלנו ב-steem; הריפו-המקומי נקי (עץ+היסטוריה). keys-batch כבר-מוכן-לקלוט-כשיצביעו.
+- **עמידות-429**: anchor-agent שרף 6-ריצות על 429 ב-48h — brainChatRetry שודרג ל-3-ניסיונות (4s→10s ג'יטר) למייצר+בודק; זריקות-שאינן-חולפות-כנות.
+- **פקודה-עצמית-שנתפסה**: /api/gate/agents GET שדרגתי-וגם-ה-DELETE הושאר-שקט — לוודא ש-patch ל-finCaps עם name לא-קיים כותב אפס-שורות (updateMany count=0 → bad-agent נשמר); אומת-חי.
+- **בדיקות**: tsc 0 · lint 0 · db:push אדיטיבי (finTier+finCaps) + prisma generate + restart-הלכה (לקח-r32/53-b) · WRITE-OK · דפדפן: 11-סעיפים · 10-combobox דרגות-כסף · אפס-שגיאות-קונסולה · מובייל 390=390 · פוטר דביק (h=innerH, stuck:true) ונדחף-טבעי בארוך (footerBottom=docH) · dev.log נקי-אחרי-ההדלקה.
+- **שידור 12/12** (tools/r39-broadcast.ts): docs/broadcast/2026-09-12-fleet-audit-financial-r39.md — כל-11-השותפים + הדלת-שלנו.
+
+Stage Summary:
+- **הביקורת הפכה-להיות-תשתית**: במקום רק-דוח — הסיכון-הפתוח הגדול (מי-מורשה-להזיז-כסף) קיבל מודל-בקוד: סולם none/build/autonomous-limited עם תקרות-קשיחות, fail-closed ואודיט-מלא. שום-סוכן לא שודרג-בעצמו — המתג בידי-המפעיל.
+- **המערכת מוכנה לגל-המפתחות**: scan→confirm→seal (טקסט או zip), זיהוי-חי, ניכוי-כפילויות, אפס-סודות-בפלט, אפס-אטימה-בלי-הכרעה — והוכח קצה-קצה כולל-ניקוי.
+- **עשרת-הבזיפים מופו וממותנים** — הדלת-אליהם בנויה.
+- קבצים: prisma/schema.prisma (finTier+finCaps) · src/lib/gate/harness/orders.ts (FIN_TIERS/parseFinCaps/autoSignLicensedOrders) · src/lib/gate/harness/heart.ts (stageOrders) · src/app/api/gate/agents/route.ts · src/app/api/gate/orders/route.ts (tiers) · src/app/api/gate/keys-batch/route.ts (חדש) · src/components/console/types.ts · src/app/page.tsx (bulk-intake+finTier-UI) · src/lib/gate/harness/loop.ts (429-סולם) · package.json (fflate) · tools/r39-broadcast.ts · docs/broadcast/2026-09-12-fleet-audit-financial-r39.md · db/custom.db · worklog.md.

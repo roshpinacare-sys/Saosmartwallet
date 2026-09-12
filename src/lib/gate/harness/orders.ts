@@ -19,7 +19,7 @@
  * honestly instead of lingering.
  */
 import { db } from "@/lib/db";
-import { requireMaster, GateError } from "@/lib/gate/crypto";
+import { requireMaster, masterReady, GateError } from "@/lib/gate/crypto";
 import { buildSteemOrderTx, buildSteemCancelTx, buildConvertTx } from "@/lib/steem-order";
 import { toSigningKey } from "@/lib/gate/signing-key";
 import {
@@ -109,6 +109,11 @@ export interface BuildOrderInput {
  * × three ops (limit buy/sell, cancel, median-price convert).
  */
 export async function createOrderFromAgent(input: BuildOrderInput): Promise<OrderPreview> {
+  // r39 financial ladder — "none" means NO hands at all, not even key-free building
+  const agent = await db.gateAgent.findUnique({ where: { name: input.agentName } });
+  if (agent && parseFinTier(agent.finTier) === "none") {
+    throw new GateError("forbidden", `דרגת-הכסף שלך היא "none" — בניית פקודות-DEX חסומה עבורך (הגבלת מפעיל)`);
+  }
   const op = input.op === "cancel" ? "limit_order_cancel" : input.op === "convert" ? "convert" : "limit_order_create";
   const rail: ConversionRail = conversionRailOf(input.rail);
   const account = (input.account || COMMANDER_ACCOUNT).trim().toLowerCase().replace(/^@/, "");
@@ -352,6 +357,108 @@ export async function rejectOrder(id: string, operatorName: string): Promise<voi
   if (o.status !== "pending") throw new GateError("already-decided", `הפקודה כבר הוכרעה (${o.status})`);
   await db.gateOrder.update({ where: { id }, data: { status: "rejected", decidedBy: operatorName, decidedAt: new Date() } });
   await bridgeMsg(`❌ פקודת-ה-DEX של ${o.agentName} נדחתה על-ידי המפעיל — לא נחתמה ולא נשדרה`, { orderId: id });
+}
+
+/* ══════════════════ r39 FINANCIAL PERMISSION MODEL ══════════════════
+ * "הכספת = הבנק של הרשת" — the permission ladder for agents and money:
+ *   none                → createOrderFromAgent refuses outright (no hands).
+ *   build (default)     → may build; the vault signs ONLY on operator decision (r21 doctrine).
+ *   autonomous-limited  → the HEART auto-signs pending orders of this agent inside hard caps.
+ *
+ * The autonomous tier is bounded on EVERY axis, enforced here at sign time:
+ *   · per-order notional ≤ finCaps.maxNotionalPerOrder (default 0.5 STEEM)
+ *   · per-day signed count ≤ finCaps.maxSignedPerDay     (default 2)
+ *   · per-day notional sum ≤ finCaps.maxNotionalPerDay   (default 1 STEEM)
+ *   · op ∈ {limit_order_create, limit_order_cancel} — convert stays operator-only
+ *   · the vault must be OPEN (master in memory) — locked vault = no signature, fail closed
+ *   · fleet rails (maxSignedPerDay=6) still apply on top — never bypassed
+ *   · every policy signature records decidedBy="policy:fin-tier" + a bridge message
+ */
+
+export const FIN_TIERS = ["none", "build", "autonomous-limited"] as const;
+export type FinTier = (typeof FIN_TIERS)[number];
+
+export interface FinCaps {
+  maxNotionalPerOrder: number;
+  maxSignedPerDay: number;
+  maxNotionalPerDay: number;
+}
+
+/** Wise defaults: tiny by design — the point is bounded capability, not size. */
+export const FIN_CAPS_DEFAULTS: FinCaps = {
+  maxNotionalPerOrder: 0.5,
+  maxSignedPerDay: 2,
+  maxNotionalPerDay: 1,
+};
+
+export function parseFinTier(v: unknown): FinTier {
+  const s = String(v || "");
+  return (FIN_TIERS as readonly string[]).includes(s) ? (s as FinTier) : "build";
+}
+
+export function parseFinCaps(raw: string | null | undefined): FinCaps {
+  if (!raw) return { ...FIN_CAPS_DEFAULTS };
+  try {
+    const j = JSON.parse(raw) as Partial<FinCaps>;
+    const num = (x: unknown, d: number) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : d);
+    return {
+      maxNotionalPerOrder: num(j.maxNotionalPerOrder, FIN_CAPS_DEFAULTS.maxNotionalPerOrder),
+      maxSignedPerDay: num(j.maxSignedPerDay, FIN_CAPS_DEFAULTS.maxSignedPerDay),
+      maxNotionalPerDay: num(j.maxNotionalPerDay, FIN_CAPS_DEFAULTS.maxNotionalPerDay),
+    };
+  } catch {
+    return { ...FIN_CAPS_DEFAULTS };
+  }
+}
+
+/**
+ * Heart stage (r39): for every PENDING order whose agent holds finTier
+ * "autonomous-limited", sign it automatically if — and only if — the order
+ * fits inside the agent's own caps AND the fleet rails. Everything else
+ * (build-tier agents, oversized orders, converts, closed vault) stays in the
+ * operator's queue untouched. Returns how many policy signatures were made.
+ */
+export async function autoSignLicensedOrders(): Promise<number> {
+  if (!masterReady()) return 0; // locked vault = no signature at all — pending orders stay pending, never "failed"
+  const pending = await db.gateOrder.findMany({ where: { status: "pending" }, orderBy: { createdAt: "asc" } });
+  if (!pending.length) return 0;
+  const agentNames = [...new Set(pending.map((o) => o.agentName))];
+  const agents = await db.gateAgent.findMany({ where: { name: { in: agentNames } } });
+  const tierOf = new Map(agents.map((a) => [a.name, { tier: parseFinTier(a.finTier), caps: parseFinCaps(a.finCaps) }]));
+
+  const dayStart = new Date(`${dayKey()}T00:00:00.000Z`);
+  let signed = 0;
+  for (const o of pending) {
+    const lic = tierOf.get(o.agentName);
+    if (!lic || lic.tier !== "autonomous-limited") continue; // the operator's queue — untouched
+    const caps = lic.caps;
+    if (o.op !== "limit_order_create" && o.op !== "limit_order_cancel") {
+      await bridgeMsg(`🛡️ הרשאה-פיננסית: פקודת ${o.op} של ${o.agentName} אינה במסגרת הדרגה האוטונומית (המרות נשארות הכרעת-מפעיל) — ממתינה לך`, { orderId: o.id });
+      continue;
+    }
+    if (o.notionalSteem > caps.maxNotionalPerOrder) {
+      await bridgeMsg(`🛡️ הרשאה-פיננסית: פקודת ${o.agentName} (${o.notionalSteem}) חורגת מתקרת-הפקודה שלו (${caps.maxNotionalPerOrder}) — ממתינה להכרעתך`, { orderId: o.id });
+      continue;
+    }
+    const [signedTodayByAgent, notionalTodayByAgent, fleetSignedToday] = await Promise.all([
+      db.gateOrder.count({ where: { agentName: o.agentName, status: "signed", decidedAt: { gte: dayStart } } }),
+      db.gateOrder.aggregate({ where: { agentName: o.agentName, status: "signed", decidedAt: { gte: dayStart } }, _sum: { notionalSteem: true } }),
+      db.gateOrder.count({ where: { status: "signed", decidedAt: { gte: dayStart } } }),
+    ]);
+    if (fleetSignedToday >= ORDER_RAILS.maxSignedPerDay) continue; // fleet rail — honest silence, it's logged elsewhere
+    if (signedTodayByAgent >= caps.maxSignedPerDay || (notionalTodayByAgent._sum.notionalSteem ?? 0) + o.notionalSteem > caps.maxNotionalPerDay) {
+      await bridgeMsg(`🛡️ הרשאה-פיננסית: התקרה היומית של ${o.agentName} מוצו (${signedTodayByAgent}/${caps.maxSignedPerDay} חתימות · ${(notionalTodayByAgent._sum.notionalSteem ?? 0).toFixed(3)}/${caps.maxNotionalPerDay}) — פקודה ממתינה להכרעתך`, { orderId: o.id });
+      continue;
+    }
+    try {
+      await approveOrder(o.id, "policy:fin-tier");
+      signed++;
+      await bridgeMsg(`🤖 מותר-ומוגבל: הכספת חתמה אוטונומית על פקודת ${o.agentName} במסגרת דרגתו (≤${caps.maxNotionalPerOrder}/פקודה · ≤${caps.maxNotionalPerDay}/יום) — כל-הראיה בתור`, { orderId: o.id });
+    } catch {
+      // approveOrder already recorded the honest failure — the heart moves on
+    }
+  }
+  return signed;
 }
 
 /** Heart stage: a pending order nobody decided on dies honestly after its TTL. */
