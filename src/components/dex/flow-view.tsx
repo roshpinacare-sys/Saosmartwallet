@@ -7,7 +7,7 @@
 import { useCallback, useState } from 'react';
 import {
   Waves, Wallet, Vote, Repeat, PiggyBank, Zap, Activity, ShieldCheck,
-  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText,
+  Loader2, ChevronDown, ChevronUp, Landmark, ScrollText, FileText,
 } from 'lucide-react';
 import { fmtInt, usePoll, StaleChip } from './common';
 import { authHeaders } from '@/components/sv/shared';
@@ -46,6 +46,7 @@ const LOOP_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
   'blurt-curation': Vote,
   'hbd-savings': PiggyBank,
   'trx-energize': Zap,
+  'publish-author': FileText,
 };
 const CHAIN_LABEL: Record<string, string> = { steem: 'STEEM', hive: 'HIVE', blurt: 'BLURT' };
 
@@ -220,14 +221,24 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
                       );
                     })()}
                     {loop.actions.filter((a) => !a.includes('autovote_pick') && a !== 'steem_vote').map((a) => (
-                      <button
-                        key={a}
-                        onClick={() => run(a, false)}
-                        className="min-h-[32px] rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
-                        aria-label={`הרץ ${a} במצב ניסיון`}
-                      >
-                        {busy === a + '!dry' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'הרץ ניסיון (dry-run)'}
-                      </button>
+                      <span key={a} className="flex gap-2">
+                        <button
+                          onClick={() => run(a, false)}
+                          className="min-h-[32px] rounded-lg border border-[color:var(--line)] bg-black/20 px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                          aria-label={`הרץ ${a} במצב ניסיון`}
+                        >
+                          {busy === a + '!dry' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'הרץ ניסיון (dry-run)'}
+                        </button>
+                        {a === 'steem_selfvote' && (
+                          <button
+                            onClick={() => run(a, true, { weightPct: 100 })}
+                            className="min-h-[32px] rounded-lg border border-[color:var(--green)] text-[color:var(--green)] px-2.5 py-1.5 text-xs hover:bg-black/30 transition-colors"
+                            aria-label="הצבעה עצמית אמת 100% על הפוסט שלנו"
+                          >
+                            {busy === a + '!exec' ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'הצבעה-עצמית 100%'}
+                          </button>
+                        )}
+                      </span>
                     ))}
                   </div>
                 )}

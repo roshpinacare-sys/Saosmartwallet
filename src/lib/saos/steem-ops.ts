@@ -235,6 +235,33 @@ export async function curationCandidates(chain: Chain3, tag = ''): Promise<Array
     .filter((c: { author: string; ageH: number }) => c.author && c.author !== OPERATOR && c.ageH > 1 && c.ageH < 18);
 }
 
+/** פוסטים-שורש-אחרונים שלנו (publish-desk) — מקור-אמת ללולאת-הפרסום (71-f) */
+export async function ownBlogPosts(chain: Chain3, limit = 3): Promise<Array<{ permlink: string; created: string; title: string; pendingSbd: number; votes: number; hasSelfVote: boolean }>> {
+  const rows = chain === 'hive'
+    ? await hiveCondenser('condenser_api.get_discussions_by_blog', [{ tag: OPERATOR, limit }])
+    : await condenser(RPC[chain], 'condenser_api.get_discussions_by_blog', [{ tag: OPERATOR, limit }]);
+  return (Array.isArray(rows) ? rows : [])
+    .filter((d: any) => d.author === OPERATOR && !d.parent_author)
+    .map((d: any) => ({
+      permlink: String(d.permlink ?? ''),
+      created: String(d.created ?? ''),
+      title: String(d.title ?? '').slice(0, 80),
+      pendingSbd: parseFloat(String(d.pending_payout_value ?? '0')) || 0,
+      votes: Array.isArray(d.active_votes) ? d.active_votes.length : Number(d.net_votes ?? 0),
+      hasSelfVote: Array.isArray(d.active_votes) ? (d.active_votes as Array<{ voter: string }>).some((v) => v.voter === OPERATOR) : false,
+    }));
+}
+
+/** RC-מנאבר (STEEM) — יכולת-תפעול של ההצבעות (71-f: טלמטריה-חיה) */
+export async function steemRcMana(): Promise<{ pct: number }> {
+  const r = await condenser(RPC.steem, 'rc_api.find_rc_accounts', { accounts: [OPERATOR] });
+  const a = r?.rc_accounts?.[0];
+  if (!a) throw new Error('rc: no account');
+  const cur = BigInt(a.rc_manabar?.current_mana ?? '0');
+  const max = BigInt(a.max_rc ?? '1');
+  return { pct: Number((cur * 10000n) / max) / 100 };
+}
+
 export async function postInfo(chain: Chain3, author: string, permlink: string): Promise<any | null> {
   const r = chain === 'hive'
     ? await hiveCondenser('condenser_api.get_content', [author, permlink])

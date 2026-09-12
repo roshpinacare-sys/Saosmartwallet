@@ -15,7 +15,7 @@
  *   G. blurt-curation — ~8.5K BLP מצביעים על BLURT
  */
 import { db } from '@/lib/db';
-import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser, getBlurtAccount, getBlurtProps } from '@/lib/saos/steem-ops';
+import { OPERATOR, getAccount, getGlobalProps, vestsToChainVests, condenser, getBlurtAccount, getBlurtProps, ownBlogPosts, steemRcMana } from '@/lib/saos/steem-ops';
 import { treasuryWallet, doorWallet, tronAccount } from '@/lib/saos/trx-ops';
 import { planEnergize } from '@/lib/saos/tron-energize';
 
@@ -169,6 +169,10 @@ export async function flowOverview(): Promise<FlowOverview> {
   const steemOwnVests = Math.max(0, steemVests - steemDelegated);
   const steemTotalVp = props ? vestsToChainVests(steemVests, props) : 0;
   const steemOwnVp = props ? vestsToChainVests(steemOwnVests, props) : 0;
+  // 71-f: מסת-ההצבעה-בפועל שהשרשרת שוקלת = own + מתקבל (היסטוריה-מלאה: haran 348K + 9-חברי-צי + lsa)
+  const steemEffectiveVests = Math.max(0, steemVests + steemReceived - steemDelegated);
+  const steemEffectiveVp = props ? vestsToChainVests(steemEffectiveVests, props) : 0;
+  const steemReceivedVp = props ? vestsToChainVests(steemReceived, props) : 0;
   const steemLiquid = parseFloat(String(steemAcc?.balance ?? '0'));
   const steemSbd = parseFloat(String(steemAcc?.sbd_balance ?? '0'));
   const pdRateRaw = parseFloat(String(steemAcc?.vesting_withdraw_rate ?? '0'));
@@ -213,6 +217,7 @@ export async function flowOverview(): Promise<FlowOverview> {
         { k: 'SBD', v: `${fmt(steemSbd)} SBD` },
         { k: 'SP כולל', v: `${fmt(steemTotalVp, 1)}` },
         { k: 'SP פנוי (לא-מואצל)', v: `${fmt(steemOwnVp, 1)}`, hint: `${fmt(steemDelegated / 1e6, 1)}M VESTS מואצלים לצי-ה-RC` },
+        { k: 'מסה-אפקטיבית', v: `${fmt(steemEffectiveVp, 1)}`, hint: `+${fmt(steemReceivedVp, 1)} SP מתקבלים (${fmt(steemReceived, 0)} VESTS — haran 88% + 9-חברי-צי, סריקת-היסטוריה-מלאה) — המסה-שבפועל-נשקלת ברשיירז` },
         { k: 'פאוורדאון', v: pdRate > 0 ? `פעיל — ${fmt(pdRemainingSp, 1)} SP בשחרור` : 'כבוי', hint: 'op: withdraw_vesting' },
       ],
     },
@@ -307,13 +312,18 @@ export async function flowOverview(): Promise<FlowOverview> {
 
   // C. curation — חי: הצבעות-אמת-מהשרשרת + מה ששולם בפועל + pending-מוערך
   const cur = await curationTrack(vestsToSp);
+  const [rcMana, ownPosts] = await Promise.all([
+    cached('steem-rc', 120_000, () => steemRcMana().catch(() => null)),
+    cached('own-posts', 120_000, () => ownBlogPosts('steem', 3).catch(() => [] as Array<{ permlink: string; created: string; title: string; pendingSbd: number; votes: number; hasSelfVote: boolean }>)),
+  ]);
   const curLast = cur.pending.length ? `${cur.pending[cur.pending.length - 1].author}/…` : null;
   loops.push({
     id: 'curation', title: 'קיוריישן (HP מצביע)', engine: 'steem · vote',
     status: cur.pending.length > 0 || (cur.paidSp ?? 0) > 0 ? 'live' : steemOwnVp > 100 ? 'armed' : 'blocked',
     statusLabel: cur.pending.length > 0 ? 'אוסף-עכשיו' : (cur.paidSp ?? 0) > 0 ? 'חי-משלם' : steemOwnVp > 100 ? 'חמוש' : 'אין-מסה',
     numbers: [
-      { k: 'SP פנוי', v: fmt(steemOwnVp, 1) },
+      { k: 'מסה-מצביעה', v: fmt(steemEffectiveVp, 1), hint: `own ${fmt(steemOwnVp, 1)} + מתקבל ${fmt(steemReceivedVp, 1)} SP — מה-שהשרשרת-באמת-שוקלת-ברשיירז (71-f: היה-מוצג-רק-own)` },
+      { k: 'RC-מנאבר', v: rcMana ? `${rcMana.pct.toFixed(1)}%` : '—', hint: 'יכולת-תפעול-הצבעות (rc_api חי)' },
       { k: 'הצבעות', v: `${cur.votesCount} בהיסטוריה · ${cur.pending.length} בפנדינג`, hint: curLast ? `אחרונה: ${curLast}` : undefined },
       { k: 'ששולם-בפועל', v: cur.paidSp !== null ? `${cur.paidSp.toFixed(4)} SP (${fmt(cur.paidVests)} VESTS)` : '—', hint: 'curation_reward-מהשרשרת — אמת-ראשונה: realsam/achievement-1' },
       { k: 'תגמול-ממתין-מוערך', v: cur.pendingEstUsd !== null ? `~$${cur.pendingEstUsd.toFixed(4)}` : '—', hint: 'הערכה-כנה: מנת-רשיירז × 50%-מאגר (SBD≈USD)' },
@@ -323,6 +333,24 @@ export async function flowOverview(): Promise<FlowOverview> {
       ? 'הלולאה חיה-ומוכחת-בשרשרת: הצבעות-אמת ב-active_votes ותגמול-קיוריישן ראשון-ששולם. כנות: במסת-SP-הנוכחית התגמול-להצבעה הוא אבק-קורט — מדרגי-התשואה הם משקל-ההצבעה ו-SP-נוסף.'
       : 'ה-HP הפנוי מצביע-על-פוסטים-חיים (1–18 שעות) — תגמולי-קיוריישן זורמים כ-VESTS. הצבעה-ראשונה תניב-ראיה-בשרשרת.',
     actions: ['steem_vote', 'autovote_pick'],
+  });
+
+  // H. publish-author (71-f) — הפרסום-שלנו → תגמולי-סופר + הצבעה-עצמית (זרימה-כפולה-חוזרת)
+  const latestPost = ownPosts[0] ?? null;
+  const pubAgeH = latestPost ? (Date.now() - new Date(latestPost.created).getTime()) / 3600_000 : null;
+  const inPayoutWindow = pubAgeH !== null && pubAgeH < 168;
+  loops.push({
+    id: 'publish-author', title: 'פרסום→תגמול-סופר (publish-desk)', engine: 'steem · comment',
+    status: latestPost && inPayoutWindow ? 'live' : latestPost ? 'armed' : 'blocked',
+    statusLabel: latestPost && inPayoutWindow ? (latestPost.hasSelfVote ? 'חי — הוצבע-עצמית' : 'חי — בחלון-תגמול') : latestPost ? 'מחוץ-לחלון' : 'אין-פוסט',
+    numbers: latestPost ? [
+      { k: 'פוסט', v: latestPost.title.slice(0, 42) || '(ללא-כותרת)', hint: latestPost.permlink },
+      { k: 'גיל', v: `${(pubAgeH ?? 0).toFixed(0)} שעות מתוך 168`, hint: latestPost.created },
+      { k: 'פנדינג', v: `$${latestPost.pendingSbd.toFixed(3)}`, hint: 'SBD≈USD — נשקל-בפאי-אאוט (יום-7)' },
+      { k: 'הצבעות', v: String(latestPost.votes), hint: latestPost.hasSelfVote ? 'כולל-הצבעה-עצמית-שלנו' : 'אין-הצבעה-עצמית-עדיין' },
+    ] : [{ k: 'מצב', v: 'אין-פוסט-שורש-חי — publish-desk מוכן' }],
+    verdict: 'הפרסום-עצמו מייצר זרימה: תגמולי-סופר 50% (SBD+SP) + הצבעה-עצמית קולטת עוד 50% קיוריישן חזרה-אלינו — כל-הפאי-אאוט נשאר-במערכת. כנות: במסה-הנוכחית זה אבק-קורט שגדל-לינארית-עם-ה-SP (המסה-האפקטיבית 2,144 SP — לולאת-קיוריישן).',
+    actions: latestPost && inPayoutWindow && !latestPost.hasSelfVote ? ['steem_selfvote'] : [],
   });
 
   const [hiveVoted, blurtVoted] = await Promise.all([
@@ -409,7 +437,7 @@ export async function flowOverview(): Promise<FlowOverview> {
 
   /* ── פקדה ── */
   const ledger = await db.auditLog.findMany({
-    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
+    where: { action: { in: ['flow-vote', 'flow-powerdown', 'flow-savings', 'flow-energize', 'flow-claim', 'flow-selfvote', 'flow-hive-vote', 'flow-blurt-vote', 'flow-hive-claim', 'wallet-sealed-trx', 'wallet-address-corrected'] } },
     orderBy: { createdAt: 'desc' }, take: 12,
   });
 

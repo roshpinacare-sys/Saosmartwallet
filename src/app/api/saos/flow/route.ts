@@ -4,7 +4,7 @@ import { audit, relayBroadcast } from '@/lib/audit';
 import { flowOverview } from '@/lib/saos/flow';
 import {
   chainVote, hiveSavingsSweep, claimRewards, curationCandidates, postInfo,
-  getAccount, getGlobalProps, vestsToChainVests, type Chain3,
+  getAccount, getGlobalProps, vestsToChainVests, ownBlogPosts, OPERATOR, type Chain3,
 } from '@/lib/saos/steem-ops';
 import { trxEnergize, tronAccount, treasuryWallet } from '@/lib/saos/trx-ops';
 
@@ -66,6 +66,30 @@ async function voteAction(chain: Chain3, action: string, p: Record<string, unkno
   });
 }
 
+/** הצבעה-עצמית על הפוסט-החי-האחרון שלנו (publish-author · 71-f) — dry-run פתוח, execute-מאומת */
+async function selfVoteAction(p: Record<string, unknown>, execute: boolean, ownerLabel: string) {
+  const posts = await ownBlogPosts('steem', 3).catch(() => []);
+  const latest = posts[0] ?? null;
+  if (!latest) return NextResponse.json({ ok: false, error: 'אין-פוסט-שורש-חי (publish-desk ריק — כנות)' });
+  const weightPct = Math.min(100, Math.max(0.1, Number(p.weightPct ?? 100) || 100));
+  if (execute) {
+    if (latest.hasSelfVote) return NextResponse.json({ ok: false, error: 'כבר-הצבענו-על-הפוסט-הזה (fail-honest — שרשרת-דוחה-כפילות)' });
+    const r = await chainVote('steem', { author: OPERATOR, permlink: latest.permlink, weightPct });
+    await audit('flow-selfvote', `self-vote on own post ${latest.permlink.slice(0, 60)} weight=${weightPct}% by owner:${ownerLabel} — dual-return (author 50% SBD+SP + curation 50% VESTS)`);
+    try { await relayBroadcast('vault', { type: 'flow-selfvote', permlink: latest.permlink, weightPct }); } catch { /* */ }
+    return NextResponse.json({ ok: true, action: 'steem_selfvote', dryRun: false, result: r });
+  }
+  return NextResponse.json({
+    ok: true, action: 'steem_selfvote', dryRun: true,
+    plan: {
+      title: latest.title.slice(0, 60), permlink: latest.permlink,
+      ageH: Math.round((Date.now() - new Date(latest.created).getTime()) / 3600_000),
+      pending: `$${latest.pendingSbd.toFixed(3)}`, votes: latest.votes, alreadyVoted: latest.hasSelfVote, weightPct,
+      note: 'הצבעה-עצמית = זרימה-כפולה-חוזרת-אלינו: 50% author + 50% curation. VP-נצבר-בכל-מקרה — לא-להצביע = בזבוז.',
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
   let body: { action?: string; execute?: boolean; params?: Record<string, unknown> };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'bad-json' }, { status: 200 }); }
@@ -90,6 +114,10 @@ export async function POST(req: NextRequest) {
   if (dryChain && execute !== true) {
     return await voteAction(dryChain, action, p, false, '');
   }
+  // 71-f: dry-run-הצבעה-עצמית = מידע-פומבי (get_discussions_by_blog) — פתוח. execute-מאומת.
+  if (action === 'steem_selfvote' && execute !== true) {
+    return await selfVoteAction(p, false, '');
+  }
 
   const owner = await requireOwner(req);
   if (!owner) return NextResponse.json({ ok: false, error: 'auth-required', note: 'התחבר כמפעיל כדי להריץ פעולות-זרימה' }, { status: 401 });
@@ -101,6 +129,10 @@ export async function POST(req: NextRequest) {
       case 'hive_vote':
       case 'blurt_vote':
         return await voteAction(VOTE_CHAINS[action], action, p, execute, owner.label);
+
+      /* ── הצבעה-עצמית על הפוסט-שלנו (publish-author · 71-f) ── */
+      case 'steem_selfvote':
+        return await selfVoteAction(p, execute, owner.label);
 
       /* ── פאוורדאון-מנוע (דרך מנוע-הדקס החי · STEEM_ACTIVE_WIF) ── */
       case 'steem_powerdown': {
@@ -179,7 +211,7 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'autovote_pick'] }, { status: 200 });
+        return NextResponse.json({ ok: false, error: 'action-not-allowed', actions: ['steem_vote', 'hive_vote', 'blurt_vote', 'steem_selfvote', 'steem_powerdown', 'hive_savings_sweep', 'steem_claim', 'hive_claim', 'trx_energize', 'autovote_pick'] }, { status: 200 });
     }
   } catch (e) {
     return NextResponse.json({ ok: false, action, error: e instanceof Error ? e.message : 'flow action failed' }, { status: 200 });
