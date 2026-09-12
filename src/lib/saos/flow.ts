@@ -5,7 +5,7 @@
  * הכספת (זהויות), מנוע-הדקס (שוק-STEEM האמיתי), CoinGecko (מחירים).
  * לולאות-הזרימה (בלי-משתמשים · טווח-בינוני):
  *   A. grid-steem     — ספר-STEEM הפנימי (מייקר/ספרד) — מנוע-הדקס החי
- *   B. powerdown-drip — HP פנוי → STEEM נזיל (13 שבועות) → מזין-את-הספר
+ *   B. powerdown-drip — HP פנוי → STEEM נזיל (STEEM-HF23: 4 שבועות) → מזין-את-הספר
  *   C. curation       — HP שלנו מצביע-על-פוסטים-חיים → תגמולי-קיוריישן
  *   D. hbd-savings    — HBD → חיסכון 15% APR (פרמטר-שרשרת)
  *   E. trx-energize   — ארנק-המערכת האטום → אנרגיה+הצבעה ~4.5% APR (ממתין-הפקדה)
@@ -43,7 +43,7 @@ export interface FlowOverview {
   wallet: { sealed: boolean; address: string | null; fp: string | null; verified: boolean; source: string | null; note: string };
   treasury: {
     rows: Array<{ chain: string; label: string; items: Array<{ k: string; v: string }>; usd: number | null; ok: boolean }>;
-    totalUsd: number | null; note: string;
+    totalUsd: number | null; inReleaseUsd: number | null; note: string;
   };
   loops: FlowLoop[];
   ledger: Array<{ id: string; action: string; detail: string; createdAt: string }>;
@@ -85,7 +85,8 @@ export async function flowOverview(): Promise<FlowOverview> {
     treasuryWallet().catch(() => null),
     doorWallet().catch(() => null),
     cached('blurt-acc', 60_000, async () => {
-      for (const url of ['https://rpc.blurt.world', 'https://rpc.blurtworld.com']) {
+      // צמתים-מוכחים (נבדקו-חי בביקורת 71-c · rpc.blurt.world/blurtworld.com מתים — החזירו ריק/HTML)
+      for (const url of ['https://blurt-rpc.saboin.com', 'https://rpc.beblurt.com', 'https://rpc.blurt.blog', 'https://blurtrpc.dagobert.uk', 'https://rpc.drakernoise.com']) {
         try { return await condenser(url, 'condenser_api.get_accounts', [['headcorner']]); } catch { /* next */ }
       }
       return null;
@@ -110,7 +111,8 @@ export async function flowOverview(): Promise<FlowOverview> {
   const steemOwnVp = props ? vestsToChainVests(steemOwnVests, props) : 0;
   const steemLiquid = parseFloat(String(steemAcc?.balance ?? '0'));
   const steemSbd = parseFloat(String(steemAcc?.sbd_balance ?? '0'));
-  const pdRate = parseFloat(String(steemAcc?.vesting_withdraw_rate ?? '0')); // VESTS תצוגה (6 עשרוניות)
+  const pdRateRaw = parseFloat(String(steemAcc?.vesting_withdraw_rate ?? '0'));
+  const pdRate = pdRateRaw > 1e9 ? pdRateRaw / 1e6 : pdRateRaw; // guard: צומת-שמחזיר-ראו-במקום-תצוגה
   const pdRemaining = Number(steemAcc?.to_withdraw ?? 0) - Number(steemAcc?.withdrawn ?? 0); // ראו-אינטג'ר (×1e6)
   const vestsToSp = (v: number) => props ? vestsToChainVests(v, props) : 0;
   const pdRemainingSp = vestsToSp(pdRemaining / 1e6);
@@ -124,6 +126,7 @@ export async function flowOverview(): Promise<FlowOverview> {
   const hiveHsp = props ? hiveVests * (parseFloat(String(props.total_vesting_fund_steem)) / parseFloat(String(props.total_vesting_shares))) : 0;
 
   const blurtLiquid = blurtAcc?.[0] ? parseFloat(String(blurtAcc[0].balance ?? '0')) : null;
+  const blurtVests = blurtAcc?.[0] ? parseFloat(String(blurtAcc[0].vesting_shares ?? '0')) : null;
 
   const treasuryRows: FlowOverview['treasury']['rows'] = [
     {
@@ -150,7 +153,11 @@ export async function flowOverview(): Promise<FlowOverview> {
     {
       chain: 'BLURT', label: 'BLURT · headcorner', ok: blurtLiquid !== null,
       usd: blurtPrice !== null && blurtLiquid !== null ? blurtLiquid * blurtPrice : null,
-      items: [{ k: 'RPC', v: blurtLiquid !== null ? 'חי' : 'לא-נגיש מהסנדבוקס (כנות)' }, ...(blurtLiquid !== null ? [{ k: 'נזיל', v: `${fmt(blurtLiquid)} BLURT` }] : [])],
+      items: [
+        { k: 'RPC', v: blurtLiquid !== null ? 'חי' : 'לא-נגיש מהסנדבוקס (כנות)' },
+        ...(blurtLiquid !== null ? [{ k: 'נזיל', v: `${fmt(blurtLiquid)} BLURT`, hint: '~$' + (blurtPrice !== null ? (blurtLiquid * blurtPrice).toFixed(2) : '—') }] : []),
+        ...(blurtVests !== null ? [{ k: 'BLP (מואצל-אפס)', v: `${fmt(blurtVests, 0)} VESTS` }] : []),
+      ],
     },
     {
       chain: 'TRON-DOOR', label: 'TRX · זהות-הדלת', ok: !!door,
@@ -205,7 +212,7 @@ export async function flowOverview(): Promise<FlowOverview> {
       { k: 'תשלום-הבא', v: String(steemAcc?.next_vesting_withdrawal ?? '—').replace('T', ' ').slice(0, 16) + ' UTC' },
     ] : [
       { k: 'SP פנוי', v: fmt(steemOwnVp, 1) },
-      { k: 'טפטוף-אם-מופעל', v: `${fmt(steemOwnVp / 13)} SP/שבוע × 13 שבועות`, hint: '~$' + (spPrice ? (steemOwnVp * spPrice).toFixed(2) : '—') + ' סה״כ' },
+      { k: 'טפטוף-אם-מופעל', v: `${fmt(steemOwnVp / 4)} SP/שבוע × 4 שבועות`, hint: 'STEEM-HF23: פאוורדאון=4-שבועות (היה-13) · ~$' + (spPrice ? (steemOwnVp * spPrice).toFixed(2) : '—') + ' סה״כ' },
       { k: 'מצב-נוכחי', v: 'כבוי — החלטת-מפעיל' },
     ],
     verdict: pdRate > 0
@@ -286,6 +293,7 @@ export async function flowOverview(): Promise<FlowOverview> {
     treasury: {
       rows: treasuryRows,
       totalUsd: totalUsd !== null ? Number(totalUsd.toFixed(2)) : null,
+      inReleaseUsd: spPrice !== null && pdRemainingSp > 0 ? Number((pdRemainingSp * spPrice).toFixed(2)) : null,
       note: 'הכל-חי מ-RPC-ציבורי/כספת — מחירים מ-CoinGecko (null כשה-API נופל)',
     },
     loops,

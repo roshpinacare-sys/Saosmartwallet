@@ -23,7 +23,7 @@ interface FlowData {
   wallet: { sealed: boolean; address: string | null; fp: string | null; verified: boolean; source: string | null; note: string };
   treasury: {
     rows: Array<{ chain: string; label: string; items: Array<{ k: string; v: string; hint?: string }>; usd: number | null; ok: boolean }>;
-    totalUsd: number | null; note: string;
+    totalUsd: number | null; inReleaseUsd?: number | null; note: string;
   };
   loops: FlowLoop[];
   ledger: Array<{ id: string; action: string; detail: string; createdAt: string }>;
@@ -126,7 +126,12 @@ export function FlowView({ authed, onNeedAuth }: { authed: boolean; onNeedAuth: 
             )}
             {d.treasury.totalUsd !== null && (
               <span className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1">
-                אוצר ≈ ${fmtInt(d.treasury.totalUsd)}
+                אוצר-נזיל ≈ ${fmtInt(d.treasury.totalUsd)}
+              </span>
+            )}
+            {!!d.treasury.inReleaseUsd && (
+              <span className="rounded-lg bg-black/30 border border-[color:var(--line)] px-2 py-1" title="SP בשחרור-פאוורדאון-פעיל — נכנס-לנזיל בתשלומים-השבועיים">
+                +${fmtInt(d.treasury.inReleaseUsd)} בשחרור
               </span>
             )}
           </div>

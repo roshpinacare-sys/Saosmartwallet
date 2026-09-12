@@ -102,8 +102,8 @@ export async function POST(req: NextRequest) {
           ok: true, action, dryRun: true,
           plan: {
             availableVests: available.toFixed(6), availableSp: spAvail.toFixed(1),
-            weeklySp: (spAvail / 13).toFixed(1), weeks: 13,
-            note: 'withdraw_vesting משחרר SP פנוי ל-STEEM נזיל על-פני 13 שבועות — מזין-מלאי-הספר. החלטה-מבנית של-מפעיל.',
+            weeklySp: (spAvail / 4).toFixed(1), weeks: 4,
+            note: 'withdraw_vesting משחרר SP פנוי ל-STEEM נזיל — STEEM-HF23: 4 תשלומים שבועיים (הכלל-הישן-היה 13). מזין-מלאי-הספר. החלטה-מבנית של-מפעיל.',
           },
         });
       }
