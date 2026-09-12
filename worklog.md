@@ -2072,3 +2072,25 @@ Stage Summary:
 - **ה"למה" של כשלי-הסבבים-הקודמים נסגרת-ממצר**: פרץ-הכשלונות-סביב-הפעלות-מחדש לא-היה-באג-מודולים אלא-ארכיטקטורת-זמן — עתה-מתוקנת-ומוכחת.
 - **תוספת-תפעולית**: tools/r36-revive.ts — החייאה-המוכחת-היחידה (spawn detached+unref) מתועדת-ככלי-ראוי-בשם.
 - קבצים: prisma/schema.prisma · src/lib/gate/harness/heart.ts · tools/r36-proof.ts · tools/r36-revive.ts · tools/r36-writeok.ts · tools/r36-broadcast.ts · docs/broadcast/2026-09-11-crash-burst-healing-r36.md · db/custom.db (schema+מבחנים) · worklog.md.
+
+---
+Task ID: 53
+Agent: Z.ai Code (main)
+Task: r37 — "הכספת כבנק-הרשת: תרגיל-שחזור מוכח, ביטוי-Coinomi נאטם, והמפתח-הראשוני נבדק-לעומק" — השלמת-הסבב-שנתקע + סגירת-פערי-המפתחות-של-המפעיל
+
+Work Log:
+- **זיהוי-התקיעה**: הסבב-הקודם נקטע באמצע — restore-drill (lib+route) נכתבו אך מעולם לא רצו; עמודת lastRestoreDrill נוספה ל-DB אך נשארה None; קומיט-db יתום לא-דחוף (f9f60fc) + 4 קבצי-r37 לא-מקומיטים.
+- **השלמת-התרגיל**: POST restore-drill הריץ חי — מצא כשל אמת: ynet·posting (רשומת-פנויה honest-null מ-r11, אפס-בייטים, ללא חומר-מפתח במתכנן — המפתח האמיתי של אותו תפקיד כבר verified בכספת). התרגיל תוקן להפריד רשומות-פנויות (placeholders) מכשלי-פענוח אמת + operatorPrimary מחושב מול חותמות מפתחות-שליטה מאומתים (owner/active verified של headcorner) במקום role-לא-קיים. ריצה-שנייה: **PASS — 236/236 סודות נפתחו בפועל · 1 פנויה · 0 כשלים · גיבוי-אטום 409KB נכתב (backups/gate-vault-*.enc)**.
+- **ביטוי-Coinomi נאטם** (upload/קונמי.txt — 24 מילים, "Coinomi recover"): import-lab הורחב בסעיף-6 — ניכוי-כפילויות בתוך-השרת (פענוח כל kind=mnemonic הקיים והשוואה מנורמלת) → **אינו כפילות** של הזרע-הריבוני/אם/tron → נאטם AES-256-GCM (mnemonic/coinomi/legacy/recovery, source=upload/קונמי.txt).
+- **סריקת-עומק של ה-Coinomi** (tools/r37-coinomi-scan.ts — BIP39→BIP32 מימוש-מקומי, אפס-סודות-בפלט): ETH m/44'/60'/0'/0/0 = 0x01Bd…8B37 — **0.0000265 ETH, nonce 11 (ארנק-פעיל-היסטורית)** · BTC (BIP44 idx0-2 + BIP49 + BIP84) אפס-יתרות · LTC idx0: 0.185 LTC נקלטו-ונשלחו (2 tx) · DOGE idx0: 420.06 DOGE נקלטו-ונשלחו (2 tx) — **הארנק-הישן שרוקן-היסטורית; הזרע מובטח לשחזור-עתידי**. הממצאים רשומים ב-verifyNote של הרשומה.
+- **בדיקת-עומק של headcorner** (API חדש POST /api/gate/key-authority): כל WIF של headcorner בכספת נפתח, נגזר למפתח-ציבורי (הוכחת-תקינות-חומר) ונבדק מול ה-authority-החי (steem+hive): **20/20 חומר-תקין · 12 מחזיקים סמכות-חיה** (steem: owner/active/posting/memo + hive: owner/active×2/posting/memo×2) · 4 תקינים-שמחוץ-לסמכות (הסט-הישן לזיהוי) · 0 פגומים.
+- **המפתח-הראשוני — החוליה-החסרה נסגרה**: upload/headcorner.txt (הניסוח "קצת-אחר" של המפעיל) נכשל-בסכום; כלי-התיקון של הסבב-הקודם (r37-key-recover) מצא את הגרסה-התקינה בניסוח-תו-אחד; **התברר שהוא מעולם לא נאטם בכספת**. נאטם עכשיו דרך /api/gate/key (steem/headcorner/primary-original, pub=STM8StTG4aes…) + בדיקת-זהות-חיה (r37-key-identity): **תקין-מכנית, CONTROLS: NONE** — איבד-סמכות ברוטציות-הצי (ראיה r34). נשמר כעוגן-שחזור; הפיכתו-למפתח-כניסה-אוניברסלי = החלטת-מפעיל להוספתו ל-authority (לא בוצע — שינוי-שרשרת).
+- **היגיינה-סודות**: WIF-מוטמע שנמצא ב-tools/r37-vault-history.ts (שריד-סבב-קודם) נמחק-מהקוד (ה-pub נקרא מהכספת); tools/r37-finalize-key.mjs נמחק לאחר-פעולתו; סריקת-רג'קס על tools/ — אפס-סודות-נותרים.
+- **UI**: כרטיס תרגיל-שחזור בסעיף-הכספת (מצב-אחרון עם תגיות עבר/נכשל + ספירה + חותמת-מפעיל + כפתור הרצה-חי) — אומת-בדפדפן: לחיצה הריצה את התרגיל והציג עבר·236/237·1-פנויות·חותמת-מפעיל.
+- **בדיקות**: tsc 0 · lint 0 · דפדפן: אפס-שגיאות-קונסולה, מובייל 390=390 אפס-גלישה, דסקטופ 1280 נקי, פוטר-תקין.
+
+Stage Summary:
+- **ההצהרה "הכספת משיבה את כל המפתחות" הפכה רישום-מכני עומד**: 237 רשומות — 236 נפתחו-בפועל מול מפתח-האב + גיבוי-אטום; התרגיל זמין-בכפתור למפעיל ומפריד כנות (פנויות) מאזעקה (כשל-פענוח).
+- **הבנק-של-הרשת הושלם**: ביטוי-Coinomi (24 מילים) + המפתח-הראשוני-המתוקן של headcorner נאטמו; 12 מפתחות חיים-בסמכות + כל-הגיבויים-המוצפנים זמינים-לפעולה-מיידית כגוף-אחד.
+- **כנות-מול-המפתח-הראשוני**: הוא תקין-אך-חסר-סמכות (הרוטציות-שלנו הוציאו-אותו) — לא בוצע-שינוי-שרשרת; ההחלטה-בידי-המפעיל.
+- קבצים: src/lib/gate/restore-drill.ts · src/app/api/gate/restore-drill/route.ts · src/app/api/gate/key-authority/route.ts (חדש) · src/app/api/gate/import-lab/route.ts · src/app/page.tsx (כרטיס-תרגיל) · tools/r37-coinomi-scan.ts · tools/r37-key-identity.ts · tools/r37-key-recover.ts · tools/r37-key-decode.ts · tools/r37-history-scan.ts · tools/r37-history-probe.ts · tools/r37-vault-history.ts · tools/r37-annotate.mjs · tools/r37-broadcast.ts · docs/broadcast/2026-09-12-vault-restore-r37.md · prisma/schema.prisma (lastRestoreDrill) · db/custom.db · worklog.md.

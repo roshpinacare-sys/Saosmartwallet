@@ -1160,6 +1160,7 @@ function VaultGrid() {
           </GlowCard>
         </motion.div>
       )}
+      <RestoreDrillCard />
     </section>
   );
 }
@@ -1182,6 +1183,71 @@ function FilterChip({ active, onClick, label }: { active: boolean; onClick: () =
 }
 
 /* ══════════════════════════ 03 · key injection ══════════════════════════ */
+
+/* ── r37 · restore drill — the standing proof that every key the vault holds can actually be restored ── */
+interface DrillResult {
+  at: string; total: number; restored: number; failed: number; placeholders?: number;
+  verdict: "pass" | "fail"; meaning: string;
+  seals?: { count: number; operatorPrimary: boolean; roles: string[] };
+  backup?: Record<string, unknown> | null;
+}
+function RestoreDrillCard() {
+  const [last, setLast] = useState<DrillResult | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await apiJson<{ ok: boolean; last: DrillResult | null }>("/api/gate/restore-drill");
+    if (r?.ok) setLast(r.last);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function run() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      // POST returns the drill result spread onto {ok:true,...} (the ok() helper shape)
+      const r = await apiJson<DrillResult & { ok: boolean; error?: string; code?: string }>("/api/gate/restore-drill", { method: "POST" });
+      if (r?.ok && r?.verdict) {
+        setLast(r);
+        if (r.verdict === "pass") toast.success(`תרגיל-שחזור עבר — ${r.restored}/${r.total} סודות נפתחו בפועל`);
+        else toast.error(`תרגיל-שחזור נכשל — ${r.failed} הצפנות לא נפתחו`);
+      } else if (r?.code === "vault-locked") toast.error("הכספת נעולה — היכנס כדי להדליק את מפתח-האב");
+      else toast.error(r?.error || "התרגיל נכשל");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <motion.div {...rise} className="mt-5">
+      <GlowCard className="p-4 sm:p-5 border-emerald-500/15">
+        <div className="flex items-start gap-3 flex-wrap">
+          <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" aria-hidden />
+          <div className="flex-1 min-w-[240px]">
+            <p className="font-bold text-sm">תרגיל-שחזור — ההוכחה-העומדת שהכספת משיבה את כל המפתחות</p>
+            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+              התרגיל פותח בפועל את כל ההצפנות מול מפתח-האב וסופר מה באמת נפתח · אפס-סודות בפלט — ספירה, תווית ופסק בלבד.
+            </p>
+            {last && (
+              <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px]">
+                <Badge variant="outline" className={last.verdict === "pass" ? "text-emerald-300 border-emerald-500/40" : "text-rose-300 border-rose-500/40"}>
+                  {last.verdict === "pass" ? "עבר" : "נכשל"}
+                </Badge>
+                <Badge variant="outline" className="text-zinc-300 border-zinc-700">{last.restored}/{last.total} נפתחו</Badge>
+                {last.placeholders ? <Badge variant="outline" className="text-zinc-400 border-zinc-700">{last.placeholders} פנויות</Badge> : null}
+                {last.failed > 0 && <Badge variant="outline" className="text-rose-300 border-rose-500/40">{last.failed} כשלים</Badge>}
+                {last.seals?.operatorPrimary && <Badge variant="outline" className="text-emerald-300 border-emerald-500/40">חותמת-מפעיל ראשית</Badge>}
+                <span className="text-zinc-600 font-mono">{new Date(last.at).toLocaleString("he-IL")}</span>
+              </div>
+            )}
+            {last?.meaning && <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">{last.meaning}</p>}
+          </div>
+          <Button variant="outline" size="sm" onClick={run} disabled={busy} className="gap-1.5 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 shrink-0">
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />} הרץ תרגיל עכשיו
+          </Button>
+        </div>
+      </GlowCard>
+    </motion.div>
+  );
+}
 
 function KeyInject() {
   const [keyInput, setKeyInput] = useState("");
