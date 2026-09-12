@@ -13,3 +13,4 @@ for (let i = 0; i < 14; i++) {
   if (await up()) { console.log(`server: up after ${(i + 1) * 5}s (pid ${proc.pid})`); process.exit(0); }
 }
 throw new Error("server did not come up in 70s");
+export {};

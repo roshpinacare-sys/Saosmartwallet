@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { db } from "@/lib/db";
-import { sealSecret, GateError } from "@/lib/gate/crypto";
+import { sealSecret, requireMaster, openSecretWith, GateError } from "@/lib/gate/crypto";
 import { requireOperator } from "@/lib/gate/session";
 import { fail, ok } from "@/lib/gate/http";
 import { wifToChainPub } from "@/lib/gate/key-id";
@@ -168,6 +168,48 @@ export async function POST() {
       if (r.created) { created++; infraCount++; }
     }
     results.infra = infraCount;
+
+    /* 6) r37 — Coinomi recovery phrase (upload/קונמי.txt) — the operator's old
+     *    multi-coin wallet seed. Dedup-aware: the normalized phrase is compared
+     *    against EVERY existing mnemonic in the vault (opened with the live
+     *    master) BEFORE a row is created — no duplicate seeds, ever. */
+    const coinomiPath = path.join(UPLOAD, "קונמי.txt");
+    let coinomi: { imported: boolean; duplicateOf: string | null; words: number; note: string } =
+      { imported: false, duplicateOf: null, words: 0, note: "" };
+    if (fs.existsSync(coinomiPath)) {
+      const firstLine = (fs.readFileSync(coinomiPath, "utf8").split(/\r?\n/)[0] || "").trim();
+      const words = firstLine.toLowerCase().split(/\s+/);
+      coinomi.words = words.length;
+      if (words.length >= 12 && words.length <= 24 && words.every((w) => /^[a-z]+$/.test(w))) {
+        const phrase = words.join(" ");
+        let dupOf: string | null = null;
+        let dedupSkipped = false;
+        try {
+          const master = requireMaster();
+          const mnemonics = await db.vaultEntry.findMany({ where: { kind: "mnemonic" } });
+          for (const e of mnemonics) {
+            try {
+              const v = openSecretWith(master, e).trim().toLowerCase().split(/\s+/).join(" ");
+              if (v === phrase) { dupOf = [e.chain, e.account, e.role].filter(Boolean).join("/"); break; }
+            } catch { /* unreadable entry is not a dup */ }
+          }
+        } catch { dedupSkipped = true; /* vault locked — honest note, no silent skip */ }
+        coinomi.duplicateOf = dupOf;
+        if (dupOf) {
+          coinomi.note = `זהה לרשומה קיימת (${dupOf}) — לא נוצר כפילות`;
+        } else {
+          const r = await put("mnemonic", "coinomi", "legacy", "recovery", null, phrase, "imported",
+            "ביטוי-שחזור Coinomi (ארנק-רב-מטבעות ישן) — הועלה על-ידי המפעיל · סריקת-כתובות r37",
+            "upload/קונמי.txt");
+          if (r.created) { created++; coinomi.imported = true; }
+          else coinomi.note = "קיים בכספת מקודם";
+          if (dedupSkipped) coinomi.note += " · ניכוי-הכפילויות דולג (כספת-נעולה בעת-הייבוא)";
+        }
+      } else {
+        coinomi.note = "השורה-הראשונה אינה ביטוי-שחזור בגודל 12–24 מילים — לא ייובא";
+      }
+    }
+    results.coinomi = coinomi;
     results.created = created;
 
     await db.gateMessage.create({
