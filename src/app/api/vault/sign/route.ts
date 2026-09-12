@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/sign — THE money path (M2)
  * ==========================================

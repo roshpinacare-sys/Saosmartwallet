@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * /api/vault/keys — key lifecycle (M2)
  * ====================================

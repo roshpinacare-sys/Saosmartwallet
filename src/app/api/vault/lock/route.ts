@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/lock — zero-fill the session master key (M2)
  * ============================================================

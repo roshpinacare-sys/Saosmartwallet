@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * /api/vault/backup — encrypted state packages (M2)
  * =================================================

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/steem/wallet?name=account — public wallet dashboard data.
  * Balances (STEEM/SBD/VESTS→SP), RC manabar, and open DEX orders.

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/bridge/routes — cross-network path finding (M3)
  * ========================================================

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/simulate — policy/balance/risk dry-run, nothing signed (M2)
  * ===========================================================================

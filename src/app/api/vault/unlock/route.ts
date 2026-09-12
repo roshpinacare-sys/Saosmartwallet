@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/unlock — verify the master password, hold the derived key
  * in VOLATILE memory only (M2)

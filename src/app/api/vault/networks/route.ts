@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * POST /api/vault/networks — create/overwrite a network vault config (M2)
  * =======================================================================

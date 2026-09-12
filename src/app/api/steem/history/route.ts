@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/steem/history?limit=50 — recent STEEM/SBD fills (newest first).
  */

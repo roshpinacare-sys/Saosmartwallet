@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/security-txt — RFC 9116 security.txt
  * ==============================================

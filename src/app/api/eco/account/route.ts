@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/eco/account — live account lookup for the M3 networks
  * =============================================================

@@ -49,7 +49,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
   // tool-results/** is agent tool output (never committed).
   // engineering/** is research workspace material (extracted external ZIPs,
   // reports) — input for engineering decisions, never project code.
-  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", ".grid98-lab/**", "tool-results/**", "db/**", "agent/**", "engineering/**", "download/**"]
+  ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills", ".grid98-lab/**", "tool-results/**", "db/**", "agent/**", "engineering/**", "download/**", "upload/**"]
 }];
 
 export default eslintConfig;

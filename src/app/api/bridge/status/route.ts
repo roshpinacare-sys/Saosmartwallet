@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/bridge/status — live rail statuses + analytics (M3)
  * ============================================================

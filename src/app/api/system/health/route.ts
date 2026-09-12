@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/system/health — System Owner consolidated probe (M4)
  * =============================================================

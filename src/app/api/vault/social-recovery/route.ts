@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * /api/vault/social-recovery — contact-sharded recovery (M2)
  * ==========================================================

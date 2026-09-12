@@ -2206,3 +2206,112 @@ Addendum (Task 57, סיום-אימות-דפדפן):
 - overview.tsx שורת-הכספת קיבלה גם-היא "verified (status-col)" — עקביות מלאה בשלוש התצוגות.
 - SQLITE_READONLY(1032) אחרי rebase הופיע שוב (inventory 500) — ריסטרט dev-server לפי-המוסכמה → ריפוי מלא, inventory HTTP 200, verified 163 וממשיך-לעלות.
 - אימות-דפדפן סופי: overview "239 · 176 verified (status-col) · 45 rotated-out" ✓ · ערוץ: כנות-הדגימה ✓ · מראה-עצמי ✓ · פירוק 31/16/15 ✓ · אפס-שגיאות-קונסולה ✓ · פוטר נוכח ✓.
+
+---
+Task ID: 1-a
+Agent: Explore
+Task: ניתוח עמוק של TFA Evolution Studio v32.0.0 (upload/extracted/tfa-evolution-studio-validated/tasks/, 454 קבצים) — מיפוי מודולים, יכולות אוטונומיות, בדיקות סטטיות בלי מפתחות LLM, תוכנית אינטגרציה לרשת רושפינה, סיכונים. מחקר בלבד — לא שונה שום קוד מקור של הפרויקט המנותח.
+
+Work Log:
+- נקרא worklog.md במלואו (57 משימות, r1–r41) — הקשר: רשת-רושפינה (roshpinacare-sys, 12 ריפו), 10 סוכנים, Gate/כספת, keys-batch (zip import עם fflate), שידורי STEEM/HIVE, פורטל Next.js; ב-r39 מופו 10 בזיפים ב-repo Project-files ביניהם "tfa 2.5MB" — הפרויקט המנותח כאן הוא ככל-הנראה תוכנו.
+- מיפוי מבנה: 454 קבצים, 147 TS/TSX, 27 תיקיות ב-src/lib, 42 API routes (src/app/api/**), 10 עמודי UI, 14 סקריפטים ב-scripts/. package.json: Next 15 + React 19 + adm-zip + fast-glob + uuid + openai (לא בשימוש בקוד). אין git, אין node_modules, קיים bun.lock + package-lock.
+- בדיקת tasks/.env: קיים, 29 בייטים, מכיל משתנה יחיד VITE_APP_ID (ערך 16 תווים, סגנון app_*) — לא מפתח LLM; הערך לא צוטט ולא נשמר. אין OPENAI_API_KEY/ANTHROPIC_API_KEY בקובץ.
+- קריאת עומק של המנועים: evolution-engine.ts (10 פאזות — פאזות 3–6 "חוזה מבני", fileCount=0 ו-step שנרשם בלי לעשות), compiler-orchestrator.ts (10 פאזות עם durable jobs + retries + resource pool — אמיתי), sandbox-runtime.ts (sandbox מבודד + ingestZipIntoSandbox עם הגנת Zip Slip — אמיתי), project-ir.ts (פרסינג ZIP ל-IR עם imports/hashes — אמיתי), compiler-intelligence.ts (8 שלבים על ה-IR — אמיתי), workflow-engine.ts (checkpoint/replay/idempotency — אמיתי), durable-job-store.ts (NDJSON file-backed — אמיתי), adapters/exec-helper.ts (spawn עם timeout/retry — אמיתי), node/nextjs/python/static adapters (npm install/build אמיתיים).
+- זוהו סטאבים מפורשים (ממצא קריטי לאמת): agents/provider.ts מחזיר תשובות LLM מזויפות ("OpenAI response to: …") — אין קריאת LLM אמיתית בקוד כולו (package openai מיובא בשום מקום); integrations/connectors/* (github/gitlab/slack/jira/notion/rest/webhook/cicd) מחזירים echo; api/artifacts/[version]/download מחזיר "Artifact body"; trace/cost/sla מינימליים. גם: אין route /api/projects אף-על-פי ש-smoke-test מתייג אותו כ-live — הצינור האמיתי הוא POST /api/compiler/compile (multipart, מקס 250MB).
+- בדיקות סטטיות שרצו בפועל (בלי npm install): node scripts/self-audit.mjs → clean (316 קבצים, exit 0); node scripts/smoke-test.mjs --coherence-only → 182 עברו / 1 נכשל — "RELEASE_NOTES.md לא מסמן 32.0.0 כ-current" (באג תיעודי קל, exit 1); node scripts/v32-tests.mjs (certify) → 40/40 עברו, exit 0.
+- מיפוי 63 EvidenceNodeKind ב-types.ts + מודולי הראיות: evidence-chain/evidence-emitter, governance/audit-trail + approval-gate + rbac, event-store (append-only + replay), release/release-gate + release-governor + release-verifier (AdmZip + sha256 + provenance אמיתי).
+- אינטליגנציה: sovereign-orchestrator.ts — debate 6 תפקידים ב-7 שלבים עם quorum מבוסס-משקל-ראיות (runDebateV2, runSovereignBatch, selectWork); memory-graph.ts (8 סוגי צמתים/7 קשתות, file-backed, ingestCycleOutcome + findBestRecovery); learning-engine/outcome-tracker; distillation/pattern-promoter + playbook-engine; intelligence/cross-project-engine; self-critique (7 מימדים, כימור עד 80); fitness-functions (5 מימדים); soak-harness (8 תרחישים); chaos-harness (ספריית תקלות).
+- נבנתה תוכנית אינטגרציה קונקרטית לרשת רושפינה (בדוח הסופי): קבצים להעתקה, APIs לחשיפה מאחורי operator-token, ושילוב EvidenceNode בגשר וב-broadcast.
+
+Stage Summary:
+- TFA Evolution Studio = פלטפורמת "שחרור-עם-ראיות": zip→sandbox→IR→adapter/build→release.zip+sha256, עם 63 סוגי ראיות, durable jobs עם checkpoint/replay (NDJSON, בלי DB), ו-gates עצמאיים לחלוטין ממפתחות LLM (self-audit + coherence-only + certify רצו כאן ועברו/כמעט).
+- אמת-מול-הצהרות: מנוע ה-אבולוציה המרכזי סטאבי בפאזות הביצוע; אין LLM אמיתי (provider פיקטיבי); connectors echo. הערך האמיתי נמצא ב-compiler/sandbox/workflow/job-engine/release-verifier/memory-graph ובסוויטות ה-gates — בדיוק השכבות שהרשת צריכה (זיפים→שחרור מאומת, ראיות לסוכנים, ריפוי-זומבים מבוסס checkpoint).
+- אינטגרציה מומלצת בשלוש שכבות: (א) מיידי — העתקת scripts/self-audit.mjs + מצב --coherence-only כ-gates לכל שחרור של הרשת; (ב) שירות — הרצת הפלטפורמה כ-side-service עם POST /api/compiler/compile ופרוקסי מהפורטל; (ג) מלא — צינור "בזיפים-בגיט → שחרור מאומת" שמזרים EvidenceNodes לגשר ול-docs/broadcast, והחלפת provider.ts במוח הרשת (NVIDIA/zai) דרך ה-interface המוכן SovereignInput.voices.
+- סיכונים עיקריים: פער הצהרות-מימוש, אין auth על ה-APIs (חובה operator-token), התמדה קובצית בלבד, חוסר-עקביות תיעודית אחת (RELEASE_NOTES current), ומשקל מודולרי עם חפיפה רעיונית.
+
+---
+Task ID: 1-b
+Agent: Explore
+Task: ניתוח עמוק של ארכיון SRS Sovereign Runtime Substrate v8.2.0 (upload/extracted/srs_sovereign_runtime_substrate_v8.2.0) — ארכיטקטורה, מנגנוני אבטחה, TemporalBankerScheduler, הרצה מקומית, ותוכנית אינטגרציה לרשת רושפינה. מחקר-בלבד, אפס-שינוי קוד המקור המנותח.
+
+Work Log:
+- נקרא worklog (משימות 1-57) להקשר: רשת רושפינה — Gate, כספת, finTier/finCaps, שידורי STEEM/HIVE, פורטל Next.js.
+- מופו מבני-העץ: kernel/ (omnivisor.py+smpu_sppu.py+ebpf_telemetry.py+c/+rust/), cognition/ (agemem_controller, agemem_adm_trainer, adm_intent_mapper, grpo_advantage_map, esr_schema.json), verification/ (z3_power_proof.py, saarthi_sva_generator.py, TemporalBankerScheduler.tla/.cfg/Cfg.tla, TLC_VERIFICATION_LOG.txt), governance/ (policy, identity, audit, persistence, cost, bls_signatures, seg_controller, sqa_aggregator), self_healing/ (digital_dna, antibody_maturation), simulation/ (adaqc_compiler, photonic_bus, qiskit_adapter), bpf/ (2 קבצי .bpf.c לא מקומפלים), srs/ (הריצה המאוחדת stdlib-only: runtime 914 ש', persistence 1576 ש', types 567, pipeline, planner, cli, primitives/×8), srs_runtime/ (עותק עצמאי — סיכון-סטייה), api/ (FastAPI + SDKs py/ts/go), tests/ (100+ קבצים), fuzz_work/ (6 הרנסים), deploy/ (k8s+helm), r17_*.py ×5 בשורש.
+- נקראו בעומק מנגנוני האבטחה ב-srs/persistence.py: _get_secret_key (0600, os.urandom(32), cache), _compute_snapshot_hash/_compute_seq_hash/_compute_inflight_hash (HMAC-SHA256 על canonical JSON sort_keys), _high_water_mirror_path (מראה high-water ב-<root>/secret_key.seq מחוץ-ל-snapshots), _get_high_water_sequence (max בין sequence.json למראה), _atomic_write_json (mkstemp+fsync+os.replace+dir-fsync+ניסיון-חוזה Windows), SafeJSONDecoder (MAX_DEPTH=100, size-gate 4KB, סריקת-סוגריים ב-regex), MAX_SNAPSHOT_SIZE=10MB, _sanitize_id ([a-zA-Z0-9_-]{1,64}), file_lock (fcntl.flock עם ירידה-חיננית ב-Windows), בקרת-הכלה של latest.json (resolve().relative_to).
+- נקראו srs/types.py (_sanitize_task_id עם __setattr__ שנדלק על-כל-השמה — R18 C4; שמות-שמורים של Windows CON/PRN/AUX/NUL/COM1-9/LPT1-9 עם קידומת srs_), srs/primitives/advice.py (fingerprint באורך-מוקדם struct.pack ">I" — סגירת r17_collision; מפתח מודע-מטרה "fp:target"; from_dict דוחה לא-str/לא-int/bool/שלילי).
+- נקראו 5 קבצי ההתקפה r17_*.py: advice_poisoning (אימות-שווא של sha256 ציבורי — נסגר ב-HMAC), collision_attack (פיצול בייט 0x7c — נסגר באורך-מוקדם), fingerprint_collision, path_traversal, latest_path_attack (symlink/TOCTOU). נמצא: כולם עם sys.path.insert('/home/z/my-project/download') קשיח — לא ירוצו מהארכיון כמות-שהוא.
+- נקרא TemporalBankerScheduler.tla (241 ש'): TIB token-budget לדומיינים APU/RPU/FPGA, Refill לפי-epoch עם תקרה, מענקי-FIFO בניכוי-עלות (עלות א-סימטרית 3/2/1), BudgetInvariant (budget≥0), NoDeadlock תחת AdmCostCheck, NoStarvation תחת WF/SF; TLC log: 220,584 מצבים, 0 הפרות (BMC — לא הוכחה מלאה; NoStarvation מוערה ב-cfg). נמצא היישום הפייתוני המקביל: kernel/omnivisor.py (TIBBudget/refill_tib/grant_hypercall) + governance/cost.py (CostTracker/Budget עם תקופה ו-reset).
+- נקראו governance/audit.py (שרשרת-גיבוב SHA-256 prev_hash/event_hash + verify), governance/persistence.py (SQLite-backed audit/identity/cost), ENTERPRISE_VALUE.md, ENGINEERING_REPORT.md (כנות: מה אמת/מה מדומה/מה חסר), SECURITY.md (STRIDE, מחזור-חיים BLS, מגבלות מוצהרות).
+- הרצה מקומית: venv מקומי כולל pytest/fastapi/numpy/PIL/uvicorn; חסרים z3/torch/hypothesis/py_ecc. 123 בדיקות-אבטחה (test_v7_7_security, test_v7_7_dos, test_v7_8_security, test_v7_8_logging) — עוברות ב-~5 שנ'. תת-הסוויטה המרכזית (9 קבצים כולל test_srs_runtime, test_concurrency, test_integration_v7) — 256 עוברות ב-~13 שנ'. סוויטה רחבה: 337 עוברות / 33 נכשלות — כל הכשלים תלות-חסרה בלבד (py_ecc/z3/torch). איסוף-מלא נכשל: 7 קבצים דורשים z3/hypothesis, וקבצי test_rce2_* מייבאים מודולי-שורש שלא-קיימים במבנה-הארכיון.
+- רישיון: Apache 2.0 — העתקה/התאמה מותרת עם ייחוס. THIRD_PARTY_LICENSES.md קיים.
+- מופו נקודות-האינטגרציה ברושפינה: src/lib/gate/{backup,crypto,key-seal,restore-drill,seal-refresh,verify,treasury}.ts, src/lib/gate/harness/orders.ts (FIN_TIERS/parseFinCaps/autoSignLicensedOrders), src/lib/rate-limit.ts, db/custom.db.
+
+Stage Summary:
+- SRS v8.2.0 הוא מעבדה אמיתית של "עמידות-עוינת לדיסק": ליבת srs/ (stdlib-בלבד) מוכחת-חיה מקומית — 256 בדיקות ליבה עוברות ב-13 שנ' בלי שום-תלות כבדה.
+- חמשת הרכיבים בעלי-הערך המיידי לרושפינה: ① HMAC-סנאפשוטים מלאי-שדות + כתיבה אטומית (srs/persistence.py) לכספת; ② מונה-רולבק high-water עם מראה מחוץ-לתיקייה (עצם המראה = תיקון החולשה שנמצאה ב-R17) ל-WAL/chain-archive-seal שלנו; ③ בנקאי-הזמן TIB (kernel/omnivisor.py + verification/TemporalBankerScheduler.tla + governance/cost.py) — מודל-הרשאות פיננסי מוכח בלי-מוות, הרחבה טבעית של finTier/finCaps; ④ ערכת-קשיחות קלט (SanitizeId/SafeLogValue/SafeJSONDecoder/תקרת-גודל) לכל-קלט-חוץ; ⑤ שרשרת-אודיט מגובבת (governance/audit.py) לגשר ולפקודות.
+- סיכונים: תיעוד-לא-עקבי (253 מול 399 בדיקות; v8.2.0 מול v4.9.0), עותק-כפול srs/ מול srs_runtime/, בדיקות-rce2 שבורות-מבנה, r17 עם נתיב-קשיח, BMC במקום הוכחה-מלאה, תלות-כבדות אופציונליות (torch/z3/py_ecc).
+- הערך בשורה: המתכון המוכח ל"כספת שעמידה לדיסק-עוין + בנקאי-תקציב מוכח-בטיחות" קיים בקוד נקי וקצר (~600 ש' רלוונטיות), Apache-2.0, ורץ מקומית עכשיו.
+
+---
+Task ID: 1-c
+Agent: Explore
+Task: ניתוח עמוק (RESEARCH ONLY) של הארכיון upload/extracted/axiomstate-phase2-queryexec — AxiomState Phase 2 (LSS kernel + AST-Graph + Query DSL + Bundle generator) — מיפוי מודולים, הרצת דמו חי, הערכת אינטגרציה לרשת רושפינה (Next.js /api), סיכונים, וערך.
+
+Work Log:
+- נקראו כל 15 קובצי המקור (src/phase0/phase1/phase2, cli.ts, bench.ts, ~1,811 שורות), README, NEXT_AGENT.md, docs (API/PHASE2/ARCHITECTURE/PROTOCOL/GRAPH_MODEL/PHASE1), package.json, tsconfig, Makefile, examples, tests.
+- מיפוי מלא: phase0/kernel.ts = LSSKernel (WAL immutable בינארי: seq u64/op/keyLen/valLen/key/value/crc32 + checkpoints "AXCP" v1 + rollback + recovery; אפס תלות חוץ). phase1 = AST-Graph: providers (typescript.ts עם TS-Compiler-API, regex.ts fallback), ids.ts (file:/symbol: + resolveImport), project-parser.ts, writer.ts (מפתחות ast://node/ ast://edge/ ast://meta), loader.ts, traversal.ts (sliceForward/sliceReverse BFS). phase2 = incremental.ts (IncrementalEngine: SHA-256 ב-hash://, מקור ב-source://, אינדקס ב-file-index://, מחיקת-קברים), query.ts (DSL: node/deps/rdeps/kind/name/and/or/not + parseQuery מחרוזת), bundle.ts (Kahn topological + זיהוי מעגלים). cli.ts = 10 פקודות.
+- הרצה חיה מול dist קיים (dist/ כבר בנוי, node v24.19.0): sync examples/sample-project --checkpoint → {scanned:3, changed:3, currentSeq:20}; sync שני → {unchanged:3, changed:0} (אינקרמנטלי אמיתי, seq לא זז); query 'and(kind:file, deps(file:src/index.ts))' → [file:src/index.ts, file:src/utils.ts]; rdeps/name/or/not/deps(…,1) עבדו; bundle src/index.ts → סדר טופולוגי [utils.ts, index.ts], cycles:0, והפלט דטרמיניסטי (SHA-256 זהה בשתי ריצות: 1718067236e6…).
+- בדיקת 29 הבדיקות: 23 עוברות; recovery 4/5 (הכשל = ENOTEMPTY ב-cleanup); fuzz 0/1. חקירה: העתקת לוגיקת ה-fuzz במדויק (tmp-analysis/fuzz-repro/repro3.mjs) — 0/10 כשלים על דיסק-מקומי (overlay) מול 10/10 כשלים כשה-store על הר-האפס של ה-upload (fuse.ossfs). מסקנה מבוססת: אין באג-לוגיקה ב-kernel — הכשלים הם ארטיפקט של ossfs (קריאות-סטייל אחרי ftruncate+append). אימות ידני: זיהוי CRC עובד ("CRC mismatch at offset 0").
+- בדיקת אינטגרציה: העתקת dist בלבד לתיקיית ביניים + symlink ל-node_modules של הפורטל → API תכנותי עבד קצה-קצה (sync כפול, query, bundle, checkpoint, stats). TypeScriptProvider אומת מול typescript 5.9.3 של הפורטל (package דורש ^6 אך ה-APIs בשימוש יציבים). תלות-חוץ יחידה בכל החבילה: typescript (רק phase1/providers/typescript.ts); phase0 = אפס תלות.
+- זוהו פגמים משניים בקוד: דליפת fd בקונסטרקטור אם recover() זורק; rollback() מוחק checkpoints לפני ולידציית גבול ה-truncate (מוטציה חלקית בנתיב-שגיאה). לא תוקנו (RESEARCH ONLY).
+- נבנה דוח ערך בעברית עם תוכנית אינטגרציה קונקרטית (src/lib/axiom/ + /api/code/query|bundle|sync).
+
+Stage Summary:
+- AxiomState Phase 2 הוא "מוח-קוד" דטרמיניסטי מוכן-לשימוש: 3 פקודות CLI חיות הוכיחו sync-אינקרמנטלי, שאילתות-תלויות מדויקות (deps/rdeps/and/or/not) ו-bundle דטרמיניסטי להקשר-סוכן.
+- האינטגרציה לרשת זולה: 15 קובצי TS (~1,570 שורות) להעתקה ל-src/lib/axiom/, תלות-חוץ יחידה typescript (כבר קיים בפורטל 5.9.3 ועובד), ללא vector search וללא DB.
+- סיכון-מפתח שנתגלה ונחקר: ה-kernel חייב store על דיסק-מקומי — על ה-upload (ossfs) ה-WAL מתקלקל שקטות (stale reads אחרי truncate) — ה-store שלנו יהיה תחת הפורטל (overlay) ולכן בטוח.
+- קבצים: worklog.md (רשומה זו) · tmp-analysis/fuzz-repro/repro3.mjs+repro2.mjs (כלי-אימות, מחוץ לפרויקט המנותח) · upload/extracted/axiomstate-phase2-queryexec/tmp/demo (תוצרי דמו-הרצה, gitignored). לא שונה שום קוד-מקור של הפרויקט המנותח.
+
+---
+Task ID: 2-a
+Agent: full-stack-developer
+Task: פיצול console-shell.tsx (2,647 שורות) למודולי-סעיפים עצלים (next/dynamic) — רפקטור מכני טהור, אפס שינוי-התנהגות, בתגובה ל-OOM-killer (dmesg: "Out of memory: Killed process next-server, anon-rss ~2GB"). אסור היה להרים dev-server ואסור bun run build.
+
+Work Log:
+- מיפוי מלא של המונוליט: זוהו 18 רכיבי-על בקובץ — Page (default, שורה 85) · Backdrop · Connections · RotationPanel · VaultGrid · KeyInjectCard · RestoreDrillCard · ModuleChip · TraceStepView · EmploymentStrip · AutonomyCard · AutonomySection · Agents · Bridge · Audit · ApiConsole · TrustedDevices · EmergencyZone, ועוד 4 קבועי-מודול (KIND_LABEL · BRAIN_MAKER_DEFAULT+KIND_META · HEART_TICK_MS_CLIENT) ו-SECTIONS/SectionId.
+- ניתוח-צרכנות לכל עוזר: כל עוזר-פרטי משרת סעיף אחד בלבד → לא נדרש shared.tsx כלל. הועברו לתוך קובץ-הסעיף של צרכנם היחיד: vault-grid (RotationPanel+KeyInjectCard+RestoreDrillCard+KIND_LABEL) · agents (ModuleChip+TraceStepView+BRAIN_MAKER_DEFAULT+KIND_META) · autonomy-section (AutonomyCard+EmploymentStrip+HEART_TICK_MS_CLIENT). Backdrop נשאר ב-shell (צרכן יחיד: Page — מסך-נעילה + קונסולה).
+- פיצול מכני באמצעות סקריפט-bun (חיתוך-טווחי-שורות מדויקים מהמקור, לא הקלדה-ידנית): 9 קבצים חדשים ב-src/components/console/sections/ (connections · vault-grid · agents · autonomy-section · bridge · audit · api-console · trusted-devices · emergency-zone), כל אחד "use client" + מספרי-יבוא מינימליים מ-kit/types/ui/lucide + קוד ורבטימי + named export לסעיף.
+- console-shell.tsx נכתב מחדש: 2,647→323 שורות (-88%). נשמרו: דוק-קומנט, SectionId, SECTIONS, Page() default, Backdrop, כל-חיווט-המצב. הוסרו: כל הגדרות-הסעיפים, KIND_LABEL (צרכנו היחיד KeyInjectCard עבר), יבואים מתים (useMemo/useRef/framer-motion/Textarea/Switch/רוב-האייקונים/Entry/ENDPOINTS/api/copyText/GlowCard/Scramble/LiveDot/FilterChip/SectionHead).
+- 12 צ'אנקים-עצלים: Overview · Channel · ToolsLab (ממודולים קיימים — הומרו ל-dynamic) + 9 הסעיפים החדשים — הכל dynamic(..., { ssr: false }) דרך .then(m => m.<Name>); שימושי-JSX והפרופס זהים (EmergencyZone ממשיך לקבל onAfter={refreshStatus}). LockScene נשאר יבוא-רגיל בכוונה — מסך-הנעילה חייב לצייר מיד. src/app/page.tsx לא נגע (כבר טוען-עצל את ה-shell).
+- הוכחת-ורבטים (סקריפט-אימות ביטים): גוף-כל-קובץ-חדש מול טווחי-המקור — 9/9 VERBATIM ✓ + זנב-ה-shell (SectionId→Backdrop) VERBATIM ✓. ההבדל היחיד בקוד-הריצה: "function X(" → "export function X(" ב-9 נקודות-הכניסה.
+- אימות-טיפוסים מול מכשול-סביבה: bunx tsc --noEmit מלא (כולל packages/ · tmp-analysis/ · download/ שלא ב-exclude) מתרסק OOM גם-על-הקוד-המקורי — נבדק על 2GB/2.8GB/3GB heap עד SIGKILL(137): אין לתיבת-4GB זיכרון-פנוי מספיק (~3.1GB available, chrome-אוטומציה אוכל ~0.5GB) — בעיה-סביבתית קדם-קיימת, לא-תוצר-הרפקטור. מנגנון-גיבוי: tsconfig מוקף זמני (extends מלא, include = src/** + .next/types) שרץ פעמיים — לפני (מקור) ואחרי (רפקטור): **קבוצת-השגיאות זהה ביט-ביט** (diff ריק) → הרפקטור מוסיף אפס שגיאות-טיפוס. תיקון-יחיד במהלך האימות: CheckCircle2 שנשכח ביבוא lucide של agents.tsx (נתפס ותוקן לפני-ההשוואה).
+- ממצא-כנות: קיימות 10 שגיאות-טיפוס קדם-קיימות מעבודת-סוכנים-מקבילים שלא-נדחפה (git status: עשרות קבצים חד-מקומעים) — src/lib/gate/banker.ts (7) · src/lib/axiom/runtime.ts (1) · src/components/console/tools-lab.tsx (1) — אף-אחת לא בקבצים שלי ולא טופלה כאן (מחוץ לסמכות-הרפקטור-המכני).
+- bun run lint: **0 שגיאות** (אזהרה-אחת קדם-קיימת ב-tools-lab.tsx — לא נגעתי). בדיקות-מבנה: 9/9 קבצים פותחים "use client"; אפס-אזכורי console-shell ב-sections (אין-ייבוא-מעגלי); page.tsx לא-שונה.
+
+Stage Summary:
+- המונוליט חדל להתקיים: 2,647 שורות → 323 שורות shell + 9 מודולי-סעיף (479+88+56+703+132+103+72+156+642), כל סעיף צ'אנק עצמאי שנטען רק בלחיצת-ניווט — קומפילציית-עריכה של סעיף אחד כבר לא גוררת את כל-הקונסולה, וזה-הטיפול-השורשי ב-OOM (הקונסולה-כולה כבר לא מתקמפלת כיחידה-אחת).
+- אפס שינוי-התנהגות מוכח בכלים: ורבטים ביטים 10/10 טווחים · קבוצת-שגיאות-tsc זהה לפני/אחרי · lint 0 · אותם-יבואים, אותם-הוקס, אותם-פרופסים, אותו-JSX.
+- שיתוף-פעולה: אין צורך ב-shared.tsx — כל עוזר שירת סעיף אחד בלבד ונשאר פרטי בקובץ-הסעיף; KIND_LABEL עזב את ה-shell (מוצהר-כאן כחריג-מהוגן מההוראה "keep if still used" — הוא כבר לא-בשימוש ב-shell).
+- לסוכן-הבא שיאמת בדפדפן: להרים dev-server ולעבור על 12 הסעיפים (00-11) — הציפייה: אפס שינוי ויזואלי/פונקציונלי; צ'אנקים נטענים בלחיצה-ראשונה על כל סעיף.
+- קבצים: src/components/console/console-shell.tsx (נכתב-מחדש 323 ש') · src/components/console/sections/{connections,vault-grid,agents,autonomy-section,bridge,audit,api-console,trusted-devices,emergency-zone}.tsx (חדשים) · worklog.md (רשומה זו). לא-נגע: src/app/page.tsx · tsconfig.json · kit.tsx · types.ts · overview/channel/tools-lab/lock-scene.
+
+---
+Task ID: 2-b
+Agent: Z.ai Code (main)
+Task: המשך-ישר מנקודת-העצירה — סגירת מלאי-האימות של שילוב-הפרויקטים-הישנים (AxiomState + SRS + TFA), תיקוני-קצה, אימות-חי קצה-לקצה, ו-commit+push.
+
+Work Log:
+- אימות-טיפוסים מלא: tsconfig מוקף (baseUrl מוחלט + include src/** + next-env) — tsc --noEmit על 252 קבצי-src כולל banker.ts/runtime.ts/tools-lab: **0 שגיאות** (10 השגיאות מדוח 2-a תוקנו כבר בקבצים עד 09:14; אומת שוב מאפס).
+- אבחון-עומק של תמותת-שרת-ה-dev: dmesg מראה OOM-kill של next-server (2.5GB RSS, ~09:49) + הריגות-שקט של קבוצות-תהליכים בסיום קריאות-כלים; הלקח המבצעי: כל-חלון-אימות חייב להכיל שרת+בדיקות בקריאה-אחת (ה-watchdog הוחזר).
+- אימות-דפדפן (agent-browser על המארח): `/` נטען — כותרת "SAOS — Sovereign Identity Network"; הקונסולה נפתחה כ-operator (סשן-זכור) עם 12 סעיפים; סקירה חיה: secrets 239 · agents 10 · msgs 843; **מעבדה (11) מלאה**: AxiomState src seq 5065 · keys 4818 · files 253 · symbols 1903; בנקאי-TIB מוצג; שער-עקביות TFA: "241 קבצי-src, 77 routes — CLEAN (0 findings)".
+- אימות-API חי (curl בתוך חלון-חי): POST /api/code/sync → 200 {scanned:253, unchanged:253, seq:5065} (אינקרמנטלי אמיתי); GET /api/code/query?status=1 → 200 ארבעת-השורשים; GET query `rdeps(file:lib/hardening.ts)` → 200 תוצאות-תלויות מדויקות (routes+banker+runtime); GET /api/code/bundle file:lib/hardening.ts → 200 {order, cycles:[], totalBytes:14636, truncated:false} דטרמיניסטי; GET /api/gate/banker → 200 []; POST banker ללא x-banker-token → **fail-closed** "requires BANKER_TOKEN" (בדיוק-כמתוכנן).
+- heart-service (mini-service, פורט 3004) חי: GET /health → {"ok":true,"service":"heart-service"}.
+- תיקון-1: `scripts/` לא היה קיים בדיסק אף-על-פי שהוא שורש-AXIOM_ROOTS → sync החזיר 500 "root missing"; נוצר scripts/README.md (הסכם-מקומות: tools/ = מבצעי-לא-מאונדקס, scripts/ = מאונדקס-לסוכנים); אימות-חוזר: sync scripts → 200 {scanned:1, changed:1, seq:4, checkpointed:true}.
+- תיקון-2: אזהרת-eslint יחידה (directive מיותר ב-tools-lab.tsx) — הוסרה; bun run lint → **0 שגיאות, 0 אזהרות**.
+- תיקון-3 (.gitignore): /db/axiom/ · /db/banker/ (מחזיק .secret-0600!) · /db/.banker-mirror/ · /db/*.lock · /tmp-analysis/ — מצב-ריצה וסודות-מקומיים מחוץ-לגיט לנצח.
+- ביקורת-סודות-לפני-push: db/custom.db (עוקב-מראש, קונבנציה-קיימת) — סריקת-strings מחמירה: **0** תבניות-WIF ממוקדות, **0** תבניות nvapi-; הערכים אטומים (scan→seal מ-r41). adm_intent_mapping.json = אוצר-מילים של ADM (בלי-סודות).
+
+Stage Summary:
+- מלאי-האימות של "הפרויקטים-הישנים ברשת" נסגר: שלושת-הארכיונים (TFA 1-a · SRS 1-b · AxiomState 1-c) לא רק-נותחו אלא **משולבים ומאומתים-חיים**: מוח-קוד (sync/query/bundle) · בנקאי-TIB (fail-closed) · שער-עקביות (CLEAN) · hardening.ts (SignedFileStore+TIBBudget) · heart-service 24/7.
+- tsc 0 · lint 0 · 7 מולדות-API מאומתות-200 · fail-closed מאומת · אפס-סודות-בגיט.
+- הישג-משני: אבחון-תמותת-השרת עודכן (OOM-מוכח + קונבנציית-חלונות-אימות) — ישמש את כל-הסוכנים-הבאים.

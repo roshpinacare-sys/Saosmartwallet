@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 /**
  * GET /api/steem/market — header ticker + chain status feed (live RPC).
  * No mock data: everything comes from api.steemit.com through the M1 client.
