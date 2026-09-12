@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * SAOS SOVEREIGN VAULT — חוויה קינמטית אחת, בלי מרכז-שליטה, בלי סרגלים, בלי טאבים.
- * העיצוב הוא מה שהתיקיה באמת היא: כספת ריבונית שמתחברת להכל ומוכיחה חיבור אמיתי.
+ * SAOS SOVEREIGN VAULT — קונסולת-פיקוד ריבונית (r38 · סדר-הקונסולה).
  *
- * מסך-נעילה: חותם-כספת מסתובב (חותמות-מפתח אמיתיות) + שדה אחד → כניסה במפתח-חי.
- * בפנים: גלילה רציפה דרך מה שעשינו בתיקיה — חיבורים חיים, הכספת עם חשיפה
- * מפוענחת-באנימציה, הזרקת מפתח, סוכנים, גשר-פיקוד, ביקורת, מסוף-API ואזור-חירום.
+ * r38: סוף עידן דף-הנחיתה. העמוד הוא עתה קונסולה מסודרת:
+ *  · סרגל-ניווט (דסקטופ: סרגל-צד דביק · מובייל: שורת-צ'יפים גוללת)
+ *  · 00 סקירה — לוח-פיקוד אמיתי במקום Hero (KPIs, לב, כסף, דלת, עוגנים, ארגון)
+ *  · 05 ערוץ — מישור-ההבנה במלואו + טיוטת-תשובה עם העתקה (פער-ר38)
+ *  · הזרקת-מפתח חוזרת להיות מוצגת בסעיף-הכספת (היה קוד-מת-שלא-רונדר — פער-ר38)
+ *  · מסך-הנעילה וכל המישורים הקיימים נשמרו כמות-שהם — אפס פגיעה בפונקציונליות.
  *
  * כל הנתונים מה-APIs האמיתיים של src/app/api/gate · אפס דמו.
  * אימות: טוקן-סשן בכותרת x-gate-token (עמיד ל-iframe) + קוקי כגיבוי.
@@ -21,312 +23,48 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
-  KeyRound, ShieldCheck, ShieldAlert, LogOut, Copy, Eye, EyeOff, Bot, Send, RefreshCw,
-  Loader2, Plus, Trash2, CheckCircle2, XCircle, MinusCircle, Terminal,
-  ScrollText, Save, UserCheck, Braces, Lock, Search, Globe, Github, Link2,
-  AlertTriangle, ArrowDown, Cpu, Crosshair, Layers, ListChecks, Play,
-  Smartphone, Unplug, HeartPulse, Clock, Zap, Lightbulb, Brain, Hand, Radio, Activity, Wallet,
+  KeyRound, LogOut, Globe, Github, Lock, Bot, HeartPulse, RadioTower, Radio,
+  LayoutDashboard, History, Terminal, Smartphone, AlertTriangle,
+  ShieldCheck, ShieldAlert, Loader2, RefreshCw, Copy, Eye, EyeOff, CheckCircle2,
+  XCircle, MinusCircle, Search, Save, Send, UserCheck, Cpu, Crosshair, Layers,
+  ListChecks, Play, Plus, Trash2, Unplug, Clock, Zap, Lightbulb, Brain, Hand,
+  Activity, Wallet, Braces, ScrollText, ArrowDown, Link2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  VaultSeal, SectionHead, LiveDot, copyText, GlowCard, FilterChip, Scramble,
+  api, apiJson, ENDPOINTS, rise, setToken, getDeviceToken, setDeviceToken, getDeviceId,
+} from "@/components/console/kit";
+import type {
+  GateStatus, Entry, Inventory, AgentRow, ModuleDef, TraceStep, CheckerVerdict,
+  RunRow, RunDetail, AgentStat, DeviceRow, Msg, ActionRow, ScheduleRow, EventRow,
+  TriggerRow, ProposalRow, ProposalPolicyRow, CheckerStatsRow, MemoryRow, PulseRow,
+  HeartData, OrderRow, OrdersData, TreasuryRow, TreasuryRail, TreasurySnapshot,
+  SituationData, DigestData, KeyReport, DrillResult, ModStats, Ep,
+} from "@/components/console/types";
+import { LockScene } from "@/components/console/lock-scene";
+import { Overview } from "@/components/console/overview";
+import { Channel } from "@/components/console/channel";
 
-/* ══════════════════════════ auth plumbing ══════════════════════════ */
+/* ══════════════════════════ console navigation (r38) ══════════════════════════ */
 
-const TOKEN_KEY = "saos-gate-token";
-const DEVICE_KEY = "saos-gate-device"; // the trusted-device token — lives ONLY in this browser
-const DEVICE_ID_KEY = "saos-gate-device-id";
+type SectionId =
+  | "overview" | "connections" | "vault" | "agents" | "autonomy"
+  | "channel" | "bridge" | "audit" | "console" | "devices" | "emergency";
 
-function getToken(): string | null {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
-}
-function setToken(t: string | null) {
-  try {
-    if (t) localStorage.setItem(TOKEN_KEY, t);
-    else localStorage.removeItem(TOKEN_KEY);
-  } catch { /* cookie fallback applies */ }
-}
-function getDeviceToken(): string | null {
-  try { return localStorage.getItem(DEVICE_KEY); } catch { return null; }
-}
-function setDeviceToken(token: string | null, id?: string) {
-  try {
-    if (token) {
-      localStorage.setItem(DEVICE_KEY, token);
-      if (id) localStorage.setItem(DEVICE_ID_KEY, id);
-    } else {
-      localStorage.removeItem(DEVICE_KEY);
-      localStorage.removeItem(DEVICE_ID_KEY);
-    }
-  } catch { /* private mode — device memory unavailable, key login still works */ }
-}
-function getDeviceId(): string | null {
-  try { return localStorage.getItem(DEVICE_ID_KEY); } catch { return null; }
-}
-
-async function api(path: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers);
-  if (init?.body) headers.set("Content-Type", "application/json");
-  const t = getToken();
-  if (t) headers.set("x-gate-token", t);
-  return fetch(path, { ...init, headers, cache: "no-store" });
-}
-async function apiJson<T>(path: string, init?: RequestInit): Promise<T | null> {
-  try { return (await (await api(path, init)).json()) as T; } catch { return null; }
-}
-
-/* ══════════════════════════ types (real API shapes) ══════════════════════════ */
-
-interface GateStatus {
-  ok: boolean; initialized: boolean; unlocked: boolean; hint: string | null;
-  unlockedAt: string | null; keySeals: number;
-  session: { kind: string; name: string; scopes: string[] } | null;
-  counts: { vaultEntries: number; activeAgents: number; messages: number };
-  // r18 — fleet employment health, live from /api/gate/status (aggregated 24h)
-  employment?: {
-    runs24h: number; done: number; blocked: number; failed: number; running: number;
-    doneRate: number | null;
-    blockedTaxonomy: { fair: number; vaultLocked: number; rate429: number; watchdog: number; other: number };
-    idleRuns24h: number; agentsActive: number;
-  } | null;
-}
-interface Entry {
-  id: string; kind: string; chain: string | null; account: string | null;
-  role: string | null; pub: string | null; status: string;
-  liveOk: boolean | null; chains: string[]; detail: string;
-}
-interface Inventory {
-  ok: boolean; locked: boolean; entries: Entry[];
-  summary?: { total: number; verified: number; failed: number; rotatedOut?: number; noLive: number; rails: Record<string, number> };
-  chains?: { steemOk: boolean; hiveOk: boolean; blurtOk: boolean; githubOk: boolean | null };
-  // r13 gap-54 — the LIVE status of the steemauto door-closure proposal;
-  // the custody banner's "awaiting operator" claim is computed from it,
-  // never hardcoded (the old hardcoded "open" claim outlived its truth:
-  // the r12 filing was auto-expired by policy and the page kept lying).
-  steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string; runId?: string | null; runStatus?: string | null } | null;
-  // r20 — the multi-rail anchor plane, live-verified by the API
-  anchors?: Array<{ chain: string; txId: string; blockNum: number | null; round: string | null; at: string; onChain: boolean; digest: string | null }> | null;
-  // r16 — rotation plane readiness, computed live by the API (never stored)
-  rotation?: { targets: Array<{ account: string; hasOwnerKey: boolean; hasP5Root: boolean; ready: boolean; rotated?: boolean }>; readyCount: number; rotatedCount?: number } | null;
-}
-interface AgentRow {
-  id: string; name: string; memo: string | null; active: boolean;
-  createdAt: string; lastSeenAt: string;
-  modules?: string[] | null; brain?: string | null; autonomy?: boolean;
-}
-interface ModuleDef { id: string; name: string; kind: "skill" | "connector" | "actor"; desc: string; args: string; needsVault: boolean }
-interface TraceStep { i: number; side: "maker" | "checker"; thought?: string; tool?: string; args?: Record<string, unknown>; ok?: boolean; result?: unknown; error?: string; ms?: number; cached?: boolean; rescued?: boolean; repair?: boolean; at: string }
-interface CheckerVerdict { done: boolean; checks: { criterion: string; pass: boolean; evidence: string }[]; gaps: string; notes: string }
-interface RunRow { id: string; agentName: string; goal: string; brain: string; checker: string; budget: number; status: string; createdAt: string; finishedAt: string | null; report?: string | null; makerSteps?: number; durationMs?: number | null; tokens?: string | null; origin?: string; attempt?: number; meta?: string | null }
-// ROAST r4: RunDetail no longer extends RunRow blindly — the detail API parses
-// `tokens` into an object while the list API ships the raw DB string, so the
-// old interface-extension was a live type contradiction.
-interface RunDetail extends Omit<RunRow, "tokens"> {
-  doneMeans: string[]; modules: string[];
-  steps: TraceStep[]; verdict: CheckerVerdict | null; error?: string | null;
-  lessons?: string[]; durationMs?: number | null; tokens?: { prompt: number; completion: number } | null;
-}
-interface AgentStat { agent: string; runs: number; done: number; blocked: number; failed: number; avgSteps: number; avgMs: number | null }
-interface DeviceRow { id: string; label: string; createdAt: string; lastUsedAt: string; expiresAt: string; revoked: boolean; live: boolean; daysLeft: number; expiringSoon?: boolean }
-interface Msg { id: string; channel: string; fromKind: string; fromName: string; body: string; createdAt: string }
-interface ActionRow { id: string; agentName: string; action: string; params: string; ok: boolean; result: string; createdAt: string }
-interface ScheduleRow { id: string; label: string; agentName: string; goal: string; kind: string; everyMs: number | null; hourUtc: number | null; budget: number; maxPerDay: number; dayCount: number; dayKey: string | null; enabled: boolean; lastRunAt: string | null; nextRunAt: string }
-interface EventRow { id: string; type: string; payload: { agent?: string; body?: string; goal?: string; gaps?: string; by?: string } | null; source: string; consumed: boolean; createdAt: string }
-interface TriggerRow { id: string; on: string; agentName: string; goalTemplate: string; budget: number; cooldownMs: number; maxPerDay: number; dayCount: number; enabled: boolean }
-interface ProposalRow { id: string; agentName: string; goal: string; rationale: string | null; doneMeans: string; budget: number; kind?: string; status: string; decidedBy: string | null; runId: string | null; createdAt: string; decidedAt: string | null }
-interface ProposalPolicyRow { autoApprove: boolean; maxAutoPerDay: number; maxBudget: number }
-interface CheckerStatsRow { verdicts: number; firstPass: number; repairPass: number; blocked: number; errors: number }
-interface MemoryRow { id: string; key: string; kind: string; body: string; source: string; refCount: number; updatedAt: string }
-interface PulseRow { startedAt: string; lastTickAt: string; beats: number; enabled: boolean; counters: { dispatched: number; reaped: number; recovered: number; schedulesFired: number; schedulesDeferred: number; triggersFired: number; proposalsFired: number; eventsSeen: number; ordersExpired?: number; marketMoves?: number; idleFired?: number }; loops: Record<string, { lastAt: string; ok: boolean; fired?: number }>; error?: string }
-interface HeartData { ok: boolean; pulse: PulseRow | null; counts: { queued: number; running: number }; autonomyEnabled: boolean; schedules: ScheduleRow[]; triggers: TriggerRow[]; events: EventRow[]; agents: { name: string; autonomy: boolean; lastSeenAt: string; brain: string | null }[]; proposals?: ProposalRow[]; proposalPolicy?: ProposalPolicyRow; checkerStats?: CheckerStatsRow | null }
-interface OrderRow { id: string; agentName: string; runId: string | null; op: string; account: string; spec: string; preview: string; notionalSteem: number; status: string; decidedBy: string | null; previewTxId: string | null; broadcastId: string | null; blockNum: number | null; error: string | null; createdAt: string; decidedAt: string | null }
-interface OrdersData { ok: boolean; orders: OrderRow[]; rails: { maxNotionalSteem: number; maxSignedPerDay: number; pendingExpiryMs: number; defaultTtlSeconds: number }; account: string; signedToday: number; vaultOpen: boolean; error?: string }
-interface TreasuryRow { account: string; liquid: string; debt: string; vesting: string | null; liquidNum: number; debtNum: number }
-interface TreasuryRail { rail: string; ok: boolean; liquidSymbol: string; debtSymbol: string; accounts: TreasuryRow[]; totals: { liquid: number; debt: number }; error?: string }
-interface TreasurySnapshot { measuredAt: string; rails: TreasuryRail[]; fleet: Record<string, number>; cached: boolean }
-interface SituationRepoRow { name: string; language: string | null; sizeKB: number; pushedAt: string; pushedMinutesAgo: number | null; ours: boolean; fresh: boolean }
-interface SituationData {
-  measuredAt: string; cached: boolean;
-  treasury: { rails: TreasuryRail[]; measuredAt: string; error?: string };
-  evm: { ethereum: { ok: boolean; wallets: number; okWallets: number; total: string; block: number | null; error?: string }; solana: { ok: boolean; wallets: number; okWallets: number; total: string; slot: number | null; error?: string } };
-  rewards: { ok: boolean; accounts: number; pendingAccounts: { account: string; steemEquiv: number }[]; totalPendingSteemEquiv: number; error?: string };
-  repos: { ok: boolean; org: string; scannedAt: string | null; ageMinutes: number | null; count: number; freshCount: number; repos: SituationRepoRow[]; broadcasts?: { repo: string; count: number; latest: string | null; ours: boolean }[]; broadcastTotal?: number; error?: string };
-  vault: { ok: boolean; total: number; verified: number; unverified: number; imported: number; operatorCustody: number; rotatedOut: number; chains: Record<string, number>; error?: string };
-  fleet: { ok: boolean; agents: number; autonomous: number; activeRuns: number; error?: string };
-  anchors: { ok: boolean; count: number; latest: { chain: string; txId: string; blockNum: number | null; at: string; round: string; signedBy: string }[]; error?: string };
-}
-interface DigestItemRow { repo: string; file: string; ours: boolean; ok: boolean; error?: string; bytes: number; hash8: string; echo: boolean; isNew: boolean; lang: string; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
-interface DoorVoiceRow { file: string; ok: boolean; error?: string; bytes: number; hash8: string; isNew: boolean; selfEcho?: boolean; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
-interface RootVoiceRow { file: string; ok: boolean; error?: string; hash8: string; looksLikeReport: boolean; isNew: boolean; headline: string; mentionsUs: boolean }
-interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; selfEchoVoices?: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
-interface KeyReport {
-  kind: string; liveChecked: boolean;
-  controls: { chain: string; account: string | null; role: string; pub: string | null }[];
-  pubs: string[];
-}
-interface Ep { method: "GET" | "POST" | "PATCH" | "PUT"; path: string; desc: string; auth: "public" | "operator"; body?: string }
-
-const ENDPOINTS: Ep[] = [
-  { method: "GET", path: "/api/gate/status", desc: "מצב-השער הריבוני", auth: "public" },
-  { method: "GET", path: "/api/gate/inventory", desc: "הכספת + אימות-חי מול השרשרות", auth: "operator" },
-  { method: "POST", path: "/api/gate/reveal", desc: "פענוח מפתח-פרטי לפי id", auth: "operator", body: '{ "id": "<entry-id>" }' },
-  { method: "POST", path: "/api/gate/key", desc: "זיהוי-חי של מפתח + שמירה מוצפנת", auth: "operator", body: '{ "key": "…", "save": false }' },
-  { method: "GET", path: "/api/gate/agents", desc: "הסוכנים המחוברים", auth: "operator" },
-  { method: "POST", path: "/api/gate/agents", desc: "צירוף סוכן (טוקן פעם-אחת)", auth: "operator", body: '{ "name": "my-agent" }' },
-  { method: "GET", path: "/api/gate/modules", desc: "מחסן-המודולים לחימוש סוכנים", auth: "operator" },
-  { method: "POST", path: "/api/gate/run", desc: "הרצת מטרה עם לולאת-חוכמה (מייצר + בודק עצמאי + לקחים)", auth: "operator", body: '{ "agentName": "…", "goal": "…", "doneMeans": ["…"] }' },
-  { method: "GET", path: "/api/gate/run", desc: "יומן הרצות + יעילות-צי אמיתית", auth: "operator" },
-  { method: "GET", path: "/api/gate/heart", desc: "דופק לב-האוטונומיה: סיורים, טריגרים, יוזמות, אירועים ותור", auth: "operator" },
-  { method: "POST", path: "/api/gate/heart", desc: "מתג-הפסק לאוטונומיה (kill-switch)", auth: "operator", body: '{ "autonomyEnabled": false }' },
-  { method: "GET", path: "/api/gate/proposals", desc: "תור יוזמות-היעד שהסוכנים הציעו + המדיניות המרוסנת", auth: "operator" },
-  { method: "PATCH", path: "/api/gate/proposals", desc: "הכרעת הצעת-יעד: אישור מזניק ריצה אמיתית (origin=proposal)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
-  { method: "PUT", path: "/api/gate/proposals", desc: "מדיניות-יוזמות: אישור-אוטומטי מרוסן (מקס-יומי + תקציב)", auth: "operator", body: '{ "autoApprove": true, "maxAutoPerDay": 2, "maxBudget": 4 }' },
-  { method: "GET", path: "/api/gate/memory", desc: "זיכרון-הצי: בנק-הממצאים הסופיים המשותף", auth: "operator" },
-  { method: "GET", path: "/api/gate/orders", desc: "יד-ריבונית: תור-החתימות (פקודות-המרה שהסוכנים הכינו — כל חשבון-צי × steem/hive × לימיט/המרת-מדין) + מדדי-הגבול", auth: "operator" },
-  { method: "PATCH", path: "/api/gate/orders", desc: "הכרעת פקודה: אישור = הכספת חותמת במפתח-הפעיל של חשבון-הפקודה עצמו ומשדרת לשרשרת-היעד (txId אמתי)", auth: "operator", body: '{ "id": "…", "decision": "approve" }' },
-  { method: "GET", path: "/api/gate/treasury", desc: "אמת-הכיס (r21): יתרות חיות של כל חשבונות-הצי על שלוש-המסילות (נזיל/חוב/vesting) — כל-מסילה נכשלת בכנות בנפרד", auth: "operator" },
-  { method: "GET", path: "/api/gate/situation", desc: "מצב-העניינים (r22): הכל במקום אחד — כסף-מסילות + ETH/SOL + תגמולים-ממתינים + כספת + צי + עוגנים + מה-קורה-בשאר-הריפו של הארגון (12 מאגרים, מה נדחף עכשיו). מטמון 60s, אפס-עומס", auth: "public" },
-  { method: "GET", path: "/api/gate/digest", desc: "מישור-ההבנה (r25) + מישור-הדלת-הקדמית (r26): הכספת קוראת את ערוץ-השידורים — הדים-שלנו מול קולות-שותף, סיווג (דוח/שאלה/בקשה/התראה/תגובה), שאלות-שהוצבו-לנו, ומעכשיו גם: סריקת-הדלת-שלנו (מי דופק ב-broadcasts/ של עצמנו — הפלטפורמה ענתה שם) + זיהוי-קולות-שורש (דוחות-שותף שנזרקו בשורש-הריפו ועקפו את-הערוץ). טיוטת-תשובה בלבד — שליחה = החלטת-מפעיל. מטמון 10 דק׳, אפס-עומס", auth: "public" },
-  { method: "GET", path: "/api/gate/stream", desc: "גשר-הפיקוד בזמן-אמת (SSE) — הודעות חדשות נדחפות, בלי דגימה", auth: "operator" },
-  { method: "POST", path: "/api/gate/schedule", desc: "קביעת סיור אוטונומי תקופתי", auth: "operator", body: '{ "label": "…", "agentName": "…", "goal": "…", "everyMinutes": 30, "maxPerDay": 8 }' },
-  { method: "PATCH", path: "/api/gate/schedule", desc: "השהיה או הפעלה של סיור", auth: "operator", body: '{ "id": "…", "enabled": false }' },
-  { method: "POST", path: "/api/gate/device", desc: "חימוש מכשיר-מהימן (זכור אותי בצורה בטוחה)", auth: "operator", body: '{ "label": "Chrome · Windows" }' },
-  { method: "POST", path: "/api/gate/device/login", desc: "כניסה חוזרת ממכשיר מוכר — בלי מפתח", auth: "public", body: '{ "deviceToken": "…" }' },
-  { method: "GET", path: "/api/gate/device", desc: "רשימת המכשירים-המהימנים", auth: "operator" },
-  { method: "POST", path: "/api/gate/messages", desc: "פרסום בגשר-הפיקוד", auth: "operator", body: '{ "body": "…" }' },
-  { method: "GET", path: "/api/gate/actions", desc: "יומן-הביקורת", auth: "operator" },
-  { method: "POST", path: "/api/gate/lock", desc: "נעילה וניקוי-זיכרון", auth: "public" },
-  { method: "GET", path: "/api/system/health", desc: "בריאות-מערכת", auth: "public" },
-  { method: "GET", path: "/api/steem/market", desc: "שוק STEEM חי", auth: "public" },
-  { method: "GET", path: "/api/steem/wallet?account=headcorner", desc: "ארנק headcorner", auth: "public" },
-  { method: "GET", path: "/api/vault/status", desc: "מצב vault ההיסטורי", auth: "public" },
-  { method: "GET", path: "/api/vault/keys", desc: "מפתחות vault ההיסטורי", auth: "public" },
-  { method: "GET", path: "/api/eco/networks", desc: "רשתות האקו-סיסטם", auth: "public" },
-  { method: "GET", path: "/api/saos/fleet-status", desc: "מצב צי SAOS", auth: "public" },
-  { method: "GET", path: "/api/bridge/status", desc: "מצב הגשר", auth: "public" },
+const SECTIONS: Array<{ id: SectionId; label: string; icon: LucideIcon; num: string }> = [
+  { id: "overview", label: "סקירה", icon: LayoutDashboard, num: "00" },
+  { id: "connections", label: "חיבורים", icon: Globe, num: "01" },
+  { id: "vault", label: "כספת", icon: Lock, num: "02" },
+  { id: "agents", label: "סוכנים", icon: Bot, num: "03" },
+  { id: "autonomy", label: "אוטונומיה", icon: HeartPulse, num: "04" },
+  { id: "channel", label: "ערוץ", icon: RadioTower, num: "05" },
+  { id: "bridge", label: "פיקוד", icon: Radio, num: "06" },
+  { id: "audit", label: "ביקורת", icon: History, num: "07" },
+  { id: "console", label: "מסוף", icon: Terminal, num: "08" },
+  { id: "devices", label: "מכשירים", icon: Smartphone, num: "09" },
+  { id: "emergency", label: "חירום", icon: AlertTriangle, num: "10" },
 ];
-
-/* ══════════════════════════ motion helpers ══════════════════════════ */
-
-const rise = {
-  initial: { opacity: 0, y: 28 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-70px" },
-  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
-};
-
-/** מונה שנספר עד לערך (אנימציית-ספירה). */
-function useCountUp(target: number, duration = 1100): number {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const t0 = performance.now();
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - t0) / duration);
-      setV(Math.round(target * (1 - Math.pow(1 - p, 3))));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, duration]);
-  return v;
-}
-
-/** פענוח-באנימציה: תווים אקראיים מתייצבים לטקסט האמיתי. */
-function Scramble({ text, className }: { text: string; className?: string }) {
-  const [out, setOut] = useState("");
-  useEffect(() => {
-    const glyphs = "0123456789abcdefABCDEFKLMNOPQRSTUVWXYZ";
-    let frame = 0;
-    const total = Math.min(46, Math.max(20, Math.round(text.length / 2.2)));
-    const iv = setInterval(() => {
-      frame++;
-      const fixed = Math.floor(text.length * (frame / total));
-      let s = text.slice(0, fixed);
-      for (let i = fixed; i < text.length; i++) {
-        s += text[i] === " " ? " " : glyphs[Math.floor(Math.random() * glyphs.length)];
-      }
-      setOut(s);
-      if (frame >= total) { clearInterval(iv); setOut(text); }
-    }, 28);
-    return () => clearInterval(iv);
-  }, [text]);
-  return <code className={className} dir="ltr">{out || "…"}</code>;
-}
-
-/* ══════════════════════════ the vault seal (SVG) ══════════════════════════ */
-
-function VaultSeal({ seals, state, size = 300 }: { seals: number; state: "locked" | "verifying" | "open"; size?: number }) {
-  const notches = Math.max(1, Math.min(16, seals || 1));
-  const iconCls = size >= 120 ? "h-10 w-10" : "h-4 w-4";
-  const spin = state === "verifying" ? "animate-[spin_2.5s_linear_infinite]" : "animate-[spin_40s_linear_infinite]";
-  const spin2 = state === "verifying" ? "animate-[spin_1.6s_linear_infinite_reverse]" : "animate-[spin_28s_linear_infinite_reverse]";
-  const color = state === "open" ? "#34d399" : state === "verifying" ? "#fcd34d" : "#a1a1aa";
-  return (
-    <div className="relative" style={{ width: size, height: size }} aria-hidden>
-      <div className="absolute inset-0 rounded-full blur-3xl opacity-30"
-        style={{ background: `radial-gradient(circle, ${color}55 0%, transparent 62%)` }} />
-      <svg viewBox="0 0 200 200" className={`absolute inset-0 h-full w-full ${spin}`} style={{ filter: `drop-shadow(0 0 14px ${color}66)` }}>
-        <circle cx="100" cy="100" r="92" fill="none" stroke={color} strokeOpacity="0.5" strokeWidth="1.5" strokeDasharray="4 9" />
-      </svg>
-      <svg viewBox="0 0 200 200" className={`absolute inset-0 h-full w-full ${spin2}`} style={{ filter: `drop-shadow(0 0 10px ${color}55)` }}>
-        <circle cx="100" cy="100" r="78" fill="none" stroke={color} strokeOpacity="0.7" strokeWidth="2.5" strokeDasharray={`${(2 * Math.PI * 78) / (notches * 2)} ${(2 * Math.PI * 78) / (notches * 2)}`} strokeLinecap="round" />
-        <circle cx="100" cy="100" r="64" fill="none" stroke={color} strokeOpacity="0.35" strokeWidth="1" strokeDasharray="1 6" />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-        <motion.div
-          key={state}
-          initial={{ scale: 0.85, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 220, damping: 18 }}
-        >
-          {state === "open"
-            ? <ShieldCheck className={iconCls} style={{ color }} />
-            : state === "verifying"
-              ? <Loader2 className={iconCls + " animate-spin"} style={{ color }} />
-              : <Lock className={iconCls} style={{ color }} />}
-        </motion.div>
-        {size >= 120 && (
-          <>
-            <p className="text-[11px] font-mono tracking-widest" style={{ color }}>{notches} SEALS</p>
-            <p className="text-[10px] font-mono tracking-[0.3em] text-zinc-500">
-              {state === "open" ? "UNLOCKED" : state === "verifying" ? "VERIFYING" : "SEALED"}
-            </p>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════ shared bits ══════════════════════════ */
-
-function SectionHead({ num, title, sub }: { num: string; title: string; sub: string }) {
-  return (
-    <motion.div {...rise} className="mb-6 flex items-end gap-4">
-      <span className="font-mono text-5xl md:text-6xl font-black leading-none text-zinc-800 select-none" aria-hidden>{num}</span>
-      <div>
-        <h2 className="text-2xl md:text-3xl font-black tracking-tight text-zinc-100">{title}</h2>
-        <p className="text-sm text-zinc-500 mt-1">{sub}</p>
-      </div>
-    </motion.div>
-  );
-}
-
-function LiveDot({ ok }: { ok: boolean | null }) {
-  if (ok === true) return <span className="inline-flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> חי</span>;
-  if (ok === false) return <span className="inline-flex items-center gap-1 text-xs text-rose-400"><XCircle className="h-3.5 w-3.5" /> נכשל</span>;
-  return <span className="inline-flex items-center gap-1 text-xs text-zinc-500"><MinusCircle className="h-3.5 w-3.5" /> ללא בדיקה</span>;
-}
-
-function copyText(text: string, label: string) {
-  navigator.clipboard.writeText(text).then(() => toast.success("הועתק: " + label)).catch(() => toast.error("ההעתקה נכשלה"));
-}
-
-function GlowCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={"rounded-2xl border border-zinc-800/80 bg-zinc-900/40 backdrop-blur-sm " + className}>
-      {children}
-    </div>
-  );
-}
 
 /* ══════════════════════════ root ══════════════════════════ */
 
@@ -339,6 +77,8 @@ export default function Page() {
   // DEAD CODE — it rendered off `deviceRemembered`, the very state the failure
   // path cleared. Rejection now has its own flag; the warning actually shows.
   const [deviceRejected, setDeviceRejected] = useState(false);
+  // r38 — the active console section (sidebar / chips navigation)
+  const [active, setActive] = useState<SectionId>("overview");
 
   const refreshStatus = useCallback(async (): Promise<boolean> => {
     const s = await apiJson<GateStatus>("/api/gate/status");
@@ -372,10 +112,6 @@ export default function Page() {
             setDeviceToken(null);
             setDeviceRemembered(false);
             setDeviceRejected(true); // r9 gap-38: the warning must actually render
-            // r9 live finding: with the operator's open-gate standing order the
-            // console re-opens right after this rejection and the lock-screen
-            // warning would never be seen — so the rejection SPEAKS as a toast
-            // on whatever screen actually renders.
             toast.warning("טוקן-המכשיר של הדפדפן הזה נשלל או פג-תוקף (הצופן נמחק מה-DB) — הכניסה הבאה במפתח תחמש מכשיר חדש");
           }
         } catch { /* network hiccup — the lock screen stays honest */ }
@@ -401,7 +137,14 @@ export default function Page() {
     await apiJson("/api/gate/lock", { method: "POST" });
     setToken(null);
     setStatus(null);
+    setActive("overview");
     toast("הכספת נאטמה — מפתח-האב נמחק מהזיכרון");
+  }
+
+  // r38 — section switching scrolls back to the top of the console
+  function go(id: SectionId) {
+    setActive(id);
+    requestAnimationFrame(() => window.scrollTo({ top: 0 }));
   }
 
   const wrapper = "min-h-screen flex flex-col bg-[#050505] text-zinc-100 relative overflow-x-hidden";
@@ -439,31 +182,126 @@ export default function Page() {
     );
   }
 
+  const activeMeta = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
+
   return (
     <div dir="rtl" className={wrapper}>
       <Backdrop />
-      <StickyHeader status={status} onLock={logout} />
-      <main className="relative z-10 flex-1 w-full max-w-5xl mx-auto px-4 md:px-6">
-        <Hero status={status} />
-        <Connections />
-        <VaultGrid />
-        <Agents />
-        <Bridge />
-        <Audit />
-        <ApiConsole />
-        <TrustedDevices />
-        <EmergencyZone onAfter={refreshStatus} />
-        <div className="h-10" />
-      </main>
-      <footer className="relative z-10 mt-auto border-t border-zinc-900 bg-black/60 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
-          <span className="font-mono tracking-widest">SAOS SOVEREIGN VAULT · AES-256-GCM · scrypt(2¹⁵)</span>
-          <span>
-            מחובר כ-<b className="text-zinc-400">{status.session.name}</b> · {status.keySeals} חותמות-מפתח · סשן 30 יום
-            {deviceRemembered && <span className="text-emerald-500/80"> · מכשיר זכור ✓</span>}
-          </span>
+      <div className="relative z-10 flex-1 flex flex-row">
+        {/* ── sidebar — desktop (RTL: renders on the right) ── */}
+        <aside className="hidden lg:flex flex-col w-60 shrink-0 sticky top-0 h-screen border-l border-zinc-900 bg-black/60 backdrop-blur-md">
+          <div className="px-5 py-3.5 border-b border-zinc-900 flex items-center gap-2.5">
+            <VaultSeal seals={status.keySeals} state="open" size={36} />
+            <div className="min-w-0">
+              <p className="font-black tracking-tight text-sm leading-tight">SOVEREIGN <span className="text-emerald-400">VAULT</span></p>
+              <p className="text-[10px] font-mono text-emerald-400/90">פתוחה · {status.keySeals} חותמות</p>
+            </div>
+          </div>
+          <nav aria-label="ניווט-הקונסולה" className="flex-1 overflow-y-auto scroll-thin px-3 py-3 space-y-1">
+            {SECTIONS.map((s) => {
+              const on = active === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => go(s.id)}
+                  aria-current={on ? "page" : undefined}
+                  className={
+                    "w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-all border " +
+                    (on
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-200 font-bold"
+                      : "border-transparent text-zinc-400 hover:bg-zinc-900/70 hover:text-zinc-200")
+                  }
+                >
+                  <s.icon className={"h-4 w-4 shrink-0 " + (on ? "text-emerald-400" : "text-zinc-500")} aria-hidden />
+                  <span className="flex-1 text-right">{s.label}</span>
+                  <span className={"font-mono text-[9px] " + (on ? "text-emerald-400/70" : "text-zinc-700")}>{s.num}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="px-4 py-3.5 border-t border-zinc-900 space-y-2">
+            <p className="text-[10px] text-zinc-500 leading-relaxed">
+              מחובר כ-<b className="text-zinc-300">{status.session.name}</b> · סשן 30 יום
+              {deviceRemembered && <span className="text-emerald-500/80"> · מכשיר זכור ✓</span>}
+            </p>
+            <Button variant="outline" size="sm" onClick={logout} className="w-full gap-1.5 border-zinc-800 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">
+              <LogOut className="h-3.5 w-3.5" /> אטום את הכספת
+            </Button>
+          </div>
+        </aside>
+
+        {/* ── content column ── */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <header className="sticky top-0 z-30 border-b border-zinc-900 bg-black/70 backdrop-blur-md">
+            <div className="max-w-6xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 lg:hidden min-w-0">
+                <VaultSeal seals={status.keySeals} state="open" size={30} />
+                <span className="font-black tracking-tight text-sm truncate">SOVEREIGN <span className="text-emerald-400">VAULT</span></span>
+              </div>
+              <div className="hidden lg:flex items-center gap-2.5 font-mono text-[11px] text-zinc-500" dir="ltr">
+                <span className="text-emerald-400 font-bold">{activeMeta.num}</span>
+                <span className="text-zinc-300 font-sans font-bold" dir="rtl">{activeMeta.label}</span>
+                <span className="text-zinc-700">·</span>
+                <span>secrets <b className="text-zinc-300">{status.counts.vaultEntries}</b></span>
+                <span>agents <b className="text-zinc-300">{status.counts.activeAgents}</b></span>
+                <span>msgs <b className="text-zinc-300">{status.counts.messages}</b></span>
+              </div>
+              <Button variant="outline" size="sm" onClick={logout} className="lg:hidden gap-1.5 border-zinc-800 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">
+                <LogOut className="h-3.5 w-3.5" /> אטום
+              </Button>
+            </div>
+            {/* mobile chips — sections within thumb reach */}
+            <div className="lg:hidden border-t border-zinc-900/70 bg-black/60">
+              <div role="tablist" aria-label="סעיפי-הקונסולה" className="flex gap-1.5 overflow-x-auto scroll-thin px-3 py-2">
+                {SECTIONS.map((s) => {
+                  const on = active === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => go(s.id)}
+                      className={
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-mono transition-all " +
+                        (on
+                          ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+                          : "bg-zinc-900/60 border-zinc-800 text-zinc-400")
+                      }
+                    >
+                      <s.icon className="h-3 w-3" aria-hidden /> {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6">
+            {active === "overview" && <Overview status={status} />}
+            {active === "connections" && <Connections />}
+            {active === "vault" && <VaultGrid />}
+            {active === "agents" && <Agents />}
+            {active === "autonomy" && <AutonomySection />}
+            {active === "channel" && <Channel />}
+            {active === "bridge" && <Bridge />}
+            {active === "audit" && <Audit />}
+            {active === "console" && <ApiConsole />}
+            {active === "devices" && <TrustedDevices />}
+            {active === "emergency" && <EmergencyZone onAfter={refreshStatus} />}
+            <div className="h-8" />
+          </main>
+
+          <footer className="mt-auto border-t border-zinc-900 bg-black/60 backdrop-blur">
+            <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-600">
+              <span className="font-mono tracking-widest">SAOS SOVEREIGN VAULT · AES-256-GCM · scrypt(2¹⁵) · r38-console</span>
+              <span>
+                מחובר כ-<b className="text-zinc-400">{status.session.name}</b> · {status.keySeals} חותמות-מפתח · סשן 30 יום
+                {deviceRemembered && <span className="text-emerald-500/80"> · מכשיר זכור ✓</span>}
+              </span>
+            </div>
+          </footer>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }
@@ -482,230 +320,6 @@ function Backdrop() {
   );
 }
 
-/* ══════════════════════════ lock scene ══════════════════════════ */
-
-function LockScene({
-  status, state, deviceRemembered, deviceRejected, onVerifying, onFail, onIn,
-}: {
-  status: GateStatus | null;
-  state: "locked" | "verifying" | "open";
-  deviceRemembered: boolean;
-  deviceRejected: boolean;
-  onVerifying: () => void;
-  onFail: () => void;
-  onIn: (token: string) => Promise<boolean>;
-}) {
-  const [keyInput, setKeyInput] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [remember, setRemember] = useState(true);
-
-  async function login() {
-    if (!keyInput.trim() || state === "verifying") return;
-    setErr(null);
-    onVerifying();
-    try {
-      const r = await fetch("/api/gate/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: keyInput.trim() }),
-      }).then((x) => x.json());
-      if (r?.ok && r.token) {
-        setKeyInput("");
-        const okIn = await onIn(r.token as string);
-        if (okIn && remember) {
-          // arm THIS browser as a trusted device — the raw token lives only here;
-          // the server keeps the hash + the master sealed under it (DB alone is inert).
-          // ROAST r9: an existing live token ROTATES that device in place —
-          // same row, new token, fresh 90 days — instead of duplicating rows.
-          try {
-            const dt = getDeviceToken();
-            const d = await apiJson<{ ok: boolean; device?: { id: string }; deviceToken?: string; error?: string }>("/api/gate/device", {
-              method: "POST",
-              body: JSON.stringify(dt ? { deviceToken: dt } : {}),
-            });
-            if (d?.ok && d.deviceToken) {
-              setDeviceToken(d.deviceToken, d.device?.id);
-              toast.success("המכשיר הזה זכור — הכניסה הבאה בלי מפתח (90 יום)");
-            } else {
-              toast.error(d?.error || "חימוש-המכשיר נכשל — הכניסה במפתח תמיד עובדת");
-            }
-          } catch { /* device arm is best-effort — session already live */ }
-        }
-      } else {
-        setErr(r?.error || "הכניסה נכשלה");
-        onFail();
-      }
-    } catch {
-      setErr("השרת לא נענה — נסה שוב");
-      onFail();
-    }
-  }
-
-  return (
-    <div className="relative z-10 flex-1 flex flex-col">
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 gap-8">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <VaultSeal seals={status?.keySeals || 0} state={state} size={280} />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15, duration: 0.6 }}
-          className="w-full max-w-lg text-center"
-        >
-          <h1 className="text-3xl md:text-5xl font-black tracking-tight">
-            SAOS <span className="text-emerald-400">SOVEREIGN</span> VAULT
-          </h1>
-          <p className="mt-3 text-zinc-400 text-sm md:text-base leading-relaxed">
-            מדביקים כל מפתח <span className="font-mono text-zinc-300">@headcorner</span> נוכחי — STEEM או HIVE,
-            כל תפקיד — והכספת נפתחת. בלי סיסמה. האימות חי מול השרשרת.
-          </p>
-
-          <div className="mt-7 flex flex-col sm:flex-row gap-2.5">
-            <label htmlFor="gate-key" className="sr-only">מפתח-פרטי</label>
-            <Input
-              id="gate-key"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") login(); }}
-              placeholder="5K… / K… / L… — הדבק כאן את המפתח"
-              className="font-mono text-sm h-12 bg-zinc-950/80 border-zinc-800 focus-visible:ring-emerald-500/40 text-center sm:text-right"
-              autoComplete="off" autoCapitalize="off" spellCheck={false} autoFocus
-            />
-            <Button
-              onClick={login}
-              disabled={state === "verifying" || !keyInput.trim()}
-              className="h-12 px-7 text-base gap-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold shrink-0"
-            >
-              {state === "verifying"
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> מאמת מול השרשרת…</>
-                : <><KeyRound className="h-4 w-4" /> פתח את הכספת</>}
-            </Button>
-          </div>
-
-          {err && (
-            <p role="alert" className="mt-4 text-sm text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-xl px-4 py-2.5">{err}</p>
-          )}
-
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <Switch
-              checked={remember}
-              onCheckedChange={setRemember}
-              aria-label="זכור אותי על המכשיר הזה"
-              className="data-[state=checked]:bg-emerald-600"
-            />
-            <span className="text-xs text-zinc-400">
-              זכור אותי בצורה בטוחה על המכשיר הזה — <span className="text-zinc-500">כניסה חוזרת בלי מפתח, 90 יום, שלילה בלחיצה</span>
-            </span>
-          </div>
-          {deviceRejected && (
-            <p className="mt-2 text-[11px] font-mono text-amber-300/80">⚠ טוקן-המכשיר שהיה כאן נשלל או פג-תוקף (הצופן שלו נמחק מה-DB) — היכנס במפתח והמכשיר יחומש מחדש</p>
-          )}
-
-          {status && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 font-mono text-xs text-zinc-500"
-            >
-              <span><b className="text-zinc-300">{status.counts.vaultEntries}</b> סודות מוצפנים</span>
-              <span className="text-zinc-700">·</span>
-              <span><b className="text-zinc-300">{status.keySeals}</b> חותמות-מפתח</span>
-              <span className="text-zinc-700">·</span>
-              <span><b className="text-zinc-300">{status.counts.activeAgents}</b> סוכנים</span>
-              <span className="text-zinc-700">·</span>
-              <span>{status.initialized ? "מאותחל" : "לא מאותחל"}</span>
-            </motion.div>
-          )}
-        </motion.div>
-      </main>
-
-      <footer className="relative z-10 mt-auto border-t border-zinc-900 bg-black/60 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 py-4 text-center font-mono text-xs text-zinc-600 tracking-widest">
-          SEALS CANNOT BE FORGED · GCM REJECTS EVERY WRONG KEY · 30-DAY SESSION
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-/* ══════════════════════════ sticky header (unlocked) ══════════════════════════ */
-
-function StickyHeader({ status, onLock }: { status: GateStatus; onLock: () => void }) {
-  const verified = useCountUp(status.counts.vaultEntries, 1400);
-  return (
-    <motion.header
-      initial={{ y: -60, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="sticky top-0 z-30 border-b border-zinc-900 bg-black/70 backdrop-blur-md"
-    >
-      <div className="max-w-5xl mx-auto px-4 md:px-6 h-14 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <VaultSeal seals={status.keySeals} state="open" size={34} />
-          <span className="font-black tracking-tight text-sm md:text-base truncate">
-            SOVEREIGN <span className="text-emerald-400">VAULT</span>
-          </span>
-          <Badge variant="outline" className="hidden sm:inline-flex text-emerald-400 border-emerald-500/40 text-[10px] font-mono">פתוחה</Badge>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden md:block font-mono text-xs text-zinc-500">
-            <span className="text-emerald-400 font-bold">{verified}</span>/{status.counts.vaultEntries} סודות
-          </span>
-          <Button variant="outline" size="sm" onClick={onLock} className="gap-1.5 border-zinc-800 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10">
-            <LogOut className="h-3.5 w-3.5" /> אטום
-          </Button>
-        </div>
-      </div>
-    </motion.header>
-  );
-}
-
-/* ══════════════════════════ hero ══════════════════════════ */
-
-function Hero({ status }: { status: GateStatus }) {
-  const secrets = useCountUp(status.counts.vaultEntries);
-  const seals = useCountUp(status.keySeals);
-  const agents = useCountUp(status.counts.activeAgents);
-  const msgs = useCountUp(status.counts.messages);
-  return (
-    <section className="pt-12 pb-8">
-      <motion.p {...rise} className="font-mono text-xs tracking-[0.35em] text-emerald-400/80 mb-3">{"// הכספת פתוחה — ברוך שובך"}</motion.p>
-      <motion.h2
-        initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.6 }}
-        className="text-4xl md:text-6xl font-black tracking-tight leading-[1.05]"
-      >
-        הכול מחובר.<br />
-        <span className="text-zinc-500">הכול מאומת.</span>{" "}
-        <span className="bg-gradient-to-l from-emerald-300 to-amber-300 bg-clip-text text-transparent">הכול שלך.</span>
-      </motion.h2>
-
-      <motion.div {...rise} transition={{ ...rise.transition, delay: 0.15 }} className="mt-9 grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { v: secrets, label: "סודות מוצפנים", unit: "" },
-          { v: seals, label: "חותמות-מפתח", unit: "" },
-          { v: agents, label: "סוכנים פעילים", unit: "" },
-          { v: msgs, label: "הודעות-פיקוד", unit: "" },
-        ].map((t) => (
-          <GlowCard key={t.label} className="p-5">
-            <p className="font-mono text-4xl font-black text-zinc-100">{t.v}</p>
-            <p className="mt-1 text-xs text-zinc-500">{t.label}</p>
-          </GlowCard>
-        ))}
-      </motion.div>
-
-      <motion.div {...rise} className="mt-6 flex justify-center">
-        <ArrowDown className="h-5 w-5 text-zinc-600 animate-bounce" aria-hidden />
-      </motion.div>
-    </section>
-  );
-}
-
-/* ══════════════════════════ 01 · connections ══════════════════════════ */
 
 function Connections() {
   const [inv, setInv] = useState<Inventory | null>(null);
@@ -802,7 +416,6 @@ function Connections() {
   );
 }
 
-/* ══════════════════════════ 02 · the vault ══════════════════════════ */
 
 /* ═════════════════ r16 — SOVEREIGN ROTATION PANEL (gap-58) ═════════════════
    "לחבר את כולם": the operator pastes each account's current owner key →
@@ -990,7 +603,9 @@ function VaultGrid() {
 
   return (
     <section className="py-14">
-      <SectionHead num="02" title="הכספת — כל המפתחות" sub="לוחצים 'פענח' והמפתח הפרטי מתגלה כאן, מוצפן-עד-הרגע הזה." />
+      <SectionHead num="02" title="הכספת — כל המפתחות" sub="לוחצים 'פענח' והמפתח הפרטי מתגלה כאן, מוצפן-עד-הרגע הזה. הזרקת-מפתח מעל — זיהוי-חי לפני שמירה." />
+
+      <KeyInjectCard />
 
       <motion.div {...rise} className="flex flex-col md:flex-row gap-3 mb-5">
         <div className="relative flex-1">
@@ -1165,32 +780,86 @@ function VaultGrid() {
   );
 }
 
-function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+/* ══════════════════════════ key injection — r38 gap fix ══════════════════════════
+   היה רכיב-מלא שמעולם לא רונדר (קוד-מת: KeyInject הוגדר ולא נקרא אף-פעם ב-Page).
+   עתה: כרטיס-קומפקטי בראש-סעיף-הכספת — מזהה חי כל מפתח ושומר מוצפן. */
+
+function KeyInjectCard() {
+  const [keyInput, setKeyInput] = useState("");
+  const [saveIt, setSaveIt] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<KeyReport | null>(null);
+
+  async function run() {
+    if (!keyInput.trim()) return;
+    setBusy(true);
+    try {
+      const r = await apiJson<{ ok: boolean; report?: KeyReport; saved?: { id: string }[]; error?: string }>("/api/gate/key", {
+        method: "POST", body: JSON.stringify({ key: keyInput.trim(), save: saveIt }),
+      });
+      if (r?.ok) {
+        setReport(r.report || null);
+        setKeyInput("");
+        toast.success(saveIt && r.saved?.length ? `נשמר מוצפן בכספת (${r.saved.length})` : "זוהה חי — דוח מוצג");
+      } else toast.error(r?.error || "הזיהוי נכשל");
+    } finally { setBusy(false); }
+  }
+
   return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        "rounded-full px-4 py-1.5 font-mono text-xs transition-all border " +
-        (active
-          ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
-          : "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200")
-      }
-    >
-      {label}
-    </button>
+    <motion.div {...rise} className="mb-6">
+      <GlowCard className="p-5">
+        <div className="flex items-center gap-2 mb-1.5">
+          <KeyRound className="h-4 w-4 text-emerald-400" aria-hidden />
+          <h3 className="font-bold text-sm">הזרקת מפתח — זיהוי-חי ושמירה מוצפנת</h3>
+          <span className="text-[10px] text-zinc-600">מזהה WIF / hex / מנשק / PAT מול השרשרות — לפני שהוא נוגע בכספת</span>
+        </div>
+        <div className="flex flex-col md:flex-row gap-3 mt-3">
+          <div className="relative flex-1">
+            <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" aria-hidden />
+            <Input
+              value={keyInput} onChange={(e) => setKeyInput(e.target.value)}
+              placeholder="WIF / hex / מנשק / PAT — הדבק כאן"
+              className="pr-9 font-mono text-sm bg-zinc-950/80 border-zinc-800" dir="ltr"
+              autoComplete="off" spellCheck={false}
+              aria-label="מפתח לזיהוי"
+            />
+          </div>
+          <Button onClick={run} disabled={busy || !keyInput.trim()} className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold shrink-0">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saveIt ? "זהה ושמור" : "זהה חי"}
+          </Button>
+        </div>
+        <label className="mt-3 flex items-center gap-2.5 text-xs text-zinc-400 cursor-pointer w-fit">
+          <Switch checked={saveIt} onCheckedChange={setSaveIt} aria-label="שמירה מוצפנת בכספת" />
+          שמור מוצפן בכספת (בלי זה — רק דוח-זיהוי)
+        </label>
+        <AnimatePresence>
+          {report && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/80 p-4 text-xs space-y-2"
+            >
+              <p><span className="text-zinc-500">סוג:</span> <span className="font-mono text-emerald-400 font-bold">{report.kind}</span>
+                <span className="text-zinc-600"> · אימות-חי: {report.liveChecked ? "כן ✓" : "לא"}</span></p>
+              {report.controls.length > 0 && (
+                <p className="break-all leading-relaxed">
+                  <span className="text-zinc-500">שליטה נוכחית:</span>{" "}
+                  {report.controls.map((ctrl, i) => (
+                    <Badge key={i} variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-300 ml-1.5">
+                      {ctrl.chain}{ctrl.account ? `·${ctrl.account}` : ""}@{ctrl.role}
+                    </Badge>
+                  ))}
+                </p>
+              )}
+              {report.pubs.length > 0 && <p className="font-mono text-[10px] text-zinc-600 break-all" dir="ltr">pub: {report.pubs[0]}</p>}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </GlowCard>
+    </motion.div>
   );
 }
 
-/* ══════════════════════════ 03 · key injection ══════════════════════════ */
-
-/* ── r37 · restore drill — the standing proof that every key the vault holds can actually be restored ── */
-interface DrillResult {
-  at: string; total: number; restored: number; failed: number; placeholders?: number;
-  verdict: "pass" | "fail"; meaning: string;
-  seals?: { count: number; operatorPrimary: boolean; roles: string[] };
-  backup?: Record<string, unknown> | null;
-}
 function RestoreDrillCard() {
   const [last, setLast] = useState<DrillResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1249,89 +918,12 @@ function RestoreDrillCard() {
   );
 }
 
-function KeyInject() {
-  const [keyInput, setKeyInput] = useState("");
-  const [saveIt, setSaveIt] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [report, setReport] = useState<KeyReport | null>(null);
-
-  async function run() {
-    if (!keyInput.trim()) return;
-    setBusy(true);
-    try {
-      const r = await apiJson<{ ok: boolean; report?: KeyReport; saved?: { id: string }[]; error?: string }>("/api/gate/key", {
-        method: "POST", body: JSON.stringify({ key: keyInput.trim(), save: saveIt }),
-      });
-      if (r?.ok) {
-        setReport(r.report || null);
-        setKeyInput("");
-        toast.success(saveIt && r.saved?.length ? `נשמר מוצפן בכספת (${r.saved.length})` : "זוהה חי — דוח מוצג");
-      } else toast.error(r?.error || "הזיהוי נכשל");
-    } finally { setBusy(false); }
-  }
-
-  return (
-    <section className="py-14">
-      <SectionHead num="03" title="הזרקת מפתח" sub="מדביקים כל מפתח — מזהים אותו חי מול השרשרות, ואפשר לשמור אותו מוצפן בכספת." />
-      <motion.div {...rise}>
-        <GlowCard className="p-6">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <KeyRound className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-600" aria-hidden />
-              <Input
-                value={keyInput} onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="WIF / hex / מנשק / PAT — הדבק כאן"
-                className="pr-9 font-mono text-sm bg-zinc-950/80 border-zinc-800" dir="ltr"
-                autoComplete="off" spellCheck={false}
-              />
-            </div>
-            <Button onClick={run} disabled={busy || !keyInput.trim()} className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-black font-bold shrink-0">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saveIt ? "זהה ושמור" : "זהה חי"}
-            </Button>
-          </div>
-          <label className="mt-3 flex items-center gap-2.5 text-xs text-zinc-400 cursor-pointer w-fit">
-            <Switch checked={saveIt} onCheckedChange={setSaveIt} aria-label="שמירה מוצפנת בכספת" />
-            שמור מוצפן בכספת (בלי זה — רק דוח-זיהוי)
-          </label>
-          <AnimatePresence>
-            {report && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/80 p-4 text-xs space-y-2"
-              >
-                <p><span className="text-zinc-500">סוג:</span> <span className="font-mono text-emerald-400 font-bold">{report.kind}</span>
-                  <span className="text-zinc-600"> · אימות-חי: {report.liveChecked ? "כן ✓" : "לא"}</span></p>
-                {report.controls.length > 0 && (
-                  <p className="break-all leading-relaxed">
-                    <span className="text-zinc-500">שליטה נוכחית:</span>{" "}
-                    {report.controls.map((c, i) => (
-                      <Badge key={i} variant="outline" className="font-mono text-[10px] border-emerald-500/30 text-emerald-300 ml-1.5">
-                        {c.chain}{c.account ? `·${c.account}` : ""}@{c.role}
-                      </Badge>
-                    ))}
-                  </p>
-                )}
-                {report.pubs.length > 0 && <p className="font-mono text-[10px] text-zinc-600 break-all" dir="ltr">pub: {report.pubs[0]}</p>}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </GlowCard>
-      </motion.div>
-    </section>
-  );
-}
-
-/* ══════════════════════════ 04 · המחסן — חימוש סוכנים + לולאת-מטרה ══════════════════════════ */
-
 const BRAIN_MAKER_DEFAULT = "nvidia:openai/gpt-oss-20b";
 const KIND_META: Record<ModuleDef["kind"], { label: string; cls: string }> = {
   skill: { label: "מיומנות", cls: "text-emerald-300 border-emerald-500/40" },
   connector: { label: "מחבר", cls: "text-sky-300 border-sky-500/40" },
   actor: { label: "מבצע", cls: "text-amber-300 border-amber-500/40" },
 };
-
-type ModStats = Record<string, { calls: number; cached: number; failed: number; msTotal: number }>;
 
 function ModuleChip({
   m, on, onClick, stats,
@@ -1417,8 +1009,6 @@ function TraceStepView({ s }: { s: TraceStep }) {
     </div>
   );
 }
-
-/* ══════════════════════════ 04 · autonomy heart ══════════════════════════ */
 
 const HEART_TICK_MS_CLIENT = 20000;
 
@@ -2077,6 +1667,29 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
   );
 }
 
+/* ══════════════════════════ 04 · autonomy plane (r38) ══════════════════════════
+   סעיף-עצמאי בקונסולה: לב-האוטונומיה עם כל הבקרה. נשלף מתוך סעיף-הסוכנים
+   כדי שלכל מישור תהיה כתובת אחת ברורה בניווט. */
+
+function AutonomySection() {
+  const [agents, setAgents] = useState<AgentRow[]>([]);
+  useEffect(() => {
+    apiJson<{ ok: boolean; agents: AgentRow[] }>("/api/gate/agents").then((r) => {
+      if (r?.ok) setAgents(r.agents || []);
+    });
+  }, []);
+  return (
+    <section className="py-10">
+      <SectionHead
+        num="04"
+        title="לב-האוטונומיה"
+        sub="הסוכנים קמים לבד: סיורים מתוכננים, טריגרים, יוזמות-מרוסנות, זיכרון-צי, יד-ריבונית על תור-החתימות — והכול עם kill-switch אחד שלך."
+      />
+      <AutonomyCard agents={agents} />
+    </section>
+  );
+}
+
 function Agents() {
   /* ── data ── */
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -2186,9 +1799,7 @@ function Agents() {
 
   return (
     <section className="py-14">
-      <SectionHead num="04" title="מחסן-החימוש" sub="סוכן בלי מודולים הוא טוקן חסר-ידיים. מחברים, חומשים, נותנים מטרה עם קריטריוני-סיום — ובודק עצמאי פוסק. והלב? הסוכנים קמים גם לבד — סיורים, טריגרים והתאוששות-מקריסה, בלי שתלחץ כלום." />
-
-      <AutonomyCard agents={agents} />
+      <SectionHead num="03" title="מחסן-החימוש" sub="סוכן בלי מודולים הוא טוקן חסר-ידיים. מחברים, חומשים, נותנים מטרה עם קריטריוני-סיום — ובודק עצמאי פוסק. לב-האוטונומיה והבקרה עליו — בסעיף הבא בניווט." />
 
       {/* attach + module rack */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -2421,8 +2032,6 @@ function Agents() {
   );
 }
 
-/* ══════════════════════════ 05 · command bridge ══════════════════════════ */
-
 function Bridge() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -2492,7 +2101,7 @@ function Bridge() {
 
   return (
     <section className="py-14">
-      <SectionHead num="05" title="גשר-הפיקוד" sub="אתה, הסוכנים והמערכת — ערוץ אחד. הכול נרשם." />
+      <SectionHead num="06" title="גשר-הפיקוד" sub="אתה, הסוכנים והמערכת — ערוץ אחד. הכול נרשם." />
       <motion.div {...rise}>
         <GlowCard className="flex flex-col h-[480px] overflow-hidden">
           <div className="flex items-center justify-between px-5 pt-3">
@@ -2544,8 +2153,6 @@ function Bridge() {
   );
 }
 
-/* ══════════════════════════ 06 · audit ══════════════════════════ */
-
 function Audit() {
   const [actions, setActions] = useState<ActionRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2561,7 +2168,7 @@ function Audit() {
   return (
     <section className="py-14">
       <div className="flex items-end justify-between">
-        <SectionHead num="06" title="ביקורת" sub="כל פעולת-סוכן — רשומה. תמיד." />
+        <SectionHead num="07" title="ביקורת" sub="כל פעולת-סוכן — רשומה. תמיד." />
         <Button variant="ghost" size="sm" onClick={refresh} className="gap-1.5 text-zinc-500 mb-6">
           <RefreshCw className={"h-3.5 w-3.5" + (loading ? " animate-spin" : "")} />
         </Button>
@@ -2594,8 +2201,6 @@ result: ${a.result}`}
   );
 }
 
-/* ══════════════════════════ 07 · API console ══════════════════════════ */
-
 function ApiConsole() {
   const [sel, setSel] = useState<Ep>(ENDPOINTS[0]);
   const [body, setBody] = useState("");
@@ -2620,7 +2225,7 @@ function ApiConsole() {
 
   return (
     <section className="py-14">
-      <SectionHead num="07" title="מסוף-API חי" sub="כל נקודת-קצה שקיימת בקוד — מוכנה להרצה אמיתית. הטוקן מצורף אוטומטית." />
+      <SectionHead num="08" title="מסוף-API חי" sub="כל נקודת-קצה שקיימת בקוד — מוכנה להרצה אמיתית. הטוקן מצורף אוטומטית." />
       <div className="grid gap-4 lg:grid-cols-5">
         <motion.div {...rise} className="lg:col-span-2">
           <GlowCard className="p-2 max-h-[60vh] overflow-y-auto scroll-thin">
@@ -2674,8 +2279,6 @@ function ApiConsole() {
     </section>
   );
 }
-
-/* ══════════════════════════ 08 · trusted devices ══════════════════════════ */
 
 function TrustedDevices() {
   const [devices, setDevices] = useState<DeviceRow[]>([]);
@@ -2759,7 +2362,7 @@ function TrustedDevices() {
 
   return (
     <section className="py-14">
-      <SectionHead num="08" title="מכשירים-מהימנים" sub="זכירה-בטוחה של המפעיל: הטוקן חי בדפדפן בלבד, השרת מחזיק hash + מפתח-אב חתום תחתו. ה-DB לבדו אינו מסוגל להיכנס. הלב גורע פגי-תוקף ומתריע לפני פקיעה." />
+      <SectionHead num="09" title="מכשירים-מהימנים" sub="זכירה-בטוחה של המפעיל: הטוקן חי בדפדפן בלבד, השרת מחזיק hash + מפתח-אב חתום תחתו. ה-DB לבדו אינו מסוגל להיכנס. הלב גורע פגי-תוקף ומתריע לפני פקיעה." />
       <motion.div {...rise}>
         <GlowCard className="p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
@@ -2821,8 +2424,6 @@ function TrustedDevices() {
   );
 }
 
-/* ══════════════════════════ 09 · emergency zone ══════════════════════════ */
-
 function EmergencyZone({ onAfter }: { onAfter: () => Promise<boolean> }) {
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState("");
@@ -2848,7 +2449,7 @@ function EmergencyZone({ onAfter }: { onAfter: () => Promise<boolean> }) {
 
   return (
     <section className="py-14">
-      <SectionHead num="09" title="אזור-חירום" sub="רק אם איבדת הכול: הוכחת-בעלות חיה משחזרת את הכספת מהמקורות ששרדו. כל המכשירים-המהימנים נשללים אוטומטית — מפתח-אב חדש." />
+      <SectionHead num="10" title="אזור-חירום" sub="רק אם איבדת הכול: הוכחת-בעלות חיה משחזרת את הכספת מהמקורות ששרדו. כל המכשירים-המהימנים נשללים אוטומטית — מפתח-אב חדש." />
       <motion.div {...rise}>
         <GlowCard className="border-rose-500/20">
           <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 px-6 py-4 text-right" aria-expanded={open}>
