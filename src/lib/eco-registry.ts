@@ -208,6 +208,14 @@ export const ECO_NETWORKS: EcoNetworkInfo[] = [
     role: "High-throughput rail + future SPL wrapped economy — live adapter (M3)",
     adapterStatus: "ADAPTER DONE (M3) — legacy build/sign (Ed25519), SPL token read; broadcast fail-closed",
   },
+  {
+    id: "xrpl",
+    name: "XRPL",
+    family: "XRP Ledger",
+    kind: "L1 public",
+    role: "Outer anchor rail + sovereign heartbeats — seal roots inscribed and read back from the ledger (anchor wall 5/5, §10.30)",
+    adapterStatus: "HEARTBEATS LIVE — tesSUCCESS AccountSet beats read back; server_state health probe wired (r49)",
+  },
 ];
 
 // ---------------------------------------------------------------------------
