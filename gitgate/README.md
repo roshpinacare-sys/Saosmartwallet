@@ -48,6 +48,7 @@ Every repo on the machine — current and future — authenticates for
 
 | Command | Purpose |
 |---|---|
+| `gitgate ensure` | **ONE-SHOT for any new chat**: setup-if-missing + live doctor. Run this before the first push of every session |
 | `gitgate setup` | (re)install store + helper + global git config (idempotent) |
 | `gitgate set-token --from F` | rotate/seed the token from file F (or stdin). Validates shape, writes atomically 0600, prints only a fingerprint |
 | `gitgate doctor` | full self-check: perms, helper, git config, clean remotes, live GitHub API identity, live `ls-remote` on every repo |
@@ -65,9 +66,28 @@ Every repo on the machine — current and future — authenticates for
    `my-project/upload/` (gitignored) and run
    `~/.gitgate/bin/gitgate set-token --from upload/<file>.txt`,
    or paste it to the agent and it runs `set-token` for you (stdin is hidden).
-3. `~/.gitgate/bin/gitgate doctor` must end with `ALL GREEN`.
+3. `~/.gitgate/bin/gitgate ensure` must end with `ALL GREEN`.
 4. Revoke the old PAT on GitHub. Nothing else to touch — no repo edits, no
    remote-URL surgery, no `.git/config` exposure.
+
+## The new-chat attach protocol (three layers of certainty)
+
+1. **Automatic (nothing to do):** `~/.gitgate` and the global git config live
+   under `/home/z`, which persists across sessions. A brand-new chat can
+   fetch/push immediately — the credential helper is already registered.
+2. **Agent knowledge (guaranteed):** the mandatory header at the top of
+   `worklog.md` (read by every agent in every chat) carries the GitGate
+   protocol: run `gitgate ensure` before the first push; never expose the
+   token; `pull --rebase` before pushing (the app's automation pushes
+   continuously); rotation recipe.
+3. **Self-heal (worst case — full environment wipe):** the canonical scripts
+   are version-controlled in `gitgate/`, so one command restores everything:
+   `bash /home/z/my-project/gitgate/install.sh`. If the token store was also
+   wiped, the operator supplies a token file and `set-token` re-seeds it.
+
+Concurrent chats: multiple sessions may push simultaneously — always
+`git pull --rebase origin main` before pushing (standard cycle, now part of
+the header protocol).
 
 ## Security model (aligned with devgate)
 

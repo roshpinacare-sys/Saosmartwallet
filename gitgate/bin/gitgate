@@ -10,6 +10,7 @@
 # Commands:
 #   gitgate setup                install store+helper, register global git config (idempotent)
 #   gitgate set-token [--from F] rotate/seed the token (stdin or file). Never prints it.
+#   gitgate ensure               ONE-SHOT for any new chat: setup-if-missing + live doctor
 #   gitgate doctor               full self-check + live authenticated test on every repo
 #   gitgate status               short local state (no network)
 #   gitgate migrate [--all|DIR]  strip embedded credentials from repo remote URLs
@@ -225,6 +226,21 @@ cmd_migrate() {
   echo "done. remotes rewritten: $changed"
 }
 
+cmd_ensure() {
+  # ONE-SHOT for any new chat/session:
+  #   1. (re)install everything missing (idempotent)
+  #   2. live doctor — must end ALL GREEN before any git push in this chat
+  cmd_setup
+  echo "--- ensure: live check ---"
+  if [ ! -r "$STORE" ]; then
+    echo "[FAIL] no token in store — seed it first:"
+    echo "       operator uploads a token file, then: gitgate set-token --from <file>"
+    echo "       (canonical restore: bash /home/z/my-project/gitgate/install.sh)"
+    return 2
+  fi
+  cmd_doctor
+}
+
 cmd_doctor() {
   local fail=0
   cmd_status || fail=1
@@ -276,6 +292,7 @@ cmd_help() {
 case "${1:-help}" in
   setup)      shift; cmd_setup "$@" ;;
   set-token)  shift; cmd_set_token "$@" ;;
+  ensure)     shift; cmd_ensure "$@" ;;
   doctor)     shift; cmd_doctor "$@" ;;
   status)     shift; cmd_status "$@" ;;
   migrate)    shift; cmd_migrate "$@" ;;
