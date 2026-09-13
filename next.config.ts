@@ -51,6 +51,14 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  /* r48 RSS-WALL DEFENSE (measured live): visiting the console sections in one
+   * session balloons webpack's cumulative memory to the sandbox kernel line
+   * (~2.14GB RSS — server killed mid-compile, twice measured). This official
+   * flag reduces webpack's memory footprint in dev. The heap ceiling stays at
+   * 2048 (see heart-service/index.ts for the tradeoff analysis). */
+  experimental: {
+    webpackMemoryOptimizations: true,
+  },
   /* r41 RELOAD-LOOP DEFENSE: the steem SDK chain (steem → bytebuffer) is a
    * node-oriented lib that webpack re-resolved and re-warned about on EVERY
    * on-demand compile (missing optional dep `memcpy`). Each recompile marked

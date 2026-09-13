@@ -122,8 +122,9 @@ async function main(): Promise<void> {
   // inherited NODE_OPTIONS --max-old-space-size=2048 (the OLD, easy threshold
   // = self-restart at 1638MB heap), so compile storms kept self-killing the
   // server and the browser kept full-reloading (measured: 3x CLS=1.0 in 75s).
-  // Now: ping the LIGHT health endpoint, and spawn with the SAME 2560MB ceiling
-  // the supervisor uses — one threshold, out of everyday reach.
+  // Now: ping the LIGHT health endpoint, and spawn with the same heap ceiling
+  // the supervisor uses — one threshold (r48: 2048 kept after a live trial of
+  // 1792; see the spawn comment below for the measured tradeoff).
   const PORTAL = "http://127.0.0.1:3000/api/system/health";
   // r34 bug-hunt: the flat 45s backoff turned every memory-threshold restart
   // (next dev self-exits with code 77) into 45-90s of dead portal, and the
@@ -145,7 +146,10 @@ async function main(): Promise<void> {
       return true;
     } catch { /* fall through to the patient recheck */ }
     try {
-      await fetch(PORTAL, { signal: AbortSignal.timeout(8_000) });
+      // r48: cold builds answered health in >25s — the patient recheck goes to
+      // 12s. With the busy-port no-spawn rule, a false death here only skips a
+      // tick (harmless), but fewer false deaths = calmer logs.
+      await fetch(PORTAL, { signal: AbortSignal.timeout(12_000) });
       return true; // any HTTP response means the server is serving
     } catch {
       return false; // refused / timeout = down
@@ -174,22 +178,35 @@ async function main(): Promise<void> {
         failedSpawns = 0;
         return;
       }
+      // r48 bug (live-proven): during the 14:18 crash-recovery window every
+      // EADDRINUSE attempt counted toward QUIET_AFTER_FAILED, so the heart
+      // entered the 10-minute rest — and then IGNORED a clean crash (portal
+      // dead + port free) for the whole window. Quiet exists to stop storms
+      // against a BUSY port (lingering socket), not to abandon a dead one.
+      // A free port is the exact crash we exist to heal: reset the ladder.
+      if (await portFree()) failedSpawns = 0;
       const now = Date.now();
       const rest = failedSpawns >= QUIET_AFTER_FAILED
         ? 10 * 60_000
         : RESPAWN_BACKOFF_MS[Math.min(failedSpawns, RESPAWN_BACKOFF_MS.length - 1)];
       if (now - lastSpawn < rest) return;
-      lastSpawn = now;
       spawnCycle = true;
       try {
+        // r48 (live-proven twice): a busy port with no HTTP answer is a server
+        // MID-COMPILE (health answered >25s during cold builds) or truly
+        // wedged — spawning into it only farms EADDRINUSE noise, burns the
+        // backoff ladder, and arms the 10-minute quiet. Never spawn into a
+        // busy port: re-evaluate on the next tick instead.
         if (!(await waitPortRelease())) {
-          console.log("eart-service] port 3000 still busy 20s after down — spawning anyway");
+          console.log("eart-service] port 3000 busy without HTTP answer — NOT spawning (mid-compile or wedged); re-evaluating next tick");
+          return;
         }
         const out = fs.openSync(path.join(ROOT, "dev.log"), "a");
+        lastSpawn = Date.now(); // only a REAL spawn arms the backoff clock
         const proc = Bun.spawn({
           cmd: ["bun", "./node_modules/next/dist/bin/next", "dev", "-p", "3000", "--webpack"],
           cwd: ROOT,
-          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2048" }, // r45: 2048 so the graceful self-restart beats the kernel OOM-killer
+          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2048" }, // r48: kept at 2048 after live trial of 1792 — a lower ceiling risks a restart-loop that never finishes the big cold compile; a kernel kill at ~2.14GB RSS costs only the server (the heart survives and respawns), while an unfinishable compile costs everything
           stdio: ["ignore", out, out],
         });
         proc.unref();
