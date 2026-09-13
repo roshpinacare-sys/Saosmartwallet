@@ -17,6 +17,9 @@
  * crew must not believe you."
  */
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { db } from "@/lib/db";
 import { sealSecret, openSecret, masterReady, GateError } from "@/lib/gate/crypto";
 
@@ -160,15 +163,82 @@ async function brainGate<T>(fn: () => Promise<T>): Promise<T> {
 const BRAIN_LADDER_MS = [6_000, 15_000, 35_000];
 const jitter = (ms: number) => Math.max(1_000, ms + Math.floor(Math.random() * 1_600) - 800);
 
-/* zai provider — backend-only SDK. Extracted so the nvidia path can fall back
- * to it honestly when the vault is locked (no operator session open). */
+/* ── r47: zai gateway 401 resilience (measured live) ──
+ * The gateway rejects with 401 {"error":"missing X-Token header"} when the
+ * request carries no X-Token. The SDK omits that header whenever the config
+ * it loaded (project → home → /etc, read fresh on EVERY ZAI.create()) lacks
+ * the `token` field — and r47 measured failure BURSTS (6 consecutive idle
+ * runs in 20 minutes, all 401) followed by recovery, consistent with the
+ * platform rewriting the config in token-less windows. Fix, three layers:
+ *   1. memory-only snapshot of the last seen-good token (never logged,
+ *      never persisted — the SDK itself already holds it in memory);
+ *   2. on a 401/X-Token failure: ONE direct retry injecting
+ *      config.token || snapshot (same request shape as the SDK);
+ *   3. if that still fails: brainChat fails over to the nvidia brain
+ *      (open vault or env key) instead of killing the run — and if nvidia is
+ *      also unreachable the ORIGINAL zai error is rethrown (honest record). */
+let zaiTokenSnapshot: string | null = null;
+
+async function readZaiConfig(): Promise<Record<string, string> | null> {
+  const candidates = [
+    path.join(process.cwd(), ".z-ai-config"),
+    path.join(os.homedir(), ".z-ai-config"),
+    "/etc/.z-ai-config",
+  ];
+  for (const p of candidates) {
+    try {
+      const parsed = JSON.parse(await readFile(p, "utf8")) as Record<string, string>;
+      if (parsed.baseUrl && parsed.apiKey) return parsed;
+    } catch {
+      /* missing/invalid — try the next candidate (same order as the SDK) */
+    }
+  }
+  return null;
+}
+
+/** Direct gateway call mirroring the SDK's exact request shape, with a token
+ * we control (config.token || snapshot). Success upgrades the snapshot. */
+async function zaiDirectCall(mapped: Array<{ role: string; content: string }>): Promise<BrainReply> {
+  const cfg = await readZaiConfig();
+  if (!cfg) throw new Error("zai direct retry: no config found");
+  const token = cfg.token || zaiTokenSnapshot;
+  if (!token) throw new Error("zai direct retry: no X-Token in config and no snapshot");
+  const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cfg.apiKey}`,
+      "X-Z-AI-From": "Z",
+      ...(cfg.chatId ? { "X-Chat-Id": cfg.chatId } : {}),
+      ...(cfg.userId ? { "X-User-Id": cfg.userId } : {}),
+      "X-Token": token,
+    },
+    body: JSON.stringify({ messages: mapped, thinking: { type: "disabled" } }),
+    signal: AbortSignal.timeout(90_000),
+  });
+  const txt = await res.text();
+  if (!res.ok) {
+    // never log the token — status + short gateway body only
+    throw new Error(`API request failed with status ${res.status}: ${txt.slice(0, 140)}`);
+  }
+  const j = JSON.parse(txt) as { choices?: { message?: { content?: string } }[] };
+  zaiTokenSnapshot = token; // proven good — remember for token-less windows
+  return { content: j.choices?.[0]?.message?.content ?? "", model: "zai" };
+}
+
 async function zaiChat(messages: ChatMsg[], opts: { maxTokens: number; temperature: number }): Promise<BrainReply> {
+  void opts; // the SDK path sends shape-only bodies; kept for signature parity
   const { default: ZAI } = await import("z-ai-web-dev-sdk");
   // z-ai chat contract: system instructions ride on the "assistant" role.
   const mapped = messages.map((m) => ({
-    role: m.role === "system" ? ("assistant" as const) : m.role,
+    role: m.role === "system" ? "assistant" : m.role,
     content: m.content,
   }));
+  // refresh the memory snapshot before flying (cheap local read)
+  try {
+    const cfgNow = await readZaiConfig();
+    if (cfgNow?.token) zaiTokenSnapshot = cfgNow.token;
+  } catch { /* snapshot stays as-is */ }
   let zaiLastErr: unknown = null;
   for (let attempt = 0; attempt < BRAIN_LADDER_MS.length + 1; attempt++) {
     try {
@@ -182,6 +252,20 @@ async function zaiChat(messages: ChatMsg[], opts: { maxTokens: number; temperatu
     } catch (e) {
       zaiLastErr = e;
       const msg = e instanceof Error ? e.message : String(e);
+      if (/401|X-Token/i.test(msg)) {
+        // gateway rejected the request for a missing token — one direct retry
+        // injecting config.token || snapshot (layer 2)
+        try {
+          return await zaiDirectCall(mapped);
+        } catch (e2) {
+          zaiLastErr = e2;
+          const m2 = e2 instanceof Error ? e2.message : String(e2);
+          const transient2 = /(?:^|\D)(?:429|5\d\d)(?:\D|$)|rate.?limit|too many requests|timeout|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(m2);
+          if (!transient2) break;
+          if (attempt < BRAIN_LADDER_MS.length) await new Promise((r) => setTimeout(r, jitter(BRAIN_LADDER_MS[attempt])));
+          continue;
+        }
+      }
       const transient = /(?:^|\D)(?:429|5\d\d)(?:\D|$)|rate.?limit|too many requests|timeout|ECONN|ETIMEDOUT|EAI_AGAIN/i.test(msg);
       if (!transient) break;
       if (attempt < BRAIN_LADDER_MS.length) await new Promise((r) => setTimeout(r, jitter(BRAIN_LADDER_MS[attempt])));
@@ -264,7 +348,24 @@ export async function brainChat(
     throw lastErr instanceof Error ? lastErr : new GateError("brain-failed", "המוח (NVIDIA) לא הגיב");
   }
 
-  return brainGate(() => zaiChat(messages, { maxTokens, temperature }));
+  try {
+    return await brainGate(() => zaiChat(messages, { maxTokens, temperature }));
+  } catch (e) {
+    // r47 layer 3 — a zai gateway 401 burst must not kill autonomous runs
+    // while a NIM key is reachable (open vault or env). Honest order: fail
+    // over to nvidia; if nvidia is ALSO unavailable (vault-locked + no env
+    // key) the ORIGINAL zai error is rethrown — the run fails on the record
+    // with the real cause, never a masked one.
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/X-Token|status 401/i.test(msg)) throw e;
+    try {
+      const r = await brainChat({ provider: "nvidia", model: "openai/gpt-oss-20b" }, messages, opts);
+      return { ...r, model: `${r.model} (zai-401-failover)` } satisfies BrainReply;
+    } catch (nvErr) {
+      if (nvErr instanceof GateError && nvErr.code === "vault-locked") throw e;
+      throw nvErr;
+    }
+  }
 }
 
 /** The checker must NEVER share a brain with the maker (generator/evaluator separation). */

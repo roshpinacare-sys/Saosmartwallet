@@ -34,8 +34,10 @@ const BLURT_RPCS = [
   "https://rpc.blurtlag.tech",
 ];
 const ANCHOR_ID = "saos.id.v1";
-const MAX_HISTORY_PAGES = 40; // × 100 entries = 4,000 ops scanned, newest-first
+const MAX_HISTORY_PAGES = 300; // filtered custom_json-only pages (~30k ops headroom)
+const MAX_HISTORY_PAGES_UNFILTERED = 40; // legacy fallback when a node ignores operation_filter
 const HISTORY_LIMIT = 100; // node hard cap
+const SCAN_CONCURRENCY = 8; // parallel backward pages per batch
 
 async function rpc<T>(url: string, method: string, params: unknown, timeoutMs = 9_000): Promise<T> {
   const controller = new AbortController();
@@ -185,44 +187,118 @@ export async function findLatestIdentityAnchor(username: string): Promise<
   | { found: true; op: AnchorOp; scanned: number }
   | { found: false; scanned: number; reason: string }
 > {
-  let scanned = 0;
-  let start: number = -1;
-  for (let page = 0; page < MAX_HISTORY_PAGES; page++) {
-    const pageResult = await rpc<{ history?: Array<[number, HistoryEntry]> }>(
-      STEEM_RPC,
-      "account_history_api.get_account_history",
-      { account: username, start, limit: HISTORY_LIMIT },
-    );
-    const ops = pageResult?.history;
-    if (!ops || ops.length === 0) break;
-    for (let i = ops.length - 1; i >= 0; i--) {
-      scanned++;
-      const [, entry] = ops[i];
-      const op = entry.op;
-      if (op?.type === "custom_json_operation" && op.value?.id === ANCHOR_ID) {
-        try {
-          const payload = JSON.parse(op.value.json ?? "{}") as AnchorOp["payload"];
-          return {
-            found: true,
-            scanned,
-            op: {
-              trxId: entry.trx_id,
-              block: entry.block,
-              timestamp: entry.timestamp,
-              cjId: ANCHOR_ID,
-              payload,
-            },
-          };
-        } catch {
-          // malformed payload — keep scanning for a well-formed anchor
+  // The anchor op is an immutable historical blockchain fact — once found it
+  // can never change (a NEWER anchor gets its own op). Cache for 1h so
+  // verifies skip the deep history scan entirely; live key probes still run
+  // every call, so authority drift is still caught in real time.
+  const cached = anchorCache.get(username);
+  if (cached && Date.now() - cached.at < ANCHOR_CACHE_TTL_MS) {
+    return { found: true, op: cached.op, scanned: cached.scanned };
+  }
+
+  // The account holds ~56k total ops but only ~4.2k custom_json ops.
+  // operation_filter=custom_json skips the noise (~92% less to page through),
+  // and pages run in parallel batches — the scan is bounded by the slowest
+  // page per batch instead of the sum of all pages.
+  try {
+    const first = await fetchHistoryPage(username, -1, true);
+    const ops = first?.history ?? [];
+    if (ops.length === 0) {
+      return { found: false, scanned: 0, reason: `no custom_json ops at all for this account` };
+    }
+    const newestIndex = ops[ops.length - 1][0];
+    const immediate = extractAnchor(ops);
+    if (immediate) {
+      anchorCache.set(username, { op: immediate.op, at: Date.now() });
+      return { found: true, op: immediate.op, scanned: ops.length };
+    }
+
+    let scanned = ops.length;
+    const starts: number[] = [];
+    for (let s = newestIndex - HISTORY_LIMIT; s > 0; s -= HISTORY_LIMIT) starts.push(s);
+    for (let i = 0; i < starts.length && i < MAX_HISTORY_PAGES; i += SCAN_CONCURRENCY) {
+      const batch = starts.slice(i, i + SCAN_CONCURRENCY);
+      const pages = await Promise.all(
+        batch.map((st) => fetchHistoryPage(username, st, true).catch(() => null)),
+      );
+      scanned += pages.reduce((n, p) => n + (p?.history?.length ?? 0), 0);
+      for (const p of pages) {
+        const hit = p?.history ? extractAnchor(p.history) : null;
+        if (hit) {
+          anchorCache.set(username, { op: hit.op, at: Date.now() });
+          return { found: true, op: hit.op, scanned };
         }
       }
+      const lastLowest = pages[pages.length - 1]?.history?.[0]?.[0];
+      if (lastLowest !== undefined && lastLowest <= 0) break; // reached account start
     }
-    const lowest = ops[0][0];
-    if (lowest <= 0 || lowest === start) break;
-    start = lowest - 1;
+    return { found: false, scanned, reason: `no ${ANCHOR_ID} op in the newest ${scanned} custom_json ops` };
+  } catch {
+    // node ignored/rejected operation_filter — legacy sequential unfiltered scan
+    let scanned = 0;
+    let start: number = -1;
+    for (let page = 0; page < MAX_HISTORY_PAGES_UNFILTERED; page++) {
+      const pageResult = await rpc<{ history?: Array<[number, HistoryEntry]> }>(
+        STEEM_RPC,
+        "account_history_api.get_account_history",
+        { account: username, start, limit: HISTORY_LIMIT },
+      );
+      const ops = pageResult?.history;
+      if (!ops || ops.length === 0) break;
+      scanned += ops.length;
+      const hit = extractAnchor(ops);
+      if (hit) {
+        anchorCache.set(username, { op: hit.op, at: Date.now() });
+        return { found: true, op: hit.op, scanned };
+      }
+      const lowest = ops[0][0];
+      if (lowest <= 0 || lowest === start) break;
+      start = lowest - 1;
+    }
+    return { found: false, scanned, reason: `no ${ANCHOR_ID} op in the newest ${scanned} history entries` };
   }
-  return { found: false, scanned, reason: `no ${ANCHOR_ID} op in the newest ${scanned} history entries` };
+}
+
+const ANCHOR_CACHE_TTL_MS = 60 * 60 * 1000; // 1h — immutable historical op
+const anchorCache = new Map<string, { op: AnchorOp; at: number }>();
+
+async function fetchHistoryPage(
+  username: string,
+  start: number,
+  filtered: boolean,
+): Promise<{ history?: Array<[number, HistoryEntry]> }> {
+  const params: Record<string, unknown> = { account: username, start, limit: HISTORY_LIMIT };
+  if (filtered) params.operation_filter = "custom_json";
+  return rpc<{ history?: Array<[number, HistoryEntry]> }>(
+    STEEM_RPC,
+    "account_history_api.get_account_history",
+    params,
+  );
+}
+
+function extractAnchor(ops: Array<[number, HistoryEntry]>): { found: true; op: AnchorOp } | null {
+  for (let i = ops.length - 1; i >= 0; i--) {
+    const [, entry] = ops[i];
+    const op = entry.op;
+    if (op?.type === "custom_json_operation" && op.value?.id === ANCHOR_ID) {
+      try {
+        const payload = JSON.parse(op.value.json ?? "{}") as AnchorOp["payload"];
+        return {
+          found: true,
+          op: {
+            trxId: entry.trx_id,
+            block: entry.block,
+            timestamp: entry.timestamp,
+            cjId: ANCHOR_ID,
+            payload,
+          },
+        };
+      } catch {
+        // malformed payload — keep scanning for a well-formed anchor
+      }
+    }
+  }
+  return null;
 }
 
 /* ── chain probes ── */
@@ -243,11 +319,19 @@ async function activeKeyOn(url: string, username: string): Promise<{ pub: string
 }
 
 export async function blurtActiveKey(username: string): Promise<{ pub: string | null; endpoint: string | null; error?: string }> {
-  for (const ep of BLURT_RPCS) {
-    const r = await activeKeyOn(ep, username);
-    if (r.pub) return { pub: r.pub, endpoint: ep };
+  // race all endpoints concurrently — one hanging endpoint used to delay every
+  // subsequent fallback try (sequential ×3 ≈ up to 3×timeout wall-clock)
+  try {
+    return await Promise.any(
+      BLURT_RPCS.map(async (ep) => {
+        const r = await activeKeyOn(ep, username);
+        if (!r.pub) throw new Error(r.error ?? `no active key on ${ep}`);
+        return { pub: r.pub, endpoint: ep };
+      }),
+    );
+  } catch {
+    return { pub: null, endpoint: null, error: "all blurt RPC endpoints unreachable from this network" };
   }
-  return { pub: null, endpoint: null, error: "all blurt RPC endpoints unreachable from this network" };
 }
 
 /* ── key equality (prefix-normalized payload bytes) ── */
@@ -297,12 +381,21 @@ export interface AnchorVerifyResult {
   summary?: string;
 }
 
-export async function verifyIdentityAnchor(usernameInput?: string): Promise<AnchorVerifyResult> {
+async function verifyIdentityAnchorOnce(usernameInput?: string): Promise<AnchorVerifyResult> {
   const username = (usernameInput ?? "headcorner").trim().replace(/^@/, "");
   const measuredAt = new Date().toISOString();
   try {
-    // 1. live active key on Steem
-    const steemKey = await activeKeyOn(STEEM_RPC, username);
+    // Probes are independent chain reads — run them concurrently. (Was
+    // sequential: steem key → history scan (≤40 RPC pages) → hive →
+    // blurt ×3 ≈ sum of slowest per chain ≈ 9-10s cold; now bounded by the
+    // slowest single probe.) None of these reject — each returns honest
+    // error objects — so Promise.all cannot short-circuit the report.
+    const [steemKey, found, hive, blurt] = await Promise.all([
+      activeKeyOn(STEEM_RPC, username),
+      findLatestIdentityAnchor(username),
+      activeKeyOn(HIVE_RPC, username),
+      blurtActiveKey(username),
+    ]);
     if (!steemKey.pub) {
       return { ok: false, username, measuredAt, error: `steem active key unavailable: ${steemKey.error}` };
     }
@@ -311,8 +404,7 @@ export async function verifyIdentityAnchor(usernameInput?: string): Promise<Anch
       return { ok: false, username, measuredAt, error: "steem active key does not parse as a secp256k1 point" };
     }
 
-    // 2. on-chain anchor op
-    const found = await findLatestIdentityAnchor(username);
+    // on-chain anchor op (already measured concurrently above)
     if (!found.found) {
       return { ok: false, username, measuredAt, error: found.reason };
     }
@@ -331,9 +423,7 @@ export async function verifyIdentityAnchor(usernameInput?: string): Promise<Anch
     const activeKeyEvm = steemDecoded.evmAddress as string;
     const activeKeyEqualsRecovered = activeKeyEvm.toLowerCase() === recovered.toLowerCase();
 
-    // 6. cross-chain key equality
-    const hive = await activeKeyOn(HIVE_RPC, username);
-    const blurt = await blurtActiveKey(username);
+    // 6. cross-chain key equality (hive/blurt already measured concurrently)
     const chains: AnchorVerifyResult["chains"] = [
       {
         chain: "steem",
@@ -396,4 +486,32 @@ export async function verifyIdentityAnchor(usernameInput?: string): Promise<Anch
   } catch (e) {
     return { ok: false, username, measuredAt, error: e instanceof Error ? e.message : "verification failed" };
   }
+}
+
+/* ── single-flight + TTL result cache (r45 pattern) ──
+ * A cold verify is heavy (multi-chain RPC + a history scan). Without this,
+ * concurrent callers each paid the full recompute (thundering herd) and the
+ * console paid it again on every open. 60s TTL matches the proof-tab cadence;
+ * the measuredAt timestamp inside the payload stays honest per flight. */
+const verifyCache = new Map<string, { at: number; value: AnchorVerifyResult }>();
+const verifyInflight = new Map<string, Promise<AnchorVerifyResult>>();
+const VERIFY_TTL_MS = 60_000;
+
+export function verifyIdentityAnchor(usernameInput?: string): Promise<AnchorVerifyResult> {
+  const key = (usernameInput ?? "headcorner").trim().replace(/^@/, "").toLowerCase() || "headcorner";
+  const hit = verifyCache.get(key);
+  const now = Date.now();
+  if (hit && now - hit.at < VERIFY_TTL_MS) return Promise.resolve(hit.value);
+  const running = verifyInflight.get(key);
+  if (running) return running;
+  const p = verifyIdentityAnchorOnce(key)
+    .then((value) => {
+      verifyCache.set(key, { at: Date.now(), value });
+      return value;
+    })
+    .finally(() => {
+      verifyInflight.delete(key);
+    });
+  verifyInflight.set(key, p);
+  return p;
 }
