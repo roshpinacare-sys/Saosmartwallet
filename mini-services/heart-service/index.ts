@@ -90,7 +90,27 @@ const LOCK = path.join(ROOT, "db", "heart-service.lock");
 })();
 
 // ── boot the heart (same beat loop that used to live inside Next) ────────────
+// ── r49: hot-reload hygiene — ONE supervisor per process, forever ────────────
+// bun --hot re-evaluates this entry whenever ANY file in its import graph
+// changes, and the graph reaches deep into the app (heart → harness/heart →
+// modules → eco-server …). Live-proven (r49): one edit to src/lib/eco-server.ts
+// hot-reloaded the heart 13 times over its lifetime — every re-run of main()
+// armed a FRESH supervision setInterval with fresh backoff state while the old
+// interval kept firing. Several independent supervisors then spawned rival
+// `next dev` servers into the same port within seconds: the EADDRINUSE farm,
+// resurrected through the reload door (r48 closed the crash door only).
+// Fix: globalThis survives module re-evaluation inside the same process, so a
+// process-wide sentinel makes every reload a no-op. The singleton lock above
+// already detects reload re-entry for the LOCK; the timers were the gap.
+type HotGlobal = typeof globalThis & { __heartServiceBooted?: boolean };
+const G = globalThis as HotGlobal;
+
 async function main(): Promise<void> {
+  if (G.__heartServiceBooted) {
+    console.log("[heart-service] hot-reload re-entry — boot/supervision already armed in this process; skipping re-arm (r49)");
+    return;
+  }
+  G.__heartServiceBooted = true;
   const { startHeart } = await import("../../src/lib/gate/harness/heart");
   startHeart();
   console.log("[heart-service] heart started (independent process, cwd=", process.cwd() + ")");

@@ -366,6 +366,71 @@ async function probeSolana(): Promise<EcoChain> {
   }
 }
 
+/**
+ * XRPL (r49) — the fact-sheet counts XRPL among the rented public rails
+ * (outer anchors + sovereign heartbeats, receipts in §10.19/§10.30), so the
+ * live network map monitors it like every other rail. server_state exposes
+ * validated_ledger.seq + age seconds — an honest online/stale/offline probe.
+ */
+async function probeXrpl(): Promise<EcoChain> {
+  const base = {
+    id: "xrpl",
+    name: "XRPL",
+    family: "XRP Ledger (consensus)",
+    kind: "L1 public — outer anchor rail",
+    stateAgeSeconds: null,
+    probedAt: new Date().toISOString(),
+  };
+  const urls = ["https://xrplcluster.com", "https://s1.ripple.com"];
+  const RIPPLE_EPOCH_OFFSET = 946684800; // ripple time starts at 2000-01-01 UTC
+  const attempt = async (url: string): Promise<EcoChain> => {
+    const r = (await fetchJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: 1, method: "server_state" }),
+      timeoutMs: 6_000,
+    })) as {
+      result?: {
+        status?: string;
+        state?: { validated_ledger?: { seq?: number; age?: number; close_time?: number; hash?: string } };
+      };
+    };
+    const vl = r.result?.state?.validated_ledger;
+    if (r.result?.status !== "success" || !vl || typeof vl.seq !== "number") throw new Error("no validated ledger");
+    // age: some hubs carry it directly; otherwise derive from ripple-epoch close_time
+    const age =
+      typeof vl.age === "number"
+        ? vl.age
+        : typeof vl.close_time === "number"
+          ? Math.max(0, Math.floor(Date.now() / 1000) - (vl.close_time + RIPPLE_EPOCH_OFFSET))
+          : null;
+    return {
+      ...base,
+      status: age !== null && age < 60 ? "online" : "stale",
+      headHeight: vl.seq,
+      lagSeconds: age,
+      headId: typeof vl.hash === "string" ? vl.hash.slice(0, 16) : null,
+      version: null,
+      note: `live probe ${url.replace("https://", "")}`,
+    };
+  };
+  // same discipline as the other rails: race all endpoints concurrently
+  try {
+    return await Promise.any(urls.map(attempt));
+  } catch (err) {
+    const lastErr = err instanceof Error ? err.message : "unknown";
+    return {
+      ...base,
+      status: "offline",
+      headHeight: null,
+      lagSeconds: null,
+      headId: null,
+      version: null,
+      note: `probe failed: ${lastErr}`,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SAOS-NET sovereign state (daemon-pushed into the `steem` repo)
 // ---------------------------------------------------------------------------
@@ -688,7 +753,7 @@ export async function ecoNetworks(): Promise<{ ok: true; chains: EcoChain[]; fet
   // r45 efficiency: TTL 60s matches the pollers' heavy-feed cadence (60s) —
   // a 16s cold probe per 6s TTL meant every poll paid full price.
   return withCache("eco-networks", 60_000, async () => {
-    const [steem, hive, blurt, tron, saosnet, ethereum, solana] = await Promise.all([
+    const [steem, hive, blurt, tron, saosnet, ethereum, solana, xrpl] = await Promise.all([
       probeSteem(),
       probeGraphene(
         "hive",
@@ -708,8 +773,9 @@ export async function ecoNetworks(): Promise<{ ok: true; chains: EcoChain[]; fet
       probeSaosNet(),
       probeEthereum(),
       probeSolana(),
+      probeXrpl(),
     ]);
-    return { ok: true, chains: [steem, hive, blurt, tron, saosnet, ethereum, solana], fetchedAt: new Date().toISOString() };
+    return { ok: true, chains: [steem, hive, blurt, tron, saosnet, ethereum, solana, xrpl], fetchedAt: new Date().toISOString() };
   });
 }
 
