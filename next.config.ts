@@ -51,6 +51,16 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  /* r41 RELOAD-LOOP DEFENSE: the steem SDK chain (steem → bytebuffer) is a
+   * node-oriented lib that webpack re-resolved and re-warned about on EVERY
+   * on-demand compile (missing optional dep `memcpy`). Each recompile marked
+   * the dev HMR as "rebuilding"; the dev client's RSC payload fetch then raced
+   * the rebuild, failed, and fell back to a FULL browser navigation (measured:
+   * "Failed to fetch RSC payload … Falling back to browser navigation" +
+   * dozens of full reloads — the operator saw the console "jump every
+   * second"). Externalizing the chain makes it a runtime require: compiled
+   * once, never re-warned, never re-churned. */
+  serverExternalPackages: ["steem", "bytebuffer"],
   /* r29 OOM-DEFENSE (proven live): the sandbox OOM-kills next-server when the
    * dev compiler + watcher balloon past the 4GB cgroup ceiling. The upload/
    * tree (user zip extractions, ~25k files) and the local axiom/banker stores
@@ -63,6 +73,7 @@ const nextConfig: NextConfig = {
         "**/.next/**",
         "**/upload/**",
         "**/db/axiom/**",
+        "**/db/**",
         "**/db/banker/**",
         "**/db/.banker-mirror/**",
         "**/dev.log",

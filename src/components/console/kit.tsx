@@ -106,11 +106,17 @@ export const ENDPOINTS: Ep[] = [
 
 /* ══════════════════════════ motion helpers ══════════════════════════ */
 
+/* BUG-HUNT r41 (user: "קופץ נופל זז לא עולה כמו שצריך"): the old `rise` used
+ * whileInView with initial y:28 + opacity:0 — every card was INVISIBLE below
+ * the fold, then popped and slid up 28px on scroll, shifting the whole page
+ * (measured CLS 0.02-0.05 per boot, and re-played on every remount/reload —
+ * and dev restarts reload the page often). A command console needs STILLNESS:
+ * this is now a mount-only fade with zero translation, so data updates and
+ * section switches can never move layout. Opacity-only = no layout impact. */
 export const rise = {
-  initial: { opacity: 0, y: 28 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-70px" },
-  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.35, ease: "easeOut" as const },
 };
 
 /** פענוח-באנימציה: תווים אקראיים מתייצבים לטקסט האמיתי. */

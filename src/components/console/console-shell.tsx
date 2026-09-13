@@ -158,13 +158,22 @@ export default function Page() {
     toast("הכספת נאטמה — מפתח-האב נמחק מהזיכרון");
   }
 
-  // r38 — section switching scrolls back to the top of the console
+  // r38 — section switching scrolls back to the top of the console.
+  // r41: behavior "instant" — the default could inherit smooth-scroll
+  // preferences and animate the jump ("זז לא עולה כמו שצריך").
   function go(id: SectionId) {
     selectSection(id);
-    requestAnimationFrame(() => window.scrollTo({ top: 0 }));
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "instant" }));
   }
 
-  const wrapper = "min-h-screen flex flex-col bg-[#050505] text-zinc-100 relative overflow-x-hidden";
+  /* r41 BUG-HUNT: `overflow-x-hidden` lived here for months — but per CSS spec
+   * it computes overflow-y to `auto`, making this wrapper the nearest SCROLL
+   * CONTAINER. The wrapper itself never scrolls (it grows with content), so
+   * every `position: sticky` descendant (the console header + the desktop
+   * sidebar) lost its scrollport and scrolled away with the page. The fixed
+   * Backdrop blobs cannot create document scrollbars (fixed elements are
+   * outside document flow), so the class is simply removed — sticky works again. */
+  const wrapper = "min-h-screen flex flex-col bg-[#050505] text-zinc-100 relative";
 
   if (booting) {
     return (
@@ -328,7 +337,7 @@ export default function Page() {
 
 function Backdrop() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
       <div className="absolute inset-0 opacity-[0.13]"
         style={{ backgroundImage: "linear-gradient(#18181b 1px, transparent 1px), linear-gradient(90deg, #18181b 1px, transparent 1px)", backgroundSize: "56px 56px" }} />
       <div className="absolute -top-40 right-1/4 h-96 w-96 rounded-full bg-emerald-500/10 blur-[130px]" />

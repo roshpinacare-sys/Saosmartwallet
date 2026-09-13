@@ -164,7 +164,10 @@
       radial-gradient(1100px 540px at 85% -8%, rgba(16, 185, 129, 0.07), transparent 62%),
       radial-gradient(900px 480px at 0% 8%, rgba(59, 130, 246, 0.05), transparent 58%),
       radial-gradient(760px 520px at 50% 112%, rgba(139, 92, 246, 0.05), transparent 62%);
-    background-attachment: fixed;
+    /* r41: `background-attachment: fixed` removed — it forces a full background
+     * repaint on EVERY scroll frame (a classic scroll-jank source on the dark
+     * terminal surface, "זז לא עולה כמו שצריך"). The gradients are subtle;
+     * letting them scroll with the page costs nothing visually. */
   }
   ::selection {
     background: rgba(16, 185, 129, 0.28);
