@@ -2464,3 +2464,19 @@ Work Log:
 Stage Summary:
 - חוסר-היציבות נסגר מהשורש: watcher-DB → Fast-Refresh → קפיצות (CLS 56.38 → 0.0000); RSC-fallback → רילודים (נעלם); סף-זיכרון-קל + פעימת-`/` → מיחזור-שרת (הוחלף ב-2560MB + health-ping).
 - השורש היה מערכתי (dev-infra), לא ה-UI; ה-UI חוזק במקביל (sticky חי, fade-יציב, שורות-שמורות, דגימה מדורגת).
+---
+Task ID: 61-r42
+Agent: main (Z.ai Code)
+Task: "סדר לי את החיבור לגיטהאב בצורה בטוחה, תקף לכל התיקיות, כדי שאוכל להחליף PAT — מה שהכנת בפעם הקודמת לא באמת עבד; הנה האפליקציה שלי (devgate), ראה מה ואיך נכון"
+
+Work Log:
+- **אבחון-השורש של "לא עבד"**: ה-PAT היחיד במכונה היה שקוע-בתוך-ה-URL של origin (`https://x-access-token:<PAT>@github.com/...`) — החלפת-טוקן חייבה-עריכת-.git/config בכל-ריפו; טוקן-בשלמות-פליין; קלון-חדש-בצ'אט-חדש = בלי-אימות-כלל. זו-הייתה-שיטת-ה"שחזור-מה-URL" — בוטלה-היום.
+- **המודל נלקח מהאפליקציה-שלך**: נבחן devgate-main.zip שהועלה — SecretBroker (סוד-אחד, קובץ-0600/תיקיית-0700, מחוץ-לריפו) + Redactor (פלט-מצונזר, רק-fingerprint) + הזרקה-בגבוה-I/O. GitGate = מימוש-החוזה-הזה ל-git-על-המכונה.
+- **נבנה GitGate**: `~/.gitgate/secrets/github.token` (0600) · `git-credential-gitgate` (helper-יחיד-קורא-טוקן, רשום-גלובלית על `https://github.com`) · CLI מלא (`setup/set-token/doctor/status/migrate/whoami/fingerprint`) · עותק-רשמי-מוגן-בריפו `gitgate/` + `install.sh` (idempotent) לשחזור-מכל-צ'אט.
+- **הגירה**: `migrate --all` ניקה-את-origin (עתה `https://github.com/roshpinacare-sys/Saosmartwallet.git` — אפס-טוקן-ב-URL); אומת-אפס-שאריות-ghp ב-.git/config; אין-`~/.git-credentials`.
+- **בטיחות-סביבה**: `safe.directory=*` (כל-התיקיות-תקפות) · set-token כותב-אטומית (tmp+mv, 0600) כך שהחלפה-כושלת-לא-הורסת-טוקן-עובד · store/erase של-git מנוטרלים (רק-set-token משנה) · whoami מעביר-טוקן-בקובץ-headers זמני-0600 (לא-ב-argv).
+- **אימות-חי**: doctor → **ALL GREEN** — API מאומת (`roshpinacare-sys`), ls-remote-חי-דרך-ה-helper על-ריפו-**פרטי** (הוכח-פרטי-מול-API; אנונימי-היה-נכשל = האימות-אמיתי-נבדק); ה-push של-commit-זה = מבחן-הכתיבה-החי.
+- **סריקת-סודות** על-התוכן-המועלה: נקי (רק-placeholder מילולי `<PAT>` בתיעוד); מדריך-מפעיל-בעברית ב-`~/.gitgate/GUIDE-HE.md` (מקומי-בלבד).
+
+Stage Summary:
+- מעכשיו: טוקן-GitHub-חי-במקום-אחד (`~/.gitgate/secrets/github.token`), תקף-אוטומטית-לכל-ריפו-קיים-ועתידי; החלפת-PAT = `set-token` + `doctor` + ביטול-הישן-ב-GitHub — בלי-לגעת-בשום-ריפו. לוח-הזמנים למפעיל בעברית בצ'אט + GUIDE-HE.

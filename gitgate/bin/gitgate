@@ -1,0 +1,289 @@
+#!/usr/bin/env bash
+# GitGate — central GitHub authentication bridge for this machine.
+#
+# Philosophy (mirrors devgate's SecretBroker + Redactor):
+#   ONE secret store, OUTSIDE any repo, perms 0600/0700.
+#   Git reaches the token ONLY through a credential helper (I/O boundary).
+#   Remote URLs stay clean — no token ever embedded in .git/config.
+#   All output is redacted: only a non-reversible fingerprint is shown.
+#
+# Commands:
+#   gitgate setup                install store+helper, register global git config (idempotent)
+#   gitgate set-token [--from F] rotate/seed the token (stdin or file). Never prints it.
+#   gitgate doctor               full self-check + live authenticated test on every repo
+#   gitgate status               short local state (no network)
+#   gitgate migrate [--all|DIR]  strip embedded credentials from repo remote URLs
+#   gitgate whoami               GitHub API identity + scopes of the stored token
+#   gitgate fingerprint          non-reversible fingerprint (sha256:8) of stored token
+#   gitgate help
+set -uo pipefail
+
+GG_DIR="${GITGATE_DIR:-$HOME/.gitgate}"
+GG_BIN="$GG_DIR/bin"
+GG_SECRETS="$GG_DIR/secrets"
+STORE="$GG_SECRETS/github.token"
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER_SRC="$SELF/git-credential-gitgate"
+HELPER="$GG_BIN/git-credential-gitgate"
+
+RED_OUT='[REDACTED]'   # devgate-grade redaction: the token NEVER reaches stdout/stderr
+
+die() { echo "gitgate: $*" >&2; exit 1; }
+
+fingerprint_of() {
+  # first 8 hex of sha256 — non-reversible, safe to display/audit
+  printf '%s' "$1" | sha256sum | cut -c1-8
+}
+
+ensure_dirs() {
+  mkdir -p "$GG_SECRETS" "$GG_BIN"
+  chmod 700 "$GG_DIR" "$GG_SECRETS" 2>/dev/null || true
+}
+
+install_helper() {
+  if [ "$HELPER_SRC" != "$HELPER" ] && [ -f "$HELPER_SRC" ]; then
+    install -m 700 "$HELPER_SRC" "$HELPER"
+  elif [ -f "$HELPER" ]; then
+    chmod 700 "$HELPER" 2>/dev/null || true
+  else
+    die "helper not found: $HELPER (run install.sh from the repo)"
+  fi
+}
+
+read_stored_token() {
+  [ -r "$STORE" ] || return 1
+  local t
+  t="$(tr -d '[:space:]' < "$STORE" 2>/dev/null)"
+  [ -n "$t" ] || return 1
+  printf '%s' "$t"
+}
+
+validate_token_shape() {
+  local t="$1"
+  case "$t" in
+    ghp_[A-Za-z0-9]*|gho_[A-Za-z0-9]*|ghu_[A-Za-z0-9]*|ghs_[A-Za-z0-9]*|ghr_[A-Za-z0-9]*|github_pat_*)
+      return 0 ;;
+  esac
+  # lenient fallback: printable, no whitespace, long enough
+  if [ "${#t}" -ge 30 ] && [ "${#t}" -le 255 ] && ! printf '%s' "$t" | grep -q '[^[:print:]]'; then
+    return 0
+  fi
+  return 1
+}
+
+discover_repos() {
+  # every git checkout under /home/z (2 levels deep is enough for this machine)
+  local d
+  for d in /home/z/*/.git /home/z/*/*/.git; do
+    [ -d "$d" ] || continue
+    printf '%s\n' "${d%/.git}"
+  done
+}
+
+cmd_setup() {
+  ensure_dirs
+  install_helper
+  git config --global credential.https://github.com.helper "$HELPER"
+  git config --global --replace-all safe.directory '*'
+  echo "[ok] store dir   : $GG_SECRETS (0700)"
+  echo "[ok] helper      : $HELPER (0700)"
+  echo "[ok] git config  : credential.https://github.com.helper registered"
+  echo "[ok] git config  : safe.directory = * (every folder valid)"
+  if [ -r "$STORE" ]; then
+    echo "[ok] token       : present (fingerprint $(fingerprint_of "$(read_stored_token)"))"
+  else
+    echo "[--] token       : NOT seeded yet — run: gitgate set-token --from <file>"
+  fi
+}
+
+cmd_set_token() {
+  local from="" token=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --from) from="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  if [ -n "$from" ]; then
+    [ -r "$from" ] || die "cannot read --from file: $from"
+    token="$(tr -d '[:space:]' < "$from")"
+  else
+    # read from stdin without echo if tty; plain pipe otherwise
+    if [ -t 0 ]; then
+      printf 'paste new GitHub PAT (input hidden): ' >&2
+      IFS= read -r -s token
+      printf '\n' >&2
+    else
+      token="$(tr -d '[:space:]')"
+    fi
+  fi
+  [ -n "$token" ] || die "empty token"
+  validate_token_shape "$token" || die "token shape rejected (expected ghp_/github_pat_/similar, 30+ chars, no spaces)"
+
+  ensure_dirs
+  local tmp
+  tmp="$(mktemp "$GG_SECRETS/.tok.XXXXXX")" || die "mktemp failed"
+  ( umask 077; printf '%s\n' "$token" > "$tmp" )
+  chmod 600 "$tmp"
+  mv -f "$tmp" "$STORE"
+  chmod 600 "$STORE"
+  install_helper
+  git config --global credential.https://github.com.helper "$HELPER" 2>/dev/null || true
+  echo "[ok] token stored: $STORE (0600)"
+  echo "[ok] fingerprint : $(fingerprint_of "$token")  (old value is now overwritten)"
+  echo "     -> verify access with: gitgate doctor"
+}
+
+cmd_status() {
+  if [ -r "$STORE" ]; then
+    local perms; perms="$(stat -c '%a' "$STORE" 2>/dev/null || stat -f '%Lp' "$STORE")"
+    echo "[ok] token present: $STORE (mode $perms, fingerprint $(fingerprint_of "$(read_stored_token)"))"
+  else
+    echo "[FAIL] no token at $STORE"
+    return 1
+  fi
+  if [ -x "$HELPER" ]; then
+    echo "[ok] helper      : $HELPER"
+  else
+    echo "[FAIL] helper missing: $HELPER (run: gitgate setup)"
+    return 1
+  fi
+  local reg
+  reg="$(git config --global --get credential.https://github.com.helper 2>/dev/null || true)"
+  if [ "$reg" = "$HELPER" ]; then
+    echo "[ok] git config  : helper registered for https://github.com"
+  else
+    echo "[FAIL] git config: helper NOT registered (run: gitgate setup)"
+    return 1
+  fi
+  local r u
+  while IFS= read -r r; do
+    u="$(git -C "$r" remote get-url origin 2>/dev/null || echo '')"
+    case "$u" in
+      *@github.com*) echo "[FAIL] repo $r: remote URL still embeds credentials — run: gitgate migrate" ;;
+      *github.com*)  echo "[ok] repo $r: clean remote" ;;
+      *)             echo "[--] repo $r: no origin/remote ($u)" ;;
+    esac
+  done < <(discover_repos)
+}
+
+api_call() {
+  # $1 = path ; sets REPLY_BODY / REPLY_SCOPES ; never leaks token (header via 0600 temp file)
+  local path="$1" token hdr body hdrout
+  token="$(read_stored_token)" || die "no token stored"
+  hdr="$(mktemp)"; body="$(mktemp)"; hdrout="$(mktemp)"
+  chmod 600 "$hdr" "$body" "$hdrout"
+  printf 'Authorization: Bearer %s\n' "$token" > "$hdr"
+  curl -sS --max-time 20 -D "$hdrout" -o "$body" -H @"$hdr" "https://api.github.com$path"
+  local rc=$?
+  REPLY_SCOPES="$(grep -i '^x-oauth-scopes:' "$hdrout" 2>/dev/null | sed 's/^[^:]*: *//' | tr -d '\r')"
+  rm -f "$hdr" "$hdrout"
+  if [ $rc -ne 0 ]; then rm -f "$body"; die "network error calling $path"; fi
+  REPLY_BODY="$(cat "$body")"
+  rm -f "$body"
+  return 0
+}
+
+cmd_whoami() {
+  api_call /user
+  local login
+  login="$(printf '%s' "$REPLY_BODY" | sed -n 's/.*"login" *: *"\([^"]*\)".*/\1/p' | head -1)"
+  if [ -z "$login" ]; then
+    echo "[FAIL] token rejected by GitHub API (fingerprint $(fingerprint_of "$(read_stored_token)"))"
+    exit 1
+  fi
+  echo "[ok] identity : $login"
+  echo "[ok] scopes   : ${REPLY_SCOPES:-<none/limited — fine-grained PAT>}"
+}
+
+cmd_migrate() {
+  local all=0; local -a targets=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --all) all=1; shift ;;
+      *) targets+=("$1"); shift ;;
+    esac
+  done
+  if [ "$all" = 1 ]; then
+    mapfile -t targets < <(discover_repos)
+  fi
+  [ ${#targets[@]} -gt 0 ] || die "no repos given (use: gitgate migrate --all)"
+  local r u clean changed=0
+  for r in "${targets[@]}"; do
+    [ -d "$r/.git" ] || { echo "[--] not a repo: $r"; continue; }
+    u="$(git -C "$r" remote get-url origin 2>/dev/null || true)"
+    [ -n "$u" ] || continue
+    clean="$(printf '%s' "$u" | sed -E 's|https://[^/@]+@|https://|')"
+    if [ "$clean" != "$u" ]; then
+      git -C "$r" remote set-url origin "$clean"
+      echo "[ok] migrated : $r (embedded credentials stripped)"
+      changed=$((changed+1))
+    else
+      echo "[ok] already clean: $r"
+    fi
+  done
+  echo "done. remotes rewritten: $changed"
+}
+
+cmd_doctor() {
+  local fail=0
+  cmd_status || fail=1
+  echo "--- live checks ---"
+  if command -v curl >/dev/null 2>&1; then
+    if api_call /user; then
+      local login
+      login="$(printf '%s' "$REPLY_BODY" | sed -n 's/.*"login" *: *"\([^"]*\)".*/\1/p' | head -1)"
+      if [ -n "$login" ]; then
+        echo "[ok] GitHub API: authenticated as $login (scopes: ${REPLY_SCOPES:-<fine-grained>})"
+      else
+        echo "[FAIL] GitHub API: token rejected"; fail=1
+      fi
+    else
+      fail=1
+    fi
+  else
+    echo "[--] curl unavailable — skipping API identity check"
+  fi
+  local r u
+  while IFS= read -r r; do
+    u="$(git -C "$r" remote get-url origin 2>/dev/null || true)"
+    case "$u" in
+      *github.com*)
+        if head_sha="$(git -C "$r" ls-remote origin HEAD 2>/dev/null | awk '{print $1}')"; then
+          if [ -n "$head_sha" ]; then
+            echo "[ok] live auth  : $r -> origin reachable (HEAD=${head_sha:0:7})"
+          else
+            echo "[FAIL] live auth: $r -> empty ls-remote"; fail=1
+          fi
+        else
+          echo "[FAIL] live auth: $r -> ls-remote failed (credentials or network)"; fail=1
+        fi
+        ;;
+    esac
+  done < <(discover_repos)
+  if [ $fail -eq 0 ]; then
+    echo "GITGATE DOCTOR: ALL GREEN"
+  else
+    echo "GITGATE DOCTOR: FAILURES FOUND"
+  fi
+  return $fail
+}
+
+cmd_help() {
+  sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
+case "${1:-help}" in
+  setup)      shift; cmd_setup "$@" ;;
+  set-token)  shift; cmd_set_token "$@" ;;
+  doctor)     shift; cmd_doctor "$@" ;;
+  status)     shift; cmd_status "$@" ;;
+  migrate)    shift; cmd_migrate "$@" ;;
+  whoami)     shift; cmd_whoami "$@" ;;
+  fingerprint)
+    t="$(read_stored_token)" || die "no token stored"
+    echo "$(fingerprint_of "$t")"
+    ;;
+  help|--help|-h) cmd_help ;;
+  *) die "unknown command: $1 (try: gitgate help)" ;;
+esac
