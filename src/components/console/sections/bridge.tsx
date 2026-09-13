@@ -12,6 +12,7 @@ import type { Msg } from "@/components/console/types";
 
 export function Bridge() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [live, setLive] = useState(false); // SSE connected — push beats polling
@@ -20,6 +21,7 @@ export function Bridge() {
   const load = useCallback(async () => {
     const r = await apiJson<{ ok: boolean; messages: Msg[] }>("/api/gate/messages");
     if (r?.ok) setMsgs((r.messages || []).slice(-100));
+    setLoading(false);
   }, []);
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
   useEffect(() => {
@@ -109,7 +111,16 @@ export function Bridge() {
                   </div>
                 </div>
               ))}
-              {msgs.length === 0 && <p className="text-sm text-zinc-500 text-center py-10">הערוץ ריק — כתוב פקודה ראשונה</p>}
+              {/* BUG-HUNT fix: the empty-state used to render while the FIRST
+                  load was still in flight (dev-compile of this route takes ~10s)
+                  — the operator saw "הערוץ ריק" (a lie) right before history
+                  popped in. A real loading state now takes its place. */}
+              {loading && msgs.length === 0 && (
+                <p className="text-sm text-zinc-500 text-center py-10 flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> טוען את הגשר…
+                </p>
+              )}
+              {!loading && msgs.length === 0 && <p className="text-sm text-zinc-500 text-center py-10">הערוץ ריק — כתוב פקודה ראשונה</p>}
             </div>
           </div>
           <div className="border-t border-zinc-800/80 p-3.5 flex gap-2 bg-black/40">

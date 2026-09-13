@@ -97,7 +97,7 @@ export function TrustedDevices() {
       <motion.div {...rise}>
         <GlowCard className="p-6">
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-            <h3 className="font-bold flex items-center gap-2"><Smartphone className="h-4 w-4 text-emerald-400" /> {active.length} מכשירים פעילים {devices.some((d) => !d.revoked && !d.live) && <span className="text-[10px] text-amber-400/80 font-normal">(+ פגי-תוקף שייגרעו)</span>}</h3>
+            <h3 className="font-bold flex items-center gap-2"><Smartphone className="h-4 w-4 text-emerald-400" /> {loading ? "…" : `${active.length} מכשירים פעילים`} {devices.some((d) => !d.revoked && !d.live) && <span className="text-[10px] text-amber-400/80 font-normal">(+ פגי-תוקף שייגרעו)</span>}</h3>
             <div className="flex gap-2">
               {canRearm && (
                 <Button variant="outline" size="sm" disabled={busy} onClick={rearmCurrent} className="h-8 text-[11px] gap-1 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10">
