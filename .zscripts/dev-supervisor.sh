@@ -29,50 +29,57 @@ port_busy() { (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; }
 http_alive() { curl -s -o /dev/null --max-time 3 "http://127.0.0.1:$PORT/" 2>/dev/null; }
 
 wait_port_release() {
-	# port can linger briefly after a crash (TIME_WAIT); wait up to ~15s
-	for _ in $(seq 1 30); do
-		port_busy || return 0
-		sleep 0.5
-	done
-	return 1
+        # port can linger briefly after a crash (TIME_WAIT); wait up to ~15s
+        for _ in $(seq 1 30); do
+                port_busy || return 0
+                sleep 0.5
+        done
+        return 1
 }
 
 log "supervisor armed (port $PORT, pid $$)"
 
 while true; do
-	[ -e "$STOP_FLAG" ] && { log "stop flag present — stepping down"; rm -f "$STOP_FLAG"; exit 0; }
+        [ -e "$STOP_FLAG" ] && { log "stop flag present — stepping down"; rm -f "$STOP_FLAG"; exit 0; }
 
-	t0=$(date +%s)
-	NODE_OPTIONS="--max-old-space-size=2048" bun ./node_modules/next/dist/bin/next dev -p 3000 --webpack 2>&1 | tee -a dev.log
-	code=${PIPESTATUS[0]}
-	dur=$(( $(date +%s) - t0 ))
+        t0=$(date +%s)
+        # BUG-HUNT r40 (user: "נפילות"): Next restarts itself (exit 77-style
+        # self-restart + EADDRINUSE window) the moment used_heap crosses 80% of
+        # the limit. 2048MB put that threshold at ~1.6GB — reachable during
+        # ordinary dev compiles, and every episode killed in-flight requests
+        # (measured: 8x 500 on status/health/session). Steady-state RSS is
+        # ~1.2GB on this 4GB box, so 2560MB keeps the same kernel safety margin
+        # while moving the self-restart threshold out of everyday reach.
+        NODE_OPTIONS="--max-old-space-size=2560" bun ./node_modules/next/dist/bin/next dev -p 3000 --webpack 2>&1 | tee -a dev.log
+        code=${PIPESTATUS[0]}
+        dur=$(( $(date +%s) - t0 ))
 
-	log "next dev exited code=$code uptime=${dur}s at $(date '+%F %T')"
+        log "next dev exited code=$code uptime=${dur}s at $(date '+%F %T')"
 
-	# intentional stop paths
-	if [ "$code" -eq 0 ] || [ "$code" -eq 143 ] || [ "$code" -eq 130 ]; then
-		log "clean/stop exit (code=$code) — stepping down"
-		exit 0
-	fi
-	[ -e "$STOP_FLAG" ] && { log "stop flag present — stepping down"; rm -f "$STOP_FLAG"; exit 0; }
+        # intentional stop paths
+        if [ "$code" -eq 0 ] || [ "$code" -eq 143 ] || [ "$code" -eq 130 ]; then
+                log "clean/stop exit (code=$code) — stepping down"
+                exit 0
+        fi
+        [ -e "$STOP_FLAG" ] && { log "stop flag present — stepping down"; rm -f "$STOP_FLAG"; exit 0; }
 
-	# if some other healthy server owns the port, never fight it
-	if http_alive; then
-		log "port $PORT already served by another healthy instance — stepping down"
-		exit 0
-	fi
+        # if some other healthy server owns the port, never fight it
+        if http_alive; then
+                log "port $PORT already served by another healthy instance — stepping down"
+                exit 0
+        fi
 
-	wait_port_release || log "port still busy 15s after exit — trying anyway"
+        wait_port_release || log "port still busy 15s after exit — trying anyway"
 
-	# crash-loop protection: 5 rapid deaths -> one 60s rest, then continue
-	if [ "$dur" -lt 10 ]; then
-		crash_streak=$((crash_streak + 1))
-	else
-		crash_streak=0
-	fi
-	if [ "$crash_streak" -ge 5 ]; then
-		log "crash-loop detected (${crash_streak} rapid deaths) — resting 60s"
-		sleep 60
-		crash_streak=0
-	fi
+        # crash-loop protection: 5 rapid deaths -> one 60s rest, then continue
+        if [ "$dur" -lt 10 ]; then
+                crash_streak=$((crash_streak + 1))
+        else
+                crash_streak=0
+        fi
+        if [ "$crash_streak" -ge 5 ]; then
+                log "crash-loop detected (${crash_streak} rapid deaths) — resting 60s"
+                sleep 60
+                crash_streak=0
+        fi
 done

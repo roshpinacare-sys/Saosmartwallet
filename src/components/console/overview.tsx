@@ -22,17 +22,26 @@ export function Overview({ status }: { status: GateStatus }) {
   const [dig, setDig] = useState<DigestData | null>(null);
   const [busy, setBusy] = useState(true);
 
+  /* BUG-HUNT fix (user: "המידע לא מוצג"): the old code awaited Promise.all on all
+   * three feeds, so the FAST responses (heart ~0.4s, digest) stayed hidden until
+   * the SLOW one (situation → live treasury measurements, 12s+ cache-cold) came
+   * back — every plane showed "…" for the full duration. Each feed now paints
+   * the moment IT returns, and a failed fetch (dev-server restart mid-flight)
+   * retries once after 3s so panels self-heal instead of hanging on "loading". */
   const load = useCallback(async () => {
     setBusy(true);
-    const [s, h, d] = await Promise.all([
-      apiJson<SituationData & { ok: boolean }>("/api/gate/situation"),
-      apiJson<HeartData>("/api/gate/heart"),
-      apiJson<DigestData & { ok: boolean }>("/api/gate/digest"),
-    ]);
-    if (s?.ok) setSit(s);
-    if (h?.ok) setHeart(h);
-    if (d?.ok) setDig(d);
-    setBusy(false);
+    const grab = async <T,>(path: string): Promise<T | null> => {
+      const first = await apiJson<T & { ok: boolean }>(path);
+      if (first) return first;
+      await new Promise((r) => setTimeout(r, 3000)); // dev-server restart window
+      return apiJson<T & { ok: boolean }>(path);
+    };
+    const sitP = grab<SituationData>("/api/gate/situation").then((s) => { if (s?.ok) setSit(s); return s; });
+    void grab<HeartData>("/api/gate/heart").then((h) => { if (h?.ok) setHeart(h); });
+    void grab<DigestData>("/api/gate/digest").then((d) => { if (d?.ok) setDig(d); });
+    // busy tracks the long pole honestly: situation carries the live money door
+    const s = await sitP;
+    setBusy(Boolean(s === null || !s.ok));
   }, []);
 
   useEffect(() => {
@@ -67,8 +76,8 @@ export function Overview({ status }: { status: GateStatus }) {
     { label: "סוכנים פעילים", v: status.counts.activeAgents, sub: sit?.fleet.ok ? `${sit.fleet.autonomous} אוטונומיים · ${sit.fleet.activeRuns} ריצות-חיות` : undefined },
     { label: "הודעות-פיקוד", v: status.counts.messages, sub: "גשר חי · SSE" },
     { label: "הצלחת-הצי 24h", v: rate === null ? "–" : `${rate}%`, sub: emp ? `${emp.done} done · ${emp.blocked} blocked · ${emp.failed} failed` : "אין ריצות ב-24h", cls: rateColor },
-    { label: "נזיל STEEM", v: steemRail?.ok ? steemRail.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 }) : "כשל כן", sub: steemRail?.ok ? `${steemRail.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} SBD חוב` : "מדידה נכשלה", cls: steemRail?.ok ? "text-emerald-300" : "text-rose-300/80" },
-    { label: "דופק-הדלת", v: doorIncoming === null ? "–" : doorIncoming, sub: `${doorNew > 0 ? `${doorNew} חדש · ` : ""}${pendingAsks ?? 0} שאלות-פתוחות · מסווגים-חי ${doorClassified ?? 0}/${doorIncoming ?? 0}`, cls: doorNew > 0 ? "text-amber-300" : undefined },
+    { label: "נזיל STEEM", v: steemRail ? (steemRail.ok ? steemRail.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 }) : "—") : "…", sub: steemRail?.ok ? `${steemRail.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} SBD חוב` : steemRail ? "מדידה נכשלה — רענון ינסה שוב" : "מודד מול הרשת…", cls: steemRail?.ok ? "text-emerald-300" : steemRail ? "text-zinc-500" : "text-zinc-500" },
+    { label: "דופק-הדלת", v: doorIncoming === null ? "…" : doorIncoming, sub: door?.checked ? `${doorNew > 0 ? `${doorNew} חדש · ` : ""}${pendingAsks ?? 0} שאלות-פתוחות · מסווגים-חי ${doorClassified ?? 0}/${doorIncoming ?? 0}` : dig?.error ? "הסריקה נכשלה — רענון ינסה שוב" : "קורא את הערוץ…", cls: doorNew > 0 ? "text-amber-300" : door?.checked ? undefined : "text-zinc-500" },
   ];
 
   return (
@@ -146,21 +155,21 @@ export function Overview({ status }: { status: GateStatus }) {
                   {sit.treasury.rails.map((r) => (
                     <div key={r.rail} className="flex items-center justify-between text-[10px] font-mono" dir="ltr">
                       <span className={r.ok ? "text-zinc-400" : "text-rose-300/80"}>{r.rail.toUpperCase()}</span>
-                      <span className={r.ok ? "text-emerald-300" : "text-rose-300/80"}>
-                        {r.ok ? `${r.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 })} ${r.liquidSymbol}${r.totals.debt > 0 ? ` · ${r.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} ${r.debtSymbol}` : ""}` : "כשל כן"}
+                      <span className={r.ok ? "text-emerald-300" : "text-zinc-500"}>
+                        {r.ok ? `${r.totals.liquid.toLocaleString("en-US", { maximumFractionDigits: 3 })} ${r.liquidSymbol}${r.totals.debt > 0 ? ` · ${r.totals.debt.toLocaleString("en-US", { maximumFractionDigits: 3 })} ${r.debtSymbol}` : ""}` : "— לא נמדד"}
                       </span>
                     </div>
                   ))}
                   <div className="flex items-center justify-between text-[10px] font-mono" dir="ltr">
-                    <span className={sit.evm.ethereum.ok ? "text-zinc-400" : "text-rose-300/80"}>ETH</span>
-                    <span className={sit.evm.ethereum.ok ? "text-emerald-300" : "text-rose-300/80"}>
-                      {sit.evm.ethereum.ok ? `${sit.evm.ethereum.total} · ${sit.evm.ethereum.okWallets}/${sit.evm.ethereum.wallets} ארנקים` : "כשל כן"}
+                    <span className={sit.evm.ethereum.ok ? "text-zinc-400" : "text-zinc-500"}>ETH</span>
+                    <span className={sit.evm.ethereum.ok ? "text-emerald-300" : "text-zinc-500"}>
+                      {sit.evm.ethereum.ok ? `${sit.evm.ethereum.total} · ${sit.evm.ethereum.okWallets}/${sit.evm.ethereum.wallets} ארנקים` : "— לא נמדד"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] font-mono" dir="ltr">
-                    <span className={sit.evm.solana.ok ? "text-zinc-400" : "text-rose-300/80"}>SOL</span>
-                    <span className={sit.evm.solana.ok ? "text-emerald-300" : "text-rose-300/80"}>
-                      {sit.evm.solana.ok ? `${sit.evm.solana.total} · ${sit.evm.solana.okWallets}/${sit.evm.solana.wallets} ארנקים` : "כשל כן"}
+                    <span className={sit.evm.solana.ok ? "text-zinc-400" : "text-zinc-500"}>SOL</span>
+                    <span className={sit.evm.solana.ok ? "text-emerald-300" : "text-zinc-500"}>
+                      {sit.evm.solana.ok ? `${sit.evm.solana.total} · ${sit.evm.solana.okWallets}/${sit.evm.solana.wallets} ארנקים` : "— לא נמדד"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] font-mono pt-1 border-t border-zinc-800/60" dir="ltr">
@@ -169,7 +178,7 @@ export function Overview({ status }: { status: GateStatus }) {
                       sit.rewards.totalPendingSteemEquiv > 0
                         ? <span className="text-amber-300">{sit.rewards.totalPendingSteemEquiv.toFixed(4)} STEEM-equiv · {sit.rewards.pendingAccounts.length} חשבונות</span>
                         : <span className="text-zinc-500">אפס — הכל נתבע</span>
-                    ) : <span className="text-rose-300/80">כשל כן</span>}
+                    ) : <span className="text-zinc-500">— לא נמדד</span>}
                   </div>
                 </>
               ) : (
@@ -238,7 +247,7 @@ export function Overview({ status }: { status: GateStatus }) {
             ) : sit?.anchors.ok ? (
               <p className="text-[10px] text-zinc-600">אין עוגנים מדודים כרגע — האמת תחושב כשהמדידה תרוץ</p>
             ) : sit ? (
-              <p className="text-[10px] text-rose-300/80">{sit.anchors.error ?? "כשל כן"}</p>
+              <p className="text-[10px] text-zinc-500">{sit.anchors.error ?? "— לא נמדד עדיין — רענון ינסה שוב"}</p>
             ) : (
               <p className="text-[10px] text-zinc-600 font-mono" dir="ltr"><Loader2 className="h-3 w-3 inline animate-spin" /> loading…</p>
             )}

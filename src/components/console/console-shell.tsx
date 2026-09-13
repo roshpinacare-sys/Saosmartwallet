@@ -78,8 +78,24 @@ export default function Page() {
   // DEAD CODE — it rendered off `deviceRemembered`, the very state the failure
   // path cleared. Rejection now has its own flag; the warning actually shows.
   const [deviceRejected, setDeviceRejected] = useState(false);
-  // r38 — the active console section (sidebar / chips navigation)
-  const [active, setActive] = useState<SectionId>("overview");
+  // r38 — the active console section (sidebar / chips navigation).
+  // BUG-HUNT fix (user: "נפילות"): dev-server memory-threshold restarts reload
+  // the page and the console used to reset to 00 סקירה — the operator lost their
+  // place on every crash. The active section is now mirrored into sessionStorage
+  // and restored on mount, so a reload lands back where the user was.
+  const [active, setActive] = useState<SectionId>(() => {
+    if (typeof window === "undefined") return "overview";
+    try {
+      const saved = window.sessionStorage.getItem("saos-console-section");
+      const ids: SectionId[] = ["overview", "connections", "vault", "agents", "autonomy", "channel", "bridge", "audit", "console", "tools", "devices", "emergency"];
+      return ids.includes(saved as SectionId) ? (saved as SectionId) : "overview";
+    } catch { return "overview"; }
+  });
+
+  function selectSection(id: SectionId) {
+    setActive(id);
+    try { window.sessionStorage.setItem("saos-console-section", id); } catch { /* private mode */ }
+  }
 
   const refreshStatus = useCallback(async (): Promise<boolean> => {
     const s = await apiJson<GateStatus>("/api/gate/status");
@@ -138,13 +154,13 @@ export default function Page() {
     await apiJson("/api/gate/lock", { method: "POST" });
     setToken(null);
     setStatus(null);
-    setActive("overview");
+    selectSection("overview");
     toast("הכספת נאטמה — מפתח-האב נמחק מהזיכרון");
   }
 
   // r38 — section switching scrolls back to the top of the console
   function go(id: SectionId) {
-    setActive(id);
+    selectSection(id);
     requestAnimationFrame(() => window.scrollTo({ top: 0 }));
   }
 
@@ -277,7 +293,7 @@ export default function Page() {
             </div>
           </header>
 
-          <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6">
+          <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6 min-h-[70vh]">
             {active === "overview" && <Overview status={status} />}
             {active === "connections" && <Connections />}
             {active === "vault" && <VaultGrid />}
