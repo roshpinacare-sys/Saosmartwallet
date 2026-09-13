@@ -2447,3 +2447,20 @@ Work Log:
 Stage Summary:
 - 6 באגים-תוקנו: Promise.all-חוסם (ליבת-"מידע לא מוצג"), "כשל כן"×6, אובדן-מקום-בנפילה, הגשר-השקרן, 0-מכשירים-בטעינה, קפיצות-פריסה; + העלאת-סף-heap-ל-2560MB-כתיקון-מניעתי-ל-8×500.
 - ההסבר-הכולל למשתמש: ה"נדפק לגמרי" = צירוף-restart-זיכרון-תכופים (שחטו-בקשות-באמצע) + פאנלים-שחיכו-לפיד-האיטי-ביחד + שקרי-ממשק-בזמן-טעינה — הכל-סגור-ואומת-חי.
+---
+Task ID: 60-r41
+Agent: main (Z.ai Code)
+Task: "עדיין מרגיש קפיצות כל שניה זה קופץ נופל זז לא עולה כמו שצריך" — ציד-שורש של חוסר-היציבות ותיקון-מקיף
+
+Work Log:
+- **מדידה-לפני-תיקון (הוכחה)**: PerformanceObserver חי על הקונסולה — 3 אירועי CLS=1.0 (החלפת-עמוד-מלאה) תוך 75 שניות; בחלון-מאוחר: 26–56 קפיצות-ענק לחלון, totalCLS עד 56.38. ה"קופץ נופל" היה נמדד, לא תחושה.
+- **שרשרת-השורש (אומתה עד stack-frame)**: (א) watcher-webpack לא התעלם מ-db/custom.db (+-wal/-shm) שמשתנה כל-שניות (לב+סשנים) → Fast-Refresh מלא על-כל-כתיבה → ה-dev client מאפס-גלילה ומרנדר מחדש = CLS=1.0; (ב) RSC-payload שנתפס באמצע-בנייה: "Failed to fetch RSC payload… Falling back to browser navigation" (hot-reloader web-socket.js:95) → רילוד-מלא; (ג) הלב החזיק סגירה-ישנה-מ-hot-reload שפעמה נגד `/` הכבד כל-15s (ובעבר הצית 4 מופעי-יריב EADDRINUSE) והצית שרתים עם סף-2048MB-הקל; (ד) `memcpy` חסר הציף אזהרת-קומפילציה על כל בנייה של שרשרת-steem.
+- **תיקוני-שורש**: `"**/db/**"` ב-watchOptions.ignored (next.config) · `serverExternalPackages: ["steem","bytebuffer"]` · `bun add memcpy` · הלב: ping→/api/system/health + spawn-env 2560MB + הפעלה-מחדש-נקייה שהמיתה את הסגירה-הישנה.
+- **תיקוני-ממשק (הגנה-לעומק)**: `rise` (whileInView + y:28) → fade-מונטה-ללא-תזוזה בכל-הסקשנים · הסרת `overflow-x-hidden` מה-wrapper (שבר position:sticky של header/סרגל-צד — overflow-y התקמפל ל-auto) · scrollTo behavior:"instant" · שורת-משנה של KPI תמיד מרונדרת (min-h) + שורת-מוני-לב במקום-שמור (אפס-צמיחת-כרטיסים בדגימות) · הסרת background-attachment:fixed (jank-גלילה) · דגימת-אוטונומיה 8s×6-endpoints → heart 20s + 5-כבדים 60s-מדורג (ביטול סערת-הקומפילציות שהרעיבה את השרת).
+- **החלפת-שרת-מבוקרת + הוכחת-הגנה**: השרת מת פעמיים במהלך-העבודה והוחייה-עצמאית על-ידי הלב-המתוקן — 2560MB מאומת ב-/proc/…/environ — מנגנון-ההחיאה עבד-חי.
+- **אימות-סופי (agent-browser, דו-שלבי, ללא-מגע)**: 5.5 דקות — shifts=0, big=0, totalCLS=0.0000, reloads=1-התחלתי-בלבד · header-sticky top:0 בגלילה · מעבר-סקשן מאפס-גלילה · אפס-גלישה-אופקית ב-390px · lint נקי · endpoints 200.
+- מסמך-המשך: broadcasts/2026-09-13-r41-stability-fact-sheet.md · צילום-מצב: tmp-analysis/final-state-r41.png.
+
+Stage Summary:
+- חוסר-היציבות נסגר מהשורש: watcher-DB → Fast-Refresh → קפיצות (CLS 56.38 → 0.0000); RSC-fallback → רילודים (נעלם); סף-זיכרון-קל + פעימת-`/` → מיחזור-שרת (הוחלף ב-2560MB + health-ping).
+- השורש היה מערכתי (dev-infra), לא ה-UI; ה-UI חוזק במקביל (sticky חי, fade-יציב, שורות-שמורות, דגימה מדורגת).

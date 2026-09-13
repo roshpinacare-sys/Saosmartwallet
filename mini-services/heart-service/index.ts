@@ -115,7 +115,16 @@ async function main(): Promise<void> {
   // when the portal is truly down (connection-refused/timeout — any HTTP
   // response counts as alive), respawns `next dev` as ITS OWN detached child,
   // with honest backoff so a crash-loop can never storm the machine.
-  const PORTAL = "http://127.0.0.1:3000/";
+  // r41 BUG-HUNT (user: "קפיצות כל שנייה"): the ping used to hit `/` — the
+  // HEAVY console page. Mid-compile it answered in 5-12s, the 2.5s+8s patience
+  // window expired, the heart declared the portal dead and spawned FOUR rival
+  // `next dev` instances (all EADDRINUSE — logged). Worse: the spawned server
+  // inherited NODE_OPTIONS --max-old-space-size=2048 (the OLD, easy threshold
+  // = self-restart at 1638MB heap), so compile storms kept self-killing the
+  // server and the browser kept full-reloading (measured: 3x CLS=1.0 in 75s).
+  // Now: ping the LIGHT health endpoint, and spawn with the SAME 2560MB ceiling
+  // the supervisor uses — one threshold, out of everyday reach.
+  const PORTAL = "http://127.0.0.1:3000/api/system/health";
   // r34 bug-hunt: the flat 45s backoff turned every memory-threshold restart
   // (next dev self-exits with code 77) into 45-90s of dead portal, and the
   // first spawn after a crash always lost to EADDRINUSE because the old socket
@@ -180,7 +189,7 @@ async function main(): Promise<void> {
         const proc = Bun.spawn({
           cmd: ["bun", "./node_modules/next/dist/bin/next", "dev", "-p", "3000", "--webpack"],
           cwd: ROOT,
-          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2048" },
+          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2560" },
           stdio: ["ignore", out, out],
         });
         proc.unref();

@@ -106,9 +106,26 @@ function AutonomyCard({ agents }: { agents: AgentRow[] }) {
     if (r?.ok) setDigest(r);
   }, []);
   useEffect(() => { void Promise.resolve().then(load); void Promise.resolve().then(loadMem); void Promise.resolve().then(loadOrders); void Promise.resolve().then(loadTreasury); void Promise.resolve().then(loadSituation); void Promise.resolve().then(loadDigest); }, [load, loadMem, loadOrders, loadTreasury, loadSituation, loadDigest]);
+  /* r41 BUG-HUNT (user: "קפיצות כל שנייה — קופץ נופל"): this section used to
+   * hammer SIX endpoints every 8s. In dev each request can take 7-14s
+   * (on-demand webpack compile), so requests piled up, the server's heap blew
+   * past its threshold, next-dev restarted itself, the browser's HMR socket
+   * reconnected and did a FULL page reload — measured as three CLS=1.0 (whole
+   * page replacement) events inside 75 seconds. That restart→reload loop was
+   * the "jumps every second". The fleet data moves on minutes, not seconds:
+   * heart (cheap) stays at 20s; the five heavy feeds now refresh every 60s,
+   * staggered 5s apart so they never fire together. Compile pressure drops
+   * ~10x and the server stops restarting. */
   useEffect(() => {
-    const t = setInterval(() => { load(); loadMem(); loadOrders(); loadTreasury(); loadSituation(); loadDigest(); }, 8000);
-    return () => clearInterval(t);
+    const timers: Array<ReturnType<typeof setInterval>> = [];
+    timers.push(setInterval(() => { void load(); }, 20000));
+    const heavy: Array<[() => Promise<void>, number]> = [
+      [loadMem, 0], [loadOrders, 5000], [loadTreasury, 10000], [loadSituation, 15000], [loadDigest, 20000],
+    ];
+    for (const [fn, offset] of heavy) {
+      timers.push(setInterval(() => { void fn(); }, 60000 + offset));
+    }
+    return () => { for (const t of timers) clearInterval(t); };
   }, [load, loadMem, loadOrders, loadTreasury, loadSituation, loadDigest]);
 
   async function toggleAutonomy(v: boolean) {

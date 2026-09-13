@@ -95,13 +95,15 @@ export function Overview({ status }: { status: GateStatus }) {
         </Button>
       </motion.div>
 
-      {/* KPI strip — real counts only */}
+      {/* KPI strip — real counts only. r41: the sub line is ALWAYS rendered
+       * with a reserved 2-line height — when data arrives late and fills it,
+       * the card no longer grows and the whole grid below no longer jumps. */}
       <motion.div {...rise} className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
         {kpis.map((k) => (
           <GlowCard key={k.label} className="p-4">
             <p className={"font-mono text-2xl font-black " + (k.cls ?? "text-zinc-100")}>{k.v}</p>
             <p className="mt-0.5 text-[11px] text-zinc-400">{k.label}</p>
-            {k.sub && <p className="mt-1 text-[10px] text-zinc-600 leading-snug">{k.sub}</p>}
+            <p className="mt-1 text-[10px] text-zinc-600 leading-snug min-h-[28px]">{k.sub ?? ""}</p>
           </GlowCard>
         ))}
       </motion.div>
@@ -127,16 +129,20 @@ export function Overview({ status }: { status: GateStatus }) {
               <span className="rounded-lg border border-zinc-800 px-2 py-1 text-zinc-400">queued {heart?.counts.queued ?? "–"}</span>
               <span className="rounded-lg border border-zinc-800 px-2 py-1 text-zinc-400">running {heart?.counts.running ?? "–"}</span>
             </div>
-            {c && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap font-mono text-[10px] text-zinc-500" dir="ltr">
-                <span title="ריצות שהלב שיגר מהתור">dispatched {c.dispatched}</span>
-                <span className="text-emerald-400/80" title="ריצות שהתאוששו מקריסה">recovered {c.recovered}</span>
-                <span title="סיורים שהוזנקו מתוכננים">patrols {c.schedulesFired}</span>
-                <span title="יוזמות-יעד שהוזנקו מהצעות סוכנים">initiatives {c.proposalsFired}</span>
-                <span className="text-lime-300/80" title="תעסוקה-עצמית">self-employed {c.idleFired ?? 0}</span>
-                <span title="ריצות קרוסות שהשומר החזיר לתור">reaped {c.reaped}</span>
-              </div>
-            )}
+            {/* r41: the counters row keeps its slot even before `c` arrives —
+             * a card that grows mid-poll pushes the entire page down. */}
+            <div className="mt-2 flex items-center gap-2 flex-wrap font-mono text-[10px] text-zinc-500 min-h-[18px]" dir="ltr">
+              {c && (
+                <>
+                  <span title="ריצות שהלב שיגר מהתור">dispatched {c.dispatched}</span>
+                  <span className="text-emerald-400/80" title="ריצות שהתאוששו מקריסה">recovered {c.recovered}</span>
+                  <span title="סיורים שהוזנקו מתוכננים">patrols {c.schedulesFired}</span>
+                  <span title="יוזמות-יעד שהוזנקו מהצעות סוכנים">initiatives {c.proposalsFired}</span>
+                  <span className="text-lime-300/80" title="תעסוקה-עצמית">self-employed {c.idleFired ?? 0}</span>
+                  <span title="ריצות קרוסות שהשומר החזיר לתור">reaped {c.reaped}</span>
+                </>
+              )}
+            </div>
             {heart?.pulse?.error && <p className="mt-2 text-[10px] text-rose-300 font-mono" dir="ltr">⚠ {heart.pulse.error}</p>}
             <p className="mt-2.5 text-[10px] text-zinc-600">המתג והבקרה המלאה — בסעיף אוטונומיה</p>
           </GlowCard>
