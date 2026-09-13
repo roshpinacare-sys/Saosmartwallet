@@ -151,29 +151,33 @@ export class SteemMarketClient {
     const hit = this.cache.get(key);
     if (hit && now - hit.at < this.cacheTtlMs) return hit.value as T;
 
-    let lastErr: unknown = null;
-    for (let attempt = 0; attempt < this.rpcUrls.length; attempt++) {
-      // Start from the sticky (last-known-good) endpoint, then walk the list.
-      const idx = (this.sticky + attempt) % this.rpcUrls.length;
-      try {
-        const res = await fetch(this.rpcUrls[idx], {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-          signal: AbortSignal.timeout(this.timeoutMs),
-        });
-        if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText}`);
-        const body = (await res.json()) as { result?: T; error?: { message?: string } };
-        if (body.error) throw new Error(`RPC error: ${body.error.message ?? "unknown"}`);
-        this.sticky = idx;
-        const value = body.result as T;
-        if (this.cacheTtlMs > 0) this.cache.set(key, { at: Date.now(), value });
-        return value;
-      } catch (err) {
-        lastErr = err; // fail over to the next endpoint
-      }
+    // r45 efficiency: RACE all endpoints concurrently (read-only client —
+    // every node serves the same consensus data). Wall time collapses from
+    // sum-of-sequential-timeouts (up to N x timeout when nodes are slow) to
+    // the single fastest healthy node. Sticky index still tracks the winner.
+    const attempt = async (idx: number): Promise<{ value: T; idx: number }> => {
+      const res = await fetch(this.rpcUrls[idx], {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!res.ok) throw new Error(`RPC HTTP ${res.status} ${res.statusText}`);
+      const body = (await res.json()) as { result?: T; error?: { message?: string } };
+      if (body.error) throw new Error(`RPC error: ${body.error.message ?? "unknown"}`);
+      return { value: body.result as T, idx };
+    };
+    try {
+      const { value, idx } = await Promise.any(this.rpcUrls.map((_, i) => attempt((this.sticky + i) % this.rpcUrls.length)));
+      this.sticky = idx;
+      if (this.cacheTtlMs > 0) this.cache.set(key, { at: Date.now(), value });
+      return value;
+    } catch (err) {
+      const msg = err instanceof AggregateError
+        ? err.errors.map((e) => (e instanceof Error ? e.message : String(e))).join(" | ")
+        : err instanceof Error ? err.message : "unknown";
+      throw new Error(`all ${this.rpcUrls.length} Steem RPC endpoints failed: ${msg}`);
     }
-    throw lastErr instanceof Error ? lastErr : new Error("all Steem RPC endpoints failed");
   }
 
   private static mapLevel(e: RawBookEntry): MarketLevel | null {

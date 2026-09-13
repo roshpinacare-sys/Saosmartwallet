@@ -14,7 +14,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const payload = await saosHubCached();
-  const status = payload.ok ? 200 : 503;
+  // r45 contract: the payload itself carries ok:false + the reason — never an
+  // exposed 5xx (r32 contract: degraded state is DATA, not a server failure).
+  const status = 200;
   return NextResponse.json(payload, {
     status,
     headers: { "Cache-Control": "no-store" },

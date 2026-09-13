@@ -189,7 +189,7 @@ async function main(): Promise<void> {
         const proc = Bun.spawn({
           cmd: ["bun", "./node_modules/next/dist/bin/next", "dev", "-p", "3000", "--webpack"],
           cwd: ROOT,
-          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2560" },
+          env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=2048" }, // r45: 2048 so the graceful self-restart beats the kernel OOM-killer
           stdio: ["ignore", out, out],
         });
         proc.unref();

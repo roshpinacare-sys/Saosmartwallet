@@ -20,6 +20,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { db } from "@/lib/db";
+import { githubToken } from "@/lib/github-token";
 import { getTreasurySnapshot, type TreasurySnapshot } from "@/lib/gate/treasury";
 import { ethereumEyes, solanaEyes } from "@/lib/multichain-server";
 import { fleetRewardsCensus } from "@/lib/gate/harness/social";
@@ -121,14 +122,8 @@ function githubHeaders(token: string): HeadersInit {
 }
 
 async function readGithubToken(): Promise<string | null> {
-  if (process.env.GITHUB_TOKEN?.trim()) return process.env.GITHUB_TOKEN.trim();
-  try {
-    const raw = (await readFile(path.join(process.cwd(), "upload", "Roshcaregt.txt"), "utf8")).trim();
-    const line = raw.split(/\r?\n/).map((l) => l.trim()).find((l) => /^ghp_|^github_pat_/.test(l));
-    return line ?? null;
-  } catch {
-    return null;
-  }
+  // aligned with GitGate (single source of truth) — see src/lib/github-token.ts
+  return githubToken();
 }
 
 async function fetchBroadcasts(token: string, repo: string): Promise<SituationBroadcast> {

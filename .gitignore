@@ -89,3 +89,7 @@ docs/broadcast-seen.json
 /db/.banker-mirror/
 /db/*.lock
 /tmp-analysis/
+
+# sqlite WAL sidecars — live artifacts, change every second (r45: WAL enabled)
+db/custom.db-shm
+db/custom.db-wal

@@ -1,5 +1,6 @@
 import { axiomBundle } from "@/lib/axiom/runtime";
 import { safeLogValue } from "@/lib/hardening";
+import { GateError } from "@/lib/gate/crypto";
 import { fail, ok } from "@/lib/gate/http";
 
 export const runtime = "nodejs";
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const root = url.searchParams.get("root") ?? "src";
     const entry = url.searchParams.get("entry");
-    if (!entry) throw new Error("missing entry (file:<path>)");
+    if (!entry) throw new GateError("bad-request", "missing entry (file:<path>)");
 
     const out = axiomBundle(root, entry);
     return ok({
@@ -29,6 +30,9 @@ export async function GET(req: Request) {
       },
     });
   } catch (e) {
+    // r45: typed GateErrors pass through as-is (400 contract); unexpected
+    // errors keep their sanitization wrapper (never leak raw internals).
+    if (e instanceof GateError) return fail(e);
     return fail(new Error(safeLogValue(e instanceof Error ? e.message : e)));
   }
 }

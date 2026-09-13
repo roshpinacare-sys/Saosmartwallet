@@ -31,7 +31,7 @@ function buildAdapter(): SteemAdapter {
     rpcUrl: RPC_URL,
     rpcUrls: RPC_URLS, // roast r3: the read path is no longer a single point of failure either
     // allowBroadcast intentionally NOT set — fails closed (M0 gate).
-    requestTimeoutMs: 15_000,
+    requestTimeoutMs: 8_000, // r45: reads race endpoints concurrently — 8s ceiling, not 3x15s
   });
 }
 
@@ -129,7 +129,7 @@ export async function steemOpenOrders(account: string): Promise<
 }
 
 export function steemMarket(): SteemMarketClient {
-  if (!marketSingleton) marketSingleton = new SteemMarketClient(RPC_URLS, 15_000, 2_500);
+  if (!marketSingleton) marketSingleton = new SteemMarketClient(RPC_URLS, 8_000, 2_500); // r45: raced reads, 8s ceiling
   return marketSingleton;
 }
 
