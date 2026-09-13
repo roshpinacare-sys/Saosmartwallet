@@ -16,6 +16,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { githubToken } from "@/lib/github-token";
 import { steemMarket } from "./steem-server";
 
 // ---------------------------------------------------------------------------
@@ -25,14 +26,30 @@ import { steemMarket } from "./steem-server";
 type CacheEntry = { at: number; value: unknown };
 
 const cache = new Map<string, CacheEntry>();
+/** r45 — single-flight: callers arriving while a cold compute is ALREADY
+ * running share that in-flight promise instead of starting their own copy.
+ * Before this, heart + console + N tabs hitting a 26s cold probe each spawned
+ * a full parallel recompute (N x memory, N x upstream load) — the thundering
+ * herd that spiked RSS into the kernel OOM-killer during cold windows. */
+const inflight = new Map<string, Promise<unknown>>();
 
 export async function withCache<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
   const hit = cache.get(key);
   const now = Date.now();
   if (hit && now - hit.at < ttlMs) return hit.value as T;
-  const value = await fn();
-  cache.set(key, { at: now, value });
-  return value;
+  const running = inflight.get(key);
+  if (running) return running as Promise<T>;
+  const p = (async () => {
+    const value = await fn();
+    cache.set(key, { at: Date.now(), value });
+    return value;
+  })();
+  inflight.set(key, p);
+  try {
+    return await p;
+  } finally {
+    inflight.delete(key);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -72,24 +89,12 @@ const STEEM_REPO = "steem";
 const SAOSNET_STATE_PATH = "sovereign/node/state.json";
 const GRID98_STATE_PATH = "sovereign/node/grid98-state.json";
 
-async function githubToken(): Promise<string | null> {
-  const env = process.env.GITHUB_TOKEN;
-  if (env && env.trim().length > 10) return env.trim();
-  try {
-    const raw = await readFile(path.join(process.cwd(), "upload", "Roshcaregt.txt"), "utf8");
-    const token = raw.trim();
-    return token.length > 10 ? token : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function githubRaw(repo: string, filePath: string): Promise<string | null> {
   const token = await githubToken();
   if (!token) return null;
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
+    const timer = setTimeout(() => controller.abort(), 6_000);
     const res = await fetch(`https://raw.githubusercontent.com/${GH_OWNER}/${repo}/main/${filePath}`, {
       headers: { Authorization: `token ${token}` },
       signal: controller.signal,
@@ -146,42 +151,44 @@ async function probeGraphene(
     stateAgeSeconds: null,
     probedAt: new Date().toISOString(),
   };
-  let lastErr = "unknown";
-  for (const url of urls) {
-    try {
-      const res = (await fetchJson(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: rpcBody("condenser_api.get_dynamic_global_properties", []),
-        timeoutMs,
-      })) as { result?: Record<string, unknown> } | Record<string, unknown>;
-      const r = ("result" in res && res.result ? res.result : res) as Record<string, unknown>;
-      const head = typeof r.head_block_number === "number" ? r.head_block_number : null;
-      if (head === null) throw new Error("no head_block_number");
-      const timeStr = typeof r.time === "string" ? r.time : null;
-      const lag = timeStr ? Math.max(0, Math.round((Date.now() - Date.parse(`${timeStr}Z`)) / 1000)) : null;
-      return {
-        ...base,
-        status: "online",
-        headHeight: head,
-        lagSeconds: lag,
-        headId: typeof r.head_block_id === "string" ? r.head_block_id : null,
-        version: typeof r.hf_version === "string" ? r.hf_version : null,
-        note: `live probe ${url.replace("https://", "")}`,
-      };
-    } catch (err) {
-      lastErr = err instanceof Error ? err.message : "unknown";
-    }
-  }
-  return {
-    ...base,
-    status: "offline",
-    headHeight: null,
-    lagSeconds: null,
-    headId: null,
-    version: null,
-    note: `probe failed: ${lastErr}`,
+  const attempt = async (url: string): Promise<EcoChain> => {
+    const res = (await fetchJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: rpcBody("condenser_api.get_dynamic_global_properties", []),
+      timeoutMs,
+    })) as { result?: Record<string, unknown> } | Record<string, unknown>;
+    const r = ("result" in res && res.result ? res.result : res) as Record<string, unknown>;
+    const head = typeof r.head_block_number === "number" ? r.head_block_number : null;
+    if (head === null) throw new Error("no head_block_number");
+    const timeStr = typeof r.time === "string" ? r.time : null;
+    const lag = timeStr ? Math.max(0, Math.round((Date.now() - Date.parse(`${timeStr}Z`)) / 1000)) : null;
+    return {
+      ...base,
+      status: "online",
+      headHeight: head,
+      lagSeconds: lag,
+      headId: typeof r.head_block_id === "string" ? r.head_block_id : null,
+      version: typeof r.hf_version === "string" ? r.hf_version : null,
+      note: `live probe ${url.replace("https://", "")}`,
+    };
   };
+  // efficiency: race every endpoint CONCURRENTLY — wall time is the fastest
+  // healthy endpoint (or a single timeout), never the sum of sequential retries.
+  try {
+    return await Promise.any(urls.map(attempt));
+  } catch (err) {
+    const lastErr = err instanceof Error ? err.message : "unknown";
+    return {
+      ...base,
+      status: "offline",
+      headHeight: null,
+      lagSeconds: null,
+      headId: null,
+      version: null,
+      note: `probe failed: ${lastErr}`,
+    };
+  }
 }
 
 async function probeTron(): Promise<EcoChain> {
@@ -272,44 +279,45 @@ async function probeEthereum(): Promise<EcoChain> {
     probedAt: new Date().toISOString(),
   };
   const urls = ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org", "https://eth-mainnet.public.blastapi.io"];
-  let lastErr = "unknown";
-  for (const url of urls) {
-    try {
-      // Raw JSON-RPC — no SDK in the probe path; eth_getBlockByNumber(false)
-      // gives head height + timestamp + baseFee in ONE call.
-      const r = (await fetchJson(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false] }),
-        timeoutMs: 6_000,
-      })) as { result?: { number?: string; timestamp?: string; baseFeePerGas?: string } };
-      const block = r.result;
-      if (!block?.number) throw new Error("no block");
-      const head = Number.parseInt(block.number, 16);
-      const ts = block.timestamp ? Number.parseInt(block.timestamp, 16) * 1000 : Date.now();
-      const baseFeeWei = block.baseFeePerGas ? BigInt(block.baseFeePerGas) : null;
-      return {
-        ...base,
-        status: "online",
-        headHeight: head,
-        lagSeconds: Math.max(0, Math.round((Date.now() - ts) / 1000)),
-        headId: null,
-        version: baseFeeWei ? `${Number(baseFeeWei) / 1e9} gwei baseFee` : null,
-        note: `live probe ${url.replace("https://", "")}`,
-      };
-    } catch (err) {
-      lastErr = err instanceof Error ? err.message : "unknown";
-    }
-  }
-  return {
-    ...base,
-    status: "offline",
-    headHeight: null,
-    lagSeconds: null,
-    headId: null,
-    version: null,
-    note: `probe failed: ${lastErr}`,
+  const attempt = async (url: string): Promise<EcoChain> => {
+    // Raw JSON-RPC — no SDK in the probe path; eth_getBlockByNumber(false)
+    // gives head height + timestamp + baseFee in ONE call.
+    const r = (await fetchJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false] }),
+      timeoutMs: 6_000,
+    })) as { result?: { number?: string; timestamp?: string; baseFeePerGas?: string } };
+    const block = r.result;
+    if (!block?.number) throw new Error("no block");
+    const head = Number.parseInt(block.number, 16);
+    const ts = block.timestamp ? Number.parseInt(block.timestamp, 16) * 1000 : Date.now();
+    const baseFeeWei = block.baseFeePerGas ? BigInt(block.baseFeePerGas) : null;
+    return {
+      ...base,
+      status: "online",
+      headHeight: head,
+      lagSeconds: Math.max(0, Math.round((Date.now() - ts) / 1000)),
+      headId: null,
+      version: baseFeeWei ? `${Number(baseFeeWei) / 1e9} gwei baseFee` : null,
+      note: `live probe ${url.replace("https://", "")}`,
+    };
   };
+  // efficiency: race all endpoints concurrently — one timeout ceiling, not the sum
+  try {
+    return await Promise.any(urls.map(attempt));
+  } catch (err) {
+    const lastErr = err instanceof Error ? err.message : "unknown";
+    return {
+      ...base,
+      status: "offline",
+      headHeight: null,
+      lagSeconds: null,
+      headId: null,
+      version: null,
+      note: `probe failed: ${lastErr}`,
+    };
+  }
 }
 
 async function probeSolana(): Promise<EcoChain> {
@@ -322,39 +330,40 @@ async function probeSolana(): Promise<EcoChain> {
     probedAt: new Date().toISOString(),
   };
   const urls = ["https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com"];
-  let lastErr = "unknown";
-  for (const url of urls) {
-    try {
-      const r = (await fetchJson(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getEpochInfo" }),
-        timeoutMs: 6_000,
-      })) as { result?: { absoluteSlot?: number; epoch?: number; slotIndex?: number; slotsInEpoch?: number } };
-      const ep = r.result;
-      if (!ep?.absoluteSlot) throw new Error("no epoch info");
-      return {
-        ...base,
-        status: "online",
-        headHeight: ep.absoluteSlot,
-        lagSeconds: null, // slots carry no wall-clock timestamp in this response — honest null
-        headId: null,
-        version: `epoch ${ep.epoch} · slot ${ep.slotIndex ?? "—"}/${ep.slotsInEpoch ?? "—"}`,
-        note: `live probe ${url.replace("https://", "")}`,
-      };
-    } catch (err) {
-      lastErr = err instanceof Error ? err.message : "unknown";
-    }
-  }
-  return {
-    ...base,
-    status: "offline",
-    headHeight: null,
-    lagSeconds: null,
-    headId: null,
-    version: null,
-    note: `probe failed: ${lastErr}`,
+  const attempt = async (url: string): Promise<EcoChain> => {
+    const r = (await fetchJson(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getEpochInfo" }),
+      timeoutMs: 6_000,
+    })) as { result?: { absoluteSlot?: number; epoch?: number; slotIndex?: number; slotsInEpoch?: number } };
+    const ep = r.result;
+    if (!ep?.absoluteSlot) throw new Error("no epoch info");
+    return {
+      ...base,
+      status: "online",
+      headHeight: ep.absoluteSlot,
+      lagSeconds: null, // slots carry no wall-clock timestamp in this response — honest null
+      headId: null,
+      version: `epoch ${ep.epoch} · slot ${ep.slotIndex ?? "—"}/${ep.slotsInEpoch ?? "—"}`,
+      note: `live probe ${url.replace("https://", "")}`,
+    };
   };
+  // efficiency: race all endpoints concurrently — one timeout ceiling, not the sum
+  try {
+    return await Promise.any(urls.map(attempt));
+  } catch (err) {
+    const lastErr = err instanceof Error ? err.message : "unknown";
+    return {
+      ...base,
+      status: "offline",
+      headHeight: null,
+      lagSeconds: null,
+      headId: null,
+      version: null,
+      note: `probe failed: ${lastErr}`,
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -615,7 +624,7 @@ function normalizeSaosNet(raw: Record<string, unknown>, grid98Raw: Record<string
 }
 
 export async function saosNetSnapshot(): Promise<SaosNetSnapshot | { ok: false; error: string }> {
-  return withCache("saosnet", 15_000, async () => {
+  return withCache("saosnet", 45_000, async () => {
     const [stateText, gridText] = await Promise.all([
       githubRaw(STEEM_REPO, SAOSNET_STATE_PATH),
       githubRaw(STEEM_REPO, GRID98_STATE_PATH),
@@ -676,7 +685,9 @@ async function probeSaosNet(): Promise<EcoChain> {
 // ---------------------------------------------------------------------------
 
 export async function ecoNetworks(): Promise<{ ok: true; chains: EcoChain[]; fetchedAt: string }> {
-  return withCache("eco-networks", 6_000, async () => {
+  // r45 efficiency: TTL 60s matches the pollers' heavy-feed cadence (60s) —
+  // a 16s cold probe per 6s TTL meant every poll paid full price.
+  return withCache("eco-networks", 60_000, async () => {
     const [steem, hive, blurt, tron, saosnet, ethereum, solana] = await Promise.all([
       probeSteem(),
       probeGraphene(

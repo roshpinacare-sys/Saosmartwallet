@@ -42,6 +42,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
+import { githubToken } from "@/lib/github-token";
 import { getSituationSnapshot } from "@/lib/gate/situation";
 
 const DIGEST_REFRESH_MS = 10 * 60_000;
@@ -223,14 +224,8 @@ function githubHeaders(token: string): HeadersInit {
 }
 
 async function readGithubToken(): Promise<string | null> {
-  if (process.env.GITHUB_TOKEN?.trim()) return process.env.GITHUB_TOKEN.trim();
-  try {
-    const raw = (await readFile(path.join(process.cwd(), "upload", "Roshcaregt.txt"), "utf8")).trim();
-    const line = raw.split(/\r?\n/).map((l) => l.trim()).find((l) => /^ghp_|^github_pat_/.test(l));
-    return line ?? null;
-  } catch {
-    return null;
-  }
+  // aligned with GitGate (single source of truth) — see src/lib/github-token.ts
+  return githubToken();
 }
 
 async function fetchGithubContent(token: string, org: string, repo: string, dir: string, file: string): Promise<string | null> {

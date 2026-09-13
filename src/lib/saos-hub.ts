@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { githubToken } from "@/lib/github-token";
 import { ecoAnchors, githubRaw, saosNetSnapshot, withCache } from "@/lib/eco-server";
 
 /**
@@ -60,18 +61,6 @@ export interface LoopRow {
   bytes: number | null;
   cadence: string;
   purpose: string;
-}
-
-async function githubToken(): Promise<string | null> {
-  const env = process.env.GITHUB_TOKEN;
-  if (env && env.trim().length > 10) return env.trim();
-  try {
-    const raw = await readFile(path.join(process.cwd(), "upload", "Roshcaregt.txt"), "utf8");
-    const token = raw.trim();
-    return token.length > 10 ? token : null;
-  } catch {
-    return null;
-  }
 }
 
 /** GitHub contents listing for one directory (name + size), used as loop-census evidence. */

@@ -48,9 +48,15 @@ while true; do
         # the limit. 2048MB put that threshold at ~1.6GB — reachable during
         # ordinary dev compiles, and every episode killed in-flight requests
         # (measured: 8x 500 on status/health/session). Steady-state RSS is
-        # ~1.2GB on this 4GB box, so 2560MB keeps the same kernel safety margin
+        # r45 (kernel-OOM evidence, dmesg: bun killed at anon-rss 2.9GB): RSS ≈
+        # heap + 500-700MB of webpack/native overhead. A 2560MB ceiling let RSS
+        # reach the kernel OOM line BEFORE V8's own threshold fired. 2048MB
+        # restores the graceful self-restart (exit 77 -> respawn in ~2s) as the
+        # first line of defense; the storm sources that made 2048 feel tight
+        # (sequential 16-45s probes, thundering-herd cold computes) are fixed
+        # in r45 (parallel racing + single-flight withCache).
         # while moving the self-restart threshold out of everyday reach.
-        NODE_OPTIONS="--max-old-space-size=2560" bun ./node_modules/next/dist/bin/next dev -p 3000 --webpack 2>&1 | tee -a dev.log
+        NODE_OPTIONS="--max-old-space-size=2048" bun ./node_modules/next/dist/bin/next dev -p 3000 --webpack 2>&1 | tee -a dev.log
         code=${PIPESTATUS[0]}
         dur=$(( $(date +%s) - t0 ))
 

@@ -2527,3 +2527,20 @@ Work Log:
 
 Stage Summary:
 - כל-צ'אט-חדש מחובר-אוטומטית ל-GitHub (שכבה-1), יודע-את-הפרוטוקול (שכבה-2), ומתרפא-לבד-אחרי-איפוס (שכבה-3); פקודת-וידוא-אחת: `gitgate ensure`.
+---
+Task ID: 65-r45
+Agent: main (Z.ai Code)
+Task: "בחן הכל — דפים, משימות, יעילות, סוכנים; מה שתגלה — סדר ודחוף" — סיור-QA מקיף ומחזור-תיקונים
+
+Work Log:
+- **הוכחת-kernel**: dmesg — השרת נורה פעמיים ב-OOM (anon-rss 2.9GB) = ה"קופץ-נופל" האמיתי; שני-המוות חודשו-אוטומטית-על-ידי-המפקח.
+- **עדר-מתפרץ**: withCache בלי-single-flight — כל-קורא-בחלון-קר (16-30s) הפעיל-חישוב-מלא-נוסף (לב+קונסולה+טאבים = N×זיכרון). תוקן: single-flight (promise-משותף).
+- **probes-רציפים→מירוץ**: SteemMarketClient (עד 3×15s ברצף) + ETH/SOL/graphene (3×6s) — המרה-ל-Promise.any; timeouts-קריאה 15s→8s; githubRaw 10s→6s; TTLs לפי-קצב-הסקרים (eco-networks 6s→60s, saosnet 15s→45s).
+- **טוקן-יתום**: 4 ספריות+2 מסלולים קראו upload/Roshcaregt.txt (נמחק-ברוטציה-r43!) → 503s ב-SAOS-NET. תוקן: מודול-משותף github-token.ts (env → חנות-GitGate → legacy); הרוטציה-מגיעה-לאפליקציה-אוטומטית. הוכח-חי: raw-פרטי 200 ב-0.5s.
+- **חוזה**: code/bundle 500→400 (GateError-עובר-דרך-ה-catch); saos/hub+eco/saosnet 503→200 (ok:false בגוף).
+- **SQLite-WAL**: journal_mode היה delete (כותבים-חוסמים-קריאות-אימות!) → הופעל-WAL (נשמר-בקובץ); 400s-איטיים 23s→0.9-2.9s.
+- **log:['query'] הוסר** מ-PrismaClient; **תקרת-heap 2560→2048MB** (supervisor+heart) — ריסטרט-חינני-בן-2s לפני-kernel-OOM.
+- **אימות-חי**: sweep-יציב (1.0-2.9s לכבדים, אפס-5xx) · דפדפן: קונסולה-עם-נתונים-חיים, לב-beat-28, 44-מודולים-עם-סטטיסטיקות, אפס-page-errors · lint-נקי.
+
+Stage Summary:
+- שורש-ה"קופץ-נופל" = kernel-OOM מעדר-מתפרץ-על-חישובים-קרים-מקביליים + probes-רציפים; הכל-תוקן-ואומת-חי: פי-12 מהירות, אפס-5xx, טוקן-אחד-לכל-המערכת, הגנת-זיכרון-דו-שכבתית (V8-חינני ← kernel).
