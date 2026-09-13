@@ -2544,3 +2544,21 @@ Work Log:
 
 Stage Summary:
 - שורש-ה"קופץ-נופל" = kernel-OOM מעדר-מתפרץ-על-חישובים-קרים-מקביליים + probes-רציפים; הכל-תוקן-ואומת-חי: פי-12 מהירות, אפס-5xx, טוקן-אחד-לכל-המערכת, הגנת-זיכרון-דו-שכבתית (V8-חינני ← kernel).
+
+---
+Task ID: 66-r46
+Agent: Z.ai Code (main)
+Task: החלפת טוקן נוספת ל-PAT מסוג fine-grained (הישן מת) + החלמה מלאה מאיפוס-סביבה (sandbox reset).
+
+Work Log:
+- התגלה איפוס-סביבה ל-snapshot תקופת-r33: כל ~/.gitgate נעלם, רישום ה-helper ב-.gitconfig נעלם, gitgate/ לא היה בעץ המקומי, וב-remote URL היה טמון שוב הטוקן הישן (המת).
+- המפעיל העלה pat.env (הדבקה ראשונה שגויה — תוקנה ע"י המפעיל): 93 תווים, פורמט github_pat_ — fine-grained עם הרשאות מינימליות, בהתאם להמלצת r43.
+- GitGate נבנה מחדש מאפס (vault 0700/0600 + helper + CLI), ואז הותקנו הסקריפטים הקנוניים מתוך gitgate/install.sh של הריפו (שומר על הטוקן הקיים) — שכבת-הריפוי של פרוטוקול r44 עבדה בפועל.
+- סבסוב אטומי set-token --from → טביעת-אצבע c029b0b7; doctor ALL GREEN (זהות API: roshpinacare-sys, fine-grained); migrate ניקה את ה-remote URL; ls-remote חי דרך ה-helper אומת (HEAD=47da86f).
+- סנכרון הריפו: מקומית היו 2 קומיטי-סנאפשוט לא-דחופים (רק db+pid). ה-db החי גובה ל-/tmp/custom.db.pre-r46.bin, reset --hard origin/main (r45), וה-db החדש-יותר הוחזר לעץ — האוטומציה תדחוף אותו במחזור הבא.
+- אימות אפליקציה: github-token.ts קורא את הכספת ישירות → hub/saosnet/situation כולם 200; pat.env נמחק; סריקת-סודות על קבצים מנוטרים נקייה (אין github_pat_/ghp_/URL-embedded).
+
+Stage Summary:
+- הטוקן החדש (fine-grained, c029b0b7) חי בכספת והוא מקור-האמת היחיד; הישן מת ומבוטל; האפליקציה צורכת אותו אוטומטית ללא ריסטארט.
+- פרוטוקול שלוש-השכבות (r44) אומת מקצה-לקצה בתרחיש אמיתי: שכבה-1 (persist) אבדה באיפוס → שכבה-3 (self-heal מהריפו) שחזרה הכל.
+- גיבוי db ב-/tmp/custom.db.pre-r46.bin; ה-push של הקומיט הזה = מבחן-כתיבה חי עם הטוקן החדש; zero secrets.
