@@ -3,7 +3,7 @@
   "version": "0.2.1",
   "private": true,
   "scripts": {
-    "dev": "(cd mini-services/heart-service && nohup bun run dev >> dev.log 2>&1 &); NODE_OPTIONS=--max-old-space-size=2048 next dev -p 3000 --webpack 2>&1 | tee dev.log",
+    "dev": "(cd mini-services/heart-service && nohup bun run dev >> dev.log 2>&1 &); bash .zscripts/dev-supervisor.sh",
     "heart": "cd mini-services/heart-service && bun run dev",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",

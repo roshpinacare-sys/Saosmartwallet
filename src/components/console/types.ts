@@ -32,7 +32,13 @@ export interface Inventory {
   // the r12 filing was auto-expired by policy and the page kept lying).
   steemautoProposal?: { status: string; decidedBy: string | null; createdAt: string; runId?: string | null; runStatus?: string | null } | null;
   // r20 — the multi-rail anchor plane, live-verified by the API
-  anchors?: Array<{ chain: string; txId: string; blockNum: number | null; round: string | null; at: string; onChain: boolean; digest: string | null }> | null;
+  anchors?: Array<{ chain: string; txId: string; blockNum: number | null; round: string | null; at: string; onChain: boolean | null; digest: string | null }> | null;
+  // r34 bug-hunt — how this payload was produced: "full" = a live chain sweep,
+  // "snapshot" = instant last-known status from the DB (no chain calls)
+  mode?: "full" | "snapshot" | "cache";
+  cached?: boolean;
+  cachedAt?: string;
+  lastVerifiedAt?: string | null;
   // r16 — rotation plane readiness, computed live by the API (never stored)
   rotation?: { targets: Array<{ account: string; hasOwnerKey: boolean; hasP5Root: boolean; ready: boolean; rotated?: boolean }>; readyCount: number; rotatedCount?: number } | null;
 }

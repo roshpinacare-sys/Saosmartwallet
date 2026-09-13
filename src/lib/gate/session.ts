@@ -57,22 +57,34 @@ export async function createSession(kind: string, name: string, scopes: string[]
  * Header first, cookie as fallback. Raw token never touches the DB (hash only).
  */
 async function currentToken(): Promise<string | null> {
+  // r34 bug-hunt: the old code returned the header token whenever PRESENT —
+  // even after a server restart invalidated it — so a stale token in the
+  // client's localStorage (sent as x-gate-token on every call) 400'd every
+  // authenticated request while a perfectly valid cookie sat in the same
+  // browser ("הכל נשבר אחרי ריסטארט" — the header shadowed the fresh cookie).
+  // Now: first token whose session row is actually VALID wins; the cookie is
+  // a real fallback, not a decoration.
+  const candidates: string[] = [];
   try {
     const h = await headers();
     const bearer = h.get("authorization");
     if (bearer?.startsWith("Bearer ")) {
       const t = bearer.slice(7).trim();
-      if (t) return t;
+      if (t) candidates.push(t);
     }
     const xt = h.get("x-gate-token");
-    if (xt?.trim()) return xt.trim();
+    if (xt?.trim()) candidates.push(xt.trim());
   } catch { /* headers() unavailable outside request scope */ }
   try {
     const jar = await cookies();
-    return jar.get(GATE_COOKIE)?.value || null;
-  } catch {
-    return null;
+    const c = jar.get(GATE_COOKIE)?.value;
+    if (c) candidates.push(c);
+  } catch { /* cookies() unavailable outside request scope */ }
+  for (const t of candidates) {
+    const row = await db.gateSession.findUnique({ where: { tokenHash: sha256hex(t) } }).catch(() => null);
+    if (row && !row.revoked && row.expiresAt.getTime() > Date.now()) return t;
   }
+  return null;
 }
 
 export async function getSession(): Promise<SessionInfo | null> {
