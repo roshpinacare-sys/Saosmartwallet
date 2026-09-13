@@ -16,16 +16,13 @@
  */
 
 import dynamic from "next/dynamic";
-import { Loader2 } from "lucide-react";
+import ConsoleGate from "@/components/console/console-gate";
 
 const ConsoleShell = dynamic(() => import("@/components/console/console-shell"), {
   ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-black flex items-center justify-center gap-3">
-      <Loader2 className="h-5 w-5 animate-spin text-emerald-500" aria-hidden />
-      <span className="font-mono text-xs text-zinc-500" dir="rtl">טוען קונסולה…</span>
-    </div>
-  ),
+  // r48: an honest loading machine (hint at 8s, refresh escape at 40s)
+  // instead of a dead-end spinner — see console-gate.tsx for the live proof.
+  loading: () => <ConsoleGate />,
 });
 
 export default function Page() {

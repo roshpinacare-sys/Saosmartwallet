@@ -209,7 +209,7 @@ export async function findLatestIdentityAnchor(username: string): Promise<
     const newestIndex = ops[ops.length - 1][0];
     const immediate = extractAnchor(ops);
     if (immediate) {
-      anchorCache.set(username, { op: immediate.op, at: Date.now() });
+      anchorCache.set(username, { op: immediate.op, at: Date.now(), scanned: ops.length });
       return { found: true, op: immediate.op, scanned: ops.length };
     }
 
@@ -225,7 +225,7 @@ export async function findLatestIdentityAnchor(username: string): Promise<
       for (const p of pages) {
         const hit = p?.history ? extractAnchor(p.history) : null;
         if (hit) {
-          anchorCache.set(username, { op: hit.op, at: Date.now() });
+          anchorCache.set(username, { op: hit.op, at: Date.now(), scanned });
           return { found: true, op: hit.op, scanned };
         }
       }
@@ -248,7 +248,7 @@ export async function findLatestIdentityAnchor(username: string): Promise<
       scanned += ops.length;
       const hit = extractAnchor(ops);
       if (hit) {
-        anchorCache.set(username, { op: hit.op, at: Date.now() });
+        anchorCache.set(username, { op: hit.op, at: Date.now(), scanned });
         return { found: true, op: hit.op, scanned };
       }
       const lowest = ops[0][0];
@@ -260,7 +260,10 @@ export async function findLatestIdentityAnchor(username: string): Promise<
 }
 
 const ANCHOR_CACHE_TTL_MS = 60 * 60 * 1000; // 1h — immutable historical op
-const anchorCache = new Map<string, { op: AnchorOp; at: number }>();
+// r48: the cache also holds the honest scan-depth of the find — line 196
+// already reported it on cache hits; the type now matches reality instead of
+// silently returning `scanned: undefined`.
+const anchorCache = new Map<string, { op: AnchorOp; at: number; scanned: number }>();
 
 async function fetchHistoryPage(
   username: string,

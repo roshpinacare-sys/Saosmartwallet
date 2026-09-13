@@ -81,6 +81,9 @@ export interface TreasuryRail { rail: string; ok: boolean; liquidSymbol: string;
 export interface TreasurySnapshot { measuredAt: string; rails: TreasuryRail[]; fleet: Record<string, number>; cached: boolean }
 export interface SituationRepoRow { name: string; language: string | null; sizeKB: number; pushedAt: string; pushedMinutesAgo: number | null; ours: boolean; fresh: boolean }
 export interface SituationData {
+  // r48: the API really returns a top-level envelope (live-proven) — overview
+  // gates on it; the type was missing it (tsc TS2339 on .ok).
+  ok: boolean; error?: string;
   measuredAt: string; cached: boolean;
   treasury: { rails: TreasuryRail[]; measuredAt: string; error?: string };
   evm: { ethereum: { ok: boolean; wallets: number; okWallets: number; total: string; block: number | null; error?: string }; solana: { ok: boolean; wallets: number; okWallets: number; total: string; slot: number | null; error?: string } };
@@ -93,7 +96,7 @@ export interface SituationData {
 export interface DigestItemRow { repo: string; file: string; ours: boolean; ok: boolean; error?: string; bytes: number; hash8: string; echo: boolean; isNew: boolean; lang: string; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
 export interface DoorVoiceRow { file: string; ok: boolean; error?: string; bytes: number; hash8: string; isNew: boolean; selfEcho?: boolean; kind: string; headline: string; asks: string[]; mentionsUs: boolean }
 export interface RootVoiceRow { file: string; ok: boolean; error?: string; hash8: string; looksLikeReport: boolean; isNew: boolean; headline: string; mentionsUs: boolean }
-export interface DigestData { measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; selfEchoVoices?: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
+export interface DigestData { ok: boolean; measuredAt: string; cached: boolean; scannedRepos: number; fetched: number; failed: number; uniqueContents: number; echoesOfOurs: number; newPartnerContents: number; partnerVoices: number; items: DigestItemRow[]; door: { checked: boolean; error?: string; files: number; oursFiles: number; selfEchoVoices?: number; incoming: number; voices: DoorVoiceRow[] }; rootVoices: { checked: boolean; error?: string; scanned: number; voices: RootVoiceRow[] }; suggestedResponse: { needed: boolean; reason: string; toRepo?: string; draft?: string[] }; error?: string }
 export interface KeyReport {
   kind: string; liveChecked: boolean; label?: string; notes?: string[];
   controls: { chain: string; account: string | null; role: string; pub: string | null }[];
