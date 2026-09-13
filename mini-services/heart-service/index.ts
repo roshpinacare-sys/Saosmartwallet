@@ -116,29 +116,66 @@ async function main(): Promise<void> {
   // response counts as alive), respawns `next dev` as ITS OWN detached child,
   // with honest backoff so a crash-loop can never storm the machine.
   const PORTAL = "http://127.0.0.1:3000/";
-  const RESPAWN_MIN_MS = 45_000; // backoff between spawn attempts
+  // r34 bug-hunt: the flat 45s backoff turned every memory-threshold restart
+  // (next dev self-exits with code 77) into 45-90s of dead portal, and the
+  // first spawn after a crash always lost to EADDRINUSE because the old socket
+  // lingers. Now: wait for the port to actually release before spawning, and
+  // escalate backoff (5s → 15s → 45s) so the common case recovers in seconds.
+  const RESPAWN_BACKOFF_MS = [5_000, 15_000, 45_000];
   const QUIET_AFTER_FAILED = 6; // 6 failed spawns → rest 10 min before retry
+  const PORT_RELEASE_TIMEOUT_MS = 20_000;
   let lastSpawn = 0;
   let failedSpawns = 0;
+  let spawnCycle = false; // r34: one recovery cycle at a time — ticks must not stack
   const portalAlive = async (): Promise<boolean> => {
+    // r34: a busy dev server mid-compile can take >2.5s to answer — that is
+    // ALIVE, not down. One slow-patience recheck (8s) before declaring death,
+    // so heavy compiles never trigger a rival spawn (EADDRINUSE noise).
     try {
       await fetch(PORTAL, { signal: AbortSignal.timeout(2_500) });
+      return true;
+    } catch { /* fall through to the patient recheck */ }
+    try {
+      await fetch(PORTAL, { signal: AbortSignal.timeout(8_000) });
       return true; // any HTTP response means the server is serving
     } catch {
       return false; // refused / timeout = down
     }
   };
+  const portFree = async (): Promise<boolean> => {
+    try {
+      await Bun.connect({ hostname: "127.0.0.1", port: 3000 });
+      return false; // something still LISTENS → not free
+    } catch {
+      return true; // refused → free
+    }
+  };
+  const waitPortRelease = async (): Promise<boolean> => {
+    const deadline = Date.now() + PORT_RELEASE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (await portFree()) return true;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false; // try anyway — the spawn's own error surfaces honestly
+  };
   setInterval(() => {
     void (async () => {
+      if (spawnCycle) return;
       if (await portalAlive()) {
         failedSpawns = 0;
         return;
       }
       const now = Date.now();
-      const rest = failedSpawns >= QUIET_AFTER_FAILED ? 10 * 60_000 : RESPAWN_MIN_MS;
+      const rest = failedSpawns >= QUIET_AFTER_FAILED
+        ? 10 * 60_000
+        : RESPAWN_BACKOFF_MS[Math.min(failedSpawns, RESPAWN_BACKOFF_MS.length - 1)];
       if (now - lastSpawn < rest) return;
       lastSpawn = now;
+      spawnCycle = true;
       try {
+        if (!(await waitPortRelease())) {
+          console.log("eart-service] port 3000 still busy 20s after down — spawning anyway");
+        }
         const out = fs.openSync(path.join(ROOT, "dev.log"), "a");
         const proc = Bun.spawn({
           cmd: ["bun", "./node_modules/next/dist/bin/next", "dev", "-p", "3000", "--webpack"],
@@ -155,10 +192,12 @@ async function main(): Promise<void> {
       } catch (e) {
         failedSpawns += 1;
         console.log("[heart-service] portal respawn failed:", e instanceof Error ? e.message : e);
+      } finally {
+        spawnCycle = false;
       }
     })();
   }, 15_000);
-  console.log("[heart-service] portal supervision armed (ping 15s, backoff 45s, quiet 10min after 6 fails)");
+  console.log("[heart-service] portal supervision armed (ping 15s, backoff 5s/15s/45s, port-release aware, quiet 10min after 6 fails)");
 }
 
 main().catch((e) => {

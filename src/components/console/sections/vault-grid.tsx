@@ -37,13 +37,26 @@ export function VaultGrid() {
   const [q, setQ] = useState("");
   const [chain, setChain] = useState<string>("*");
 
-  const load = useCallback(async () => {
-    const i = await apiJson<Inventory>("/api/gate/inventory");
-    setInv(i);
-    setLoading(false);
+  // r34 bug-hunt: mount loads the INSTANT snapshot (last-known status, no chain
+  // calls); the full live sweep runs only when the operator presses "אמת-חי"
+  // (?verify=1 — the sweep verifies all secrets against the chains and used to
+  // block the whole grid for minutes). `verifying` marks the heavy pass.
+  const [verifying, setVerifying] = useState(false);
+  const load = useCallback(async (verify = false) => {
+    if (verify) setVerifying(true);
+    try {
+      const i = await apiJson<Inventory>(verify ? "/api/gate/inventory?verify=1" : "/api/gate/inventory");
+      setInv(i);
+      if (verify) toast.success("אימות-חי הושלם — המצב עודכן מהשרשרות");
+    } catch {
+      if (verify) toast.error("האימות-החי נכשל — נסה שוב");
+    } finally {
+      setLoading(false);
+      setVerifying(false);
+    }
   }, []);
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
-  const refresh = useCallback(() => { setLoading(true); return load(); }, [load]);
+  useEffect(() => { void load(false); }, [load]);
+  const refresh = useCallback((verify = true) => { setLoading(true); return load(verify); }, [load]);
 
   async function reveal(id: string) {
     if (revealed[id]) { setRevealed((s) => { const n = { ...s }; delete n[id]; return n; }); return; }
@@ -104,8 +117,8 @@ export function VaultGrid() {
             aria-label="חיפוש בכספת"
           />
         </div>
-        <Button variant="outline" size="sm" onClick={refresh} className="gap-1.5 border-zinc-800 shrink-0">
-          <RefreshCw className={"h-3.5 w-3.5" + (loading ? " animate-spin" : "")} /> אמת-חי
+        <Button variant="outline" size="sm" onClick={() => refresh(true)} className="gap-1.5 border-zinc-800 shrink-0">
+          <RefreshCw className={"h-3.5 w-3.5" + (verifying ? " animate-spin" : "")} /> אמת-חי
         </Button>
       </motion.div>
 
@@ -200,9 +213,21 @@ export function VaultGrid() {
 
       <RotationPanel inv={inv} onDone={() => refresh()} />
 
+      {inv?.mode === "snapshot" && (
+        <motion.div {...rise} className="mb-5">
+          <GlowCard className="p-3 flex items-center gap-2.5 border-zinc-800 bg-zinc-900/40">
+            <ScanSearch className="h-4 w-4 text-zinc-500 shrink-0" aria-hidden />
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              מוצג <b className="text-zinc-300">מצב-אחרון-ידוע</b> מהכספת ({entries.length} רשומות{inv.lastVerifiedAt ? ` · אימות-מלא אחרון: ${new Date(inv.lastVerifiedAt).toLocaleString("he-IL")}` : ""}) — בלי סריקת-שרשראות.
+              לחץ <b className="text-emerald-400">אמת-חי</b> לאימות-מלא מול השרשרות.
+            </p>
+          </GlowCard>
+        </motion.div>
+      )}
+
             {loading && entries.length === 0 ? (
         <GlowCard className="p-12 flex items-center justify-center gap-2 text-zinc-500 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" /> מאמת {entries.length || ""} סודות מול השרשרות…
+          <Loader2 className="h-4 w-4 animate-spin" /> {verifying ? "מאמת את הסודות מול השרשרות…" : "טוען את הכספת…"}
         </GlowCard>
       ) : (
         <motion.div {...rise}>
