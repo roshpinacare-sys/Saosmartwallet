@@ -66,11 +66,15 @@ jobs:
             if bunx tsc --noEmit; then TSC="pass"; else TSC="fail"; fi
           fi
 
-          # 4) בילד ייצור
+          # 4) בילד ייצור - לארנק יש קונפיגורציית webpack; Next החדש בונה ב-Turbopack כברירת מחדל ודורש דגל מפורש
           BUILD="skipped"
           if [ "$INSTALL" = "pass" ] && grep -q '"build"' package.json; then
             [ -f .env.example ] && cp .env.example .env
-            if DATABASE_URL="file:./ci-tmp.db" bun run build; then BUILD="pass"; else BUILD="fail"; fi
+            if grep -q "webpack" next.config.* 2>/dev/null; then
+              if bunx next build --webpack; then BUILD="pass"; else BUILD="fail"; fi
+            else
+              if bunx next build; then BUILD="pass"; else BUILD="fail"; fi
+            fi
           fi
 
           # 5) דוחות מצב-המערכת קיימים (מדידה רכה - מדווחת ולא מכשילה)
