@@ -108,6 +108,3 @@ export async function DELETE(req: Request) {
     return fail(e);
   }
 }
-
-/** Helper export used by messages route for agent identity. */
-export { requireAgent };
