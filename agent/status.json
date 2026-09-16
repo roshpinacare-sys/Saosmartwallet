@@ -1,6 +1,6 @@
 {
  "agent": "wallet-verify",
- "generatedAt": "2026-09-16T21:12:25Z",
+ "generatedAt": "2026-09-16T21:28:57Z",
  "verdict": "FAIL",
  "checks": {
   "install": "pass",
