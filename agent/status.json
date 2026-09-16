@@ -1,0 +1,14 @@
+{
+ "agent": "wallet-verify",
+ "generatedAt": "2026-09-16T21:12:25Z",
+ "verdict": "FAIL",
+ "checks": {
+  "install": "pass",
+  "prismaGenerate": "pass",
+  "typecheck": "pass",
+  "productionBuild": "fail",
+  "systemStatusDocs": 1,
+  "miniServicesDir": 1
+ },
+ "reason": "install=pass prisma=pass tsc=pass build=fail"
+}
