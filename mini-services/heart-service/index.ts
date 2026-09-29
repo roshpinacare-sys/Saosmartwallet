@@ -118,6 +118,9 @@ async function main(): Promise<void> {
   // tiny health surface — not required by the portal, useful for ops checks
   const port = Number(process.env.HEART_PORT ?? 3004);
   Bun.serve({
+    // 2026-09-29 audit fix (HIGH): the service is health-only and must never
+    // bind 0.0.0.0 — Bun's default. Loopback-only, per the R123 policy.
+    hostname: "127.0.0.1",
     port,
     fetch: () =>
       new Response(
