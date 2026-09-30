@@ -1,0 +1,10 @@
+# .gitleaksignore — triaged 2026-10-01 by Task 13-d2 (org-gitleaks run 36763896413)
+# one fingerprint per line; git form (commit:file:rule:line) + HEAD-only form (file:rule:line)
+# so full-history AND --no-git scans agree. No secret material in this file (fingerprints+comments only).
+
+# historical: pre-rotation — owner-blocked rotation 2026-10-01 (material absent at HEAD; history retains)
+f2d448e80262d4550a9401873cc7b4c7572e4584:agent/vault/recovery-meta-2026-09-12.json:generic-api-key:3
+
+# false-positive: synthetic test fixture (in-repo test data / self-test constant, not a real credential)
+9244d3414df1b575140e8c582ca71be4d3387c7a:tools/vault-zk-check.ts:generic-api-key:27
+tools/vault-zk-check.ts:generic-api-key:27
