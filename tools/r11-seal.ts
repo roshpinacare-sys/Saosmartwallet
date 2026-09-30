@@ -10,7 +10,7 @@
  * (6) re-probe the 10 "unverified" tron fleet rows (bounded, backoff — r10 rule)
  * Key material lives only in this process's memory; nothing is ever printed.
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { createHash } from "crypto";
 import { HDNodeWallet, SigningKey, keccak256 } from "ethers";
 import bs58 from "bs58";
@@ -19,7 +19,12 @@ import { setMaster, sealSecret, openSecret } from "@/lib/gate/crypto";
 import { loadKeySeals, openMasterWithKey } from "@/lib/gate/key-seal";
 import { wifToChainPub, tronAddress } from "@/lib/gate/key-id";
 
-const KZ = "/tmp/r11/keys-restored";
+// Task 13-c: the /tmp/r11 restore workdir is session-ephemeral; the canonical
+// org key vault (steem/agent/keys, gitignored+0600) holds the same agent/keys
+// tree. Env override → ephemeral restore dir (if present) → canonical vault.
+const KZ = process.env.KEYS_ZIP_DIR
+  ?? ["/tmp/r11/keys-restored", "/home/z/git-audit/steem"].find((p) => existsSync(p + "/agent/keys/vault.json"))
+  ?? "/home/z/git-audit/steem";
 const AGENTS = ["cashmachine","haran","headcorner","israelnews","lsa","macrame","siq","tov","wic","wog","woq","ynet"];
 const sha256buf = (s: string) => createHash("sha256").update(s).digest();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

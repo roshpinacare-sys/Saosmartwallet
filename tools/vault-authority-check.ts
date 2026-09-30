@@ -10,11 +10,15 @@
  * Exit 0 = every stored WIF matches the live authority for its role.
  * Exit 1 = at least one mismatch/missing (signing with it would fail).
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { PrivateKey } from "../packages/crypto/src/keys";
 
 const RPC = process.env.STEEM_RPC ?? "https://api.steemit.com";
-const vaultPath = process.env.VAULT_KEYS_PATH ?? ".grid98-lab/agent/keys/vault.json";
+// Task 13-c: env override wins; then the lab default, then the canonical org
+// vault (steem/agent/keys — the live fleet vault.json).
+const vaultPath = process.env.VAULT_KEYS_PATH
+  ?? [".grid98-lab/agent/keys/vault.json", "/home/z/git-audit/steem/agent/keys/vault.json"].find((p) => existsSync(p))
+  ?? ".grid98-lab/agent/keys/vault.json";
 
 interface VaultKey { wif?: string }
 interface VaultAccount {

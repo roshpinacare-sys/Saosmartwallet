@@ -30,11 +30,21 @@ export async function githubToken(): Promise<string | null> {
     /* store not present in this environment */
   }
 
-  try {
-    const raw = await readFile(path.join(process.cwd(), "upload", "Roshcaregt.txt"), "utf8");
-    const token = raw.trim();
-    return token.length > 10 ? token : null;
-  } catch {
-    return null;
+  // Task 13-c: the LIVE operator-staged PAT (upload/pat.env — bare token,
+  // R18/R19 format-tolerant) before the legacy Roshcaregt.txt fallback.
+  for (const p of [
+    path.join(process.cwd(), "upload", "pat.env"),
+    "/home/z/my-project/upload/pat.env",
+    path.join(process.cwd(), "upload", "Roshcaregt.txt"),
+  ]) {
+    try {
+      const raw = (await readFile(p, "utf8")).trim();
+      const token = raw.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 10 && !l.startsWith("#")) ?? "";
+      const value = token.replace(/^[A-Za-z_][A-Za-z0-9_]*=/, "").replace(/^["']|["']$/g, "").trim();
+      if (value.length > 10) return value;
+    } catch {
+      /* candidate not present */
+    }
   }
+  return null;
 }
