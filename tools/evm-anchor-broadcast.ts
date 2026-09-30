@@ -16,7 +16,7 @@
  * SECRETS: the fleet registry lives in the gitignored lab; this tool never
  * prints or writes private key material — only addresses, hashes and verdicts.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { ethers } from "ethers";
 
 import { EthereumAdapter } from "../packages/chains/ethereum/adapter";
@@ -24,7 +24,11 @@ import type { UnsignedTx } from "../packages/chains/chain-adapter";
 import { totalGas } from "../packages/jumpper/gas-model";
 
 const RPC = process.env.EVM_RPC ?? "https://ethereum-rpc.publicnode.com";
-const REGISTRY_PATH = process.env.FLEET_REGISTRY_PATH ?? ".grid98-lab/agent/keys/wallets-registry.json";
+// Task 13-c: env override wins; then the lab default, then the canonical org
+// vault registry (steem/agent/keys/wallets-registry.json — 12/12 accounts).
+const REGISTRY_PATH = process.env.FLEET_REGISTRY_PATH
+  ?? [".grid98-lab/agent/keys/wallets-registry.json", "/home/z/git-audit/steem/agent/keys/wallets-registry.json"].find((p) => existsSync(p))
+  ?? ".grid98-lab/agent/keys/wallets-registry.json";
 const STATE_URL =
   process.env.SOVEREIGN_STATE_URL ?? "https://raw.githubusercontent.com/roshpinacare-sys/steem/main/sovereign/node/state.json";
 const CHAIN_ID = 1;
@@ -47,8 +51,15 @@ interface SovereignState {
 async function fetchSovereignState(): Promise<SovereignState> {
   // the steem repo is PRIVATE — raw fetch needs the owner token (local gitignored file / env)
   const headers: Record<string, string> = {};
+  // Task 13-c: token chain — env first, then the live upload/pat.env, then the
+  // legacy Roshcaregt.txt (each optional — a private-repo fetch without a token
+  // fails honestly at HTTP level instead of crashing on a missing file).
+  const fsmod = { existsSync, readFileSync };
   const token = process.env.GITHUB_TOKEN
-    ?? (await import("node:fs")).readFileSync("upload/Roshcaregt.txt", "utf8").trim();
+    ?? ["upload/pat.env", "/home/z/my-project/upload/pat.env", "upload/Roshcaregt.txt"]
+      .filter((p) => fsmod.existsSync(p))
+      .map((p) => { try { return fsmod.readFileSync(p, "utf8").trim(); } catch { return ""; } })
+      .find((t) => t.length > 10);
   if (token) headers.Authorization = `token ${token}`;
   const res = await fetch(STATE_URL, { headers, signal: AbortSignal.timeout(20_000) });
   if (!res.ok) throw new Error(`sovereign state fetch failed: HTTP ${res.status}`);

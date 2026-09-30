@@ -4,12 +4,17 @@
  * Reuses r10's fetchChainAuthorityMap (raw-33-byte matching, blurt included).
  * Output: verdicts and public keys only — private material never printed.
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import bs58 from "bs58";
 import { db } from "@/lib/db";
 import { fetchChainAuthorityMap } from "@/lib/gate/key-id";
 
-const KZ = "/tmp/r11/keys-restored";
+// Task 13-c: the /tmp/r11 restore workdir is session-ephemeral; the canonical
+// org key vault (steem/agent/keys, gitignored+0600) holds the same agent/keys
+// tree. Env override → ephemeral restore dir (if present) → canonical vault.
+const KZ = process.env.KEYS_ZIP_DIR
+  ?? ["/tmp/r11/keys-restored", "/home/z/git-audit/steem"].find((p) => existsSync(p + "/agent/keys/vault.json"))
+  ?? "/home/z/git-audit/steem";
 
 function pub33Of(wire: string): string | null {
   const m = /^(STM|HIVE|BLT|TST)([1-9A-HJ-NP-Za-km-z]+)$/.exec(wire);
