@@ -1,12 +1,14 @@
 {
  "agent": "wallet-verify",
- "generatedAt": "2026-10-02T22:47:57Z",
+ "generatedAt": "2026-10-03T18:39:11Z",
  "verdict": "PASS",
  "checks": {
-  "install": "cached",
+  "install": "pass",
   "prismaGenerate": "pass",
   "typecheck": "pass",
-  "productionBuild": "skipped-local"
+  "productionBuild": "pass",
+  "systemStatusDocs": 1,
+  "miniServicesDir": 1
  },
- "reason": "install+typecheck pass (local gate: build skipped by sandbox policy)"
+ "reason": "install, typecheck and build all pass"
 }
