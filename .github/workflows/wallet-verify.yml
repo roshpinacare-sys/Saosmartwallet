@@ -9,6 +9,9 @@ name: wallet-verify
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 permissions:
   contents: write
 
@@ -80,8 +83,11 @@ jobs:
           MINI_SERVICES=0
           [ -d mini-services ] && MINI_SERVICES=1
 
-          if [ "$INSTALL" = "pass" ] && [ "$TSC" != "fail" ] && [ "$BUILD" != "fail" ] && [ "$PRISMA" != "fail" ]; then
-            VERDICT="PASS"; REASON="install, typecheck and build all pass"
+          # חוק-כנות: PASS רק כשכל בדיקה רצה ועברה. skipped ≠ pass — ריצה חלקית = BLOCKED (כשל)
+          if [ "$INSTALL" = "pass" ] && [ "$PRISMA" = "pass" ] && [ "$TSC" = "pass" ] && [ "$BUILD" = "pass" ]; then
+            VERDICT="PASS"; REASON="install, prisma, typecheck and build all ran and passed"
+          elif [ "$INSTALL" = "skipped" ] || [ "$PRISMA" = "skipped" ] || [ "$TSC" = "skipped" ] || [ "$BUILD" = "skipped" ]; then
+            VERDICT="BLOCKED"; REASON="incomplete run — skipped is never pass: install=$INSTALL prisma=$PRISMA tsc=$TSC build=$BUILD"
           else
             REASON="install=$INSTALL prisma=$PRISMA tsc=$TSC build=$BUILD"
           fi
@@ -100,7 +106,12 @@ jobs:
             "systemStatusDocs": $SYSSTATUS,
             "miniServicesDir": $MINI_SERVICES
            },
-           "reason": "$REASON"
+           "reason": "$REASON",
+           "provenance": {
+            "runId": "${GITHUB_RUN_ID}",
+            "runUrl": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+            "sha": "${GITHUB_SHA}"
+           }
           }
           EOF
           git config user.name "wallet-verify[bot]"
@@ -109,7 +120,7 @@ jobs:
           if git diff --cached --quiet agent/status.json; then
             echo "status unchanged - no commit"
           else
-            git commit -m "wallet-verify: $VERDICT at $NOW"
+            git commit -m "wallet-verify: $VERDICT at $NOW" -m "provenance: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
             git push
           fi
           echo "verdict: $VERDICT ($REASON)"
