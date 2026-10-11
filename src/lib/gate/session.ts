@@ -41,7 +41,7 @@ export async function createSession(kind: string, name: string, scopes: string[]
   jar.set(GATE_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: false, // sandbox preview runs behind the gateway (http hop)
+    secure: process.env.GATE_COOKIE_SECURE === "true", // ברירת-מחדל false — תצוגת-סנדבוקס מאחורי גשר http; מאחורי TLS הפעל GATE_COOKIE_SECURE=true
     path: "/",
     maxAge: SESSION_DAYS * 24 * 3600,
   });
