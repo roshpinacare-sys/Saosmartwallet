@@ -1,5 +1,16 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
+**ROLE (declared 2026-10-11, task 10-c un-silence sweep — complements
+REVIVAL-2026-10-11.md):** the **wallet product design & bridge-adapter
+source** — wire formats verified against real chain bytes, 3 chain adapters
+(steem/ethereum/solana) in `packages/chains`. Known anti-pattern recorded by
+the audits (git-committed `db/custom.db` = live key vault, 248 AES-GCM
+entries) — its fate is an OWNER decision (rotation/scrub), not a code lane
+(E-series records the same). Why it was muted: design-complete, runtime
+never deployed. Revival path: (1) owner decision on the committed vault DB,
+(2) drop the 61MB skills/ scaffold, (3) dispatch wallet-verify — everything
+else is ready.
+
 > **סטטוס: M0+M1+M2+M3+M4 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · Sovereign Key Vault חי · שכבת גשרים עם router+quotes חיים · M4 System Owner: בדיקות-חיים מאוחדות (/api/system/health) + דו"ח סטטוס חי (docs/system-status) + failover הוכח חי**
 > עדכון אחרון: 2026-09-08 (Asia/Jerusalem)
 
