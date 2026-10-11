@@ -6,7 +6,7 @@ export function ok(data: unknown) {
 }
 export function fail(err: unknown) {
   if (err instanceof GateError) {
-    return NextResponse.json({ ok: false, code: err.code, error: err.message }, { status: err.code === "vault-locked" ? 423 : 400 });
+    return NextResponse.json({ ok: false, code: err.code, error: err.message }, { status: err.code === "vault-locked" ? 423 : err.code === "rate-limited" ? 429 : 400 });
   }
   const msg = err instanceof Error ? err.message : String(err);
   return NextResponse.json({ ok: false, code: "internal", error: msg }, { status: 500 });
