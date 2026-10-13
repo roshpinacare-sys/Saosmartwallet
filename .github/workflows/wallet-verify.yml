@@ -115,7 +115,7 @@ jobs:
           }
           EOF
           git config user.name "wallet-verify[bot]"
-          git config user.email "wallet-verify[bot]@users.noreply.github.com"
+          git config user.email "wallet-verify[bot]@agents.roshpinacare-sys"
           git add agent/status.json
           if git diff --cached --quiet agent/status.json; then
             echo "status unchanged - no commit"
