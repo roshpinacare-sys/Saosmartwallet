@@ -1,48 +1,19 @@
-# Multi Search Engine
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## 基本信息
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 e76603f4891c4deb7d81dfb8966218a3705d639bf1f721bccb1626d4fd1aa67e, 1132 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-- **名称**: multi-search-engine
-- **版本**: v2.0.1
-- **描述**: 集成17个搜索引擎（8国内+9国际），支持高级搜索语法
-- **发布时间**: 2026-02-06
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/multi-search-engine/CHANNELLOG.md && git show <sha>:skills/multi-search-engine/CHANNELLOG.md
 
-## 搜索引擎
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/multi-search-engine/CHANNELLOG.md |
+| sha256 of what was here | e76603f4891c4deb7d81dfb8966218a3705d639bf1f721bccb1626d4fd1aa67e |
+| size of what was here | 1132 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/multi-search-engine/CHANNELLOG.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-**国内（8个）**: 百度、必应、360、搜狗、微信、头条、集思录
-**国际（9个）**: Google、DuckDuckGo、Yahoo、Brave、Startpage、Ecosia、Qwant、WolframAlpha
-
-## 核心功能
-
-- 高级搜索操作符（site:, filetype:, intitle:等）
-- DuckDuckGo Bangs快捷命令
-- 时间筛选（小时/天/周/月/年）
-- 隐私保护搜索
-- WolframAlpha知识计算
-
-## 更新记录
-
-### v2.0.1 (2026-02-06)
-- 精简文档，优化发布
-
-### v2.0.0 (2026-02-06)
-- 新增9个国际搜索引擎
-- 强化深度搜索能力
-
-### v1.0.0 (2026-02-04)
-- 初始版本：8个国内搜索引擎
-
-## 使用示例
-
-```javascript
-// Google搜索
-web_fetch({"url": "https://www.google.com/search?q=python"})
-
-// 隐私搜索
-web_fetch({"url": "https://duckduckgo.com/html/?q=privacy"})
-
-// 站内搜索
-web_fetch({"url": "https://www.google.com/search?q=site:github.com+python"})
-```
-
-MIT License
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

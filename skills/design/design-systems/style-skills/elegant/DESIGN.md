@@ -1,55 +1,19 @@
----
-name: Elegant
-colors:
-  primary: "#3B82F6"
-  secondary: "#8B5CF6"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FFFFFF"
-  text: "#111827"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "Google Sans"
-    fontSize: 2.5rem
-  body-md:
-    fontFamily: "Google Sans"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "Anonymous Pro"
-    fontSize: 0.875rem
-  sourceScale: "14/16/18/24/32/40"
-  weights: "100, 200, 300, 400, 500, 600"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 9b04641f0f74916a8619f5935c6a1a0195a1b75ab6adaf88ee64010a8684ac17, 1534 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Graceful, refined aesthetic with delicate typography, minimal palettes, and polished layouts that exude sophistication.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/elegant/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/elegant/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/elegant/DESIGN.md |
+| sha256 of what was here | 9b04641f0f74916a8619f5935c6a1a0195a1b75ab6adaf88ee64010a8684ac17 |
+| size of what was here | 1534 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/elegant/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** minimal, clean
-- **Typography scale:** 14/16/18/24/32/40
-- **Typography fonts:** primary=Google Sans, display=Google Sans, mono=Anonymous Pro
-- **Typography weights:** 100, 200, 300, 400, 500, 600
-- **Color palette:** primary, secondary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#3B82F6):** Token from style foundations.
-- **Secondary (#8B5CF6):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

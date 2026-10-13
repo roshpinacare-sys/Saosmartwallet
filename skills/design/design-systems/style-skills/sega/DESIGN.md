@@ -1,55 +1,19 @@
----
-name: Sega
-colors:
-  primary: "#4502FF"
-  secondary: "#FFDA14"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FFFFFF"
-  text: "#111827"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "VT323"
-    fontSize: 2.1875rem
-  body-md:
-    fontFamily: "VT323"
-    fontSize: 0.9375rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.8125rem
-  sourceScale: "13/15/17/21/27/35"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 25eebea80a8103d3865663bda15171b5930912b6dacc746650d5e268aff20ee5, 1542 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Arcade-inspired game interface with pixel typography, hard edges, and physically punchy, offset-shadow controls.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/sega/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/sega/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/sega/DESIGN.md |
+| sha256 of what was here | 25eebea80a8103d3865663bda15171b5930912b6dacc746650d5e268aff20ee5 |
+| size of what was here | 1542 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/sega/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, playful
-- **Typography scale:** 13/15/17/21/27/35
-- **Typography fonts:** primary=VT323, display=VT323, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, secondary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#4502FF):** Token from style foundations.
-- **Secondary (#FFDA14):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

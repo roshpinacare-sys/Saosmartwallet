@@ -1,28 +1,19 @@
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
----
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 3f117a67432e936526529a0535962cde7e4b7515519f19c426c4dd2071003bc7, 1054 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## CJK Typography Supplement
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/pdf/typesetting/typography.md && git show <sha>:skills/pdf/typesetting/typography.md
 
-> See `pagination.md` Section 3 for detailed rules.
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/pdf/typesetting/typography.md |
+| sha256 of what was here | 3f117a67432e936526529a0535962cde7e4b7515519f19c426c4dd2071003bc7 |
+| size of what was here | 1054 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/pdf/typesetting/typography.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-### Scope: Creative Flow pipeline (html2pdf-next.js) ONLY
-
-These CSS rules apply to **multi-page HTML documents** rendered via `html2pdf-next.js` (Creative Flow brief). In this pipeline, Chromium's `text-align: justify` + `line-break: strict` produces proper CJK typesetting with correct punctuation handling.
-
-**Do NOT apply these rules to:**
-- **Poster pipeline** (html2poster.js) — short lines + fixed containers make justify stretch CJK character spacing. Use `text-align: left` instead. See `briefs/poster.md` §7.1.
-- **Report pipeline** (ReportLab) — use `TA_LEFT` for CJK body text. ReportLab’s justify algorithm handles CJK poorly. See `briefs/report.md` §CJK alignment.
-
-```css
-/* CJK punctuation placement rules — Creative Flow pipeline only */
-body {
-  line-break: strict;
-  word-break: normal;
-  overflow-wrap: break-word;
-}
-
-p, td, li {
-  line-break: strict;
-  text-align: justify;  /* Only for Creative Flow; poster/report use left */
-}
-```
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

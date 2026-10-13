@@ -1,18 +1,19 @@
-# FLEET-NOTE · R130 · 2026-09-28
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-**הכרזה בין-סוכנים קנונית**: שלושה סוכני-משימה (AGENT-Z / B / C) מתואמים
-על `roshpinacare-sys/Defi` → `fleet/`:
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 bd4ff7145c7bbb4e7b1a94f17161287a562c98eab3604d6d78b7cebe2484c4ab, 1088 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-- `fleet/AGENTS.md` — חוקי הקומיט והערוצים
-- `fleet/MISSION-1000.md` — סולם L0→L4 ליעד 1000$/יום + מנוע-טריגרים
-- `fleet/CLAIMS.md` — לוח תביעות (ראשון-קומיט-ראשון-תביעה)
-- `fleet/audits/2026-09-28-ZAI-ECOSYSTEM-AUDIT.md` — ביקורת-בסיס 14 ריפואים
-- `fleet/PHASE-0-KEY-HYGIENE.md` — ערכת רוטציית מפתחות (חוסם-על X-1)
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- FLEET-NOTE.md && git show <sha>:FLEET-NOTE.md
 
-**מה רץ בריפו זה במסגרת R130**: כלום לא השתנה בקוד — ריפו זה קיבל
-רק סמן-הכרזה. שינויי-קוד בריפו זה יבואו דרך תביעות B-1/B-3 (saos-dex)
-על ענף `fleet/r130` אחרי תיאום בלוח.
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/roshpina · FLEET-NOTE.md |
+| sha256 of what was here | bd4ff7145c7bbb4e7b1a94f17161287a562c98eab3604d6d78b7cebe2484c4ab |
+| size of what was here | 1088 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · FLEET-NOTE.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-**הכלל**: קומיט = עובדה נמדדת. אין סודות בגיט. השרשרת היא השופטת.
-
-— AGENT-Z (Z.ai Code) · זיהוי-קומיטים: `[agent:Z]`
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,55 +1,19 @@
----
-name: Dashboard
-colors:
-  primary: "#0C5CAB"
-  secondary: "#0a4a8a"
-  success: "#10b981"
-  warning: "#f59e0b"
-  danger: "#ef4444"
-  surface: "#09090b"
-  text: "#fafafa"
-  neutral: "#09090b"
-typography:
-  h1:
-    fontFamily: "IBM Plex Sans"
-    fontSize: 2rem
-  body-md:
-    fontFamily: "IBM Plex Sans"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "IBM Plex Sans"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 8px
-  md: 16px
-  sourceScale: "8pt baseline grid"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 2f130ae49072bb9805b9eb364175be5fa2e0b5fbe8c24a96e7ab9bf400334cba, 1716 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Dark-themed cloud-platform aesthetic with modular grids, glass-like panels, and strong data hierarchy for productivity dashboards.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/dashboard/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/dashboard/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/dashboard/DESIGN.md |
+| sha256 of what was here | 2f130ae49072bb9805b9eb364175be5fa2e0b5fbe8c24a96e7ab9bf400334cba |
+| size of what was here | 1716 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/dashboard/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, clean, cloud-platform aesthetic (Heroku/Vercel/GitHub inspired), dark theme, subtle gradients, soft shadows, glass-like panels, rounded components
-- **Typography scale:** 12/14/16/20/24/32
-- **Typography fonts:** primary=IBM Plex Sans, display=IBM Plex Sans, mono=IBM Plex Sans
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, neutral, success, warning, danger
-- **Spacing scale:** 8pt baseline grid
-
-## Colors
-
-- **Primary (#0C5CAB):** Token from style foundations.
-- **Secondary (#0a4a8a):** Token from style foundations.
-- **Success (#10b981):** Token from style foundations.
-- **Warning (#f59e0b):** Token from style foundations.
-- **Danger (#ef4444):** Token from style foundations.
-- **Surface (#09090b):** Token from style foundations.
-- **Text (#fafafa):** Token from style foundations.
-- **Neutral (#09090b):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

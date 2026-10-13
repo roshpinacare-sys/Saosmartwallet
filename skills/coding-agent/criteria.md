@@ -1,48 +1,19 @@
-# Criteria for Storing Preferences
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Reference for when to save user preferences to `~/code/memory.md`.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 20d5332856656e571d6c1c73d1512125af38449bd79c2b239c96454479a7a187, 1108 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## When to Save (User Must Request)
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/coding-agent/criteria.md && git show <sha>:skills/coding-agent/criteria.md
 
-Save only when user explicitly asks:
-- "Remember that I prefer X"
-- "Always do Y from now on"
-- "Save this preference"
-- "Don't forget that I like Z"
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/coding-agent/criteria.md |
+| sha256 of what was here | 20d5332856656e571d6c1c73d1512125af38449bd79c2b239c96454479a7a187 |
+| size of what was here | 1108 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/coding-agent/criteria.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## When NOT to Save
-
-- User didn't explicitly ask to save
-- Project-specific requirement (applies to this project only)
-- One-off request ("just this once")
-- Temporary preference
-
-## What to Save
-
-**Preferences:**
-- Coding style preferences user stated
-- Tools or frameworks user prefers
-- Patterns user explicitly likes
-
-**Things to avoid:**
-- Approaches user explicitly dislikes
-- Patterns user asked not to repeat
-
-## Format in memory.md
-
-```markdown
-## Preferences
-- prefers TypeScript over JavaScript
-- likes detailed comments
-- wants tests for all functions
-
-## Never
-- no class-based React components
-- avoid inline styles
-```
-
-## Important
-
-- Only save what user EXPLICITLY asked to save
-- Ask user before saving: "Should I remember this preference?"
-- Never modify any skill files, only `~/code/memory.md`
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

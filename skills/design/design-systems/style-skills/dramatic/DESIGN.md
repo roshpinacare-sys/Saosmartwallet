@@ -1,55 +1,19 @@
----
-name: Dramatic
-colors:
-  primary: "#8B5CF6"
-  secondary: "#F43F5E"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#09090B"
-  text: "#FAFAFA"
-  neutral: "#09090B"
-typography:
-  h1:
-    fontFamily: "Outfit"
-    fontSize: 2rem
-  body-md:
-    fontFamily: "Outfit"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32"
-  weights: "400, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 1c34081f55b892d54092c49ad60331139cac5227db5d2d2da2ad1662e03d2acd, 1484 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-High-contrast, theatrical design with bold layouts, immersive visuals, and unconventional compositions that command attention.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/dramatic/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/dramatic/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/dramatic/DESIGN.md |
+| sha256 of what was here | 1c34081f55b892d54092c49ad60331139cac5227db5d2d2da2ad1662e03d2acd |
+| size of what was here | 1484 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/dramatic/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, clean, high-contrast
-- **Typography scale:** 12/14/16/20/24/32
-- **Typography fonts:** primary=Outfit, display=Outfit, mono=JetBrains Mono
-- **Typography weights:** 400, 900
-- **Color palette:** primary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#8B5CF6):** Token from style foundations.
-- **Secondary (#F43F5E):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#09090B):** Token from style foundations.
-- **Text (#FAFAFA):** Token from style foundations.
-- **Neutral (#09090B):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

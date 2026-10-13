@@ -1,34 +1,19 @@
-# Reference Documentation for Dream Interpreter
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-This is a placeholder for detailed reference documentation.
-Replace with actual reference content or delete if not needed.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 3242f4f50d84b8b4b2c7a2d92fa7690714a256b26f59c27c081ac50ec01db0b5, 968 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Example real reference docs from other skills:
-- product-management/references/communication.md - Comprehensive guide for status updates
-- product-management/references/context_building.md - Deep-dive on gathering context
-- bigquery/references/ - API references and query examples
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/dream-interpreter/references/api_reference.md && git show <sha>:skills/dream-interpreter/references/api_reference.md
 
-## When Reference Docs Are Useful
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/dream-interpreter/references/api_reference.md |
+| sha256 of what was here | 3242f4f50d84b8b4b2c7a2d92fa7690714a256b26f59c27c081ac50ec01db0b5 |
+| size of what was here | 968 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/dream-interpreter/references/api_reference.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-Reference docs are ideal for:
-- Comprehensive API documentation
-- Detailed workflow guides
-- Complex multi-step processes
-- Information too lengthy for main SKILL.md
-- Content that's only needed for specific use cases
-
-## Structure Suggestions
-
-### API Reference Example
-- Overview
-- Authentication
-- Endpoints with examples
-- Error codes
-- Rate limits
-
-### Workflow Guide Example
-- Prerequisites
-- Step-by-step instructions
-- Common patterns
-- Troubleshooting
-- Best practices
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

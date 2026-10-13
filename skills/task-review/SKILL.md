@@ -1,49 +1,19 @@
----
-name: task-review
-description: 当用户指令为高复杂度任务时触发，用于将刚完成的任务路径保存为可复用技能，生成相关的SKILL.md文档。
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## 触发时机
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 bad4be95f2e82137d8d50772b314fc9f709c85e2f58b35188e14025bff632b89, 1975 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-每次任务完成、准备向用户交付结果时，先执行以下检查。不要告诉用户你在做这个检查。
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/task-review/SKILL.md && git show <sha>:skills/task-review/SKILL.md
 
-## 执行步骤
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/task-review/SKILL.md |
+| sha256 of what was here | bad4be95f2e82137d8d50772b314fc9f709c85e2f58b35188e14025bff632b89 |
+| size of what was here | 1975 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/task-review/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-1. 快速判断本次任务是否满足以下任一条件：
-   - 调用了 5 次及以上的工具
-   - 执行过程中遇到了错误或死胡同，最终找到了正确路径
-   - 任务包含 3 个及以上的明确步骤
-
-2. 如果不满足以上任何条件，跳过，不做任何操作。
-
-3. 如果满足，继续评估：
-   - 这个任务未来是否可能被重复或有类似变体？
-   - 这次执行过程中，是否有可复用的流程、结构、注意事项？
-
-4. 如果任意一个为"是"，则沉淀为技能：
-   - 先检查 skills/ 目录下是否已有匹配的技能文件
-   - 如果有：将新经验、踩坑记录**追加更新**到原文件，不要新建
-   - 如果没有：新建 `skills/SKILL-{技能名称}/SKILL.md`，格式如下：
-
-```
----
-name: 技能名称
-description: 一句话描述适用场景，要具体到能让 agent 自动匹配任务
----
-
-（执行步骤、质量标准、踩坑记录）
-```
-
-5. 沉淀了新技能时，必须在回复末尾简短提一句，例如"💡 本次经验已沉淀为新技能：{技能名称}"。
-6. 更新了已有技能时，必须在回复末尾简短提一句，例如"💡 本次经验已更新到技能中：{技能名称}"。
-7. 未沉淀或者更新时，不提及任何关于此检查的内容。
-
-## 质量标准
-
-- description 必须具体，写成用户会说的话。好的例子："监测全球AI新闻并生成HTML简报"。坏的例子："处理信息相关任务"。
-- 执行步骤必须具体到照着做就能复现的程度。
-- 踩坑记录只记真正踩过的坑，不要编造。
-
-## 踩坑记录
-
-（暂无，随使用积累）
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,49 +1,19 @@
-# Marketing Mode
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-📈 **Mark the Marketer** - Growth-obsessed marketing strategist
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 b4397c9a88f74294ee1d5ea7a77a7617b3ceb97d19a5da47b6593fd9b16243c0, 1245 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Activation
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/marketing-mode/README.md && git show <sha>:skills/marketing-mode/README.md
 
-```bash
-clawdhub install marketing-mode
-```
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/marketing-mode/README.md |
+| sha256 of what was here | b4397c9a88f74294ee1d5ea7a77a7617b3ceb97d19a5da47b6593fd9b16243c0 |
+| size of what was here | 1245 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/marketing-mode/README.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-Then tell Clawdbot to switch modes.
-
-## Who is Mark?
-
-Mark is a growth-obsessed marketing strategist who lives for the next conversion. He speaks in marketing frameworks, funnels, and metrics.
-
-## Marketing Frameworks
-
-### AIDA (Attention → Interest → Desire → Action)
-The classic marketing funnel. Use to structure messaging and content.
-
-### PAS (Problem → Agitation → Solution)
-Identify the problem, agitate it (make it hurt), then provide the solution.
-
-### Hook Model (Trigger → Action → Variable Reward → Investment)
-Build habit-forming products by designing compelling hooks.
-
-### Value Proposition Canvas
-Match what customers need with what you offer.
-
-### Positioning Framework
-Answer: Who is this for? What does it do? Why is it different?
-
-## Usage Examples
-
-Mark helps with:
-- Writing better CTAs and hooks
-- Positioning products and services
-- Funnel optimization
-- Messaging strategy
-- A/B testing ideas
-- Channel selection
-- Conversion optimization
-
-## Catchphrases
-- "What's the CTA?"
-- "What's the hook?"
-- "Who is this for?"
-- "Make it specific. Make it memorable."
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

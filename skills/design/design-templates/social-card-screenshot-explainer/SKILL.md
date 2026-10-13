@@ -1,59 +1,19 @@
----
-name: social-card-screenshot-explainer
-description: 截图 / UI / 工具流解释类社交卡 — 必须给截图一个"舞台"：可读裁切 + 标注层级 + 出现的理由。骨架：封面 + 大截图 + 3 个标注 / 截图裁切 + 放大细节 + 结论 / before-after 截图对 / 产品 UI 框 + 编号 callout / 3 步工作流。截图要大到手机能看清，箭头节制，加一个 takeaway 标题。触发："做个工具教程卡 / AI 工作流卡 / UI 解释卡 / 截图说明卡 / before-after 卡"。NOT 原图直接丢上画布，NOT 装饰性无关截图。
-visibility: public
-mode: template
-carrier: fixed-image
-scenario: social-content
-pattern_source: pattern.html
-source_priority: skill-first
-triggers:
-  - "做个工具教程卡"
-  - "AI 工作流卡"
-  - "UI 解释卡"
-  - "截图说明卡"
-  - "before-after 卡"
-  - "产品功能拆解卡"
-related_patterns: social-card-swiss
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-# Social Card Screenshot Explainer
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 97ae032b9445468416869b8321a9e59f0ace203f0e19bc1508bce7bb0f7fe972, 2424 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Use for tool walkthroughs, product UI explanations, app feature breakdowns, AI workflow screenshots, or before/after UI captures.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-templates/social-card-screenshot-explainer/SKILL.md && git show <sha>:skills/design/design-templates/social-card-screenshot-explainer/SKILL.md
 
-## Core Rule
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-templates/social-card-screenshot-explainer/SKILL.md |
+| sha256 of what was here | 97ae032b9445468416869b8321a9e59f0ace203f0e19bc1508bce7bb0f7fe972 |
+| size of what was here | 2424 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-templates/social-card-screenshot-explainer/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-Never drop a raw screenshot onto the canvas and call it designed. A screenshot needs a stage, readable crop, annotation hierarchy, and a reason to be there.
-
-## Structure Options
-
-- cover + large screenshot + 3 annotations
-- screenshot crop + zoomed detail + conclusion
-- before / after screenshot pair
-- product UI frame + numbered callouts
-- 3-step workflow with one screenshot per step
-
-## Must Do
-
-- Keep the screenshot large enough to inspect on phone.
-- Crop irrelevant browser chrome unless it helps context.
-- Use device/browser frames only when they clarify the source.
-- Use arrows/callouts sparingly; labels must not cover key UI.
-- Add one takeaway title so the card is not just a screenshot.
-
-## Avoid
-
-- Tiny unreadable UI captures.
-- Too many callout bubbles.
-- Fake product screenshots.
-- Decorative screenshots unrelated to the point.
-
-## Related Pattern
-
-Use `social-card-swiss` as the closest pattern if a visual reference is needed.
-
-## Pattern Source Rule
-
-Read this `SKILL.md` first. Do **not** read `pattern.html` by default.
-
-Read `pattern.html` only when you need concrete layout rhythm, spatial relationships, or interaction/annotation behavior that this markdown cannot fully specify. When read, extract patterns only; do not copy DOM, CSS classes, exact spacing, placeholder copy, or styling wholesale.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

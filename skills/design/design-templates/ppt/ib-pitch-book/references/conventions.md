@@ -1,36 +1,19 @@
-# Investment-banking pitch book — layout conventions
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Use as a self-check before finishing **`index.html`**.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 a459037b6f8a85cd2da40a9865ad0d717b0052d0ef96c4cabbf9beeecca3d774, 1264 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Every slide
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-templates/ppt/ib-pitch-book/references/conventions.md && git show <sha>:skills/design/design-templates/ppt/ib-pitch-book/references/conventions.md
 
-- **Masthead**: advisory bank name + project codename + section label + page x/y.
-- **Confidentiality**: visible treatment ("Strictly Confidential — Discussion
-  Materials" or firm-standard ribbon).
-- **Footer**: page fraction, optional run id / skill trace for internal QA.
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-templates/ppt/ib-pitch-book/references/conventions.md |
+| sha256 of what was here | a459037b6f8a85cd2da40a9865ad0d717b0052d0ef96c4cabbf9beeecca3d774 |
+| size of what was here | 1264 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-templates/ppt/ib-pitch-book/references/conventions.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Tables
-
-- Financial figures use **tabular numerals** (monospace or `font-feature-settings: "tnum"`).
-- Multiples use **×** (not `x`) where appropriate.
-- **Median / mean** summary rows differ visually from data rows (italic or tint).
-- **Subject company** row highlighted consistently.
-
-## Football field
-
-- Shared horizontal axis across methodologies; **current price** as vertical tick.
-- Range labels right-aligned; methodology labels left.
-
-## DCF sensitivity
-
-- Highlight **base case** cell (WACC × terminal growth).
-- State rounding rules in a foot line.
-
-## Strategic alternatives matrix
-
-- Four options; **recommended** option uses inverted emphasis (e.g. dark fill).
-- Each cell: headline, indicative value band, **for / against** bullets.
-
-## Disclaimer slide
-
-- Prepared for whom, sources, limitations, no reliance for transaction decisions.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

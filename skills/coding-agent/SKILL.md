@@ -1,120 +1,19 @@
----
-name: coding-agent
-slug: code
-version: 1.0.4
-homepage: https://clawic.com/skills/code
-description: Coding workflow with planning, implementation, verification, and testing for clean software development.
-changelog: Improved description for better discoverability
-metadata: {"clawdbot":{"emoji":"💻","requires":{"bins":[]},"os":["linux","darwin","win32"]}}
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## When to Use
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 1021c4d7db47644dede46d8f44c7428c32a7d4ce40a4a08710de78e2ceb6e436, 3213 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-User explicitly requests code implementation. Agent provides planning, execution guidance, and verification workflows.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/coding-agent/SKILL.md && git show <sha>:skills/coding-agent/SKILL.md
 
-## Architecture
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/coding-agent/SKILL.md |
+| sha256 of what was here | 1021c4d7db47644dede46d8f44c7428c32a7d4ce40a4a08710de78e2ceb6e436 |
+| size of what was here | 3213 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/coding-agent/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-User preferences stored in `~/code/` when user explicitly requests.
-
-```
-~/code/
-  - memory.md    # User-provided preferences only
-```
-
-Create on first use: `mkdir -p ~/code`
-
-## Quick Reference
-
-| Topic | File |
-|-------|------|
-| Memory setup | `memory-template.md` |
-| Task breakdown | `planning.md` |
-| Execution flow | `execution.md` |
-| Verification | `verification.md` |
-| Multi-task state | `state.md` |
-| User criteria | `criteria.md` |
-
-## Scope
-
-This skill ONLY:
-- Provides coding workflow guidance
-- Stores preferences user explicitly provides in `~/code/`
-- Reads included reference files
-
-This skill NEVER:
-- Executes code automatically
-- Makes network requests
-- Accesses files outside `~/code/` and the user's project
-- Modifies its own SKILL.md or auxiliary files
-- Takes autonomous action without user awareness
-
-## Core Rules
-
-### 1. Check Memory First
-Read `~/code/memory.md` for user's stated preferences if it exists.
-
-### 2. User Controls Execution
-- This skill provides GUIDANCE, not autonomous execution
-- User decides when to proceed to next step
-- Sub-agent delegation requires user's explicit request
-
-### 3. Plan Before Code
-- Break requests into testable steps
-- Each step independently verifiable
-- See `planning.md` for patterns
-
-### 4. Verify Everything
-| After | Do |
-|-------|-----|
-| Each function | Suggest running tests |
-| UI changes | Suggest taking screenshot |
-| Before delivery | Suggest full test suite |
-
-### 5. Store Preferences on Request
-| User says | Action |
-|-----------|--------|
-| "Remember I prefer X" | Add to memory.md |
-| "Never do Y again" | Add to memory.md Never section |
-
-Only store what user explicitly asks to save.
-
-## Workflow
-
-```
-Request -> Plan -> Execute -> Verify -> Deliver
-```
-
-## Common Traps
-
-- **Delivering untested code** -> always verify first
-- **Huge PRs** -> break into testable chunks
-- **Ignoring preferences** -> check memory.md first
-
-## Self-Modification
-
-This skill NEVER modifies its own SKILL.md or auxiliary files.
-User data stored only in `~/code/memory.md` after explicit request.
-
-## External Endpoints
-
-This skill makes NO network requests.
-
-| Endpoint | Data Sent | Purpose |
-|----------|-----------|---------|
-| None | None | N/A |
-
-## Security & Privacy
-
-**Data that stays local:**
-- Only preferences user explicitly asks to save
-- Stored in `~/code/memory.md`
-
-**Data that leaves your machine:**
-- None. This skill makes no network requests.
-
-**This skill does NOT:**
-- Execute code automatically
-- Access network or external services  
-- Access files outside `~/code/` and user's project
-- Take autonomous actions without user awareness
-- Delegate to sub-agents without user's explicit request
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

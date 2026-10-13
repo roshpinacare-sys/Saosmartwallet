@@ -1,55 +1,19 @@
----
-name: Enterprise
-colors:
-  primary: "#072C2C"
-  secondary: "#FF5F03"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#EDEADE"
-  text: "#111827"
-  neutral: "#EDEADE"
-typography:
-  h1:
-    fontFamily: "Oswald"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Ubuntu"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "Ubuntu Mono"
-    fontSize: 0.75rem
-  sourceScale: "desktop-first expressive scale"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 8px
-  md: 16px
-  sourceScale: "comfortable density mode"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 082d1cd86843ff8b542d3a289c331f172d454bf9d8c6bd5216e26d8a3d3f6b03, 1590 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Clean, high-contrast enterprise design for data-driven workflows with intuitive drag-and-drop patterns and structured layouts.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/enterprise/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/enterprise/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/enterprise/DESIGN.md |
+| sha256 of what was here | 082d1cd86843ff8b542d3a289c331f172d454bf9d8c6bd5216e26d8a3d3f6b03 |
+| size of what was here | 1590 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/enterprise/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** clean, high-contrast, enterprise
-- **Typography scale:** desktop-first expressive scale
-- **Typography fonts:** primary=Ubuntu, display=Oswald, mono=Ubuntu Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, success, warning, danger
-- **Spacing scale:** comfortable density mode
-
-## Colors
-
-- **Primary (#072C2C):** Token from style foundations.
-- **Secondary (#FF5F03):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#EDEADE):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#EDEADE):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

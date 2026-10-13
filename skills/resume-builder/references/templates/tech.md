@@ -1,53 +1,19 @@
-# 技术 / 研发 / 数据 简历模板
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## 结构
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 d419f06032f6bead40d1d2be4eaa903b3837b2c4451a8e14b1e89e1f783bb677, 2268 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-```
-姓名｜电话｜邮箱｜GitHub｜城市｜目标岗位
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/resume-builder/references/templates/tech.md && git show <sha>:skills/resume-builder/references/templates/tech.md
 
-【个人简介 / Summary】（可选，1~2 行）
-X 年 ___ 经验，专注 ___（高并发后端 / 推荐系统 / LLM 应用 / ...），熟悉 ___ 技术栈
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/resume-builder/references/templates/tech.md |
+| sha256 of what was here | d419f06032f6bead40d1d2be4eaa903b3837b2c4451a8e14b1e89e1f783bb677 |
+| size of what was here | 2268 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/resume-builder/references/templates/tech.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-【技能】（技术岗放前面，让 HR 一眼看到栈是否对口）
-- 语言：Java（精通）、Python（熟练）、Go（了解）
-- 后端：Spring Boot、Spring Cloud、gRPC、Kafka、Redis、MySQL、ClickHouse
-- 大数据 / 算法：Spark、Flink、Hive、PyTorch（如果是算法岗）
-- 工程：Docker、Kubernetes、Linux、Git、CI/CD
-- 其他：TypeScript、AWS
-
-【工作经历】
-公司 A | 职级（高级工程师 / 资深工程师 / Tech Lead）| 起止
-- 系统级成绩（含 QPS、延迟、可用性、规模等数字）
-- 架构 / 设计贡献（你设计了什么、为什么这么选）
-- 业务影响（推动了什么业务结果）
-
-【项目经历】
-项目名 | 角色 | 技术栈 | 时间
-- 背景：业务规模 / 痛点（一句话）
-- 方案：你的核心设计 + 关键技术决策（讲为什么）
-- 结果：性能 / 稳定性 / 成本 数字
-
-【教育背景】
-
-【开源 / 论文 / 比赛】（强加分）
-- GitHub 项目（star 数 / 主要 contributor）
-- 论文（标注会议 / 期刊）
-- 比赛（Kaggle / ACM / 天池 / 黑客松，含名次）
-```
-
-## 风格要点
-
-- **少形容词，多数字 + 技术细节**
-  - 弱："优化了系统性能"
-  - 强："通过引入二级缓存 + SQL 改写，将商品详情接口 P99 从 480ms 降至 110ms"
-- **讲清楚『你做了什么』vs『团队做了什么』**：用"主导"/"负责"明确 ownership 边界
-- 算法岗：技能列表里**强调具体模型 / 框架版本**（避免堆砌 buzzword）
-- LLM / Agent 岗：明确写"训练 / 微调 / 推理 / 应用"中你做的部分，避免被以为是 prompt-only
-- 长度：1~2 页
-
-## 常见雷区
-
-- 简历里写"精通"，面试问到一脸懵 → 不熟就写"熟练 / 了解"
-- 列出 20+ 技能，问哪个都不深 → 删到 8~12 个真正会的
-- 把课程内容当项目经历 → 标注"课程项目 (Course Project)"，不要假装是工业项目
-- 项目描述只有"什么是 ___"，没有"我做了什么" → 重写
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

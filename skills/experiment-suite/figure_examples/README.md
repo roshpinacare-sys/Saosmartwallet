@@ -1,33 +1,19 @@
-# Figure Examples
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Reference matplotlib / seaborn scripts producing publication-grade figures
-for AI4S research papers. Reproduce with:
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 1166cdda841e834e021fb0352287198cefed549cfbeabab246a1c947817eff9b, 1316 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-```bash
-pip install matplotlib seaborn
-cd <where-you-want-the-pdf>
-python make_fig_02_horizon_sweep.py
-python make_fig_03_heatmap.py
-python make_fig_04_ablation.py
-```
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/experiment-suite/figure_examples/README.md && git show <sha>:skills/experiment-suite/figure_examples/README.md
 
-These are illustrative templates — copy and adapt for your data. They were
-extracted from a successful enrichment run of the `paper-writer` skill on
-the topic *Transformer-based time-series forecasting* (May 2026); the data
-embedded inline are simulated and meant only to illustrate the formatting.
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/experiment-suite/figure_examples/README.md |
+| sha256 of what was here | 1166cdda841e834e021fb0352287198cefed549cfbeabab246a1c947817eff9b |
+| size of what was here | 1316 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/experiment-suite/figure_examples/README.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-Start by filling `FIGURE_CONTRACT_TEMPLATE.md` for the figure you are about to make.
-Then reuse `style_kit.py` so exports, palette, panel labels, and simulated
-watermarks stay consistent across the experiment package.
-
-## Style summary
-- Shared `style_kit.py` with editable SVG text and PDF font embedding
-- Explicit color palette (no default cycle)
-- Removed top/right spines
-- `axes.grid` on at low alpha
-- Figure sizes targeted at column-width (3.4-5.0 inches wide)
-- "simulated" watermark in italic gray for runs from the simulator path
-- Save PDF + SVG + TIFF together when the environment allows it
-
-See the `paper-writer` skill's `references/02-figures-publication-grade.md`
-for the full taste guide.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

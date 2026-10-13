@@ -1,66 +1,19 @@
----
-name: gaokao-recommend-majors
-description: >-
-  基于考生画像与 API 志愿列表，由 Agent 分析推荐适合的专业方向、就业出口与具体专业清单，
-  输出结构化 major_recommendation.json。适用于高考专业推荐、选专业、就业方向分析。
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-# 推荐专业与就业方向
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 837ec536d96cc245692531b3fc34be076ee16cb4b08f25b6edaa082d7112b6d5, 2504 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-本 Skill 是流水线的**第三步**：纯 Agent 分析，无规则脚本。结合考生兴趣、成绩、就业意向与 `parsed.json` 中的真实专业，产出个性化专业推荐。
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/gaokao-recommend-majors/SKILL.md && git show <sha>:skills/gaokao-recommend-majors/SKILL.md
 
-## 上下游
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/gaokao-recommend-majors/SKILL.md |
+| sha256 of what was here | 837ec536d96cc245692531b3fc34be076ee16cb4b08f25b6edaa082d7112b6d5 |
+| size of what was here | 2504 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/gaokao-recommend-majors/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **上游**：`student.json` + `parsed.json`（来自信息采集与获取志愿）
-- **下游**：[gaokao-recommend-schools](../gaokao-recommend-schools/SKILL.md) 读取 `major_recommendation.json`
-
-## 输入
-
-1. `student.json` — 考生完整画像
-2. `parsed.json` — 冲/稳/保志愿及每校 `majors`（含 `claim` 选科要求、录取概率）
-
-## Agent 分析任务
-
-1. 阅读 [career_reference.md](career_reference.md) 了解常见专业大类与就业出口（**参考，非硬规则**）。
-2. 综合选科要求、各科成绩、兴趣、家庭、就业方向，判断 2–4 个**专业方向**（`major_directions`）。
-3. 从 `parsed.json` 中挑选 **8–15 个**最契合的具体专业，写入 `recommended_majors`。
-4. 撰写综合开篇 `intro` 与整体策略 `strategy`（专业优先视角）。
-
-## 硬性约束
-
-`recommended_majors` 每项的 `university_name`、`university_code`、`major_name`、`major_code` 必须与 `parsed.json` **完全一致**，否则最终报告无法显示 🔥 标签。
-
-生成前在 `parsed.json` 中检索确认字段值。
-
-## 输出
-
-保存为 `output/major_recommendation.json`，结构见 [examples/major_recommendation_template.json](examples/major_recommendation_template.json)。
-
-```json
-{
-  "student": { "...辅助画像字段..." },
-  "intro": "综合测评开篇（HTML 可用 <strong>）",
-  "strategy": "填报策略（专业视角）",
-  "major_directions": [
-    { "icon": "🧑‍💻", "title": "...", "match_level": "极高", "description": "..." }
-  ],
-  "recommended_majors": [
-    {
-      "major_name": "...",
-      "major_code": "...",
-      "university_name": "...",
-      "university_code": "...",
-      "modal": { "title": "...", "body": "<h4>...</h4><ul>...</ul>" }
-    }
-  ]
-}
-```
-
-## 向用户交付
-
-- 保存 JSON 绝对路径
-- 用自然语言解读推荐的专业方向与 Top 专业理由
-
-## 附加资源
-
-- [career_reference.md](career_reference.md) — 专业/职业方向参考
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

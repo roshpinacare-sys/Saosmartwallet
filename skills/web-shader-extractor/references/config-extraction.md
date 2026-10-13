@@ -1,50 +1,19 @@
-# 配置参数提取
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-配置值必须从源站提取，不猜测。（猜错实例：颜色差 60x、图案完全不同）
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 c23a7a0ba1abc105c4b5b84b1b76a3bb910d9ee1dfbbb4611374addcd9ea0076, 1226 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## 来源（按优先级）
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/web-shader-extractor/references/config-extraction.md && git show <sha>:skills/web-shader-extractor/references/config-extraction.md
 
-### 1. 公开 REST API
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/web-shader-extractor/references/config-extraction.md |
+| sha256 of what was here | c23a7a0ba1abc105c4b5b84b1b76a3bb910d9ee1dfbbb4611374addcd9ea0076 |
+| size of what was here | 1226 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/web-shader-extractor/references/config-extraction.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-```bash
-# 在 JS bundle 中搜索 API 端点
-grep -oE 'api/(presets|shaders|collections)[^"]*' /tmp/*.js
-# 直接调用
-curl -s -L --compressed 'https://example.com/api/collections/slug/uuid'
-```
-
-API 返回可能是编码的 → 见 `encoded-definitions.md`
-
-### 2. Nuxt.js Payload
-
-```bash
-grep -oE '_payload\.json[^"]*' /tmp/page.html          # payload URL
-grep -oE 'public:\{[^}]*\}' /tmp/page.html             # runtime config（可能含密钥）
-```
-
-### 3. Next.js
-
-```bash
-# App Router (RSC)
-grep -oE '"(scene|glass|postProcessing)":\{' /tmp/page.html
-# Pages Router
-grep -o '<script id="__NEXT_DATA__"[^>]*>[^<]*' /tmp/page.html | sed 's/.*>//'
-```
-
-### 4. 内联 JSON / window 全局变量
-
-```bash
-grep -oE 'window\.__CONFIG__\s*=\s*\{[^;]+' /tmp/page.html
-```
-
-### 5. JS Bundle 默认值（最后手段）
-
-```bash
-grep -oE '(config|options|settings)\s*=\s*\{' /tmp/entry-chunk.js
-```
-
-## 验证
-
-- 颜色范围：0-1 还是 0-255？
-- resolution：像素值还是比例系数？
-- 布尔值：`false` 是否跳过整个渲染 pass？
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

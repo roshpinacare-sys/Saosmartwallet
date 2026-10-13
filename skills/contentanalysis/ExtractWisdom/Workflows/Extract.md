@@ -1,60 +1,19 @@
-# Extract Workflow
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Extract dynamic, content-adaptive wisdom from any content source.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 fa40bd2940663110dd3f6977d4356f21462c79287785eebeeb61ded4da09ef56, 1872 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Input Sources
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/contentanalysis/ExtractWisdom/Workflows/Extract.md && git show <sha>:skills/contentanalysis/ExtractWisdom/Workflows/Extract.md
 
-| Source | Method |
-|--------|--------|
-| YouTube URL | `fabric -y "URL"` to get transcript |
-| Article URL | WebFetch to get content |
-| File path | Read the file directly |
-| Pasted text | Use directly |
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/contentanalysis/ExtractWisdom/Workflows/Extract.md |
+| sha256 of what was here | fa40bd2940663110dd3f6977d4356f21462c79287785eebeeb61ded4da09ef56 |
+| size of what was here | 1872 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/contentanalysis/ExtractWisdom/Workflows/Extract.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Execution Steps
-
-### Step 1: Get the Content
-
-Obtain the full text/transcript. For YouTube, use `fabric -y "URL"` to extract transcript. Save to a working file if large.
-
-### Step 2: Deep Read
-
-Read the entire content. Don't extract yet. Notice:
-- What domains of wisdom are present?
-- What made you stop and think?
-- What's genuinely novel vs. commonly known?
-- What would {PRINCIPAL.NAME} highlight if he were reading this?
-- What quotes land perfectly?
-
-### Step 3: Select Dynamic Sections
-
-Based on your deep read, pick 5-12 section names. Rules:
-- Section names must be conversational, not academic
-- Each must have at least 3 quality bullets
-- Always include "Quotes That Hit Different" if source has quotable moments
-- Always include "First-Time Revelations" if genuinely new ideas exist
-- Be SPECIFIC — "Agentic Engineering Philosophy" not "Technology Insights"
-
-### Step 4: Extract Per Section
-
-For each section, extract 3-15 bullets. Apply tone rules from SKILL.md:
-- 8-20 words, flexible for clarity
-- Specific details, not vague summaries
-- Speaker's words when they're good
-- No hedging language
-- Every bullet worth telling someone about
-
-### Step 5: Add Closing Sections
-
-Always append:
-1. **One-Sentence Takeaway** (15-20 words)
-2. **If You Only Have 2 Minutes** (5-7 essential points)
-3. **References & Rabbit Holes** (people, projects, books, tools mentioned)
-
-### Step 6: Quality Check
-
-Run the quality checklist from SKILL.md before delivering.
-
-### Step 7: Output
-
-Present the complete extraction in the format specified in SKILL.md.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

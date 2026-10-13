@@ -1,54 +1,19 @@
-# Figure QA For Experiment Packages
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Use this before delivery or before passing figures to `paper-writer`.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 94a2afdb48109e5e0c9083d9215b410a5197dfed6f5e890b4167a2c28334bd54, 1475 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Export bundle
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/experiment-suite/references/04b-figure-qa.md && git show <sha>:skills/experiment-suite/references/04b-figure-qa.md
 
-The ideal bundle per figure is:
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/experiment-suite/references/04b-figure-qa.md |
+| sha256 of what was here | 94a2afdb48109e5e0c9083d9215b410a5197dfed6f5e890b4167a2c28334bd54 |
+| size of what was here | 1475 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/experiment-suite/references/04b-figure-qa.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- `<basename>.pdf` for paper reuse
-- `<basename>.svg` for editable vector text
-- `<basename>.tiff` for journal upload when needed
-- `make_<basename>.py` as the source of truth
-
-If the environment cannot produce all three, keep PDF mandatory and note the limitation.
-
-## Editable-text rules
-
-For matplotlib-based figures:
-
-```python
-plt.rcParams["svg.fonttype"] = "none"
-plt.rcParams["pdf.fonttype"] = 42
-plt.rcParams["ps.fonttype"] = 42
-```
-
-This keeps SVG text editable and PDF text embedded.
-
-## Minimum QA checklist
-
-- Figure title / axes / legend readable at final size
-- No legend overlapping the data
-- No default matplotlib color cycle
-- Panel labels consistent across figures
-- Simulated watermark present iff the run is simulated
-- Figure caption can stand alone in the report
-- Statistics in the caption or surrounding prose define mean/std/CI and seed count
-
-## For image-based experiment figures
-
-If the figure contains microscopy, pathology, blots, or spatial overlays, also record:
-
-- raw image source
-- crop
-- brightness/contrast handling
-- scale-bar presence
-- whether pseudo-coloring was applied
-
-## Anti-patterns
-
-- 3-D bars
-- pie charts for quantitative comparison
-- saturated rainbow heatmaps without justification
-- repeated legends in every panel
-- simulated figures without visible disclosure
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

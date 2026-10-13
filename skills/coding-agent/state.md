@@ -1,60 +1,19 @@
-# State Tracking Guidance
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Reference for tracking multiple tasks or requests.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 3e2451947af895ce2f1f9df99f0308f65bed491327021b02b35c05ac57366785, 1342 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Request Tracking
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/coding-agent/state.md && git show <sha>:skills/coding-agent/state.md
 
-Label each user request:
-```
-[R1] Build login page
-[R2] Add dark mode
-[R3] Fix header alignment
-```
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/coding-agent/state.md |
+| sha256 of what was here | 3e2451947af895ce2f1f9df99f0308f65bed491327021b02b35c05ac57366785 |
+| size of what was here | 1342 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/coding-agent/state.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-Track state for user visibility:
-```
-[R1] [DONE] Done
-[R2] [WIP] In progress (awaiting user approval for step 2)
-[R3] [Q] Queued
-```
-
-## Managing Multiple Requests
-
-When user sends a new request while another is in progress:
-
-1. Acknowledge: "Got it, I'll add this to the queue"
-2. Show updated queue to user
-3. Ask user if priority should change
-
-## Handling Interruptions
-
-| Situation | Suggested Action |
-|-----------|------------------|
-| New unrelated request | Add to queue, ask user priority |
-| Request affects current work | Pause, explain impact, ask user how to proceed |
-| User says "stop" or "wait" | Stop immediately, await instructions |
-| User changes requirements | Summarize impact, ask user to confirm changes |
-
-## User Decisions
-
-Always ask user before:
-- Starting work on queued items
-- Changing priority order
-- Rolling back completed work
-- Modifying the plan
-
-## Progress File (Optional)
-
-User may request a state file:
-```markdown
-## In Progress
-[R2] Dark mode - Step 2/4 (awaiting user approval)
-
-## Queued  
-[R3] Header fix
-
-## Done
-[R1] Login page [DONE]
-```
-
-Update only when user requests or approves changes.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

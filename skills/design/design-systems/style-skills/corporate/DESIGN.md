@@ -1,55 +1,19 @@
----
-name: Corporate
-colors:
-  primary: "#3B82F6"
-  secondary: "#8B5CF6"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FFFFFF"
-  text: "#111827"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "Poppins"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Open Sans"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "IBM Plex Mono"
-    fontSize: 0.75rem
-  sourceScale: "desktop-first expressive scale"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 8px
-  md: 16px
-  sourceScale: "8pt baseline grid"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 be7707ec9ffb9fc3d4149d6b8d686e4bb3a60b77a974fe91c2263f6859cfd991, 1570 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Professional, brand-aligned design with structured grids, minimalist layouts, and consistent enterprise patterns.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/corporate/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/corporate/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/corporate/DESIGN.md |
+| sha256 of what was here | be7707ec9ffb9fc3d4149d6b8d686e4bb3a60b77a974fe91c2263f6859cfd991 |
+| size of what was here | 1570 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/corporate/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** enterprise, premium
-- **Typography scale:** desktop-first expressive scale
-- **Typography fonts:** primary=Open Sans, display=Poppins, mono=IBM Plex Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, neutral, success, warning, danger
-- **Spacing scale:** 8pt baseline grid
-
-## Colors
-
-- **Primary (#3B82F6):** Token from style foundations.
-- **Secondary (#8B5CF6):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

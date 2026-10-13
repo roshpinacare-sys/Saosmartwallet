@@ -1,54 +1,19 @@
-# 框架识别特征
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Three.js
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 69d8cf1ecaddf44fe919a4df987883c7debe95e918a891b45fcf9ba467f11f7a, 1721 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-**未混淆**：`THREE.`, `WebGLRenderer`, `ShaderMaterial`, `BufferGeometry`
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/web-shader-extractor/references/tech-signatures.md && git show <sha>:skills/web-shader-extractor/references/tech-signatures.md
 
-**混淆后**（通过构造参数推断）：
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/web-shader-extractor/references/tech-signatures.md |
+| sha256 of what was here | 69d8cf1ecaddf44fe919a4df987883c7debe95e918a891b45fcf9ba467f11f7a |
+| size of what was here | 1721 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/web-shader-extractor/references/tech-signatures.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-| 调用模式 | 原始类 |
-|---------|--------|
-| `new X({canvas, antialias, alpha})` | `WebGLRenderer` |
-| `new X(fov, aspect, near, far)` — 4 数字 | `PerspectiveCamera` |
-| `new X(-1, 1, 1, -1, 0, 1)` — 6 参数 | `OrthographicCamera` |
-| `new X(w, h, {wrapS, minFilter})` | `WebGLRenderTarget` |
-| `new X(data, w, h, format, type)` — Float32Array | `DataTexture` |
-| `new X(2, 2)` 作为几何体 | `PlaneGeometry` |
-| `new X({uniforms, vertexShader, fragmentShader})` | `ShaderMaterial` |
-| `X.getElapsedTime()` | `Clock` |
-
-**常量**：`ClampToEdgeWrapping`, `NearestFilter`, `RGBAFormat`, `FloatType`, `DoubleSide`
-
-## 2D Canvas
-
-`dataEngine: null` 时，用 `getContext('2d')` 有无 + `createShader`/`shaderSource` 有无区分：
-- 有 `getContext('2d')`，无 WebGL 调用 → 纯 2D Canvas
-- 有 WebGL 调用 → Raw WebGL / PixiJS
-
-## Raw WebGL
-
-```javascript
-gl.createShader / gl.shaderSource / gl.compileShader / gl.createProgram
-gl.bindBuffer / gl.bindFramebuffer / gl.drawArrays
-```
-
-## PixiJS
-
-`PIXI.Application`, `PIXI.Filter`, `new PIXI.Filter(vertSrc, fragSrc, uniforms)`
-
-## Babylon.js
-
-`BABYLON.Engine`, `BABYLON.ShaderMaterial`, `BABYLON.Effect.ShadersStore`
-
-## GPGPU 模式
-
-两个 `WebGLRenderTarget`（ping-pong）+ `OrthographicCamera(-1,1,1,-1,0,1)` + `PlaneGeometry(2,2)` + `DataTexture` 初始位置 + `setRenderTarget` 循环
-
-## 常见噪声
-
-| 函数 | 类型 |
-|------|------|
-| `snoise` | Simplex noise (Ashima) |
-| `cnoise` | Classic Perlin |
-| `cellular` | Worley/Voronoi |
-| `fbm` | Fractal Brownian Motion |
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

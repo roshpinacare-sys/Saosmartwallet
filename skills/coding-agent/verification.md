@@ -1,39 +1,19 @@
-# Verification Reference
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Consult when verifying implementations visually or with tests.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 350148370baf9823d8886d0f9106a4f716eba85ffb2ccd8df2d9c05c3773fc9d, 874 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Screenshots
-- Wait for full page load (no spinners)
-- Review yourself before sending
-- Split long pages into 3-5 sections (~800px each)
-- Caption each: "Hero", "Features", "Footer"
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/coding-agent/verification.md && git show <sha>:skills/coding-agent/verification.md
 
-## Before Sending
-```
-[ ] Content loaded
-[ ] Shows the specific change
-[ ] No visual bugs
-[ ] Caption explains what user sees
-```
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/coding-agent/verification.md |
+| sha256 of what was here | 350148370baf9823d8886d0f9106a4f716eba85ffb2ccd8df2d9c05c3773fc9d |
+| size of what was here | 874 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/coding-agent/verification.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Fix-Before-Send
-If screenshot shows problem:
-1. Fix code
-2. Re-deploy
-3. New screenshot
-4. Still broken? -> back to 1
-5. Fixed? -> now send
-
-Never send "I noticed X is wrong, will fix" - fix first.
-
-## No UI? Show Output
-
-When verifying API endpoints, show actual output:
-```
-GET /api/users -> {"id": 1, "name": "test"}
-```
-
-Include actual response, not just "it works".
-
-## Flows
-Number sequential states: "1/4: Form", "2/4: Loading", "3/4: Error", "4/4: Success"
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

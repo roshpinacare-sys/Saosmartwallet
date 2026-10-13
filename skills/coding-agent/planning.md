@@ -1,31 +1,19 @@
-# Planning Reference
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Consult when breaking down a multi-step request.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 25675d904cc7d84f97b7e491ad9fda3684f9111c55711766b02826a921735948, 633 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## When to Plan
-- Multiple files or components
-- Dependencies between parts
-- UI that needs visual verification
-- User says "build", "create", "implement"
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/coding-agent/planning.md && git show <sha>:skills/coding-agent/planning.md
 
-## Step Format
-```
-Step N: [What]
-- Output: [What exists after]
-- Test: [How to verify]
-```
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/coding-agent/planning.md |
+| sha256 of what was here | 25675d904cc7d84f97b7e491ad9fda3684f9111c55711766b02826a921735948 |
+| size of what was here | 633 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/coding-agent/planning.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Good Steps
-- Clear output (file, endpoint, screen)
-- Testable independently
-- No ambiguity in what "done" means
-
-## Bad Steps
-- "Implement the thing" (vague output)
-- No test defined
-- Depends on undefined prior step
-
-## Don't Plan
-- One-liner functions
-- Simple modifications
-- Questions about existing code
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.
