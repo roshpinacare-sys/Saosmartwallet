@@ -1,55 +1,19 @@
----
-name: Bold
-colors:
-  primary: "#0077BC"
-  secondary: "#009866"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#111111"
-  text: "#111827"
-  neutral: "#111111"
-typography:
-  h1:
-    fontFamily: "Archivo Black"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Archivo Black"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "desktop-first expressive scale"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 97e3f6f510f03c3c07e2e52215c51437b5f04193c56931dd0f432a3437278d5e, 1527 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Strong visual presence with heavyweight typography, high-contrast colors, and commanding layouts.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/bold/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/bold/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/bold/DESIGN.md |
+| sha256 of what was here | 97e3f6f510f03c3c07e2e52215c51437b5f04193c56931dd0f432a3437278d5e |
+| size of what was here | 1527 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/bold/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** bold
-- **Typography scale:** desktop-first expressive scale
-- **Typography fonts:** primary=Archivo Black, display=Archivo Black, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, secondary
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#0077BC):** Token from style foundations.
-- **Secondary (#009866):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#111111):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#111111):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

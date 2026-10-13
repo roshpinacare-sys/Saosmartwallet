@@ -1,55 +1,19 @@
----
-name: Neumorphism
-colors:
-  primary: "#006666"
-  secondary: "#F1F2F5"
-  success: "#00A63D"
-  warning: "#FE9900"
-  danger: "#FF2157"
-  surface: "#E7E5E4"
-  text: "#1E2938"
-  neutral: "#E7E5E4"
-typography:
-  h1:
-    fontFamily: "Space Mono"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Space Mono"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "desktop-first expressive scale"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "compact density mode"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 173b515779ea215fe6b27eb19e742003ceabda29caae91ae94accb76dba58665, 1620 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Soft, extruded UI elements with inner and outer shadows on monochromatic surfaces for a tactile, embedded look.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/neumorphism/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/neumorphism/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/neumorphism/DESIGN.md |
+| sha256 of what was here | 173b515779ea215fe6b27eb19e742003ceabda29caae91ae94accb76dba58665 |
+| size of what was here | 1620 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/neumorphism/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** minimal, clean, high-contrast, playful, matrix
-- **Typography scale:** desktop-first expressive scale
-- **Typography fonts:** primary=Space Mono, display=Space Mono, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, secondary, success, warning, danger, info
-- **Spacing scale:** compact density mode
-
-## Colors
-
-- **Primary (#006666):** Token from style foundations.
-- **Secondary (#F1F2F5):** Token from style foundations.
-- **Success (#00A63D):** Token from style foundations.
-- **Warning (#FE9900):** Token from style foundations.
-- **Danger (#FF2157):** Token from style foundations.
-- **Surface (#E7E5E4):** Token from style foundations.
-- **Text (#1E2938):** Token from style foundations.
-- **Neutral (#E7E5E4):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

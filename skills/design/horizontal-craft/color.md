@@ -1,88 +1,19 @@
-# Color craft rules
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Universal color rules applied on top of the active `DESIGN.md`. The
-design system supplies the palette tokens; this file enforces how to
-*use* them.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 896a24f3e3d3c1548e89c0102b0f46c275b2c27ef26e28a65f9170468ef613bf, 3118 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-> Adapted from [refero_skill](https://github.com/referodesign/refero_skill)
-> (MIT). All examples reference Open Design's standard tokens
-> (`--bg`, `--surface`, `--fg`, `--muted`, `--border`, `--accent`).
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/horizontal-craft/color.md && git show <sha>:skills/design/horizontal-craft/color.md
 
-## Palette structure
-
-A coherent palette has four layers. Plan all four before writing any CSS.
-
-| Layer | Share of pixels | Tokens |
-|---|---|---|
-| **Neutrals** | 70–90% | `--bg`, `--surface`, `--fg`, `--muted`, `--border` |
-| **Accent** (one) | 5–10% | `--accent` only — never invent a second accent |
-| **Semantic** | 0–5% | `--success`, `--warn`, `--danger` |
-| **Effect** | <1% | gradients, glows; rarely justified |
-
-## Accent discipline
-
-The single biggest readability failure in AI-generated UIs is accent
-overuse. Hard caps:
-
-- **At most 2 visible uses of `--accent` per screen.** Typical pair:
-  one eyebrow / chip + one primary CTA. Or one accent card + one tab
-  pill. Pick a pair, not a flood.
-- Links count as accent; demote to `--fg` underline if you also have a
-  CTA on the same screen.
-- Hover/focus rings count as accent. Ration accordingly.
-
-## Contrast minimums
-
-Run these as gates, not goals:
-
-| Pair | Minimum |
+| field | value |
 |---|---|
-| Body text (≤16 px) on background | **4.5:1** |
-| Large text (>18 px or 14 px bold) | **3:1** |
-| UI components against adjacent surfaces | **3:1** |
+| canonical copy | roshpinacare-sys/steem · skills/design/horizontal-craft/color.md |
+| sha256 of what was here | 896a24f3e3d3c1548e89c0102b0f46c275b2c27ef26e28a65f9170468ef613bf |
+| size of what was here | 3118 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/horizontal-craft/color.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-When the brand color clashes (low-contrast indigo on light background is
-common), darken the accent to a `600`-level shade for text use; reserve
-the brand-bright variant for fills only.
-
-## Dark themes
-
-Avoid pure black and pure white — both cause vibration and eye strain.
-
-| Token | Dark theme | Light theme |
-|---|---|---|
-| Background | `#0f0f0f` (not `#000`) | `#fafafa` (not `#fff`) |
-| Foreground | `#f0f0f0` (not `#fff`) | `#111111` (not `#000`) |
-
-On dark surfaces, prefer **semi-transparent white borders** over solid
-dark borders — a 1px `rgba(255,255,255,0.08)` reads as structure
-without adding visual noise.
-
-## Semantic color naming
-
-Always name tokens by **purpose**, never by hue:
-
-```css
-/* good */
---accent: #2f6feb;
---success: #17a34a;
-
-/* bad — locks you out of theming */
---blue-500: #2f6feb;
---green-500: #17a34a;
-```
-
-## Anti-defaults
-
-- **Indigo `#6366f1`** (Tailwind `indigo-500`) is the most reliable
-  AI-slop tell. The active `DESIGN.md` provides `--accent`; use it. If
-  the brief truly needs indigo, make the user say so explicitly. If
-  your `DESIGN.md` encodes indigo as `--accent`, that is intentional —
-  the linter only flags hardcoded hex, so `var(--accent)` uses are
-  unaffected even when the resolved color happens to be `#6366f1`.
-- **Two-stop "trust" gradient** (purple → blue, blue → cyan, etc.) on a
-  hero is the second most reliable tell. A flat surface + one
-  type-driven hierarchy beats it every time.
-- **Decorative gradients with no functional purpose**. Gradients should
-  separate hierarchies (header → body, primary CTA → secondary), not
-  decorate empty space.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,40 +1,19 @@
-# Paper Enrichment Prompt
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-You are enriching academic papers with Chinese content before they are sent as Feishu cards.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 063113310b2ccd8f383a46bb8675f0fa73f55075133ab14cd89c1d60e4b980f9, 1561 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-For each paper in the `papers` array that is missing a Chinese summary (i.e., the `summary` field contains only English text or is empty), generate:
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/aminer-daily-paper/prompts/enrich.md && git show <sha>:skills/aminer-daily-paper/prompts/enrich.md
 
-1. **summary** — A concise Chinese summary (1-2 sentences, starting with "本文"). Describe the core contribution and significance. Keep English terms (e.g., RAG, LLM, Transformer) as-is.
-2. **keywords** — 2-4 Chinese keywords. Keep well-known English acronyms as-is.
-3. **comment** — If the paper's venue is a well-known conference/journal, annotate its tier, e.g., "已发表在 AAAI（CCF-A）". Leave empty if unknown.
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/aminer-daily-paper/prompts/enrich.md |
+| sha256 of what was here | 063113310b2ccd8f383a46bb8675f0fa73f55075133ab14cd89c1d60e4b980f9 |
+| size of what was here | 1561 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/aminer-daily-paper/prompts/enrich.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-Rules:
-- Do NOT fabricate information not present in the paper's title/abstract.
-- Do NOT generate or modify `famous_authors`.
-- If the abstract is missing or too short to summarize, write "摘要信息不足，请查看原文。"
-- Preserve all other fields unchanged.
-
-## Input
-
-The papers are in `papers_summarized.json` at the path provided. The file structure:
-
-```json
-{
-  "status": "success",
-  "profile_topics": ["topic1", "topic2"],
-  "papers": [
-    {
-      "title": "...",
-      "summary": "...(may be English-only)...",
-      "keywords": ["kw1", "kw2"],
-      "authors": ["..."],
-      "comment": "",
-      ...other fields preserved as-is...
-    }
-  ]
-}
-```
-
-## Output
-
-Write the enriched data back to the same `papers_summarized.json` path, preserving all fields. Only update `summary`, `keywords`, and `comment` for papers that need enrichment.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

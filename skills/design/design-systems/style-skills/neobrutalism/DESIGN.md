@@ -1,55 +1,19 @@
----
-name: Neobrutalism
-colors:
-  primary: "#FDC800"
-  secondary: "#432DD7"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FBFBF9"
-  text: "#1C293C"
-  neutral: "#FBFBF9"
-typography:
-  h1:
-    fontFamily: "Inter"
-    fontSize: 2.1875rem
-  body-md:
-    fontFamily: "Inter"
-    fontSize: 0.9375rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.8125rem
-  sourceScale: "13/15/17/21/27/35"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 ea1d894156d31c284564bd4708e5283daac514ba97c24f8553a7ceca6a0f5e1c, 1553 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Modern take on brutalism with bold borders, vivid accent colors, and raw, high-contrast layouts on warm surfaces.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/neobrutalism/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/neobrutalism/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/neobrutalism/DESIGN.md |
+| sha256 of what was here | ea1d894156d31c284564bd4708e5283daac514ba97c24f8553a7ceca6a0f5e1c |
+| size of what was here | 1553 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/neobrutalism/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, clean, high-contrast
-- **Typography scale:** 13/15/17/21/27/35
-- **Typography fonts:** primary=Inter, display=Inter, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#FDC800):** Token from style foundations.
-- **Secondary (#432DD7):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FBFBF9):** Token from style foundations.
-- **Text (#1C293C):** Token from style foundations.
-- **Neutral (#FBFBF9):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,55 +1,19 @@
----
-name: Doodle
-colors:
-  primary: "#49B6E5"
-  secondary: "#263D5B"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FFFFFF"
-  text: "#111827"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "Delius Swash Caps"
-    fontSize: 2.5rem
-  body-md:
-    fontFamily: "Delius Swash Caps"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.875rem
-  sourceScale: "14/16/18/24/32/40"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 edc6b45e083e43706b1386e30a9f6c52a6b8936090d6856a741d53baddaf5c22, 1575 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Hand-drawn, sketch-like style with doodles, handwritten fonts, and imperfect lines for a playful, informal feel.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/doodle/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/doodle/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/doodle/DESIGN.md |
+| sha256 of what was here | edc6b45e083e43706b1386e30a9f6c52a6b8936090d6856a741d53baddaf5c22 |
+| size of what was here | 1575 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/doodle/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** playful
-- **Typography scale:** 14/16/18/24/32/40
-- **Typography fonts:** primary=Delius Swash Caps, display=Delius Swash Caps, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, secondary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#49B6E5):** Token from style foundations.
-- **Secondary (#263D5B):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

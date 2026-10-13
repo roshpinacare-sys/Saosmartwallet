@@ -1,52 +1,19 @@
----
-name: wechat-cover-pair
-description: 微信公众号封面对模板 — 主图（headline + subline + 视觉锚点）+ 次图/分享图（短标题 + logo / 账号标签）+ 长图头（文章标题 + 章节预览）。比小红书封面要求更强的标题腿粗、更明确的安全区、更克制的阅读节奏。必须按当前微信尺寸读 canvas-and-device.md。触发："做个公众号封面 / 微信首图次图对 / 视频号封面 / 公众号分享图 / 长图头"。NOT XHS 3:4 尺寸，NOT XHS 贴纸密集风。
-visibility: public
-mode: template
-carrier: fixed-image
-scenario: social-content
-pattern_source: pattern.html
-source_priority: skill-first
-triggers:
-  - "做个公众号封面"
-  - "微信首图次图对"
-  - "视频号封面"
-  - "公众号分享图"
-  - "长图头封面"
-  - "微信生态封面"
-related_patterns: social-card-editorial
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-# WeChat Cover Pair Template
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 c8976e26bdfee6ff35fd55720ec35baf0bad0a0169b3e92f55f9b1fdd490e135, 2138 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Use for 微信公众号首图、封面图、分享图、视频号/微信生态封面等 fixed-image surfaces.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-templates/wechat-cover-pair/SKILL.md && git show <sha>:skills/design/design-templates/wechat-cover-pair/SKILL.md
 
-## Core Rule
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-templates/wechat-cover-pair/SKILL.md |
+| sha256 of what was here | c8976e26bdfee6ff35fd55720ec35baf0bad0a0169b3e92f55f9b1fdd490e135 |
+| size of what was here | 2138 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-templates/wechat-cover-pair/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-WeChat covers are not Xiaohongshu covers. They need stronger headline legibility, clearer safe areas, and a calmer reading rhythm.
-
-## Structure Options
-
-- main cover: headline + subline + visual anchor
-- secondary cover: shorter title + logo/account label
-- long image header: article title + section preview
-- cover pair: large main cover + smaller share-safe variant
-
-## Must Do
-
-- Read `canvas-and-device.md` for current WeChat dimensions and safe areas.
-- Keep title readable in thumbnail contexts.
-- Avoid placing important text too close to edges.
-- Do not assume XHS 3:4 dimensions.
-
-## Avoid
-
-- XHS-style crowded sticker layouts.
-- Long headline squeezed into one line.
-- Tiny subtitle that disappears in feed preview.
-
-## Pattern Source Rule
-
-Read this `SKILL.md` first. Do **not** read `pattern.html` by default.
-
-Read `pattern.html` only when you need concrete layout rhythm, spatial relationships, or interaction/annotation behavior that this markdown cannot fully specify. When read, extract patterns only; do not copy DOM, CSS classes, exact spacing, placeholder copy, or styling wholesale.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

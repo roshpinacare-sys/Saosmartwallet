@@ -1,55 +1,19 @@
----
-name: Application
-colors:
-  primary: "#9333ea"
-  secondary: "#a855f7"
-  success: "#10b981"
-  warning: "#f59e0b"
-  danger: "#ef4444"
-  surface: "#FFFFFF"
-  text: "#09090b"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "Inter"
-    fontSize: 2rem
-  body-md:
-    fontFamily: "Inter"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 a36acae80e477a4718282c87a70fd772d709eeec9b92d2fd71ce93b8d19f63bb, 1603 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-App dashboard with purple-themed aesthetic, top-bar navigation, card-based layouts, and developer-first workflows.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/application/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/application/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/application/DESIGN.md |
+| sha256 of what was here | a36acae80e477a4718282c87a70fd772d709eeec9b92d2fd71ce93b8d19f63bb |
+| size of what was here | 1603 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/application/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, clean, high-contrast, glass-like panels, soft shadows, rounded components
-- **Typography scale:** 12/14/16/20/24/32
-- **Typography fonts:** primary=Inter, display=Inter, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary (purple), neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#9333ea):** Token from style foundations.
-- **Secondary (#a855f7):** Token from style foundations.
-- **Success (#10b981):** Token from style foundations.
-- **Warning (#f59e0b):** Token from style foundations.
-- **Danger (#ef4444):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#09090b):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

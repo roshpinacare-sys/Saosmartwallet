@@ -1,5 +1,19 @@
-# Framer Inspired Design System
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Design system details have been moved to: https://getdesign.md/framer/design-md
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 91eeca4bbef64db0f76f9ca5496d68acd497b96256c59301df289017f03cdc90, 200 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-You can also view previews, dark mode examples, and download options on getdesign.md.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/brand-inspiration/framer/README.md && git show <sha>:skills/design/design-systems/brand-inspiration/framer/README.md
+
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/brand-inspiration/framer/README.md |
+| sha256 of what was here | 91eeca4bbef64db0f76f9ca5496d68acd497b96256c59301df289017f03cdc90 |
+| size of what was here | 200 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/brand-inspiration/framer/README.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
+
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

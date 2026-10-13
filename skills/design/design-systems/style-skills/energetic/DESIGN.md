@@ -1,51 +1,19 @@
----
-name: Energetic
-colors:
-  primary: "#EA580B"
-  secondary: "#F59E0B"
-  background: "#FFEDD5"
-  surface: "#FDBA74"
-  text: "#EA580C"
-  neutral: "#FDBA74"
-typography:
-  h1:
-    fontFamily: "Limelight"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Limelight"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32/48"
-  weights: "400"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32/48/64"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 595ecc80de0691b6113419d9983ea261790820b1af29ffe7a8e77cfb34682d64, 1371 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Dynamic, vibrant style with thick borders, geometric shapes, high-contrast colors, and expressive typography conveying motion and vitality.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/energetic/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/energetic/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/energetic/DESIGN.md |
+| sha256 of what was here | 595ecc80de0691b6113419d9983ea261790820b1af29ffe7a8e77cfb34682d64 |
+| size of what was here | 1371 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/energetic/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** bold, geometric, vibrant, thick-bordered
-- **Typography scale:** 12/14/16/20/24/32/48
-- **Typography fonts:** primary=Limelight, display=Limelight, mono=JetBrains Mono
-- **Typography weights:** 400
-- **Color palette:** primary, secondary, neutral
-- **Spacing scale:** 4/8/12/16/24/32/48/64
-
-## Colors
-
-- **Primary (#EA580B):** Token from style foundations.
-- **Secondary (#F59E0B):** Token from style foundations.
-- **Background (#FFEDD5):** Token from style foundations.
-- **Surface (#FDBA74):** Token from style foundations.
-- **Text (#EA580C):** Token from style foundations.
-- **Neutral (#FDBA74):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

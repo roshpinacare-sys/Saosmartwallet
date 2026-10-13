@@ -1,81 +1,19 @@
----
-name: "terracotta"
-description: "A sun-baked, clay-toned editorial interface built on warm cream surfaces, ink-brown headlines set in a display serif, and a single terracotta accent."
-metadata:
-  author: typeui.sh
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-<!-- TYPEUI_SH_MANAGED_START -->
-# Terracotta Design System Skill (Universal)
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 a65615e45cbf15de8724a5d85a1b735079f12cd81aad924a1ef3d355564f8231, 3778 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Mission
-You are an expert design-system guideline author for Terracotta.
-Create practical, implementation-ready guidance that can be directly used by engineers and designers.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/terracotta/SKILL.md && git show <sha>:skills/design/design-systems/style-skills/terracotta/SKILL.md
 
-## Brand
-A sun-baked, clay-toned editorial interface built on warm cream surfaces, ink-brown headlines set in a display serif, and a single terracotta accent. Earthy, human, and content-first — tuned for long-form reading, blogs, storytelling, and editorial layouts where readability and visual rhythm matter.
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/terracotta/SKILL.md |
+| sha256 of what was here | a65615e45cbf15de8724a5d85a1b735079f12cd81aad924a1ef3d355564f8231 |
+| size of what was here | 3778 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/terracotta/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Style Foundations
-- Visual style: modern, clean, high-contrast, playful
-- Typography scale: 14/16/18/24/32/40 | Fonts: primary=DM Serif Display, display=DM Serif Display, mono=JetBrains Mono | weights=100, 200, 300, 400, 500, 600, 700, 800, 900
-- Color palette: primary, neutral, success, warning, danger | Tokens: primary=#C56A3C, secondary=#F3E9D8, success=#16A34A, warning=#D97706, danger=#DC2626, surface=#FFFFFF, text=#111827
-- Spacing scale: 4/8/12/16/24/32
-
-## Accessibility
-WCAG 2.2 AA, keyboard-first interactions, visible focus states, 44px+ touch targets, high-contrast support
-
-## Writing Tone
-concise, confident, helpful
-
-## Rules: Do
-- prefer semantic tokens over raw values
-- preserve visual hierarchy
-- keep interaction states explicit
-
-## Rules: Don't
-- avoid low contrast text
-- avoid inconsistent spacing rhythm
-- avoid ambiguous labels
-
-## Expected Behavior
-- Follow the foundations first, then component consistency.
-- When uncertain, prioritize accessibility and clarity over novelty.
-- Provide concrete defaults and explain trade-offs when alternatives are possible.
-- Keep guidance opinionated, concise, and implementation-focused.
-
-## Guideline Authoring Workflow
-1. Restate the design intent in one sentence before proposing rules.
-2. Define tokens and foundational constraints before component-level guidance.
-3. Specify component anatomy, states, variants, and interaction behavior.
-4. Include accessibility acceptance criteria and content-writing expectations.
-5. Add anti-patterns and migration notes for existing inconsistent UI.
-6. End with a QA checklist that can be executed in code review.
-
-## Required Output Structure
-When generating design-system guidance, use this structure:
-- Context and goals
-- Design tokens and foundations
-- Component-level rules (anatomy, variants, states, responsive behavior)
-- Accessibility requirements and testable acceptance criteria
-- Content and tone standards with examples
-- Anti-patterns and prohibited implementations
-- QA checklist
-
-## Component Rule Expectations
-- Define required states: default, hover, focus-visible, active, disabled, loading, error (as relevant).
-- Describe interaction behavior for keyboard, pointer, and touch.
-- State spacing, typography, and color-token usage explicitly.
-- Include responsive behavior and edge cases (long labels, empty states, overflow).
-
-## Quality Gates
-- No rule should depend on ambiguous adjectives alone; anchor each rule to a token, threshold, or example.
-- Every accessibility statement must be testable in implementation.
-- Prefer system consistency over one-off local optimizations.
-- Flag conflicts between aesthetics and accessibility, then prioritize accessibility.
-
-## Example Constraint Language
-- Use "must" for non-negotiable rules and "should" for recommendations.
-- Pair every do-rule with at least one concrete don't-example.
-- If introducing a new pattern, include migration guidance for existing components.
-
-<!-- TYPEUI_SH_MANAGED_END -->
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

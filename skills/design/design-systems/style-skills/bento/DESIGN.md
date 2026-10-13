@@ -1,55 +1,19 @@
----
-name: Bento
-colors:
-  primary: "#FAD4C0"
-  secondary: "#80A1C1"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FFF5E6"
-  text: "#111827"
-  neutral: "#FFF5E6"
-typography:
-  h1:
-    fontFamily: "Inter"
-    fontSize: 2rem
-  body-md:
-    fontFamily: "Inter"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 d71e545da4ed6cf15b762d2b745aba445344b86a4a0238b65cae12783b1a0b84, 1543 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Modular grid layout with card-like blocks, clear hierarchy, soft spacing, and subtle visual contrast for organized, scannable interfaces.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/bento/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/bento/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/bento/DESIGN.md |
+| sha256 of what was here | d71e545da4ed6cf15b762d2b745aba445344b86a4a0238b65cae12783b1a0b84 |
+| size of what was here | 1543 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/bento/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, clean
-- **Typography scale:** 12/14/16/20/24/32
-- **Typography fonts:** primary=Inter, display=Inter, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#FAD4C0):** Token from style foundations.
-- **Secondary (#80A1C1):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FFF5E6):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#FFF5E6):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,42 +1,19 @@
-# Execution Guidance
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Reference for executing multi-step implementations.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 da81c0a72ef9240881d2c974a6917bfd2d7e7cc526b14cfc3fc93b94cf44c337, 857 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Recommended Flow
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/coding-agent/execution.md && git show <sha>:skills/coding-agent/execution.md
 
-When user approves a step:
-1. Execute that step
-2. Verify it works
-3. Report completion to user
-4. Wait for user to approve next step
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/coding-agent/execution.md |
+| sha256 of what was here | da81c0a72ef9240881d2c974a6917bfd2d7e7cc526b14cfc3fc93b94cf44c337 |
+| size of what was here | 857 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/coding-agent/execution.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Progress Tracking
-
-Show user the current state:
-```
-- [DONE] Step 1 (completed)
-- [WIP] Step 2 <- awaiting user approval
-- [ ] Step 3
-- [ ] Step 4
-```
-
-## When to Pause and Ask User
-
-- Before starting any new step
-- When encountering an error
-- When a decision is needed (A vs B)
-- When credentials or permissions are needed
-
-## Error Handling
-
-If an error occurs:
-1. Report the error to user
-2. Suggest possible fixes
-3. Wait for user decision on how to proceed
-
-## Patterns to Follow
-
-- Report completion of each step
-- Ask before proceeding to next step
-- Let user decide retry strategy
-- Keep user informed of progress
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

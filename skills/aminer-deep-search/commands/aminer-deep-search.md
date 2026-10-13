@@ -1,51 +1,19 @@
----
-description: AMiner deep multi-round paper collection for survey references
-argument-hint: "[research topic | topic: ... target-size: 400 max-rounds: 12]"
-allowed-tools: Read, Bash, Glob, Grep
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-# /aminer-deep-search - AMiner Deep Search
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 d19fb74efaee1649b3ab99239a9ce43344997b5c65e8a12e8bbbd68784c6c68d, 2275 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-User invoked the AMiner deep paper collection skill with the following arguments:
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/aminer-deep-search/commands/aminer-deep-search.md && git show <sha>:skills/aminer-deep-search/commands/aminer-deep-search.md
 
-```text
-$ARGUMENTS
-```
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/aminer-deep-search/commands/aminer-deep-search.md |
+| sha256 of what was here | d19fb74efaee1649b3ab99239a9ce43344997b5c65e8a12e8bbbd68784c6c68d |
+| size of what was here | 2275 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/aminer-deep-search/commands/aminer-deep-search.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## Your task
-
-Follow `${CLAUDE_PLUGIN_ROOT}/SKILL.md`. You are the controller: run the tool scripts, read their JSON output, judge relevance yourself, and iterate. There is no external LLM mode and nothing to configure beyond `AMINER_API_KEY`.
-
-Use this command only for deep survey-style paper collection, not for simple paper lookup or lightweight recommendations.
-
-### 1. Parse `$ARGUMENTS`
-
-- `topic`: required research topic. Preserve the user's wording. If absent or too vague, ask for a concrete topic.
-- `target-size`: optional final paper target, default 400.
-- `max-rounds`: optional round budget, default 12.
-
-### 2. Pre-flight
-
-```bash
-[ -z "${AMINER_API_KEY:-}" ] && echo "AMINER_API_KEY missing" || echo "AMINER_API_KEY exists"
-```
-
-If missing, stop and tell the user to set `AMINER_API_KEY`. Never print the key. The scripts are pure stdlib — no dependency installation is needed.
-
-### 3. Run the round protocol
-
-Execute the Round Protocol from `${CLAUDE_PLUGIN_ROOT}/SKILL.md`:
-
-- Round 0: derive 4–8 seed queries, estimate cost; confirm with the user if the estimate is ≥¥5.
-- Each round (max `max-rounds`): search via
-  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/aminer_api.py" search --query "..." --order n_citation`,
-  filter results for relevance yourself, add the kept items via
-  `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/paper_set.py" add`,
-  snowball with `references --ids ...` on ≤5 strong unexpanded seeds, and check `stats`.
-- Stop when `target-size` is reached, results are exhausted, or 2 consecutive rounds add <5 papers.
-
-Keep the state file and exports under the current working directory (`outputs/`).
-
-### 4. Present the result
-
-Run `export` and report the final paper count, the total cost (sum of `[cost]` stderr lines), and the output path. If the run fails due to missing configuration or API errors, show the actionable error without exposing secrets. Never fabricate papers.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

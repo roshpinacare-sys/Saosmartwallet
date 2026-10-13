@@ -1,55 +1,19 @@
----
-name: Luxury
-colors:
-  primary: "#FAFAFA"
-  secondary: "#FAFAFA"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#000000"
-  text: "#ffffff"
-  neutral: "#000000"
-typography:
-  h1:
-    fontFamily: "Oswald"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Oswald"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "desktop-first expressive scale"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 8px
-  md: 16px
-  sourceScale: "8pt baseline grid"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 13c7c90422748923ad3e0d94bdc3539be6c40cb470ccdc2668684da39f01030b, 1533 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-High-end dark aesthetic with bold headings, monochromatic palette, and premium feel for luxury brand experiences.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/luxury/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/luxury/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/luxury/DESIGN.md |
+| sha256 of what was here | 13c7c90422748923ad3e0d94bdc3539be6c40cb470ccdc2668684da39f01030b |
+| size of what was here | 1533 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/luxury/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** modern, bold, big headings
-- **Typography scale:** desktop-first expressive scale
-- **Typography fonts:** primary=Oswald, display=Oswald, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary
-- **Spacing scale:** 8pt baseline grid
-
-## Colors
-
-- **Primary (#FAFAFA):** Token from style foundations.
-- **Secondary (#FAFAFA):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#000000):** Token from style foundations.
-- **Text (#ffffff):** Token from style foundations.
-- **Neutral (#000000):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

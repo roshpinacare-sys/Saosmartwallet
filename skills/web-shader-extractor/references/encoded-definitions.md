@@ -1,53 +1,19 @@
-# 编码配置解码
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## 识别信号
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 8063361b5fde2848bcbcef3b95793c684fabaab8312c13e5323e727e8bbdb5e6, 1324 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-1. API 返回有 `_encoded: true` 标志
-2. `definition` 字段是 Base64 字符串而非 JSON
-3. JS 中有 `atob()`/`btoa()` + `TextEncoder`/`TextDecoder` + XOR
-4. Runtime config 中有 `obfuscationKey`
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/web-shader-extractor/references/encoded-definitions.md && git show <sha>:skills/web-shader-extractor/references/encoded-definitions.md
 
-```bash
-grep -oE '(atob|btoa|obfuscation|_encoded)' /tmp/*.js | sort | uniq -c
-grep -oE 'obfuscationKey:"[^"]*"' /tmp/page.html
-```
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/web-shader-extractor/references/encoded-definitions.md |
+| sha256 of what was here | 8063361b5fde2848bcbcef3b95793c684fabaab8312c13e5323e727e8bbdb5e6 |
+| size of what was here | 1324 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/web-shader-extractor/references/encoded-definitions.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## 常见方案
-
-### Base64 + XOR
-
-```python
-import base64, json
-
-def decode(encoded, key):
-    raw = base64.b64decode(encoded)
-    key_bytes = key.encode('utf-8')
-    decrypted = bytes([raw[i] ^ key_bytes[i % len(key_bytes)] for i in range(len(raw))])
-    return json.loads(decrypted.decode('utf-8'))
-```
-
-### 短码映射（组件/属性名缩写）
-
-配置中 `C74`/`p29` 代替 `StudioBackground`/`color`。
-
-```bash
-grep -oE '(codeToComponent|codeToProp)' /tmp/bundle.js
-```
-
-映射表通常是动态生成的——所有名称按字母排序分配 `C{nn}`/`p{nn}` 编号。
-
-## 密钥来源
-
-| 框架 | 位置 |
-|------|------|
-| Nuxt.js | `public:{obfuscationKey:"..."}` in HTML |
-| Next.js | `__NEXT_DATA__` 的 runtimeConfig |
-| SPA | bundle 常量或 `window.__CONFIG__` |
-
-## 查找解码函数
-
-```bash
-grep -l '_encoded' /tmp/*.js
-grep -A3 '_encoded' /tmp/bundle.js
-# 模式：if (t._encoded) { return decode(t.definition, key) }
-```
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,55 +1,19 @@
----
-name: Fantasy
-colors:
-  primary: "#0250CC"
-  secondary: "#FDC800"
-  success: "#16A34A"
-  warning: "#D97706"
-  danger: "#DC2626"
-  surface: "#FFFFFF"
-  text: "#111827"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "New Rocker"
-    fontSize: 2rem
-  body-md:
-    fontFamily: "New Rocker"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "IBM Plex Mono"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 8px
-  md: 16px
-  sourceScale: "8pt baseline grid"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 57b22a56e861727d8fff4ee5470528df20bf176e0555f0b079d427fef5127fa2, 1552 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Game-inspired fantasy aesthetic with bold, premium visuals, rich color palettes, and immersive thematic elements.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/fantasy/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/fantasy/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/fantasy/DESIGN.md |
+| sha256 of what was here | 57b22a56e861727d8fff4ee5470528df20bf176e0555f0b079d427fef5127fa2 |
+| size of what was here | 1552 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/fantasy/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** bold, premium
-- **Typography scale:** 12/14/16/20/24/32
-- **Typography fonts:** primary=New Rocker, display=New Rocker, mono=IBM Plex Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, secondary, success, warning, danger, info
-- **Spacing scale:** 8pt baseline grid
-
-## Colors
-
-- **Primary (#0250CC):** Token from style foundations.
-- **Secondary (#FDC800):** Token from style foundations.
-- **Success (#16A34A):** Token from style foundations.
-- **Warning (#D97706):** Token from style foundations.
-- **Danger (#DC2626):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#111827):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

@@ -1,35 +1,19 @@
-# Attribution
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-This skill adapts the workflow scope of **Pitch Agent** from:
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 1ac6b67d5676d5b8cf9ad944a2022e28df807451d214b84ec35677eec7078c3c, 1489 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-- Repository: [anthropics/financial-services](https://github.com/anthropics/financial-services)
-- Path: `plugins/agent-plugins/pitch-agent/`
-- License: **Apache-2.0**
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-templates/ppt/ib-pitch-book/references/attribution.md && git show <sha>:skills/design/design-templates/ppt/ib-pitch-book/references/attribution.md
 
-## What is adapted
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-templates/ppt/ib-pitch-book/references/attribution.md |
+| sha256 of what was here | 1ac6b67d5676d5b8cf9ad944a2022e28df807451d214b84ec35677eec7078c3c |
+| size of what was here | 1489 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-templates/ppt/ib-pitch-book/references/attribution.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- The high-level workflow shape: investment-banking pitch-book generation,
-  strategic-alternatives framing, comps / precedents / DCF / recommendation
-  slide sequence, and the Pitch Agent naming reference.
-- The upstream Apache-2.0 project is credited in `SKILL.md` frontmatter and this
-  notice file.
-
-## What is original to Open Design
-
-- `pattern.html` visual system, fictional NorthPeak / Hartfield content,
-  slide-by-slide copy, tables, styling, and JavaScript.
-- `assets/template.html` seed deck shell and Open Design-specific workflow
-  instructions.
-- The local references in this folder, except where they describe the adapted
-  upstream workflow scope.
-
-## Apache-2.0 notice handling
-
-Retain this attribution file and the upstream link when redistributing or
-modifying the skill. If future edits copy upstream source text, code, prompts,
-or documentation more directly, preserve the upstream Apache-2.0 license notice
-for those adapted portions and document the copied files / sections here.
-
-The Open Design skill bundle (`SKILL.md`, `pattern.html`, `assets/template.html`,
-and references in this folder) is contributed under Open Design's repository
-license except for the adapted workflow ideas noted above.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

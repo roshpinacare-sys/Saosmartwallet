@@ -1,55 +1,19 @@
----
-name: Lingo
-colors:
-  primary: "#58cc02"
-  secondary: "#ce82ff"
-  success: "#58cc02"
-  warning: "#ffc800"
-  danger: "#ff4b4b"
-  surface: "#FFFFFF"
-  text: "#3c3c3c"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "Nunito"
-    fontSize: 2rem
-  body-md:
-    fontFamily: "Nunito"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "12/14/16/20/24/32"
-  weights: "400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 4px
-  md: 8px
-  sourceScale: "4/8/12/16/24/32"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 91cc28b8448f9c8f2cf4bcd3468414384913227e416946ddbf210a0b66d39488, 1515 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Playful, minimal design with bright colors, rounded shapes, tactile 3D borders, and friendly illustrations for approachable interfaces.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/lingo/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/lingo/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/lingo/DESIGN.md |
+| sha256 of what was here | 91cc28b8448f9c8f2cf4bcd3468414384913227e416946ddbf210a0b66d39488 |
+| size of what was here | 1515 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/lingo/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** bold, playful
-- **Typography scale:** 12/14/16/20/24/32
-- **Typography fonts:** primary=Nunito, display=Nunito, mono=JetBrains Mono
-- **Typography weights:** 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, neutral, success, warning, danger
-- **Spacing scale:** 4/8/12/16/24/32
-
-## Colors
-
-- **Primary (#58cc02):** Token from style foundations.
-- **Secondary (#ce82ff):** Token from style foundations.
-- **Success (#58cc02):** Token from style foundations.
-- **Warning (#ffc800):** Token from style foundations.
-- **Danger (#ff4b4b):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#3c3c3c):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

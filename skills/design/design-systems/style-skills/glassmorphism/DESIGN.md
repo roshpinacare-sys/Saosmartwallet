@@ -1,55 +1,19 @@
----
-name: Glassmorphism
-colors:
-  primary: "#1856FF"
-  secondary: "#3A344E"
-  success: "#07CA6B"
-  warning: "#E89558"
-  danger: "#EA2143"
-  surface: "#FFFFFF"
-  text: "#141414"
-  neutral: "#FFFFFF"
-typography:
-  h1:
-    fontFamily: "Plus Jakarta Sans"
-    fontSize: 3rem
-  body-md:
-    fontFamily: "Plus Jakarta Sans"
-    fontSize: 1rem
-  label-caps:
-    fontFamily: "JetBrains Mono"
-    fontSize: 0.75rem
-  sourceScale: "mobile-first compact scale"
-  weights: "100, 200, 300, 400, 500, 600, 700, 800, 900"
-rounded:
-  sm: 4px
-  md: 8px
-spacing:
-  sm: 8px
-  md: 16px
-  sourceScale: "comfortable density mode"
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## Overview
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 a9ab735bff17d6d2c37e18c10e82904dbe5cd13c26a16f68ae362aa941b9a631, 1698 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Frosted glass effect with translucent layers, subtle blur, and luminous borders for depth and modern elegance.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-systems/style-skills/glassmorphism/DESIGN.md && git show <sha>:skills/design/design-systems/style-skills/glassmorphism/DESIGN.md
 
-## Style Foundations
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-systems/style-skills/glassmorphism/DESIGN.md |
+| sha256 of what was here | a9ab735bff17d6d2c37e18c10e82904dbe5cd13c26a16f68ae362aa941b9a631 |
+| size of what was here | 1698 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-systems/style-skills/glassmorphism/DESIGN.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- **Visual style:** clean, high-contrast, bold, enterprise, liquidglass effect, glassmorphism
-- **Typography scale:** mobile-first compact scale
-- **Typography fonts:** primary=Plus Jakarta Sans, display=Plus Jakarta Sans, mono=JetBrains Mono
-- **Typography weights:** 100, 200, 300, 400, 500, 600, 700, 800, 900
-- **Color palette:** primary, neutral, success, warning, danger, info, surface/subtle layers
-- **Spacing scale:** comfortable density mode
-
-## Colors
-
-- **Primary (#1856FF):** Token from style foundations.
-- **Secondary (#3A344E):** Token from style foundations.
-- **Success (#07CA6B):** Token from style foundations.
-- **Warning (#E89558):** Token from style foundations.
-- **Danger (#EA2143):** Token from style foundations.
-- **Surface (#FFFFFF):** Token from style foundations.
-- **Text (#141414):** Token from style foundations.
-- **Neutral (#FFFFFF):** Derived from the surface token for official format compatibility.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

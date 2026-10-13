@@ -1,53 +1,19 @@
----
-name: social-card-map
-description: 地图 / 行程 / 路线主导的社交卡 — 路线 + 3 个停靠点 / 邻里地图 + 推荐标签 / 一日行程 + 简化路径 / 地点卡 + 迷你地图 + 旅行笔记 / 两区两路线对比。地理必须激进简化，只标必要地点，给清晰路径层级，配 city/date/duration/walking-driving 上下文。触发："做个旅行路线卡 / 行程图卡 / 邻里地图卡 / 周末散步路线 / 城市指南"。NOT 真实地图数据虚构，NOT 地图当背景装饰。
-visibility: public
-mode: template
-carrier: fixed-image
-scenario: social-content
-pattern_source: pattern.html
-source_priority: skill-first
-triggers:
-  - "做个旅行路线卡"
-  - "行程图卡"
-  - "邻里地图卡"
-  - "周末散步路线"
-  - "城市指南卡"
-  - "地图打卡卡"
-related_patterns: social-card-editorial
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-# Social Card Map / Travel Template
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 db2ac64857d31be15867e77f67d2762691124e41f0fb97b240ff832148fa9b9e, 2019 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-Use when location, route, itinerary, distance, neighborhood, or place relationship is central to the card.
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/design/design-templates/social-card-map/SKILL.md && git show <sha>:skills/design/design-templates/social-card-map/SKILL.md
 
-## Core Rule
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/design/design-templates/social-card-map/SKILL.md |
+| sha256 of what was here | db2ac64857d31be15867e77f67d2762691124e41f0fb97b240ff832148fa9b9e |
+| size of what was here | 2019 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/design/design-templates/social-card-map/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-A map card must clarify spatial relationships. Do not add a map shape only as decoration.
-
-## Structure Options
-
-- route map + 3 stops
-- neighborhood map + recommendation labels
-- day itinerary + simple path
-- place card + mini map + travel note
-- comparison: two areas / two routes
-
-## Must Do
-
-- Simplify geography aggressively.
-- Label only necessary places.
-- Use a clear route/path hierarchy.
-- Include context: city, date, duration, walking/driving/transit if relevant.
-
-## Avoid
-
-- Map details too dense for phone viewing.
-- Fake exact map data when none is provided.
-- Decorative map backgrounds unrelated to content.
-
-## Pattern Source Rule
-
-Read this `SKILL.md` first. Do **not** read `pattern.html` by default.
-
-Read `pattern.html` only when you need concrete layout rhythm, spatial relationships, or interaction/annotation behavior that this markdown cannot fully specify. When read, extract patterns only; do not copy DOM, CSS classes, exact spacing, placeholder copy, or styling wholesale.
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

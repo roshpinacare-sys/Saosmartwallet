@@ -1,62 +1,19 @@
-# {Candidate_Name}_Targeted_Interview_Guide
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-> [!IMPORTANT]
-> **Planning Context**: Based on war room simulation with {Expert_List}.
-> **Objective**: Verify competency match (Step 1), gather evidence on resume concerns (Step 2), project future performance (Step 3).
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 6243d60f4a6752ce009fcf70ead611d1759da0ea7fcb22fe6fa6d2bb3e622fa1, 1732 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
----
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/interview-designer/templates/interview_guide_template.md && git show <sha>:skills/interview-designer/templates/interview_guide_template.md
 
-## 1. Competency Scorecard
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/interview-designer/templates/interview_guide_template.md |
+| sha256 of what was here | 6243d60f4a6752ce009fcf70ead611d1759da0ea7fcb22fe6fa6d2bb3e622fa1 |
+| size of what was here | 1732 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/interview-designer/templates/interview_guide_template.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-*Before looking at the resume, THIS is what success looks like.*
-
-*   **Mission (One-sentence mission)**: ...
-*   **Outcomes (12-month must-achieve results)**:
-    1.  ...
-    2.  ...
-*   **Core Competencies**:
-    *   **{Competency 1}**: {Description}
-    *   **{Competency 2}**: {Description}
-
----
-
-## 2. Forensic Resume Scan
-
-*Scan resume against Scorecard, looking for Gaps (concerns) and Evidence (matches).*
-
-### 🔴 Red Flags (Concerns/Gaps)
-*   **{Concern 1}**: ...
-    *   *Expert Challenge*: ...
-*   **{Concern 2}**: ...
-
-### 🟢 Green Signals (Highlights/Matches)
-*   **{Highlight 1}**: ...
-    *   *Evidence*: ...
-
----
-
-## 3. Interview Battle Scripts
-
-### Part A: Pressure Validation (Past Performance)
-*Forensic STAR follow-ups designed for Red Flags.*
-
-**Q1 (targeting {Concern 1})**:
-*   **The Setup**: "{Question...}"
-*   **The Drill**: "{Follow-up...}"
-
-### Part B: Future Projection (Future Scenario)
-*Performance simulations designed for Outcomes.*
-
-**Q2 (targeting Outcome 1)**:
-*   **Scenario**: "{Set up a specific challenge highly relevant to future work...}"
-*   **Question**: "If this is the situation you face in your first week, how would you handle it?"
-*   **Bar Raiser**: "{What would an A Player do?}" vs "{What would a B Player do?}"
-
----
-
-## 4. Decision Matrix
-
-| Dimension | No Hire (Kill) | HIRE (Pass) |
-| :--- | :--- | :--- |
-| **Integrity** | ... | ... |
-| **Competency Match** | ... | ... |
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

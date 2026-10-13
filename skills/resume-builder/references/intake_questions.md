@@ -1,44 +1,19 @@
-# 简历信息收集问题清单
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-分 3 轮问，不要一次性塞给用户。
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 5fee993704f799495b41be64fcaf30fb2f96b5235355b1c5cf70ba0e616ee04f, 2019 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## 第 1 轮：基本信息（必问）
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/resume-builder/references/intake_questions.md && git show <sha>:skills/resume-builder/references/intake_questions.md
 
-1. 你的姓名 + 联系方式（手机、邮箱，可选 GitHub / 作品集）
-2. 学历（学校 + 专业 + 学历层次 + 毕业年份；多段教育依次列）
-3. 你目前 / 最近一份工作的：公司、岗位、起止时间
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/resume-builder/references/intake_questions.md |
+| sha256 of what was here | 5fee993704f799495b41be64fcaf30fb2f96b5235355b1c5cf70ba0e616ee04f |
+| size of what was here | 2019 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/resume-builder/references/intake_questions.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## 第 2 轮：经历主体（必问）
-
-针对每段工作 / 实习 / 项目，按这个套路问：
-
-- 这段经历你**主要负责什么**？
-- 有哪些**具体的事情**是你独立或主导做的？（关键词：你"做了什么"，不是"参与了什么"）
-- **结果如何**？有没有可以量化的数字（用户量、转化率、收入、效率提升、排名等）
-- 这段经历你最得意的**一件事**是什么？
-
-如果用户记不清数字，可以这样追问：
-- "大致量级也可以，比如 10 万 / 百万 / 千万"
-- "百分比记不清的话，给一个 range，比如『大约 20-30%』"
-- "如果完全没办法估，我会标成『[需补具体数字]』，你后面填"
-
-## 第 3 轮：补充信息（可选）
-
-- 技能 / 工具：编程语言、框架、设计 / 数据 / 办公工具
-- 语言能力：英语 / 其他语种 + 等级
-- 证书 / 获奖：仅写有含金量的（CFA Level 2、ACM 区域赛、PMP 等）
-- 兴趣 / 其他：除非真的有亮点（比如马拉松、独立游戏作品），否则不写
-
-## 应届生补充问
-
-- 校园经历（学生会、社团、志愿者）—— 但只挑能体现"领导 / 组织 / 推动力"的写
-- 课程项目 —— 挑跟目标岗位相关的 1~2 个
-- GPA / 排名 / 奖学金 —— 高于 3.5/4.0 或专业前 20% 才写
-
-## 转行候选人补充问
-
-- 你为什么想转到这个方向？
-- 你已经为转行做了哪些准备（自学、项目、副业、证书）？
-- 原岗位有哪些**可迁移技能**？（举具体例子）
-
-把这些信息会用到一段简短的"个人简介 / Career Summary"里，化解 HR 看到转行简历时的困惑。
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

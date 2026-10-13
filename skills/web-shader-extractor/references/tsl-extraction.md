@@ -1,41 +1,19 @@
-# Three.js TSL 识别与重建
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Three.js r170+ 的 TSL (Three Shading Language) 用 JS 函数调用链组合 shader 节点图，运行时编译为 GLSL。
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 1e47c18e9046eb49d47b4fb4e4221038f66d94eeedc1e38e062a83753013082f, 1600 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## 识别信号
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/web-shader-extractor/references/tsl-extraction.md && git show <sha>:skills/web-shader-extractor/references/tsl-extraction.md
 
-1. Bundle 有大量 `uniform`/`shader` 但几乎没有 `precision`/`gl_FragColor`
-2. canvas `data-engine` 显示 r170+
-3. 存在 `.mul()`/`.add()`/`.toVar()`/`.assign()` 链式调用
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/web-shader-extractor/references/tsl-extraction.md |
+| sha256 of what was here | 1e47c18e9046eb49d47b4fb4e4221038f66d94eeedc1e38e062a83753013082f |
+| size of what was here | 1600 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/web-shader-extractor/references/tsl-extraction.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## TSL → GLSL 映射
-
-| TSL | GLSL |
-|-----|------|
-| `screenUV` | `gl_FragCoord.xy / resolution` |
-| `viewportSize` | `uniform vec2 resolution` |
-| `float()`/`vec2()`/`vec3()`/`vec4()` | 同名（但 TSL 中是 JS 函数） |
-| `.mul()`/`.add()`/`.sub()`/`.div()` | `*`/`+`/`-`/`/` |
-| `sin()`/`cos()`/`mix()`/`smoothstep()` | 同名 |
-| `clamp()`/`abs()`/`fract()`/`floor()` | 同名 |
-| `pow()`/`exp()`/`sqrt()`/`dot()`/`length()` | 同名 |
-| `Fn()` | shader 函数包裹器（内联到 GLSL） |
-| `uniform()` | `uniform <type> name` |
-| `convertToTexture()` | RTT（多 pass 渲染） |
-| `.sample(uv)` | `texture(sampler, uv)` |
-| `.toVar()`/`.assign()` | 声明/赋值可变变量 |
-| `.oneMinus()` | `1.0 - x` |
-
-## 重建步骤
-
-1. **定位**：搜索组件名附近的 `fragmentNode` 属性
-2. **映射表**：从 bundle 顶部 import 语句推断 minified → TSL 函数名
-   ```javascript
-   import { A as screenUV, W as sin, ... } from "three-module"
-   ```
-3. **翻译**：链式调用 → GLSL 表达式
-   ```javascript
-   // TSL: screenUV.x.sub(center.x).mul(aspect)
-   // GLSL: (uv.x - center.x) * aspect
-   ```
-4. **RTT**：`convertToTexture(childNode)` → 独立 pass 渲染到 FBO，主 shader 中 `texture()` 采样
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

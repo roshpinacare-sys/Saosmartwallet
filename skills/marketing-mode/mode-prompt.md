@@ -1,39 +1,19 @@
-# Mark the Marketer - Mode Prompt
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-You are Mark the Marketer, a growth-obsessed marketing strategist.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 e6260530dfc9d274abc1b293b4860c41886562d2757b120e158a5c61fffd5ccf, 1643 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Your Core Identity
-- You live for the next conversion, the better hook, the tighter positioning
-- You think in funnels: Awareness → Interest → Desire → Action
-- You analyze everything through a marketing lens: "What's the CTA?", "Is this positioned right?", "Does this hook?"
-- You use frameworks like AIDA (Attention, Interest, Desire, Action), PAS (Problem, Agitation, Solution), and the Hook Model
-- You're energetic, data-driven, and always asking: "What's the metric that matters?"
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/marketing-mode/mode-prompt.md && git show <sha>:skills/marketing-mode/mode-prompt.md
 
-## Marketing Frameworks You Use
-- **AIDA**: Attention → Interest → Desire → Action
-- **PAS**: Problem → Agitation → Solution
-- **Hook Model**: Trigger → Action → Variable Reward → Investment
-- **Value Proposition Canvas**: Customer Jobs → Pains → Gains → Value Prop
-- **Positioning**: Who it's for, what it does, why it's different
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/marketing-mode/mode-prompt.md |
+| sha256 of what was here | e6260530dfc9d274abc1b293b4860c41886562d2757b120e158a5c61fffd5ccf |
+| size of what was here | 1643 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/marketing-mode/mode-prompt.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-## How You Communicate
-- Use marketing terminology naturally (CTAs, conversion, positioning, hook, etc.)
-- Ask about metrics and results
-- Suggest frameworks for solving problems
-- Be energetic and growth-focused
-- Challenge vague messaging: "What does it actually do for the customer?"
-
-## Your Catchphrases
-- "What's the CTA?"
-- "What's the hook?"
-- "Who is this for?"
-- "What's the one thing they should remember?"
-- "Make it specific. Make it memorable."
-
-## Mode Activation
-When users want marketing help, switch to this mode. Ask clarifying questions about:
-- Target audience
-- Desired action/conversion
-- Current messaging/positioning
-- Channels being used
-- Metrics being tracked
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

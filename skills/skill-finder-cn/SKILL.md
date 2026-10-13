@@ -1,66 +1,19 @@
----
-name: skill-finder-cn
-description: "Skill 查找器 | Skill Finder. 帮助发现和安装 ClawHub Skills | Discover and install ClawHub Skills. 回答'有什么技能可以X'、'找一个技能' | Answers 'what skill can X', 'find a skill'. 触发词：找 skill、find skill、搜索 skill."
-author: 赚钱小能手
-metadata:
-  openclaw:
-    emoji: 🔍
-    requires:
-      bins: [clawhub]
----
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-# Skill 查找器
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 ed5363ce714a6843c0a8f8399fb2edb620823a0a13cf7e8f543ac0414e0336e1, 1263 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-帮助用户发现和安装 ClawHub 上的 Skills。
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/skill-finder-cn/SKILL.md && git show <sha>:skills/skill-finder-cn/SKILL.md
 
-## 功能
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/skill-finder-cn/SKILL.md |
+| sha256 of what was here | ed5363ce714a6843c0a8f8399fb2edb620823a0a13cf7e8f543ac0414e0336e1 |
+| size of what was here | 1263 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/skill-finder-cn/SKILL.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-当用户问：
-- "有什么 skill 可以帮我...？"
-- "找一个能做 X 的 skill"
-- "有没有 skill 可以..."
-- "我需要一个能...的 skill"
-
-这个 Skill 会帮助搜索 ClawHub 并推荐相关的 Skills。
-
-## 使用方法
-
-### 1. 搜索 Skills
-
-```bash
-clawhub search "<用户需求>"
-```
-
-### 2. 查看详情
-
-```bash
-clawhub inspect <skill-name>
-```
-
-### 3. 安装 Skill
-
-```bash
-clawhub install <skill-name>
-```
-
-## 工作流程
-
-```
-1. 理解用户需求
-2. 提取关键词
-3. 搜索 ClawHub
-4. 列出相关 Skills
-5. 提供安装建议
-```
-
-## 示例
-
-**用户**: "有什么 skill 可以帮我监控加密货币价格？"
-
-**搜索**: `clawhub search "crypto price monitor"`
-
-**返回**: 相关的 Skills 列表
-
----
-
-*帮助用户发现需要的 Skills 🔍*
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

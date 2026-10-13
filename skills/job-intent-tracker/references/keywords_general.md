@@ -1,45 +1,19 @@
-# 通用关键词库（跨行业）
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-## 通用软技能（任何岗位都吃香）
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 981a4024d6e0fdfd3cb74077da2c502c1ab572d09eabb611a21deb8d8bbb36c3, 1367 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-- Ownership / 主人翁意识
-- 跨部门 / 跨团队协作
-- 推动落地 / drive
-- 业务 sense / 商业化思维
-- 数据驱动 / 量化思维
-- 用户同理心 / 客户导向
-- Learning agility / 快速学习
-- Ambiguity tolerance / 应对模糊
-- 影响力 / 说服力
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/job-intent-tracker/references/keywords_general.md && git show <sha>:skills/job-intent-tracker/references/keywords_general.md
 
-## 通用硬技能
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/job-intent-tracker/references/keywords_general.md |
+| sha256 of what was here | 981a4024d6e0fdfd3cb74077da2c502c1ab572d09eabb611a21deb8d8bbb36c3 |
+| size of what was here | 1367 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/job-intent-tracker/references/keywords_general.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-- SQL（半数岗位需要）
-- Excel 高阶（vlookup、pivot、power query、宏 / VBA）
-- PowerPoint / Keynote（结构化输出）
-- 英语（书面 + 口语，外企 / 跨境必备）
-- 项目管理：Jira / Asana / Notion / 飞书
-
-## 通用职业资质
-
-- 学历：本科 / 硕士 / 博士 + 学校 tier
-- 证书：CFA、CPA、ACCA、PMP、AWS / GCP / Azure 认证
-- 语言：托福 / 雅思 / 多语种
-
-## 量化结果通用模板
-
-写简历 / 画像时，**所有动作都尽量量化**。模板：
-
-- "通过 ___，使 ___ 提升 X%（基线 Y → 现状 Z）"
-- "在 ___ 期间，覆盖 ___ 业务，规模 X 万 / 亿"
-- "主导 ___ 项目，缩短 ___ 时间 X%"
-- "管理 X 人团队，覆盖 X 个业务线"
-
-## 转行 / 跨界叙事关键词
-
-- "可迁移技能"（transferable skill）
-- "跨界视角"
-- "第一性原理"
-- "从 0 到 1 / 从 1 到 N"
-
-转行候选人的画像应该突出**结构化思维 + 学习速度 + 已有 case**，而不是硬编技能词。
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.

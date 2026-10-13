@@ -1,54 +1,19 @@
-# Figure Contract For Experiment Packages
+# אוחד לבית הקנוני — G6 · T23-C library consolidation
 
-Use this before writing plotting code. The figure is part of the experiment's argument, not decoration after the fact.
+This file was a byte-identical cross-repo copy of the library corpus
+(dup-group sha256 1ecad88750b38160660787a9c87fe67c331f3c1862f46ad5841bf7857ef40422, 1596 B; measured by weave-ecosystem G6 dup-scan).
+The corpus lives in ONE canonical home now — keep it there.
 
-## Required working note
+Do not re-copy the content into this repo. Update the canonical and link to it.
+The original bytes remain recoverable from this repo's git history:
+  git log --oneline -- skills/experiment-suite/references/04a-figure-contract.md && git show <sha>:skills/experiment-suite/references/04a-figure-contract.md
 
-Write a short contract to `$RUN/figures/figure_contract.md` before generating figures:
+| field | value |
+|---|---|
+| canonical copy | roshpinacare-sys/steem · skills/experiment-suite/references/04a-figure-contract.md |
+| sha256 of what was here | 1ecad88750b38160660787a9c87fe67c331f3c1862f46ad5841bf7857ef40422 |
+| size of what was here | 1596 bytes |
+| location of what was here | roshpinacare-sys/Saosmartwallet · skills/experiment-suite/references/04a-figure-contract.md |
+| consolidated | 2026-10-13 · THE WEAVE ecosystem dedup (G6) · T23-C agent |
 
-```text
-Core conclusion:
-Figure archetype:
-Target output:
-Final size:
-Panel map:
-  a:
-  b:
-  c:
-Evidence hierarchy:
-  hero evidence:
-  validation evidence:
-  controls / robustness:
-Statistics needed:
-Source data needed:
-Reviewer risk:
-```
-
-## Rules
-
-- The core conclusion must be one sentence with a verb.
-- Every panel must answer a distinct question.
-- If removing a panel does not weaken the argument, remove or merge it.
-- Give the main result the clearest panel; do not make every subplot equally important by default.
-- Keep controls and robustness panels visually quieter than the hero panel.
-
-## Figure archetypes
-
-Pick one of these before plotting:
-
-- `quantitative grid`
-- `schematic-led composite`
-- `image plate + quant`
-- `asymmetric mixed-modality figure`
-
-For most experiment-suite outputs, the default is `quantitative grid`. If the experiment involves microscopy, pathology, gels, or spatial overlays, use `image plate + quant` instead.
-
-## Reviewer-risk prompts
-
-Before plotting, ask these privately:
-
-- Is the sample split actually comparable across methods?
-- Are the error bars / intervals defined?
-- Could a skeptical reader claim cherry-picking?
-- Does the figure need a direct disclosure marker because the numbers are simulated?
-- Would a simpler chart communicate the same claim more clearly?
+Consolidated by THE WEAVE ecosystem dedup (G6). This pointer is intentional — do not copy content back.
