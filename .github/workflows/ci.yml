@@ -1,0 +1,24 @@
+# wallet-core-tests — added additively by agent-9 (task 4-c).
+# First CI lane for packages/core crypto unit tests (KDF / Shamir / cipher).
+# Does not modify or replace any existing workflow.
+name: wallet-core-tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core-crypto-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run packages/core crypto tests
+        run: bun test packages/core/test/
