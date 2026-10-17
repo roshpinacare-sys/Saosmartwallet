@@ -93,3 +93,6 @@ docs/broadcast-seen.json
 # sqlite WAL sidecars — live artifacts, change every second (r45: WAL enabled)
 db/custom.db-shm
 db/custom.db-wal
+
+# P0-FAILCLOSE (2026-10-17): secret material must never be git-tracked (agent4/p0-purge-secrets)
+db/custom.db
