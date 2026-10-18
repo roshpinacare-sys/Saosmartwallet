@@ -26,7 +26,7 @@ import {
   shardSecret,
   reconstructSecret,
 } from "../src/crypto";
-import { VaultError } from "../src/types";
+import { VaultError, type VaultErrorCode } from "../src/types";
 
 const FAST_KDF = { algorithm: "argon2id" as const, memoryKiB: 1024, iterations: 1, parallelism: 1, hashLength: 32 };
 
@@ -40,7 +40,7 @@ function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
   return true;
 }
 
-function expectVaultError(fn: () => unknown, code: string): void {
+function expectVaultError(fn: () => unknown, code: VaultErrorCode): void {
   try {
     fn();
     throw new Error(`expected VaultError(${code}) — nothing thrown`);
