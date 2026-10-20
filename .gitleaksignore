@@ -3,3 +3,10 @@
 # selftest tool (fail-closed proofs; LIVE vault untouched, stays uninitialized) —
 # ceremony material, not a live credential.
 tools/vault-zk-check.ts:generic-api-key:27
+
+# X-1 historical triage (wave-19.39, measured with gitleaks v8.24.3 full-history scan):
+# exactly 2 findings remain, both = the KNOWN R11 relic (agent/vault/recovery-meta-2026-09-12.json,
+# retired 09-12; law-r11-head-absent guards it stays absent at HEAD — measured absent).
+# Key-generation-era metadata, retired material, not live.
+133817224c136e87e9073da6af0d3217e5047298:agent/vault/recovery-meta-2026-09-12.json:generic-api-key:3
+f2d448e80262d4550a9401873cc7b4c7572e4584:agent/vault/recovery-meta-2026-09-12.json:generic-api-key:3
