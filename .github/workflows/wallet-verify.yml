@@ -9,6 +9,8 @@ name: wallet-verify
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '43 14 * * *'
   push:
     branches:
       - main
