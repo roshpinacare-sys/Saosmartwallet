@@ -41,3 +41,14 @@ export {
   normalizeBrainKey,
   recoverFromCompact,
 } from "./keys";
+
+export {
+  SigningError,
+  Secp256k1Signer,
+  Ed25519Signer,
+  wipeBytes,
+  CHAIN_KEY_SCHEMES,
+  describeChainKeyScheme,
+  type ChainKeyScheme,
+  type Secp256k1Signature,
+} from "./multichain";
