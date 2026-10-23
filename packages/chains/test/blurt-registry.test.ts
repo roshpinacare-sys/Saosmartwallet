@@ -167,9 +167,12 @@ describe("THE UNIFIED KEY ROUTE — one AES-256-GCM vault, four chains", () => {
     const keyset = { steem: { wif: PrivateKey.random().toWif() } };
     const masterKey = random32();
     const sealed = sealJson(keyset, masterKey);
-    sealed.ciphertext = new Uint8Array(sealed.ciphertext); // copy
-    sealed.ciphertext[0] ^= 0xff; // flip one bit
-    expect(() => openJson<typeof keyset>(sealed, masterKey)).toThrow();
+    // ciphertext is the canonical base64 string (EncryptedPayload) — decode,
+    // flip one bit of the content ciphertext, re-encode (the core test's pattern).
+    const raw = Buffer.from(sealed.ciphertext, "base64");
+    raw[0] ^= 0xff;
+    const tampered = { ...sealed, ciphertext: raw.toString("base64") };
+    expect(() => openJson<typeof keyset>(tampered, masterKey)).toThrow();
   });
 
   it("steem-family chain-id isolation: identical tx → different digests → cross-chain replay FALSE", () => {
