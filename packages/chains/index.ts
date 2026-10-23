@@ -15,6 +15,15 @@ import { EthereumAdapter, type EvmChainInfo } from "./ethereum";
 import { SolanaAdapter, type SolanaChainInfo } from "./solana";
 
 export type { ChainAdapter, ChainHealthReport, AccountSnapshot, TokenBalances, RcManabar, UnsignedTx, SignedTx, BroadcastResult, SigningKeys, ChainOperation, AdapterCapability, ChainFlavor, KeyRole } from "./chain-adapter";
+export {
+  BLURT_CHAIN_ID,
+  BLURT_CHAIN_ID_HEX,
+  BLURT_RPC_URLS,
+  BLURT_PREFIXES,
+  BLURT_ASSET_SYMBOLS,
+  BLURT_ADAPTER_DEFAULTS,
+  makeBlurtAdapter,
+} from "./blurt";
 export { SteemAdapter } from "./steem/src/adapter";
 export {
   EthereumAdapter,
