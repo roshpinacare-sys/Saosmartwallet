@@ -26,3 +26,12 @@ jobs:
 
       - name: Run packages/chains registry tests (BLURT + vault key-route)
         run: bun test packages/chains/test/
+
+      # t56 convergence: the multichain signing surface + BLURT adapter lanes
+      # join additively (agent-9, PR feat/saosmartwallet-signing-engine) —
+      # nothing replaced, two new directories only.
+      - name: Run packages/crypto multichain signer tests
+        run: bun test packages/crypto/test/
+
+      - name: Run packages/chains/blurt adapter tests
+        run: bun test packages/chains/blurt/test/

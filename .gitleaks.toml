@@ -1,0 +1,23 @@
+# gitleaks config — extends the DEFAULT ruleset; nothing is weakened.
+# =============================================================================
+# Doctrine: cryptographic KNOWN-ANSWER TEST (KAT) vectors are PUBLIC constants
+# by definition — e.g. the Bitcoin mainnet WIF of scalar 1 is a famous,
+# published serialization vector, and in-test "secret" material is generated
+# throwaway entropy (never a production key). They appear literally in test
+# suites on purpose. The allowlist below matches ONLY these exact constants,
+# and ONLY inside test files — any other high-entropy string anywhere in the
+# repo (including test files) is still reported.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public crypto KAT vectors + in-test throwaway entropy (test files only)"
+paths = ['''(?i)\.test\.(ts|mts|cts|js|mjs|cjs)$''']
+regexes = [
+  # Bitcoin mainnet WIF of scalar 1 — published KAT (uncompressed form).
+  '''5HpHagT65TZzG1PH3CSu63k8DbpvD8s5ip4nEB3kEsreAnchuDf''',
+  # Bitcoin mainnet WIF of scalar 1 — published KAT (compressed form).
+  '''KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn''',
+  # In-test throwaway entropy source (generated, never a real key).
+  '''2b9d4c8e7f0a1325b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3''',
+]

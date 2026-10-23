@@ -11,6 +11,8 @@
  */
 
 import { SteemAdapter } from "./steem/src/adapter";
+import { BLURT_CHAIN_ID_HEX, BLURT_RPC_URLS } from "./blurt";
+import { BlurtAdapter, blurtChainIdFromHex } from "./blurt/src/adapter";
 import { EthereumAdapter, type EvmChainInfo } from "./ethereum";
 import { SolanaAdapter, type SolanaChainInfo } from "./solana";
 
@@ -25,6 +27,7 @@ export {
   makeBlurtAdapter,
 } from "./blurt";
 export { SteemAdapter } from "./steem/src/adapter";
+export { BlurtAdapter, blurtChainIdFromHex } from "./blurt/src/adapter";
 export {
   EthereumAdapter,
   toEvmAddress,
@@ -71,6 +74,23 @@ export function getSteemAdapter(): SteemAdapter {
   return steemAdapter;
 }
 
+/**
+ * BLURT adapter — canonical convergence of the two sister rails (t56):
+ *   · constants come ONLY from ./blurt (r10-oracle-measured: 3/3 real
+ *     on-chain signature recoveries under BLURT_CHAIN_ID_HEX — the chain is
+ *     the oracle, zero assumption, wave 19.77);
+ *   · the explicit-chain-id law still holds in the class: getBlurtAdapter
+ *     pins the MEASURED constant by default, and an operator override is
+ *     parsed fail-closed (64 hex chars enforced) — never guessed.
+ */
+export function getBlurtAdapter(chainIdHex: string = BLURT_CHAIN_ID_HEX): BlurtAdapter {
+  return new BlurtAdapter({
+    rpcUrl: BLURT_RPC_URLS[0],
+    rpcUrls: [...BLURT_RPC_URLS.slice(1)],
+    chainId: blurtChainIdFromHex(chainIdHex),
+  });
+}
+
 let ethereumAdapter: EthereumAdapter | null = null;
 
 export function getEthereumAdapter(): EthereumAdapter {
@@ -85,7 +105,7 @@ export function getSolanaAdapter(): SolanaAdapter {
   return solanaAdapter;
 }
 
-/** All adapters, construction lazily deferred. */
+/** All adapters, construction lazily deferred. Blurt requires an operator-pinned chain id (fail-closed) and is constructed on demand. */
 export function getAllAdapters(): Array<SteemAdapter | EthereumAdapter | SolanaAdapter> {
   return [getSteemAdapter(), getEthereumAdapter(), getSolanaAdapter()];
 }

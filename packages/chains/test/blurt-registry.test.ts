@@ -37,6 +37,7 @@ import {
   EncodingError,
   PrivateKey,
   PublicKey,
+  base58Decode,
   steemPublicKeyDecode,
   steemPublicKeyEncode,
 } from "../../crypto/src/index";
@@ -160,7 +161,14 @@ describe("THE UNIFIED KEY ROUTE — one AES-256-GCM vault, four chains", () => {
     expect(steemPub.startsWith("STM")).toBe(true);
     expect(blurtPub.startsWith("BLT")).toBe(true);
     expect(ethAddr).toMatch(/^0x[0-9a-fA-F]{40}$/);
-    expect(solAddr.length).toBe(44); // base58 ed25519 pubkey (32 bytes → 43-44 chars)
+    // base58 of a 32-byte ed25519 pubkey is 43-44 chars depending on the
+    // seed's leading zero bytes — a literal toBe(44) flakes on ~1/256 of
+    // random seeds (caught live by the push-event CI run, t56 convergence).
+    // The DETERMINISTIC invariants: the address roundtrips to exactly 32
+    // bytes and its char length stays inside the base58 32-byte envelope.
+    expect(base58Decode(solAddr).length).toBe(32);
+    expect(solAddr.length).toBeGreaterThanOrEqual(43);
+    expect(solAddr.length).toBeLessThanOrEqual(44);
   });
 
   it("the tampered envelope fails closed (AEAD tag) — no key material leaks", () => {
