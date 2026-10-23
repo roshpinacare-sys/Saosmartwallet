@@ -1,6 +1,7 @@
 # wallet-core-tests — added additively by agent-9 (task 4-c).
 # First CI lane for packages/core crypto unit tests (KDF / Shamir / cipher).
-# Does not modify or replace any existing workflow.
+# wave 19.77: the chains registry lane joins (BLURT entry + unified vault
+# key-route proof) — same additive discipline, nothing replaced.
 name: wallet-core-tests
 
 on:
@@ -22,3 +23,6 @@ jobs:
 
       - name: Run packages/core crypto tests
         run: bun test packages/core/test/
+
+      - name: Run packages/chains registry tests (BLURT + vault key-route)
+        run: bun test packages/chains/test/
