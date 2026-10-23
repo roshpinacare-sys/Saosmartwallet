@@ -50,6 +50,8 @@ local-*
 dev.log
 dev.out.log
 test
+!packages/**/test/
+!packages/**/test/**
 prompt
 
 server.log
