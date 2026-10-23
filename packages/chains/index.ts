@@ -11,6 +11,7 @@
  */
 
 import { SteemAdapter } from "./steem/src/adapter";
+import { BLURT_CHAIN_ID_HEX, BLURT_RPC_URLS } from "./blurt";
 import { BlurtAdapter, blurtChainIdFromHex } from "./blurt/src/adapter";
 import { EthereumAdapter, type EvmChainInfo } from "./ethereum";
 import { SolanaAdapter, type SolanaChainInfo } from "./solana";
@@ -62,13 +63,6 @@ export const SOLANA_RPC_URLS = [
 
 export const STEEM_RPC_URL = "https://api.steemit.com";
 
-/**
- * BLURT endpoints (§7B rail). Endpoint 1 measured live 2026-10-23 (chain id
- * NOT exposed by either — the adapter keeps chainId explicit, fail-closed).
- * rpc.blurt.world DNS-fails from some sandboxes; kept as documented failover.
- */
-export const BLURT_RPC_URLS = ["https://blurt-rpc.saboin.com", "https://rpc.blurt.world"] as const;
-
 // ---------------------------------------------------------------------------
 // Adapters (read-only by default — broadcast requires explicit opt-in)
 // ---------------------------------------------------------------------------
@@ -81,11 +75,15 @@ export function getSteemAdapter(): SteemAdapter {
 }
 
 /**
- * BLURT adapter — chainId is REQUIRED (fail-closed; no default constant is
- * shipped because blurt's public RPC does not expose get_chain_id). Operators
- * pin the mainnet chain id hex they have verified for themselves.
+ * BLURT adapter — canonical convergence of the two sister rails (t56):
+ *   · constants come ONLY from ./blurt (r10-oracle-measured: 3/3 real
+ *     on-chain signature recoveries under BLURT_CHAIN_ID_HEX — the chain is
+ *     the oracle, zero assumption, wave 19.77);
+ *   · the explicit-chain-id law still holds in the class: getBlurtAdapter
+ *     pins the MEASURED constant by default, and an operator override is
+ *     parsed fail-closed (64 hex chars enforced) — never guessed.
  */
-export function getBlurtAdapter(chainIdHex: string): BlurtAdapter {
+export function getBlurtAdapter(chainIdHex: string = BLURT_CHAIN_ID_HEX): BlurtAdapter {
   return new BlurtAdapter({
     rpcUrl: BLURT_RPC_URLS[0],
     rpcUrls: [...BLURT_RPC_URLS.slice(1)],

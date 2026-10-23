@@ -8,10 +8,15 @@
  *   • chainId   — EXPLICIT AND REQUIRED. Blurt's reachable public RPC
  *                 (blurt-rpc.saboin.com, measured live 2026-10-23) exposes
  *                 neither condenser_api.get_chain_id nor database_api.get_chain_id,
- *                 so NO default constant is shipped — an unverified chain id
+ *                 so the CLASS never guesses — an unverified chain id
  *                 must never sign (fail-closed, same doctrine as the M0
- *                 allowBroadcast gate). blurtChainIdFromHex() converts a
- *                 hex string once, with length enforcement.
+ *                 allowBroadcast gate). Canonical convergence (t56): the
+ *                 r10-oracle-MEASURED constant BLURT_CHAIN_ID_HEX lives in
+ *                 ../blurt.ts (3/3 real on-chain signature recoveries — the
+ *                 chain is the oracle, wave 19.77) and the registry's
+ *                 getBlurtAdapter() pins it as the explicit default. An
+ *                 operator override is still parsed fail-closed via
+ *                 blurtChainIdFromHex() (64 hex chars enforced).
  *   • opIds     — BLURT_OP_IDS (in-repo EMPIRICAL proof: blurt maps
  *                 custom_json to wire tag 0x0c; operations.ts r20).
  *   • prefix    — "BLT" (the graphene helper already recognizes it).
