@@ -11,8 +11,11 @@
  *   htlc.ts    — hash-time-lock law (sha256 binding, timelock, claim/refund)
  *   witness.ts — on-chain evidence for graphene legs (steem/blurt/hive tables)
  *   session.ts — the initiator/responder composition (T1 > T2 safety law)
+ *   rehearse.ts— full-lifecycle rehearsal harness (SAOS-SWAP-REHEARSAL/1
+ *                self-verifying hash-chained reports; zero broadcast)
  */
 
 export * from "./htlc";
 export * from "./witness";
 export * from "./session";
+export * from "./rehearse";
