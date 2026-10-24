@@ -35,3 +35,9 @@ jobs:
 
       - name: Run packages/chains/blurt adapter tests
         run: bun test packages/chains/blurt/test/
+
+      # t58 wallet-htlc-swap-engine (agent-9, MASTER DIRECTIVE §3): the atomic
+      # swap / HTLC primitives join additively — one new directory only,
+      # nothing replaced.
+      - name: Run packages/swap HTLC + witness + session tests
+        run: bun test packages/swap/test/
