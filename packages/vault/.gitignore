@@ -1,0 +1,4 @@
+# Sealed key store — NEVER commit vault state (owner directive §11).
+# keys.enc is ciphertext, but it is still account-critical material:
+# it never belongs in git, in backups, or in any bundle.
+state/
