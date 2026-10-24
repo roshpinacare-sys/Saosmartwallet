@@ -41,3 +41,9 @@ jobs:
       # nothing replaced.
       - name: Run packages/swap HTLC + witness + session tests
         run: bun test packages/swap/test/
+
+      # agent-9 (t58): the packages/htlc machine lane (cycle-31) had no CI
+      # lane — added additively so the whole repo's HTLC surface is provably
+      # green on every push.
+      - name: Run packages/htlc machine + codec tests
+        run: bun test packages/htlc/test/
