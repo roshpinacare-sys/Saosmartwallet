@@ -16,10 +16,17 @@ export const dynamic = "force-dynamic";
  *                                                 existing token must be used
  *                                                 (or set SAOS_ADMIN_TOKEN)
  *   429                                          — rate-limited (5/min/IP)
- *
- * First-caller-wins is the documented trust model of this sandbox (the same
- * trust level the console had BEFORE gating existed); from the second call on
- * the gate is real. Rate-limited to blunt that race window.
+ *   503 { ok: false, error: "bootstrap-locked" } — §1 deny-by-default (directive
+ *                                                  1a173c6ac120ccb1): the first-caller-wins
+ *                                                  ceremony is LOCKED unless the operator
+ *                                                  explicitly arms it (ALLOW_ADMIN_BOOTSTRAP=1
+ *                                                  in the env) or a credential already exists
+ *                                                  (SAOS_ADMIN_TOKEN or a prior bootstrap row).
+ *                                                  Rationale: on any public deploy the first
+ *                                                  anonymous POST used to own the admin API.
+ *                                                  Locking the ceremony is strictly safer: an
+ *                                                  unbootstrapped deployment now fails closed,
+ *                                                  and a bootstrapped one is unaffected.
  */
 export async function POST(req: Request) {
   const rl = rateLimit(`admin-bootstrap:${clientIpOf(req)}`, 5, 60_000);
@@ -40,6 +47,17 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: true, created: false, exists: true, source: "db", note: "admin credential already exists — authenticate with its token" },
       { headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  // §1 deny-by-default: a FRESH credential mint is now a supervised ceremony.
+  if (process.env.ALLOW_ADMIN_BOOTSTRAP !== "1") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "bootstrap-locked",
+        note: "no admin credential exists and the bootstrap ceremony is locked (deny-by-default). Set ALLOW_ADMIN_BOOTSTRAP=1 in the operator env for ONE supervised first-boot, or set SAOS_ADMIN_TOKEN",
+      },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
   return NextResponse.json(
