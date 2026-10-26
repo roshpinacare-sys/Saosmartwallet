@@ -1,183 +1,286 @@
 /**
- * Saosmartwallet packages/hsm-runtime — the deny-by-default HTTP handler
- * =======================================================================
- * The production signing surface. FOUR routes exist; everything else is a
- * bare 404. The auth plane (constant-time bearer law) gates /status, /sign
- * and /keys:
+ * packages/hsm-runtime — the HTTP service (node:http, zero new deps)
+ * ===================================================================
+ * Surface (deny-by-default):
  *
- *   • NO token  → 503 HSM_E_AUTH_REQUIRED (fail-closed: an unauthenticated
- *     caller must not be able to distinguish "authenticated service" from
- *     "unavailable" — 503 says the service is not answerable, full stop).
- *   • WRONG token → 401 HSM_E_AUTH_INVALID (constant-time comparison).
- *   • BAD SHAPE  → 400 HSM_E_BAD_REQUEST (no keyId / no payload / bad JSON).
- *   • UNKNOWN KEY → 404 HSM_E_UNKNOWN_KEY (no existence oracle for keys).
+ *   GET  /health      liveness ONLY — bare shape, zero operational data
+ *   GET  /status      Bearer-gated — full measured verdicts per capability
+ *   POST /keys        Bearer-gated — metadata-only vault listing
+ *   POST /sign/steem  Bearer-gated — steem-family signing → receipt
+ *   POST /sign/bytes  Bearer-gated — ed25519 signing → receipt
  *
- * /health is bare liveness: {"ok":true} — zero operational data, zero keys,
- * zero counts, zero version strings. A port scanner learns nothing.
- *
- * Every successful /sign appends exactly one hash-chained audit event with
- * fingerprints + payload DIGEST only. Auth denials are counted in memory
- * (exposed via /status as denyCount) — deliberately NOT written to disk, so
- * an unauthenticated flood cannot fill the audit store (a documented,
- * honest trade-off: the count is visible, the flood is inert).
+ * There is NO broadcast route. POST /broadcast is a 404 — the side-effect law
+ * is structural, not a flag. Auth failures never leak whether a token is
+ * "close" (constant-time compare). Bodies are bounded (256KB → 413). Every
+ * error answers a stable JSON {error:{code,message}} — never a 500.
  */
 
-import { createHash } from "node:crypto";
+import http from "node:http";
 
-import { constantTimeEqual, extractBearerToken } from "./token";
-import type { HashChainAudit } from "./audit";
-import type { HsmKeyring, HsmKeyringError } from "./keyring";
+import { authorizeToken } from "./auth";
+import { BROADCAST, MODE, SERVICE_NAME, type HsmConfig } from "./config";
+import { HsmError, isHsmError, type HsmErrorCode } from "./errors";
+import { bareHealth, measureHealth, type HealthState } from "./health";
+import { HsmSigner } from "./sign";
+import type { KeyMetaLike } from "./health";
 
-export const HSM_SERVICE_NAME = "saosmartwallet-hsm-runtime";
-export const HSM_SERVICE_VERSION = "1.0.0";
+const MAX_BODY_BYTES = 256 * 1024;
 
-export interface HsmDeps {
-  ring: HsmKeyring;
-  audit: HashChainAudit;
-  /** The bearer token (from HSM_RUNTIME_TOKEN — 0600 runtime.env, outside git). */
-  token: string;
-  bootedAt: string;
-  version?: string;
-  /** Injectable clock (tests); defaults to wall time. */
-  now?: () => Date;
+export interface HsmServerDeps {
+  config: HsmConfig;
+  startedAt: number;
+  now(): number;
 }
 
-const MAX_PAYLOAD_BYTES = 1024 * 1024; // 1 MiB — a signing oracle is not a data pipe
-const MAX_KEYID_CHARS = 512;
+interface RuntimeState {
+  signer: HsmSigner | null;
+  vaultOpen: boolean;
+  vaultReason: string | null;
+  keyMetadata: KeyMetaLike[] | null;
+}
 
-function json(status: number, body: Record<string, unknown>): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+function statusFor(code: HsmErrorCode): number {
+  switch (code) {
+    case "HSM_E_AUTH_MISSING":
+      return 401;
+    case "HSM_E_AUTH_INVALID":
+      return 403;
+    case "HSM_E_TOKEN_UNSET":
+    case "HSM_E_VAULT_SEALED":
+      return 503;
+    case "HSM_E_BODY_TOO_LARGE":
+      return 413;
+    case "HSM_E_NOT_FOUND":
+      return 404;
+    case "HSM_E_METHOD":
+      return 405;
+    case "HSM_E_BAD_INPUT":
+      return 400;
+    default:
+      return 422; // unknown key / key type / role policy / chain id
+  }
+}
+
+function errorBody(e: unknown): { error: { code: string; message: string } } {
+  if (isHsmError(e)) {
+    return { error: { code: e.code, message: e.message } };
+  }
+  return { error: { code: "HSM_E_BAD_INPUT", message: e instanceof Error ? e.message : "refused" } };
+}
+
+function readBody(req: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        // Stop buffering but DRAIN the socket so the 413 response can still
+        // be delivered (destroying mid-upload resets the connection instead).
+        chunks.length = 0;
+        req.removeAllListeners("data");
+        req.resume();
+        reject(new HsmError("HSM_E_BODY_TOO_LARGE", `body exceeds ${MAX_BODY_BYTES} bytes`));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", (err) => reject(err));
   });
 }
 
-function sha256Hex(data: Buffer): string {
-  return createHash("sha256").update(data).digest("hex");
-}
+/**
+ * Boots the runtime state (lazily opens the vault on first gated use) and
+ * returns the server. The vault path comes from config.vaultDir — never a
+ * key, never an inline secret.
+ */
+export function createHsmServer(deps: HsmServerDeps): http.Server {
+  const state: RuntimeState = { signer: null, vaultOpen: false, vaultReason: null, keyMetadata: null };
 
-/** The auth gate: 503 (absent) / 401 (wrong) / null (authenticated). */
-function authGate(deps: HsmDeps, req: Request, denyCount: { n: number }): Response | null {
-  const token = extractBearerToken(req.headers.get("authorization"));
-  if (token === null) {
-    denyCount.n += 1;
-    return json(503, { error: "HSM_E_AUTH_REQUIRED" });
+  async function ensureVault(): Promise<void> {
+    if (state.signer !== null || state.vaultReason !== null) return;
+    try {
+      const signer = await HsmSigner.open({ vaultDir: deps.config.vaultDir });
+      state.signer = signer;
+      state.vaultOpen = true;
+      state.vaultReason = null;
+      state.keyMetadata = signer.metadata();
+    } catch (e) {
+      const code = isHsmError(e) ? e.code : "HSM_E_VAULT_SEALED";
+      const m = /code ([A-Z_0-9]+)\)/.exec((e as Error).message);
+      state.vaultReason = m ? m[1] : code === "HSM_E_VAULT_SEALED" ? "HSM_VAULT_DIR-unset" : code;
+      throw e;
+    }
   }
-  if (!constantTimeEqual(token, deps.token)) {
-    denyCount.n += 1;
-    return json(401, { error: "HSM_E_AUTH_INVALID" });
+
+  function healthNow(): HealthState {
+    return measureHealth({
+      vaultOpen: state.vaultOpen,
+      vaultReason: state.vaultReason,
+      tokenSet: deps.config.token !== null,
+      keyMetadata: state.keyMetadata,
+      startedAt: deps.startedAt,
+      now: deps.now(),
+    });
   }
-  return null;
-}
 
-export type HsmHandler = (req: Request) => Promise<Response>;
+  function send(res: http.ServerResponse, status: number, payload: unknown): void {
+    const body = JSON.stringify(payload);
+    res.writeHead(status, {
+      "content-type": "application/json; charset=utf-8",
+      "content-length": Buffer.byteLength(body),
+      "x-saos-service": SERVICE_NAME,
+      "cache-control": "no-store",
+    });
+    res.end(body);
+  }
 
-export function createHsmHandler(deps: HsmDeps): HsmHandler {
-  const denyCount = { n: 0 };
-  const now = deps.now ?? (() => new Date());
+  async function gated(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    handler: () => Promise<unknown>,
+  ): Promise<void> {
+    try {
+      authorizeToken(req.headers.authorization ?? null, deps.config.token);
+      await handler().then((payload) => send(res, 200, payload));
+    } catch (e) {
+      send(res, statusFor(isHsmError(e) ? e.code : "HSM_E_BAD_INPUT"), errorBody(e));
+    }
+  }
 
-  return async function handle(req: Request): Promise<Response> {
-    const url = new URL(req.url);
+  return http.createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://localhost");
     const path = url.pathname.replace(/\/+$/, "") || "/";
+    const method = (req.method ?? "GET").toUpperCase();
 
-    // --- /health: bare liveness, UNAUTHENTICATED, zero operational data ----
-    if (path === "/health") {
-      if (req.method !== "GET") return json(405, { error: "HSM_E_METHOD" });
-      return json(200, { ok: true });
+    if (path === "/health" && method === "GET") {
+      send(res, 200, bareHealth(healthNow()));
+      return;
     }
 
-    // --- /status ------------------------------------------------------------
     if (path === "/status") {
-      if (req.method !== "GET") return json(405, { error: "HSM_E_METHOD" });
-      const denied = authGate(deps, req, denyCount);
-      if (denied) return denied;
-      return json(200, {
-        ok: true,
-        service: HSM_SERVICE_NAME,
-        version: deps.version ?? HSM_SERVICE_VERSION,
-        bootedAt: deps.bootedAt,
-        keyCount: deps.ring.listKeys().length,
-        denyCount: denyCount.n,
-        audit: deps.audit.verify(),
+      if (method !== "GET") {
+        send(res, 405, errorBody(new HsmError("HSM_E_METHOD", "use GET /status")));
+        return;
+      }
+      void gated(req, res, async () => {
+        await ensureVault();
+        return healthNow();
       });
+      return;
     }
 
-    // --- /sign --------------------------------------------------------------
-    if (path === "/sign") {
-      if (req.method !== "POST") return json(405, { error: "HSM_E_METHOD" });
-      const denied = authGate(deps, req, denyCount);
-      if (denied) return denied;
-
-      let parsed: unknown;
-      try {
-        const raw = await req.text();
-        if (raw.length === 0 || raw.length > MAX_PAYLOAD_BYTES * 2) {
-          return json(400, { error: "HSM_E_BAD_REQUEST" });
-        }
-        parsed = JSON.parse(raw);
-      } catch {
-        return json(400, { error: "HSM_E_BAD_REQUEST" });
-      }
-      const body = (parsed ?? {}) as { keyId?: unknown; payload?: unknown };
-      if (typeof body.keyId !== "string" || body.keyId.length === 0 || body.keyId.length > MAX_KEYID_CHARS) {
-        return json(400, { error: "HSM_E_BAD_REQUEST", detail: "keyId" });
-      }
-      if (typeof body.payload !== "string" || body.payload.length === 0) {
-        return json(400, { error: "HSM_E_BAD_REQUEST", detail: "payload" });
-      }
-      const payload = Buffer.from(body.payload, "utf8");
-      if (payload.length === 0 || payload.length > MAX_PAYLOAD_BYTES) {
-        return json(400, { error: "HSM_E_BAD_REQUEST", detail: "payload-size" });
-      }
-
-      try {
-        const sig = await deps.ring.sign(body.keyId, payload);
-        const payloadSha256 = sha256Hex(payload);
-        deps.audit.append("sign", {
-          keyId: sig.keyId,
-          algorithm: sig.algorithm,
-          fingerprint: sig.fingerprint,
-          payloadSha256,
-        }, now);
-        return json(200, {
-          ok: true,
-          keyId: sig.keyId,
-          algorithm: sig.algorithm,
-          signature: sig.signature,
-          fingerprint: sig.fingerprint,
-          payloadSha256,
-          signedAt: sig.signedAt,
-        });
-      } catch (err) {
-        if ((err as HsmKeyringError)?.name === "HsmKeyringError") {
-          const msg = (err as Error).message;
-          if (msg.startsWith("HSM_E_UNKNOWN_KEY") || msg.startsWith("HSM_E_WRONG_CURVE")) {
-            return json(404, { error: "HSM_E_UNKNOWN_KEY" });
-          }
-          return json(400, { error: "HSM_E_BAD_REQUEST" });
-        }
-        return json(500, { error: "HSM_E_INTERNAL" });
-      }
-    }
-
-    // --- /keys --------------------------------------------------------------
     if (path === "/keys") {
-      if (req.method !== "GET") return json(405, { error: "HSM_E_METHOD" });
-      const denied = authGate(deps, req, denyCount);
-      if (denied) return denied;
-      return json(200, {
-        ok: true,
-        keys: deps.ring.listKeys().map((k) => ({
-          id: k.id,
-          curve: k.curve,
-          publicKey: k.publicKey,
-          fingerprint: k.fingerprint,
-          createdAt: k.createdAt,
-        })),
+      if (method !== "POST") {
+        send(res, 405, errorBody(new HsmError("HSM_E_METHOD", "use POST /keys")));
+        return;
+      }
+      void gated(req, res, async () => {
+        await ensureVault();
+        return { keys: state.signer?.metadata() ?? [] };
       });
+      return;
     }
 
-    // --- everything else: bare deny -----------------------------------------
-    return json(404, { error: "HSM_E_NOT_FOUND" });
-  };
+    if (path === "/sign/steem") {
+      if (method !== "POST") {
+        send(res, 405, errorBody(new HsmError("HSM_E_METHOD", "use POST /sign/steem")));
+        return;
+      }
+      void gated(req, res, async () => {
+        await ensureVault();
+        const raw = await readBody(req);
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          throw new HsmError("HSM_E_BAD_INPUT", "body is not valid JSON");
+        }
+        const b = (parsed ?? {}) as Record<string, unknown>;
+        const chain = b.chain === "blurt" ? "blurt" : b.chain === "steem" ? "steem" : null;
+        if (chain === null) {
+          throw new HsmError("HSM_E_BAD_INPUT", 'body.chain must be "steem" or "blurt"');
+        }
+        if (typeof b.keyId !== "string" || b.keyId.length === 0) {
+          throw new HsmError("HSM_E_BAD_INPUT", "body.keyId must be a non-empty string");
+        }
+        if (typeof b.tx !== "object" || b.tx === null) {
+          throw new HsmError("HSM_E_BAD_INPUT", "body.tx must be the unsigned transaction object");
+        }
+        return state.signer!.signSteemFamily({
+          chain,
+          tx: b.tx as Parameters<HsmSigner["signSteemFamily"]>[0]["tx"],
+          keyId: b.keyId,
+          blurtChainIdHex: deps.config.blurtChainIdHex,
+          now: deps.now(),
+        });
+      });
+      return;
+    }
+
+    if (path === "/sign/bytes") {
+      if (method !== "POST") {
+        send(res, 405, errorBody(new HsmError("HSM_E_METHOD", "use POST /sign/bytes")));
+        return;
+      }
+      void gated(req, res, async () => {
+        await ensureVault();
+        const raw = await readBody(req);
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          throw new HsmError("HSM_E_BAD_INPUT", "body is not valid JSON");
+        }
+        const b = (parsed ?? {}) as Record<string, unknown>;
+        if (typeof b.keyId !== "string" || b.keyId.length === 0) {
+          throw new HsmError("HSM_E_BAD_INPUT", "body.keyId must be a non-empty string");
+        }
+        if (typeof b.messageHex !== "string" || b.messageHex.length === 0 || b.messageHex.length % 2 !== 0) {
+          throw new HsmError("HSM_E_BAD_INPUT", "body.messageHex must be a non-empty even-length hex string");
+        }
+        if (!/^[0-9a-fA-F]*$/.test(b.messageHex)) {
+          throw new HsmError("HSM_E_BAD_INPUT", "body.messageHex must be hex");
+        }
+        return state.signer!.signBytes({
+          keyId: b.keyId,
+          message: Buffer.from(b.messageHex, "hex"),
+          now: deps.now(),
+        });
+      });
+      return;
+    }
+
+    // /broadcast deliberately does NOT exist — a 404 is the honest answer.
+    send(res, 404, {
+      error: {
+        code: "HSM_E_NOT_FOUND",
+        message: `no route ${method} ${path} — this runtime signs only (mode ${MODE}, broadcast ${BROADCAST}) and never broadcasts`,
+      },
+    });
+  });
+}
+
+/** Binds a declared port; rejects honestly (no retry storm) on failure. */
+export function listen(server: http.Server, port: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const onError = (err: Error) => {
+      server.close();
+      reject(err);
+    };
+    server.once("error", onError);
+    server.listen(port, () => {
+      server.removeListener("error", onError);
+      const addr = server.address();
+      const bound = typeof addr === "object" && addr !== null ? addr.port : port;
+      resolve(bound);
+    });
+  });
+}
+
+/** Test helper — binds an ephemeral port and resolves the base URL. */
+export async function listenOnEphemeralPort(server: http.Server): Promise<string> {
+  const port = await listen(server, 0);
+  return `http://127.0.0.1:${port}`;
 }
