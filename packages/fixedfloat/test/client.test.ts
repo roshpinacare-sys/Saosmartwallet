@@ -177,6 +177,28 @@ describe("fixedfloat client — envelope law", () => {
     }
   });
 
+  test("MEASURED: HTTP 403 with a valid envelope body surfaces kind=API carrying code 501 (permission refusal)", async () => {
+    // Measured live 2026-10-26: ff.io answers permission refusals as
+    // HTTP 403 + {"code":"501","msg":"Not have permission","data":null}.
+    const { transport } = scriptedTransport(() => ({
+      status: 403,
+      text: JSON.stringify({ code: "501", msg: "Not have permission", data: null }),
+    }));
+    const { client } = makeClient(transport);
+    try {
+      await client.getPrice("ETH", "BTC", "0.1");
+      expect.unreachable();
+    } catch (e) {
+      const err = e as FixedFloatError;
+      expect(err.kind).toBe("API");
+      expect(err.apiCode).toBe(501);
+      expect(err.httpStatus).toBe(403);
+      expect(err.message).toContain("Not have permission");
+      expect(err.message).not.toContain(TEST_KEY);
+      expect(err.message).not.toContain(TEST_SECRET);
+    }
+  });
+
   test("every error path is redacted: key and secret never appear in messages", async () => {
     const { transport } = scriptedTransport(() => ({ status: 403, text: `denied key=${TEST_KEY}` }));
     const { client } = makeClient(transport);

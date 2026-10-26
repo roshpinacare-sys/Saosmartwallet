@@ -179,6 +179,29 @@ export class FixedFloatClient {
       );
     }
     if (resp.status < 200 || resp.status >= 300) {
+      // MEASURED (live 2026-10-26, trace 1a1788373a64c3ed): permission
+      // refusals arrive as HTTP 403 WITH a valid v2 envelope body
+      // ({"code":"501","msg":"Not have permission"}). If the body parses to
+      // an envelope with a code, surface kind=API (the true refusal) while
+      // preserving the http status; only non-envelope bodies stay NETWORK.
+      let bodyCode: number | undefined;
+      let bodyMsg: string | undefined;
+      try {
+        const probe = JSON.parse(resp.text) as Record<string, unknown>;
+        if (probe !== null && typeof probe === "object" && !Array.isArray(probe)) {
+          if (typeof probe["code"] !== "undefined") bodyCode = Number(probe["code"]);
+          if (typeof probe["msg"] === "string") bodyMsg = probe["msg"];
+        }
+      } catch {
+        // non-JSON body — stays NETWORK
+      }
+      if (bodyCode !== undefined && Number.isFinite(bodyCode) && bodyCode !== 0 && bodyCode !== 200) {
+        throw new FixedFloatError(
+          "API",
+          `fixedfloat: ${method} refused (code ${bodyCode}, HTTP ${resp.status}): ${String(bodyMsg ?? "")}`,
+          { apiCode: bodyCode, httpStatus: resp.status, secrets: this.cfg.secrets() },
+        );
+      }
       const tail = resp.text.length > 200 ? `${resp.text.slice(0, 200)}…` : resp.text;
       throw new FixedFloatError(
         "NETWORK",
