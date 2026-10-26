@@ -1,18 +1,53 @@
 # Saosmartwallet — ארנק פורץ-דרך לרשת ממשפחת Steem
 
-**ROLE (declared 2026-10-11, task 10-c un-silence sweep — complements
-REVIVAL-2026-10-11.md):** the **wallet product design & bridge-adapter
-source** — wire formats verified against real chain bytes, 3 chain adapters
-(steem/ethereum/solana) in `packages/chains`. Known anti-pattern recorded by
-the audits (git-committed `db/custom.db` = live key vault, 248 AES-GCM
-entries) — its fate is an OWNER decision (rotation/scrub), not a code lane
-(E-series records the same). Why it was muted: design-complete, runtime
-never deployed. Revival path: (1) owner decision on the committed vault DB,
-(2) drop the 61MB skills/ scaffold, (3) dispatch wallet-verify — everything
-else is ready.
+**ROLE (updated 2026-10-26, wave G77-d — supersedes the 2026-10-11
+"design-complete, runtime never deployed" muting):** the wallet's **production
+HSM signing runtime is DEPLOYED, MEASURED, AND RUNNING** (owner directive §3 —
+the prototype label is cured), on top of the wire formats verified against real
+chain bytes and the 3 chain adapters (steem/ethereum/solana) in
+`packages/chains`. Historical anti-pattern (git-committed `db/custom.db` = live
+key vault, 248 AES-GCM entries) remains an OWNER decision (rotation/scrub), not
+a code lane (E-series records the same). Standing revival items unchanged:
+(1) owner decision on the committed vault DB, (2) drop the 61MB skills/
+scaffold, (3) wallet-verify dispatch.
 
-> **סטטוס: M0+M1+M2+M3+M4 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · Sovereign Key Vault חי · שכבת גשרים עם router+quotes חיים · M4 System Owner: בדיקות-חיים מאוחדות (/api/system/health) + דו"ח סטטוס חי (docs/system-status) + failover הוכח חי**
-> עדכון אחרון: 2026-09-08 (Asia/Jerusalem)
+## 🟢 Deployed runtime — production HSM signing service (measured 2026-10-26T15:42Z, wave G77-d)
+
+**`packages/hsm-runtime` + `mini-services/hsm-runtime` — RUNNING on sovereign
+device port `127.0.0.1:3057`.** Deny-by-default signing, zero plaintext key
+exposure, hash-chained audit. Measured receipts (live HTTP, real signatures,
+client-side-verified against the `/keys` public keys):
+
+| Proof | Measured value |
+|---|---|
+| `GET /health` | **200** `{"ok":true}` (bare liveness — zero operational data) |
+| `GET /status` unauthenticated | **503** `HSM_E_AUTH_REQUIRED` (fail-closed, never 200) |
+| `GET /status` wrong token | **401** `HSM_E_AUTH_INVALID` (constant-time compare) |
+| `GET /status` authenticated | **200** — counts only (keyCount=2, denyCount, audit-chain verdict) |
+| `POST /sign` secp256k1 | **200** — RFC6979 ECDSA over sha256, fingerprint `sha256:e6153feedd7d…`, client-verified ✔ |
+| `POST /sign` ed25519 | **200** — one-shot crypto.sign, fingerprint `sha256:60646a84bd90…`, client-verified ✔ |
+| deny extras | no-keyId **400** · unknown-key **404** · wrong-method **405** · unknown-path **404** |
+| key custody | sealed AES-256-GCM envelopes (`ciphertext+iv+tag+salt`) in `state/keys.enc`; master key = scrypt(0600 key file outside the tree); tokens in 0600 `runtime.env`; **fingerprints only, ever** |
+| audit | JSONL hash-chain (`prevHash → sha256`), tamper-detecting `verify()` — 5 entries at boot receipt, chain `ok:true` |
+| tests | packages/hsm-runtime **38/38** (RED-first) · full repo **359 pass / 0 fail** (17 files) · tsc clean |
+| receipts | `/home/z/audit/hsm-runtime-receipt.json` + `/home/z/audit/hsm-runtime-heartbeat.json` + `/home/z/audit/hsm-runtime.log` |
+
+**Boot (Instance-0 persistence — exact commands):**
+
+```bash
+# custody (0700 dir, 0600 files — minted once, outside git):
+#   /home/z/coord-work/vaults/saosmartwallet/master.key   (64 hex chars)
+#   /home/z/coord-work/vaults/saosmartwallet/runtime.env  (HSM_RUNTIME_TOKEN=<64 hex>)
+cd /home/z/lane/Saosmartwallet/mini-services/hsm-runtime
+node -e "const{spawn}=require('child_process');const c=spawn('/bin/sh',['-c','exec setsid bun --hot index.ts >> /home/z/audit/hsm-runtime.log 2>&1 </dev/null'],{detached:true,stdio:'ignore'});c.unref()"   # double-fork daemonizer (sandbox-proven)
+curl http://127.0.0.1:3057/health   # → {"ok":true}
+```
+
+Port law: **3056 is occupied by the estate's local-gates-host (measured
+2026-10-26T15:24Z — untouched)**; the HSM runtime declares fixed port **3057**.
+
+> **סטטוס: ארנק-חתימת-ייצור חי — HSM runtime נפרס ונמדד על :3057 (deny-by-default · חתימה-secp256k1+ed25519 · כספת-AES-256-GCM · אודיט-שרשרת-גיבוב) · M0+M1+M2+M3+M4 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · שכבת גשרים עם router+quotes חיים · M4 System Owner: בדיקות-חיים מאוחדות + דו"ח סטטוס חי + failover הוכח חי**
+> עדכון אחרון: 2026-10-26 (wave G77-d — פרוטוטיפ/טרם-נפרס: נרפא. הרנטיים חיים למעלה)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
 

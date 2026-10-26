@@ -1,0 +1,4 @@
+# Sealed key store + audit trail — NEVER commit runtime state (owner directive §11).
+# keys.enc is ciphertext, but it is account-critical material: it never belongs
+# in git, in backups, or in any bundle. audit.jsonl is host evidence, not canon.
+state/

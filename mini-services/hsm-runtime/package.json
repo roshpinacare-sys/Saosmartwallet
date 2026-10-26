@@ -1,0 +1,11 @@
+{
+  "name": "hsm-runtime-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Saosmartwallet production HSM signing runtime (owner directive §3) — deny-by-default signing service over the sealed keyring. Fixed port 3057; state in state/ (gitignored); custody in /home/z/coord-work/vaults/saosmartwallet (0600, outside the tree).",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {}
+}
