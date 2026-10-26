@@ -47,3 +47,10 @@ jobs:
       # green on every push.
       - name: Run packages/htlc machine + codec tests
         run: bun test packages/htlc/test/
+
+      # wave 20.01 (agent-9, ULTIMATE SWARM DIRECTIVE §4): the FixedFloat
+      # exchange rail joins additively — one new directory only, nothing
+      # replaced. Zero-network suite (RFC 4231-pinned signing, injected
+      # transport, fail-closed custody laws).
+      - name: Run packages/fixedfloat rail tests
+        run: bun test packages/fixedfloat/test/
