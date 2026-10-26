@@ -2631,3 +2631,20 @@ Work Log:
 - measured-v2 contract adopted (RFC 2202 TC3-pinned HMAC-SHA1, canonical deepSort, method whitelist, envelope-on-non-2xx = measured 501 permission class)
 - 47/47 tests (112 assertions), tsc 0, eslint 0; live probe: signature ACCEPTED by ff.io, key awaits account-side API enablement (owner action)
 - full receipt: /home/z/my-project/worklog.md (t61 entry) — registering-four-copies+t42
+
+---
+Task ID: t62-insurance (wave 20.02)
+Agent: agent-9 (headcorner / insurance)
+Task: trace 1a178c6d097fd5e9 — MASTER DIRECTIVE verification pass (copy 3/4)
+
+Work Log:
+- G77-a…i lanes honored (claimed by Instance 0 minutes prior) → insurance surface taken
+- §1 saos-0004 on-chain VERIFIED (id 1979531, created 2026-10-25T17:50:54, 4 distinct authorities, 0.600 STEEM+0.150 SBD); NVIDIA NIM key custody proven (200 /v1/models)
+- §2 ledger site LIVE-OK (execution.html 200 + execution-state.json 200, wave-81 fresh, fetch logic defect-free)
+- §3 FixedFloat re-probe: 501 still-blocked (owner API-enable lever); pools: SAOS/USDS 66,064 swaps ACTIVE + USDS/WSTEEM ACTIVE
+- §4 Pulse gapsOpen:null = reader 401-blind (FLEET_TOKEN); gearbox law already receipt-gated (gear2=streak6/gear3=streak12, ALLOW×3 @15:01Z)
+- §5 f4d763c S1 gate landed; full verdict agent9-clock t62-verdict-g77-directive.md (c01883b) · SWARM_STATE 466af57
+- registering-four-copies+t42
+
+Stage Summary:
+- independent measured verdicts for all 5 directive §s; zero feature-lane overlap; owner levers named (FixedFloat API enablement · FLEET_TOKEN 401)
