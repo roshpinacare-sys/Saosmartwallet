@@ -1,23 +1,25 @@
 /**
- * Saosmartwallet packages/fixedfloat — client law suite (RED first)
- * =================================================================
+ * Saosmartwallet packages/fixedfloat — client law suite (measured v2 wire)
+ * ========================================================================
  * The exchange-rail client over an INJECTED transport (house law: zero
  * network in tests; the real fetch transport exists but is never invoked
  * from this suite).
  *
  * Laws pinned:
- *   • Wire form: POST form-encoded, params sent in insertion order, auth via
- *     X-API-KEY / X-API-SIGN (HMAC over concatenated values) / X-API-NONCE.
- *   • Signature on the wire == ffSign(secret, values-in-body-order) — verified
- *     against the locally-recomputed expectation in every wire assertion.
- *   • Nonce strictly increases across calls on one client.
- *   • Envelope law: {code:0} → data; {code≠0} → FixedFloatError kind API with
- *     the API code carried; non-JSON → PARSE; non-2xx → NETWORK with the
- *     status carried; every error path is redacted (no key/secret anywhere).
+ *   • Wire form: POST JSON (deep-sorted deterministic bytes) to
+ *     {base}{method}, auth X-Api-Key + X-Signature = ffSign(body, secret).
+ *   • Signature on the wire == ffSign(body, secret) — recomputed in the test
+ *     via the same pure law and cross-checked against the RFC-pinned
+ *     primitive.
+ *   • Method whitelist: the measured v2 set {price, ccies, create, order,
+ *     emergency, qr}; unknown methods refuse LOCALLY (zero wire calls).
+ *   • Envelope law: `data` present (+ code absent/0/200) → data; refusing
+ *     code → FixedFloatError kind API carrying the code (the measured 501
+ *     "Not have permission" class); non-JSON → PARSE; non-2xx → NETWORK;
+ *     every error path is redacted (no key/secret anywhere).
  *   • Fail-closed input validation before any wire call (empty pair, bad
- *     direction, non-positive amount, unknown order type all refuse LOCALLY
- *     with zero transport invocations).
- *   • The client counts wire calls — the validation laws assert 0.
+ *     type, non-positive amount, empty order id all refuse LOCALLY with
+ *     zero transport invocations).
  */
 
 import { describe, expect, test } from "bun:test";
@@ -49,97 +51,103 @@ function scriptedTransport(
 }
 
 function okEnvelope(data: unknown): TransportResponse {
-  return { status: 200, text: JSON.stringify({ code: 0, msg: "OK", data }) };
+  // Measured v2 success shape: data present, code may be absent.
+  return { status: 200, text: JSON.stringify({ msg: "ok", data }) };
 }
 
 function makeClient(transport: FixedFloatTransport) {
   const cfg = loadFixedFloatConfig({ FIXEDFLOAT_API_KEY: TEST_KEY, FIXEDFLOAT_API_SECRET: TEST_SECRET });
-  let tick = 1_700_000_000_000;
-  const client = new FixedFloatClient(cfg, { transport, now: () => tick });
-  return { client, tickRef: () => tick };
+  const client = new FixedFloatClient(cfg, { transport });
+  return { client };
 }
 
-describe("fixedfloat client — wire law", () => {
-  test("sends the documented v1 auth headers and a correctly-signed form body", async () => {
-    const { calls, transport } = scriptedTransport(() => okEnvelope({ currencies: [] }));
+describe("fixedfloat client — measured v2 wire law", () => {
+  test("sends the measured auth headers and a signed JSON body to {base}{method}", async () => {
+    const { calls, transport } = scriptedTransport(() => okEnvelope({}));
     const { client } = makeClient(transport);
-    await client.getPair("BTC", "ETH");
+    await client.getPrice("ETH", "BTC", "0.25");
 
     expect(calls).toHaveLength(1);
     const req = calls[0]!;
-    expect(req.url).toBe("https://ff.io/api/v1/getPair");
+    expect(req.url).toBe("https://ff.io/api/v2/price");
     expect(req.method).toBe("POST");
-    expect(req.headers["X-API-KEY"]).toBe(TEST_KEY);
+    expect(req.headers["content-type"]).toBe("application/json");
+    expect(req.headers["X-Api-Key"]).toBe(TEST_KEY);
 
-    // body = form-encoding of {from: BTC, to: ETH} in insertion order
-    expect(req.body).toBe("from=BTC&to=ETH");
-    const expectedSig = ffSign(new TextEncoder().encode(TEST_SECRET), ["BTC", "ETH"]);
-    expect(req.headers["X-API-SIGN"]).toBe(expectedSig);
-    expect(req.headers["X-API-NONCE"]).toMatch(/^[0-9]+$/);
+    const body = JSON.parse(req.body) as Record<string, unknown>;
+    expect(body).toEqual({ type: "float", from: "eth", to: "btc", amount: "0.25" });
+    // signature is over the canonical form of the wire body
+    expect(req.headers["X-Signature"]).toBe(ffSign(body, TEST_SECRET));
   });
 
-  test("empty-param method (getCurrencies) signs the empty concatenation", async () => {
-    const { calls, transport } = scriptedTransport(() => okEnvelope([]));
-    const { client } = makeClient(transport);
-    await client.getCurrencies();
-
-    const req = calls[0]!;
-    expect(req.url).toBe("https://ff.io/api/v1/getCurrencies");
-    expect(req.body).toBe("");
-    expect(req.headers["X-API-SIGN"]).toBe(ffSign(new TextEncoder().encode(TEST_SECRET), []));
-  });
-
-  test("nonce strictly increases across successive calls on the wire", async () => {
+  test("JSON body is deep-sorted — deterministic bytes regardless of param order", async () => {
     const { calls, transport } = scriptedTransport(() => okEnvelope({}));
     const { client } = makeClient(transport);
-    await client.getCurrencies();
-    await client.getCurrencies();
-    const n1 = BigInt(calls[0]!.headers["X-API-NONCE"]);
-    const n2 = BigInt(calls[1]!.headers["X-API-NONCE"]);
-    expect(n2 > n1).toBe(true);
-    expect(client.nonceCount).toBe(2n);
+    await client.getPrice("ETH", "BTC", "0.25");
+    const req = calls[0]!;
+    expect(req.body).toBe('{"amount":"0.25","from":"eth","to":"btc","type":"float"}');
   });
 
-  test("values keep insertion order in the body and the signature", async () => {
-    const { calls, transport } = scriptedTransport(() => okEnvelope({ o: 1 }));
+  test("nested params are deep-sorted in the body and the signature", async () => {
+    const { calls, transport } = scriptedTransport(() => okEnvelope({}));
     const { client } = makeClient(transport);
-    await client.createOrder({
-      from: "BTC",
-      to: "ETH",
+    // drive the raw surface with a nested body through a known method:
+    await client.callRaw("price", { method: "price", params: { to: "usdt", from: "btc", type: "float" } });
+    const req = calls[0]!;
+    expect(req.body).toBe(
+      '{"method":"price","params":{"from":"btc","to":"usdt","type":"float"}}',
+    );
+    expect(req.headers["X-Signature"]).toBe(ffSign(JSON.parse(req.body) as Record<string, unknown>, TEST_SECRET));
+  });
+
+  test("createOrder sends the validated params as JSON", async () => {
+    const { calls, transport } = scriptedTransport(() => okEnvelope({ id: "CH-9" }));
+    const { client } = makeClient(transport);
+    await client.createOrder({ from: "BTC", to: "ETH", amount: "0.05", type: "fixed", addrTo: "0xabc" });
+    const req = calls[0]!;
+    expect(req.url).toBe("https://ff.io/api/v2/create");
+    expect(JSON.parse(req.body)).toEqual({
+      addrTo: "0xabc",
       amount: "0.05",
-      direction: "from",
+      from: "btc",
+      to: "eth",
       type: "fixed",
     });
-    const req = calls[0]!;
-    expect(req.body).toBe("from=BTC&to=ETH&amount=0.05&direction=from&type=fixed");
-    expect(req.headers["X-API-SIGN"]).toBe(
-      ffSign(new TextEncoder().encode(TEST_SECRET), ["BTC", "ETH", "0.05", "from", "fixed"]),
-    );
+    expect(req.headers["X-Signature"]).toBe(ffSign(JSON.parse(req.body) as Record<string, unknown>, TEST_SECRET));
   });
 });
 
 describe("fixedfloat client — envelope law", () => {
-  test("code=0 unwraps data", async () => {
+  test("measured success shape ({msg,data}) unwraps data", async () => {
     const { transport } = scriptedTransport(() => okEnvelope({ id: "CH-123" }));
     const { client } = makeClient(transport);
     const data = await client.getOrder("CH-123");
     expect(data).toEqual({ id: "CH-123" });
   });
 
-  test("code≠0 throws kind=API carrying the API code and message", async () => {
+  test("code=0 envelope (v1 style) also unwraps data", async () => {
     const { transport } = scriptedTransport(() => ({
       status: 200,
-      text: JSON.stringify({ code: 5, msg: "Pair not found" }),
+      text: JSON.stringify({ code: 0, msg: "OK", data: { ok: 1 } }),
+    }));
+    const { client } = makeClient(transport);
+    expect(await client.getOrder("CH-1")).toEqual({ ok: 1 });
+  });
+
+  test("refusing code throws kind=API carrying the code — the measured 501 class", async () => {
+    const { transport } = scriptedTransport(() => ({
+      status: 200,
+      text: JSON.stringify({ code: 501, msg: "Not have permission" }),
     }));
     const { client } = makeClient(transport);
     try {
-      await client.getPair("XXX", "YYY");
+      await client.getPrice("ETH", "BTC", "1");
       expect.unreachable();
     } catch (e) {
       const err = e as FixedFloatError;
       expect(err.kind).toBe("API");
-      expect(err.apiCode).toBe(5);
-      expect(err.message).toContain("Pair not found");
+      expect(err.apiCode).toBe(501);
+      expect(err.message).toContain("Not have permission");
     }
   });
 
@@ -181,35 +189,41 @@ describe("fixedfloat client — envelope law", () => {
       expect(err.message).not.toContain(TEST_SECRET);
     }
   });
+
+  test("unknown methods refuse locally at zero wire cost", async () => {
+    const { calls, transport } = scriptedTransport(() => okEnvelope({}));
+    const { client } = makeClient(transport);
+    await expect(
+      client.callRaw("getRate" as "price", {}),
+    ).rejects.toThrow(FixedFloatError);
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe("fixedfloat client — fail-closed local validation (zero wire calls)", () => {
   test("createOrder refuses empty from/to", async () => {
     const { calls, transport } = scriptedTransport(() => okEnvelope({}));
     const { client } = makeClient(transport);
-    await expect(client.createOrder({ from: "", to: "ETH", amount: "1", direction: "from" })).rejects.toThrow(
+    await expect(client.createOrder({ from: "", to: "ETH", amount: "1", type: "fixed" })).rejects.toThrow(
       FixedFloatError,
     );
-    await expect(client.createOrder({ from: "BTC", to: " ", amount: "1", direction: "from" })).rejects.toThrow(
+    await expect(client.createOrder({ from: "BTC", to: " ", amount: "1", type: "fixed" })).rejects.toThrow(
       FixedFloatError,
     );
     expect(calls).toHaveLength(0);
   });
 
-  test("createOrder refuses non-positive amounts and bad direction/type", async () => {
+  test("createOrder refuses non-positive amounts and bad type", async () => {
     const { calls, transport } = scriptedTransport(() => okEnvelope({}));
     const { client } = makeClient(transport);
     await expect(
-      client.createOrder({ from: "BTC", to: "ETH", amount: "0", direction: "from" }),
+      client.createOrder({ from: "BTC", to: "ETH", amount: "0", type: "fixed" }),
     ).rejects.toThrow(FixedFloatError);
     await expect(
-      client.createOrder({ from: "BTC", to: "ETH", amount: "-1", direction: "from" }),
+      client.createOrder({ from: "BTC", to: "ETH", amount: "-1", type: "fixed" }),
     ).rejects.toThrow(FixedFloatError);
     await expect(
-      client.createOrder({ from: "BTC", to: "ETH", amount: "1", direction: "sideways" as "from" }),
-    ).rejects.toThrow(FixedFloatError);
-    await expect(
-      client.createOrder({ from: "BTC", to: "ETH", amount: "1", direction: "from", type: "agile" as "fixed" }),
+      client.createOrder({ from: "BTC", to: "ETH", amount: "1", type: "agile" as "fixed" }),
     ).rejects.toThrow(FixedFloatError);
     expect(calls).toHaveLength(0);
   });
