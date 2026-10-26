@@ -54,3 +54,11 @@ jobs:
       # transport, fail-closed custody laws).
       - name: Run packages/fixedfloat rail tests
         run: bun test packages/fixedfloat/test/
+
+      # wave 20.1 (G77-d, owner MASTER DIRECTIVE §3.1): the production HSM
+      # signing runtime joins additively — one new directory only, nothing
+      # replaced. Zero-network suite: self-generated fixture keys ONLY,
+      # SIGN-ONLY (no broadcast route exists), deny-by-default auth matrix,
+      # honest verdicts, receipts with wire digests.
+      - name: Run packages/hsm-runtime signing runtime tests
+        run: bun test packages/hsm-runtime/test/
