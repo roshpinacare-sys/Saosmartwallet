@@ -1,76 +1,71 @@
 /**
  * Saosmartwallet packages/fixedfloat — request signing (pure)
  * ===========================================================
- * FixedFloat API v1 wire law (documented contract):
+ * MEASURED wire law (FixedFloat API v2, ff.io/api/v2/ — measured live
+ * 2026-10-26 by the fx-fixedfloat lane, giant :3055, trace
+ * 1a178850450f2e55; reconciled here so the wallet package and the bridge
+ * head share ONE contract):
  *
- *   signature = HMAC_SHA256(apiSecret, CONCAT(values of every request
- *                            parameter, in the exact order they are sent))
- *   → 64 lowercase hex chars, sent as X-API-SIGN together with X-API-KEY and
- *     a strictly-increasing integer X-API-NONCE.
+ *   signature = HMAC_SHA1(apiSecret, canonical(body))
+ *   canonical(body) = CONCAT over keys sorted alphabetically of
+ *                     key + (object ? JSON.stringify(deepSort(v)) : String(v))
+ *   headers: X-Api-Key + X-Signature (hex) — JSON body, no nonce header.
  *
- * Everything here is pure and offline: no fetch, no wall-clock (the nonce
- * source is the injected clock), no I/O.
+ * The HMAC primitive is pinned to RFC 2202 Test Case 3 (an external
+ * standard); the canonical law is pinned by explicit fixtures. Everything
+ * here is pure and offline: no fetch, no wall-clock, no I/O.
  */
 
 import { createHmac } from "node:crypto";
 
-/** Documented v1 auth headers. */
-export const FF_HEADER_KEY = "X-API-KEY";
-export const FF_HEADER_SIGN = "X-API-SIGN";
-export const FF_HEADER_NONCE = "X-API-NONCE";
+/** Measured v2 endpoint (trailing slash included — URL is base + method). */
+export const FF_API_BASE = "https://ff.io/api/v2/";
 
-/** Documented v1 base endpoint. */
-export const FF_API_BASE = "https://ff.io/api/v1";
+/** Measured v2 auth headers. */
+export const FF_HEADER_KEY = "X-Api-Key";
+export const FF_HEADER_SIGN = "X-Signature";
 
-type Bytes = Uint8Array | number[];
+/** The measured v2 method set — anything else refuses locally. */
+export const FF_METHODS = ["price", "ccies", "create", "order", "emergency", "qr"] as const;
+export type FfMethod = (typeof FF_METHODS)[number];
 
-function toBytes(v: string | Bytes): Uint8Array {
-  if (typeof v === "string") return new TextEncoder().encode(v);
-  if (typeof v === "number") {
-    // A bare number is NEVER a legal value element (a string or a byte array
-    // is) — failing loudly here prevents silent zero-buffer signatures.
-    throw new TypeError("ffSign: bare number is not a legal value element");
+/** Deep-sort an object's keys alphabetically (recursively, arrays included). */
+export function deepSort(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(deepSort);
+  if (v !== null && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+      out[k] = deepSort((v as Record<string, unknown>)[k]);
+    }
+    return out;
   }
-  return new Uint8Array(v);
+  return v;
 }
 
 /**
- * HMAC-SHA256 over the concatenation of `values` (each string → UTF-8 bytes),
- * keyed by `key`. Returns 64 lowercase hex chars.
- *
- * Verified against RFC 4231 Test Case 2 in test/sign.test.ts — the digest is
- * pinned to an external standard, not to the implementation.
+ * Canonical signing form (measured law): keys sorted alphabetically at the
+ * top level, each rendered as key + (nested objects → deep-sorted compact
+ * JSON, primitives → String(v)), concatenated with no separator.
  */
-export function ffSign(key: Bytes, values: (string | Bytes)[]): string {
-  const keyBytes = toBytes(key);
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (const v of values) {
-    const b = toBytes(v);
-    chunks.push(b);
-    total += b.length;
+export function canonical(body: Record<string, unknown>): string {
+  const keys = Object.keys(body).sort();
+  const parts: string[] = [];
+  for (const k of keys) {
+    const v = body[k];
+    parts.push(k + (typeof v === "object" && v !== null ? JSON.stringify(deepSort(v)) : String(v)));
   }
-  const payload = new Uint8Array(total);
-  let off = 0;
-  for (const b of chunks) {
-    payload.set(b, off);
-    off += b.length;
-  }
-  return createHmac("sha256", keyBytes).update(payload).digest("hex");
+  return parts.join("");
+}
+
+/** The HMAC-SHA1 primitive (RFC 2104) — pinned to RFC 2202 TC3 in tests. */
+export function hmacSha1Hex(key: string, data: string): string {
+  return createHmac("sha1", key).update(data, "utf8").digest("hex");
 }
 
 /**
- * Monotonic nonce source. base = clock_ms * 4096 + a process-local sequence
- * that advances even when the clock stands still; if the clock ever moves
- * backward the previous nonce is simply incremented (absolute monotonicity
- * per process). Decimal digits only — wire-safe as an integer header.
+ * The wire signature: HMAC-SHA1(apiSecret, canonical(body)) — 40 lowercase
+ * hex chars. Deterministic: same body ⇒ same signature.
  */
-let __lastNonce = 0n;
-let __seq = 0n;
-
-export function nextNonce(now: () => number): string {
-  let candidate = BigInt(Math.floor(now())) * 4096n + (__seq++ % 4096n);
-  if (candidate <= __lastNonce) candidate = __lastNonce + 1n;
-  __lastNonce = candidate;
-  return candidate.toString(10);
+export function ffSign(body: Record<string, unknown>, apiSecret: string): string {
+  return hmacSha1Hex(apiSecret, canonical(body));
 }
