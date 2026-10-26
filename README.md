@@ -11,6 +11,19 @@ a code lane (E-series records the same). Standing revival items unchanged:
 (1) owner decision on the committed vault DB, (2) drop the 61MB skills/
 scaffold, (3) wallet-verify dispatch.
 
+**HSM signer SEAM (landed 2026-10-26, wave #82, task 4-b — code commit
+b10653f, docs commit = this one):** the signing runtime now has a first-class
+seam callers
+program against — `packages/hsm/src/signer.ts`: `HsmSigner` interface
+(sign/publicKey/listKeys) + `LocalSoftwareHsm` deterministic
+sha256-secp256k1 reference implementation (throwaway in-test keys only) +
+`VaultBackedSigner` remote adapter (POST {base}/sign {keyRef, digestHex},
+Bearer from HSM_TOKEN / HSM_ENDPOINT, fail-closed constructor). Pinned by 21
+contract tests (repo suite 380 pass / 0 fail, tsc clean). Honest boundary:
+**broadcast remains plans-only; keys stay in owner/vault custody** — the seam
+signs digests on request; it does not hold production keys, move funds, or
+broadcast transactions.
+
 ## 🟢 Deployed runtime — production HSM signing service (measured 2026-10-26T15:42Z, wave G77-d)
 
 **`packages/hsm-runtime` + `mini-services/hsm-runtime` — RUNNING on sovereign
@@ -47,7 +60,7 @@ Port law: **3056 is occupied by the estate's local-gates-host (measured
 2026-10-26T15:24Z — untouched)**; the HSM runtime declares fixed port **3057**.
 
 > **סטטוס: ארנק-חתימת-ייצור חי — HSM runtime נפרס ונמדד על :3057 (deny-by-default · חתימה-secp256k1+ed25519 · כספת-AES-256-GCM · אודיט-שרשרת-גיבוב) · M0+M1+M2+M3+M4 מומשו ואומתו מול ה-chain · 7 רשתות חיות (STEEM/HIVE/BLURT/TRON/SAOS-NET/ETHEREUM/SOLANA) · שכבת גשרים עם router+quotes חיים · M4 System Owner: בדיקות-חיים מאוחדות + דו"ח סטטוס חי + failover הוכח חי**
-> עדכון אחרון: 2026-10-26 (wave G77-d — פרוטוטיפ/טרם-נפרס: נרפא. הרנטיים חיים למעלה)
+> עדכון אחרון: 2026-10-26 (wave G77-d — פרוטוטיפ/טרם-נפרס: נרפא. הרנטיים חיים למעלה) · (wave #82 — איטום-החתימה (HsmSigner seam) נחת ב-packages/hsm עם 21 בדיקות-חוזה; הברודקאסט נשאר plans-only · המפתחות נשארים בחזקת הבעלים/הכספת)
 
 מאגר זה מכיל את עיצוב המוצר והארכיטקטורה המלאים עבור **Saosmartwallet** — ארנק self-custodial שמנצל את התכונות הייחודיות של רשת ממשפחת **Steem** (היררכיית מפתחות owner/active/posting/memo · עסקאות ללא עמלות דרך Resource Credits · הצפנת memo נייטיב · ממשל מובנה), במקום לחקות ארנקי EVM.
 
