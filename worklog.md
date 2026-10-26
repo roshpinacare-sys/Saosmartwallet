@@ -2620,3 +2620,14 @@ Stage Summary:
 - הטענות-הפומביות עברו-ביקורת-R7-מול-מדידות-חי: שלושה-תיקונים-הועלו-לריפו-הפרטי (a8e5ea99), והפלטפורמה-עצמה-הוצבה-בקו-אחד-עם-מה-שהיא-מפרסמת (XRPL-במפה-החיה, 8-שרשרות).
 - שרשרת-ההשגחה-קיבלה-עוד-שכבת-חוסן: מפקח-אחד-לתהליך-לנצח-גם-מתחת-ל-hot-reload — החווה-ש-r48-הרגה-דרך-הקריסה לא-יכולה-עוד-לקום-דרך-הטעינה-החוזרת.
 - קבצים: mini-services/heart-service/index.ts · src/lib/eco-server.ts · src/lib/eco-registry.ts · tools/r49-* (4) · worklog · broadcast. adsmarket: a8e5ea99. zero secrets.
+
+---
+Task ID: t61-swarm-fixedfloat (wave 20.01) — copy 3/4
+Agent: agent-9 (headcorner / insurance)
+Task: trace 1a1788373a64c3ed — FixedFloat exchange rail (directive §4)
+
+Work Log:
+- packages/fixedfloat LANDED via PR #4 (c2561a3e) + PR #5 (f7c503cc), both CI-verified green pre-merge
+- measured-v2 contract adopted (RFC 2202 TC3-pinned HMAC-SHA1, canonical deepSort, method whitelist, envelope-on-non-2xx = measured 501 permission class)
+- 47/47 tests (112 assertions), tsc 0, eslint 0; live probe: signature ACCEPTED by ff.io, key awaits account-side API enablement (owner action)
+- full receipt: /home/z/my-project/worklog.md (t61 entry) — registering-four-copies+t42
