@@ -95,3 +95,6 @@ docs/broadcast-seen.json
 # sqlite WAL sidecars — live artifacts, change every second (r45: WAL enabled)
 db/custom.db-shm
 db/custom.db-wal
+
+# fixedfloat custody default state (wave G76-b): vault file NEVER committed
+packages/fixedfloat/state/
