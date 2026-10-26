@@ -40,11 +40,20 @@ packages/
                    serving /api/bridge/routes + /api/bridge/status
   saos-id-verify/  ✅ SHIPPED — official zero-dependency TypeScript SDK for
                    POST /api/v1/identity/verify (live-dogfooded incl. dist)
+  hsm-runtime/     ✅ DEPLOYED (wave 20.1 / G77-d) — production HSM signing
+                   runtime: token-gated SIGN-ONLY API over the vault store
+                   (0600, master key never copied, keys only via vault
+                   scoped-unseal), steem-family + ed25519 signing with
+                   wire-digest receipts, deny-by-default, structural
+                   no-broadcast law, honest READY/NO-KEYS/SEALED verdicts;
+                   lives on sovereign-runner-kit :3155 (systemd
+                   saos-hsm-runtime.service; receipts/hsm-runtime/boot-proof)
 ```
 
 Known honest gaps inside packages: the ZK module (core/src/crypto/zk.ts) is
 real math but wired to nothing yet; `multiSign/batchSign/crossChainSign`
-orchestrator paths are implemented but unwired.
+orchestrator paths are implemented but unwired; hsm-runtime holds no real
+custody keys (owner custody flow) and reports NO-KEYS honestly until loaded.
 
 Dependency rule (from `wallet-design/wallet-architecture.md`):
 `apps → core → crypto` and `apps → chains`. **`core` never imports `chains`** —

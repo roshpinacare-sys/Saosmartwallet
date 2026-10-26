@@ -7,7 +7,20 @@ source** — wire formats verified against real chain bytes, 3 chain adapters
 the audits (git-committed `db/custom.db` = live key vault, 248 AES-GCM
 entries) — its fate is an OWNER decision (rotation/scrub), not a code lane
 (E-series records the same). Why it was muted: design-complete, runtime
-never deployed. Revival path: (1) owner decision on the committed vault DB,
+never deployed. **UNBLOCKED (2026-10-26, wave 20.1 / G77-d — owner MASTER
+DIRECTIVE §3.1): the signing component is a prototype no longer —
+`packages/hsm-runtime` is the PRODUCTION HSM SIGNING RUNTIME, deployed on
+sovereign-runner-kit :3155 (`saos-hsm-runtime.service`, `Restart=always`):
+SIGN-ONLY with the no-broadcast law structural (no route exists),
+deny-by-default token gate, key material ONLY inside the packages/vault
+AES-256-GCM store (path-only custody, 0600), signed-transaction receipts
+with wire digests, honest per-capability verdicts
+(READY/NO-KEYS/SEALED/BLOCKED — never fake-ready). Boot proof (measured
+matrix): sovereign-runner-kit `receipts/hsm-runtime/boot-proof.json`;
+suite 46/46 green. Soldier-key loading stays owner-custody — the runtime
+reports NO-KEYS honestly until the owner loads keys. The web product
+runtime (Next app) remains owner-scope work.** Revival path: (1) owner
+decision on the committed vault DB,
 (2) drop the 61MB skills/ scaffold, (3) dispatch wallet-verify — everything
 else is ready.
 
@@ -48,6 +61,7 @@ else is ready.
 | [`packages/crypto/`](./packages/crypto/README.md) | PrivateKey/PublicKey/חתימות, WIF + "STM", גזירת מפתחות מ-password/brain-key | ✅ מומש ואומת |
 | [`packages/chains/steem/`](./packages/chains/steem/README.md) | מנוע serialization בינארי (varint/asset/ops/tx) + SteemAdapter עם broadcast נעול | ✅ מומש ואומת |
 | [`packages/core/`](./packages/core/README.md) | Sovereign Key Vault — Argon2id + AES-GCM/ChaCha20 + Shamir + ZK · Policy Engine · Signing Orchestrator · Backup · Audit hash-chain | ✅ M2 |
+| [`packages/hsm-runtime/`](./packages/hsm-runtime/README.md) | **Production HSM signing runtime (wave 20.1 / G77-d):** token-gated SIGN-ONLY API (:3155) over the vault — steem-family + ed25519 signing, receipts with wire digests, deny-by-default, honest READY/NO-KEYS/SEALED verdicts, no broadcast route | ✅ **פרוס ב-sovereign-runner-kit** (:3155, boot-proof receipts) |
 | [`packages/chains/ethereum/`](./packages/chains/ethereum/) | EthereumAdapter (EIP-1559) — build/sign + ERC-20 + EIP-55 נגזרת ממפתח ה-vault · broadcast נעול | ✅ M3 |
 | [`packages/chains/solana/`](./packages/chains/solana/) | SolanaAdapter (Ed25519) — build/sign + SPL read · broadcast נעול | ✅ M3 |
 | [`packages/bridges/`](./packages/bridges/) | שכבת גשרים: router (מציאת-נתיב + quotes עמלות חיות) · monitor (סטטוס-מסילות מה-state החי) | ✅ M3 |
