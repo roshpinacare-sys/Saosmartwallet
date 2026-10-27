@@ -1,6 +1,6 @@
 {
  "agent": "wallet-verify",
- "generatedAt": "2026-10-27T12:38:49Z",
+ "generatedAt": "2026-10-27T19:38:05Z",
  "verdict": "PASS",
  "checks": {
   "install": "pass",
@@ -12,8 +12,8 @@
  },
  "reason": "install, prisma, typecheck and build all ran and passed",
  "provenance": {
-  "runId": "40505382304",
-  "runUrl": "https://github.com/roshpinacare-sys/Saosmartwallet/actions/runs/40505382304",
-  "sha": "1e8570ad947c1fed3dbb007bf32d90a4936425f7"
+  "runId": "40570857785",
+  "runUrl": "https://github.com/roshpinacare-sys/Saosmartwallet/actions/runs/40570857785",
+  "sha": "5f1321616d232e0448b608937080a29e67fc6562"
  }
 }
