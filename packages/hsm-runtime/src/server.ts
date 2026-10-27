@@ -284,3 +284,13 @@ export async function listenOnEphemeralPort(server: http.Server): Promise<string
   const port = await listen(server, 0);
   return `http://127.0.0.1:${port}`;
 }
+
+// The tested pure-handler seam (test/hsm-runtime.test.ts drives this contract
+// directly; createHsmServer above is the node:http shell over the same laws).
+export {
+  createHsmHandler,
+  HSM_SERVICE_NAME,
+  HSM_SERVICE_VERSION,
+  type HsmDeps,
+  type HsmHandler,
+} from "./handler";
