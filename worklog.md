@@ -2648,3 +2648,18 @@ Work Log:
 
 Stage Summary:
 - independent measured verdicts for all 5 directive §s; zero feature-lane overlap; owner levers named (FixedFloat API enablement · FLEET_TOKEN 401)
+
+---
+Task ID: t63-arch-heal (wave 20.03)
+Agent: agent-9 (headcorner / insurance)
+Task: trace 1a17d288e80e801d — architecture heal (copy 3/4)
+
+Work Log:
+- wallet-verify FAIL ×4 root-caused (G77-d's hsm-runtime seam never compiled) → src/handler.ts born per the RED law suite spec + server.ts re-export
+- 84/84 package · 426/426 packages-full · tsc 0 · CI 68b23bb: verify+core-tests+gitleaks ALL SUCCESS — main green after 18h
+- FLEET-401 cured by sister lane (raw-first reader) — gapsOpen:0 live; treasury LADDER-ACTED; army ARMY-ACTED roster 13; gearbox streak 2/6
+- FixedFloat: still 501 (owner account lever)
+- registering-four-copies+t42
+
+Stage Summary:
+- §3 production surface TRUE: compiles + tested + CI green; architecture mandate honored with a measured cure, zero collision (G77-d files untouched)
