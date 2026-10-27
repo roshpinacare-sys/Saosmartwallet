@@ -62,3 +62,17 @@ jobs:
       # honest verdicts, receipts with wire digests.
       - name: Run packages/hsm-runtime signing runtime tests
         run: bun test packages/hsm-runtime/test/
+
+      # wave G78-d (owner directive §1.3, worker 4/9): the cross-chain arb
+      # scanner joins additively — one new directory only, nothing replaced.
+      # Zero-network suite (injected transports, measured wire fixtures,
+      # anti-mock provenance laws on every row).
+      - name: Run packages/arb-scanner corridor tests
+        run: bun test packages/arb-scanner/test/
+
+      # wave G78-d: the lawful arb execution rail joins additively — one new
+      # directory only, nothing replaced. Zero-network suite: fixture keys
+      # ONLY, SIGN-ONLY rail (no broadcast path — grep-law pinned), armed
+      # policy fail-closed matrix, authority/RC/reserve/cap verdict laws.
+      - name: Run packages/arb-executor rail tests
+        run: bun test packages/arb-executor/test/

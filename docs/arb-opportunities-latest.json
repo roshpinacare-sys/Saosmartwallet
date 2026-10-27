@@ -1,0 +1,1197 @@
+{
+  "schema": "arb-opportunities/1",
+  "at": "2026-10-27T13:03:44.255Z",
+  "scannerVersion": "1.0.0",
+  "corridors": [
+    {
+      "corridor": "STEEM_SBD_INTERNAL",
+      "opportunities": [
+        {
+          "pair": "STEEM/SBD",
+          "buyVenue": "steem-internal",
+          "sellVenue": "steem-internal",
+          "spreadBps": -32.106584690710825,
+          "depthBaseSatoshis": 376898,
+          "depthQuoteSatoshis": 38597,
+          "buyPrice": 0.10241129032258064,
+          "sellPrice": 0.10208248264597795,
+          "basis": "same-book-cross",
+          "note": "same-book cross: buy@ask 0.10241129032258064 sell@bid 0.10208248264597795 (https://api.steemit.com)",
+          "at": "2026-10-27T13:03:44.255Z"
+        }
+      ],
+      "gaps": [],
+      "books": [
+        {
+          "venue": "steem-internal",
+          "pair": "STEEM/SBD",
+          "asks": [
+            {
+              "price": "0.10241129032258064",
+              "priceNum": 0.10241129032258064,
+              "baseSatoshis": 372000,
+              "quoteSatoshis": 38097,
+              "created": "2026-10-26T19:01:54"
+            },
+            {
+              "price": "0.10241704219582139",
+              "priceNum": 0.10241704219582139,
+              "baseSatoshis": 9764,
+              "quoteSatoshis": 1000,
+              "created": "2026-10-25T22:38:33"
+            },
+            {
+              "price": "0.10250685070536893",
+              "priceNum": 0.10250685070536893,
+              "baseSatoshis": 29559,
+              "quoteSatoshis": 3030,
+              "created": "2026-10-25T22:23:30"
+            },
+            {
+              "price": "0.10279823269513991",
+              "priceNum": 0.10279823269513991,
+              "baseSatoshis": 3395,
+              "quoteSatoshis": 349,
+              "created": "2026-10-25T18:20:51"
+            },
+            {
+              "price": "0.10279823269513991",
+              "priceNum": 0.10279823269513991,
+              "baseSatoshis": 3395,
+              "quoteSatoshis": 349,
+              "created": "2026-10-25T18:20:54"
+            },
+            {
+              "price": "0.10312315851502651",
+              "priceNum": 0.10312315851502651,
+              "baseSatoshis": 1697,
+              "quoteSatoshis": 175,
+              "created": "2026-10-25T18:06:06"
+            },
+            {
+              "price": "0.10371243370654096",
+              "priceNum": 0.10371243370654096,
+              "baseSatoshis": 1697,
+              "quoteSatoshis": 176,
+              "created": "2026-10-25T18:06:09"
+            },
+            {
+              "price": "0.10371243370654096",
+              "priceNum": 0.10371243370654096,
+              "baseSatoshis": 1697,
+              "quoteSatoshis": 176,
+              "created": "2026-10-25T18:06:12"
+            },
+            {
+              "price": "0.10390295358649788",
+              "priceNum": 0.10390295358649788,
+              "baseSatoshis": 1896,
+              "quoteSatoshis": 197,
+              "created": "2026-10-25T21:19:12"
+            },
+            {
+              "price": "0.10400000000000000",
+              "priceNum": 0.104,
+              "baseSatoshis": 1500,
+              "quoteSatoshis": 156,
+              "created": "2026-10-25T23:36:33"
+            },
+            {
+              "price": "0.10413935193856527",
+              "priceNum": 0.10413935193856527,
+              "baseSatoshis": 5339,
+              "quoteSatoshis": 556,
+              "created": "2026-10-27T12:57:06"
+            },
+            {
+              "price": "0.10415175375805297",
+              "priceNum": 0.10415175375805297,
+              "baseSatoshis": 2794,
+              "quoteSatoshis": 291,
+              "created": "2026-10-27T13:00:42"
+            },
+            {
+              "price": "0.10416666666666667",
+              "priceNum": 0.10416666666666667,
+              "baseSatoshis": 2400,
+              "quoteSatoshis": 250,
+              "created": "2026-10-27T12:54:57"
+            },
+            {
+              "price": "0.10418743768693918",
+              "priceNum": 0.10418743768693918,
+              "baseSatoshis": 2006,
+              "quoteSatoshis": 209,
+              "created": "2026-10-27T13:02:30"
+            },
+            {
+              "price": "0.10419818456883510",
+              "priceNum": 0.1041981845688351,
+              "baseSatoshis": 5288,
+              "quoteSatoshis": 551,
+              "created": "2026-10-27T12:52:24"
+            },
+            {
+              "price": "0.10426429240862231",
+              "priceNum": 0.10426429240862231,
+              "baseSatoshis": 4268,
+              "quoteSatoshis": 445,
+              "created": "2026-10-27T12:55:54"
+            },
+            {
+              "price": "0.10429042904290430",
+              "priceNum": 0.1042904290429043,
+              "baseSatoshis": 3030,
+              "quoteSatoshis": 316,
+              "created": "2026-10-27T12:57:00"
+            },
+            {
+              "price": "0.10431034482758621",
+              "priceNum": 0.10431034482758621,
+              "baseSatoshis": 2320,
+              "quoteSatoshis": 242,
+              "created": "2026-10-27T12:55:15"
+            },
+            {
+              "price": "0.10434541931912537",
+              "priceNum": 0.10434541931912537,
+              "baseSatoshis": 3613,
+              "quoteSatoshis": 377,
+              "created": "2026-10-27T12:53:36"
+            },
+            {
+              "price": "0.10438729198184570",
+              "priceNum": 0.1043872919818457,
+              "baseSatoshis": 5288,
+              "quoteSatoshis": 552,
+              "created": "2026-10-27T12:52:24"
+            },
+            {
+              "price": "0.10451306413301663",
+              "priceNum": 0.10451306413301663,
+              "baseSatoshis": 2526,
+              "quoteSatoshis": 264,
+              "created": "2026-10-27T12:56:33"
+            },
+            {
+              "price": "0.10462046204620462",
+              "priceNum": 0.10462046204620462,
+              "baseSatoshis": 3030,
+              "quoteSatoshis": 317,
+              "created": "2026-10-27T12:57:00"
+            },
+            {
+              "price": "0.10465116279069768",
+              "priceNum": 0.10465116279069768,
+              "baseSatoshis": 3526,
+              "quoteSatoshis": 369,
+              "created": "2026-10-27T12:58:45"
+            },
+            {
+              "price": "0.10465511382942576",
+              "priceNum": 0.10465511382942576,
+              "baseSatoshis": 2943,
+              "quoteSatoshis": 308,
+              "created": "2026-10-27T12:53:33"
+            },
+            {
+              "price": "0.10483573274270949",
+              "priceNum": 0.10483573274270949,
+              "baseSatoshis": 2709,
+              "quoteSatoshis": 284,
+              "created": "2026-10-27T12:54:36"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.10208248264597795",
+              "priceNum": 0.10208248264597795,
+              "baseSatoshis": 4898,
+              "quoteSatoshis": 500,
+              "created": "2026-10-27T13:02:48"
+            },
+            {
+              "price": "0.10208248264597795",
+              "priceNum": 0.10208248264597795,
+              "baseSatoshis": 4898,
+              "quoteSatoshis": 500,
+              "created": "2026-10-27T13:03:42"
+            },
+            {
+              "price": "0.10206180747113001",
+              "priceNum": 0.10206180747113001,
+              "baseSatoshis": 21389,
+              "quoteSatoshis": 2183,
+              "created": "2026-10-27T12:59:39"
+            },
+            {
+              "price": "0.10206164523372117",
+              "priceNum": 0.10206164523372117,
+              "baseSatoshis": 4899,
+              "quoteSatoshis": 500,
+              "created": "2026-10-27T12:58:45"
+            },
+            {
+              "price": "0.10205589522877145",
+              "priceNum": 0.10205589522877145,
+              "baseSatoshis": 54137,
+              "quoteSatoshis": 5525,
+              "created": "2026-10-27T13:03:39"
+            },
+            {
+              "price": "0.10204800000000000",
+              "priceNum": 0.102048,
+              "baseSatoshis": 859928,
+              "quoteSatoshis": 87754,
+              "created": "2026-10-24T13:16:21"
+            },
+            {
+              "price": "0.10204700000000000",
+              "priceNum": 0.102047,
+              "baseSatoshis": 780855,
+              "quoteSatoshis": 79684,
+              "created": "2026-10-23T19:24:18"
+            },
+            {
+              "price": "0.10198714202220924",
+              "priceNum": 0.10198714202220924,
+              "baseSatoshis": 6844,
+              "quoteSatoshis": 698,
+              "created": "2026-10-25T18:06:15"
+            },
+            {
+              "price": "0.10197635592455555",
+              "priceNum": 0.10197635592455555,
+              "baseSatoshis": 11081,
+              "quoteSatoshis": 1130,
+              "created": "2026-10-25T21:19:15"
+            },
+            {
+              "price": "0.10189037296547697",
+              "priceNum": 0.10189037296547697,
+              "baseSatoshis": 13701,
+              "quoteSatoshis": 1396,
+              "created": "2026-10-25T18:20:57"
+            },
+            {
+              "price": "0.10175217240888093",
+              "priceNum": 0.10175217240888093,
+              "baseSatoshis": 49139,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-24T19:28:39"
+            },
+            {
+              "price": "0.10173444104357965",
+              "priceNum": 0.10173444104357965,
+              "baseSatoshis": 6861,
+              "quoteSatoshis": 698,
+              "created": "2026-10-25T18:06:18"
+            },
+            {
+              "price": "0.10163815070986530",
+              "priceNum": 0.1016381507098653,
+              "baseSatoshis": 13735,
+              "quoteSatoshis": 1396,
+              "created": "2026-10-25T18:21:00"
+            },
+            {
+              "price": "0.10148298924105845",
+              "priceNum": 0.10148298924105845,
+              "baseSatoshis": 6878,
+              "quoteSatoshis": 698,
+              "created": "2026-10-25T18:06:21"
+            },
+            {
+              "price": "0.10145466375424084",
+              "priceNum": 0.10145466375424084,
+              "baseSatoshis": 21517,
+              "quoteSatoshis": 2183,
+              "created": "2026-10-27T12:59:39"
+            },
+            {
+              "price": "0.10126582278481013",
+              "priceNum": 0.10126582278481013,
+              "baseSatoshis": 49375,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T18:06:39"
+            },
+            {
+              "price": "0.10098154057438301",
+              "priceNum": 0.10098154057438301,
+              "baseSatoshis": 49514,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T17:35:09"
+            },
+            {
+              "price": "0.10084508178536133",
+              "priceNum": 0.10084508178536133,
+              "baseSatoshis": 49581,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T18:06:39"
+            },
+            {
+              "price": "0.10066666666666667",
+              "priceNum": 0.10066666666666667,
+              "baseSatoshis": 3000,
+              "quoteSatoshis": 302,
+              "created": "2026-10-26T07:48:24"
+            },
+            {
+              "price": "0.10003691399040236",
+              "priceNum": 0.10003691399040236,
+              "baseSatoshis": 2709,
+              "quoteSatoshis": 271,
+              "created": "2026-10-24T15:09:27"
+            },
+            {
+              "price": "0.10000000000000001",
+              "priceNum": 0.1,
+              "baseSatoshis": 7380,
+              "quoteSatoshis": 738,
+              "created": "2026-10-23T19:29:00"
+            },
+            {
+              "price": "0.10000000000000001",
+              "priceNum": 0.1,
+              "baseSatoshis": 3000,
+              "quoteSatoshis": 300,
+              "created": "2026-10-26T04:08:36"
+            },
+            {
+              "price": "0.09991153052196992",
+              "priceNum": 0.09991153052196992,
+              "baseSatoshis": 16955,
+              "quoteSatoshis": 1694,
+              "created": "2026-10-21T09:13:48"
+            },
+            {
+              "price": "0.09944509636229837",
+              "priceNum": 0.09944509636229837,
+              "baseSatoshis": 50279,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T17:35:09"
+            },
+            {
+              "price": "0.09879234424728604",
+              "priceNum": 0.09879234424728604,
+              "baseSatoshis": 22937,
+              "quoteSatoshis": 2266,
+              "created": "2026-10-25T19:04:39"
+            }
+          ],
+          "fetchedAt": "2026-10-27T13:03:45.084Z",
+          "endpoints": [
+            "https://api.steemit.com",
+            "https://api.justyy.com",
+            "https://steemapi.boylikegirl.club"
+          ]
+        }
+      ]
+    },
+    {
+      "corridor": "STEEM_HIVE_BRIDGE",
+      "opportunities": [
+        {
+          "pair": "STEEM/HIVE",
+          "buyVenue": "steem-internal",
+          "sellVenue": "hive-internal",
+          "spreadBps": 46.17970159706229,
+          "depthBaseSatoshis": 372000,
+          "depthQuoteSatoshis": 38097,
+          "buyPrice": 0.10241129032258064,
+          "sellPrice": 0.04815294774421532,
+          "basis": "parity-assumed-cross",
+          "note": "buy STEEM@0.10241129032258064 SBD · sell HIVE@0.04815294774421532 HBD → implied 2.126792 HIVE/STEEM; reverse route implies 2.117015 — ASSUMES SBD≈HBD peg; bridge rail is gated (owner lever)",
+          "at": "2026-10-27T13:03:44.255Z"
+        },
+        {
+          "pair": "HIVE/STEEM",
+          "buyVenue": "hive-internal",
+          "sellVenue": "steem-internal",
+          "spreadBps": -45.96742539825463,
+          "depthBaseSatoshis": 4898,
+          "depthQuoteSatoshis": 500,
+          "buyPrice": 0.04822,
+          "sellPrice": 0.10208248264597795,
+          "basis": "parity-assumed-cross",
+          "note": "buy HIVE@0.04822000000000000 HBD · sell STEEM@0.10208248264597795 SBD → implied 0.472363 STEEM/HIVE; reverse route implies 0.470192 — ASSUMES SBD≈HBD peg; bridge rail is gated (owner lever)",
+          "at": "2026-10-27T13:03:44.255Z"
+        }
+      ],
+      "gaps": [
+        {
+          "kind": "BRIDGE_RAIL_GATED",
+          "corridor": "STEEM_HIVE_BRIDGE",
+          "detail": "no live bridge-rate source is reachable — packages/bridges STEEM↔HIVE rails are readiness:gated; spread rows are parity-assumed (SBD≈HBD) and NOT executable until an owner-authorized bridge rate feeds this corridor",
+          "retryAfterMs": 300000,
+          "at": "2026-10-27T13:03:44.255Z"
+        }
+      ],
+      "books": [
+        {
+          "venue": "steem-internal",
+          "pair": "STEEM/SBD",
+          "asks": [
+            {
+              "price": "0.10241129032258064",
+              "priceNum": 0.10241129032258064,
+              "baseSatoshis": 372000,
+              "quoteSatoshis": 38097,
+              "created": "2026-10-26T19:01:54"
+            },
+            {
+              "price": "0.10241704219582139",
+              "priceNum": 0.10241704219582139,
+              "baseSatoshis": 9764,
+              "quoteSatoshis": 1000,
+              "created": "2026-10-25T22:38:33"
+            },
+            {
+              "price": "0.10250685070536893",
+              "priceNum": 0.10250685070536893,
+              "baseSatoshis": 29559,
+              "quoteSatoshis": 3030,
+              "created": "2026-10-25T22:23:30"
+            },
+            {
+              "price": "0.10279823269513991",
+              "priceNum": 0.10279823269513991,
+              "baseSatoshis": 3395,
+              "quoteSatoshis": 349,
+              "created": "2026-10-25T18:20:51"
+            },
+            {
+              "price": "0.10279823269513991",
+              "priceNum": 0.10279823269513991,
+              "baseSatoshis": 3395,
+              "quoteSatoshis": 349,
+              "created": "2026-10-25T18:20:54"
+            },
+            {
+              "price": "0.10312315851502651",
+              "priceNum": 0.10312315851502651,
+              "baseSatoshis": 1697,
+              "quoteSatoshis": 175,
+              "created": "2026-10-25T18:06:06"
+            },
+            {
+              "price": "0.10371243370654096",
+              "priceNum": 0.10371243370654096,
+              "baseSatoshis": 1697,
+              "quoteSatoshis": 176,
+              "created": "2026-10-25T18:06:09"
+            },
+            {
+              "price": "0.10371243370654096",
+              "priceNum": 0.10371243370654096,
+              "baseSatoshis": 1697,
+              "quoteSatoshis": 176,
+              "created": "2026-10-25T18:06:12"
+            },
+            {
+              "price": "0.10390295358649788",
+              "priceNum": 0.10390295358649788,
+              "baseSatoshis": 1896,
+              "quoteSatoshis": 197,
+              "created": "2026-10-25T21:19:12"
+            },
+            {
+              "price": "0.10400000000000000",
+              "priceNum": 0.104,
+              "baseSatoshis": 1500,
+              "quoteSatoshis": 156,
+              "created": "2026-10-25T23:36:33"
+            },
+            {
+              "price": "0.10413935193856527",
+              "priceNum": 0.10413935193856527,
+              "baseSatoshis": 5339,
+              "quoteSatoshis": 556,
+              "created": "2026-10-27T12:57:06"
+            },
+            {
+              "price": "0.10415175375805297",
+              "priceNum": 0.10415175375805297,
+              "baseSatoshis": 2794,
+              "quoteSatoshis": 291,
+              "created": "2026-10-27T13:00:42"
+            },
+            {
+              "price": "0.10416666666666667",
+              "priceNum": 0.10416666666666667,
+              "baseSatoshis": 2400,
+              "quoteSatoshis": 250,
+              "created": "2026-10-27T12:54:57"
+            },
+            {
+              "price": "0.10418743768693918",
+              "priceNum": 0.10418743768693918,
+              "baseSatoshis": 2006,
+              "quoteSatoshis": 209,
+              "created": "2026-10-27T13:02:30"
+            },
+            {
+              "price": "0.10419818456883510",
+              "priceNum": 0.1041981845688351,
+              "baseSatoshis": 5288,
+              "quoteSatoshis": 551,
+              "created": "2026-10-27T12:52:24"
+            },
+            {
+              "price": "0.10426429240862231",
+              "priceNum": 0.10426429240862231,
+              "baseSatoshis": 4268,
+              "quoteSatoshis": 445,
+              "created": "2026-10-27T12:55:54"
+            },
+            {
+              "price": "0.10429042904290430",
+              "priceNum": 0.1042904290429043,
+              "baseSatoshis": 3030,
+              "quoteSatoshis": 316,
+              "created": "2026-10-27T12:57:00"
+            },
+            {
+              "price": "0.10431034482758621",
+              "priceNum": 0.10431034482758621,
+              "baseSatoshis": 2320,
+              "quoteSatoshis": 242,
+              "created": "2026-10-27T12:55:15"
+            },
+            {
+              "price": "0.10434541931912537",
+              "priceNum": 0.10434541931912537,
+              "baseSatoshis": 3613,
+              "quoteSatoshis": 377,
+              "created": "2026-10-27T12:53:36"
+            },
+            {
+              "price": "0.10438729198184570",
+              "priceNum": 0.1043872919818457,
+              "baseSatoshis": 5288,
+              "quoteSatoshis": 552,
+              "created": "2026-10-27T12:52:24"
+            },
+            {
+              "price": "0.10451306413301663",
+              "priceNum": 0.10451306413301663,
+              "baseSatoshis": 2526,
+              "quoteSatoshis": 264,
+              "created": "2026-10-27T12:56:33"
+            },
+            {
+              "price": "0.10462046204620462",
+              "priceNum": 0.10462046204620462,
+              "baseSatoshis": 3030,
+              "quoteSatoshis": 317,
+              "created": "2026-10-27T12:57:00"
+            },
+            {
+              "price": "0.10465116279069768",
+              "priceNum": 0.10465116279069768,
+              "baseSatoshis": 3526,
+              "quoteSatoshis": 369,
+              "created": "2026-10-27T12:58:45"
+            },
+            {
+              "price": "0.10465511382942576",
+              "priceNum": 0.10465511382942576,
+              "baseSatoshis": 2943,
+              "quoteSatoshis": 308,
+              "created": "2026-10-27T12:53:33"
+            },
+            {
+              "price": "0.10483573274270949",
+              "priceNum": 0.10483573274270949,
+              "baseSatoshis": 2709,
+              "quoteSatoshis": 284,
+              "created": "2026-10-27T12:54:36"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.10208248264597795",
+              "priceNum": 0.10208248264597795,
+              "baseSatoshis": 4898,
+              "quoteSatoshis": 500,
+              "created": "2026-10-27T13:02:48"
+            },
+            {
+              "price": "0.10208248264597795",
+              "priceNum": 0.10208248264597795,
+              "baseSatoshis": 4898,
+              "quoteSatoshis": 500,
+              "created": "2026-10-27T13:03:42"
+            },
+            {
+              "price": "0.10206180747113001",
+              "priceNum": 0.10206180747113001,
+              "baseSatoshis": 21389,
+              "quoteSatoshis": 2183,
+              "created": "2026-10-27T12:59:39"
+            },
+            {
+              "price": "0.10206164523372117",
+              "priceNum": 0.10206164523372117,
+              "baseSatoshis": 4899,
+              "quoteSatoshis": 500,
+              "created": "2026-10-27T12:58:45"
+            },
+            {
+              "price": "0.10205589522877145",
+              "priceNum": 0.10205589522877145,
+              "baseSatoshis": 54137,
+              "quoteSatoshis": 5525,
+              "created": "2026-10-27T13:03:39"
+            },
+            {
+              "price": "0.10204800000000000",
+              "priceNum": 0.102048,
+              "baseSatoshis": 859928,
+              "quoteSatoshis": 87754,
+              "created": "2026-10-24T13:16:21"
+            },
+            {
+              "price": "0.10204700000000000",
+              "priceNum": 0.102047,
+              "baseSatoshis": 780855,
+              "quoteSatoshis": 79684,
+              "created": "2026-10-23T19:24:18"
+            },
+            {
+              "price": "0.10198714202220924",
+              "priceNum": 0.10198714202220924,
+              "baseSatoshis": 6844,
+              "quoteSatoshis": 698,
+              "created": "2026-10-25T18:06:15"
+            },
+            {
+              "price": "0.10197635592455555",
+              "priceNum": 0.10197635592455555,
+              "baseSatoshis": 11081,
+              "quoteSatoshis": 1130,
+              "created": "2026-10-25T21:19:15"
+            },
+            {
+              "price": "0.10189037296547697",
+              "priceNum": 0.10189037296547697,
+              "baseSatoshis": 13701,
+              "quoteSatoshis": 1396,
+              "created": "2026-10-25T18:20:57"
+            },
+            {
+              "price": "0.10175217240888093",
+              "priceNum": 0.10175217240888093,
+              "baseSatoshis": 49139,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-24T19:28:39"
+            },
+            {
+              "price": "0.10173444104357965",
+              "priceNum": 0.10173444104357965,
+              "baseSatoshis": 6861,
+              "quoteSatoshis": 698,
+              "created": "2026-10-25T18:06:18"
+            },
+            {
+              "price": "0.10163815070986530",
+              "priceNum": 0.1016381507098653,
+              "baseSatoshis": 13735,
+              "quoteSatoshis": 1396,
+              "created": "2026-10-25T18:21:00"
+            },
+            {
+              "price": "0.10148298924105845",
+              "priceNum": 0.10148298924105845,
+              "baseSatoshis": 6878,
+              "quoteSatoshis": 698,
+              "created": "2026-10-25T18:06:21"
+            },
+            {
+              "price": "0.10145466375424084",
+              "priceNum": 0.10145466375424084,
+              "baseSatoshis": 21517,
+              "quoteSatoshis": 2183,
+              "created": "2026-10-27T12:59:39"
+            },
+            {
+              "price": "0.10126582278481013",
+              "priceNum": 0.10126582278481013,
+              "baseSatoshis": 49375,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T18:06:39"
+            },
+            {
+              "price": "0.10098154057438301",
+              "priceNum": 0.10098154057438301,
+              "baseSatoshis": 49514,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T17:35:09"
+            },
+            {
+              "price": "0.10084508178536133",
+              "priceNum": 0.10084508178536133,
+              "baseSatoshis": 49581,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T18:06:39"
+            },
+            {
+              "price": "0.10066666666666667",
+              "priceNum": 0.10066666666666667,
+              "baseSatoshis": 3000,
+              "quoteSatoshis": 302,
+              "created": "2026-10-26T07:48:24"
+            },
+            {
+              "price": "0.10003691399040236",
+              "priceNum": 0.10003691399040236,
+              "baseSatoshis": 2709,
+              "quoteSatoshis": 271,
+              "created": "2026-10-24T15:09:27"
+            },
+            {
+              "price": "0.10000000000000001",
+              "priceNum": 0.1,
+              "baseSatoshis": 7380,
+              "quoteSatoshis": 738,
+              "created": "2026-10-23T19:29:00"
+            },
+            {
+              "price": "0.10000000000000001",
+              "priceNum": 0.1,
+              "baseSatoshis": 3000,
+              "quoteSatoshis": 300,
+              "created": "2026-10-26T04:08:36"
+            },
+            {
+              "price": "0.09991153052196992",
+              "priceNum": 0.09991153052196992,
+              "baseSatoshis": 16955,
+              "quoteSatoshis": 1694,
+              "created": "2026-10-21T09:13:48"
+            },
+            {
+              "price": "0.09944509636229837",
+              "priceNum": 0.09944509636229837,
+              "baseSatoshis": 50279,
+              "quoteSatoshis": 5000,
+              "created": "2026-10-25T17:35:09"
+            },
+            {
+              "price": "0.09879234424728604",
+              "priceNum": 0.09879234424728604,
+              "baseSatoshis": 22937,
+              "quoteSatoshis": 2266,
+              "created": "2026-10-25T19:04:39"
+            }
+          ],
+          "fetchedAt": "2026-10-27T13:03:45.290Z",
+          "endpoints": [
+            "https://api.steemit.com",
+            "https://api.justyy.com",
+            "https://steemapi.boylikegirl.club"
+          ]
+        },
+        {
+          "venue": "hive-internal",
+          "pair": "HIVE/HBD",
+          "asks": [
+            {
+              "price": "0.04822000000000000",
+              "priceNum": 0.04822,
+              "baseSatoshis": 100000,
+              "quoteSatoshis": 4822,
+              "created": "2026-10-27T12:57:48"
+            },
+            {
+              "price": "0.04822840974856923",
+              "priceNum": 0.04822840974856923,
+              "baseSatoshis": 15551,
+              "quoteSatoshis": 750,
+              "created": "2026-10-27T12:48:39"
+            },
+            {
+              "price": "0.04828442166793450",
+              "priceNum": 0.0482844216679345,
+              "baseSatoshis": 24977,
+              "quoteSatoshis": 1206,
+              "created": "2026-10-27T12:37:39"
+            },
+            {
+              "price": "0.04832000000000000",
+              "priceNum": 0.04832,
+              "baseSatoshis": 100000,
+              "quoteSatoshis": 4832,
+              "created": "2026-10-27T12:35:57"
+            },
+            {
+              "price": "0.04848000000000000",
+              "priceNum": 0.04848,
+              "baseSatoshis": 1000000,
+              "quoteSatoshis": 48480,
+              "created": "2026-10-27T12:32:27"
+            },
+            {
+              "price": "0.04850000000000000",
+              "priceNum": 0.0485,
+              "baseSatoshis": 1000000,
+              "quoteSatoshis": 48500,
+              "created": "2026-10-27T12:30:12"
+            },
+            {
+              "price": "0.04860000000000000",
+              "priceNum": 0.0486,
+              "baseSatoshis": 5000,
+              "quoteSatoshis": 243,
+              "created": "2026-10-27T12:34:45"
+            },
+            {
+              "price": "0.04865731939163498",
+              "priceNum": 0.04865731939163498,
+              "baseSatoshis": 16832,
+              "quoteSatoshis": 819,
+              "created": "2026-10-27T12:27:42"
+            },
+            {
+              "price": "0.04869304478195684",
+              "priceNum": 0.04869304478195684,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 747,
+              "created": "2026-10-27T12:27:51"
+            },
+            {
+              "price": "0.04870000000000000",
+              "priceNum": 0.0487,
+              "baseSatoshis": 1000000,
+              "quoteSatoshis": 48700,
+              "created": "2026-10-27T12:26:24"
+            },
+            {
+              "price": "0.04879487179487180",
+              "priceNum": 0.0487948717948718,
+              "baseSatoshis": 312000,
+              "quoteSatoshis": 15224,
+              "created": "2026-10-27T01:17:39"
+            },
+            {
+              "price": "0.04880000000000000",
+              "priceNum": 0.0488,
+              "baseSatoshis": 400000,
+              "quoteSatoshis": 19520,
+              "created": "2026-10-26T04:42:03"
+            },
+            {
+              "price": "0.04880000000000000",
+              "priceNum": 0.0488,
+              "baseSatoshis": 415000,
+              "quoteSatoshis": 20252,
+              "created": "2026-10-26T08:18:24"
+            },
+            {
+              "price": "0.04882154882154882",
+              "priceNum": 0.04882154882154882,
+              "baseSatoshis": 14850,
+              "quoteSatoshis": 725,
+              "created": "2026-10-26T00:51:00"
+            },
+            {
+              "price": "0.04883172079022704",
+              "priceNum": 0.04883172079022704,
+              "baseSatoshis": 6982449,
+              "quoteSatoshis": 340965,
+              "created": "2026-10-27T12:31:03"
+            },
+            {
+              "price": "0.04888859917867153",
+              "priceNum": 0.04888859917867153,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 750,
+              "created": "2026-10-26T00:47:24"
+            },
+            {
+              "price": "0.04890308974287821",
+              "priceNum": 0.04890308974287821,
+              "baseSatoshis": 126127,
+              "quoteSatoshis": 6168,
+              "created": "2026-10-26T00:43:48"
+            },
+            {
+              "price": "0.04900000000000000",
+              "priceNum": 0.049,
+              "baseSatoshis": 405000,
+              "quoteSatoshis": 19845,
+              "created": "2026-10-26T04:25:30"
+            },
+            {
+              "price": "0.04900000000000000",
+              "priceNum": 0.049,
+              "baseSatoshis": 400000,
+              "quoteSatoshis": 19600,
+              "created": "2026-10-26T04:41:39"
+            },
+            {
+              "price": "0.04902792702102085",
+              "priceNum": 0.04902792702102085,
+              "baseSatoshis": 6982449,
+              "quoteSatoshis": 342335,
+              "created": "2026-10-27T12:31:03"
+            },
+            {
+              "price": "0.04913260456273764",
+              "priceNum": 0.04913260456273764,
+              "baseSatoshis": 16832,
+              "quoteSatoshis": 827,
+              "created": "2026-10-26T00:47:12"
+            },
+            {
+              "price": "0.04914933837429111",
+              "priceNum": 0.04914933837429111,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 754,
+              "created": "2026-10-26T00:41:15"
+            },
+            {
+              "price": "0.04920000000000000",
+              "priceNum": 0.0492,
+              "baseSatoshis": 405000,
+              "quoteSatoshis": 19926,
+              "created": "2026-10-26T04:25:54"
+            },
+            {
+              "price": "0.04920000000000000",
+              "priceNum": 0.0492,
+              "baseSatoshis": 400000,
+              "quoteSatoshis": 19680,
+              "created": "2026-10-26T04:41:24"
+            },
+            {
+              "price": "0.04922484933294894",
+              "priceNum": 0.04922484933294894,
+              "baseSatoshis": 6982449,
+              "quoteSatoshis": 343710,
+              "created": "2026-10-27T12:31:03"
+            }
+          ],
+          "bids": [
+            {
+              "price": "0.04815294774421532",
+              "priceNum": 0.04815294774421532,
+              "baseSatoshis": 34829871,
+              "quoteSatoshis": 1677161,
+              "created": "2026-10-27T12:31:06"
+            },
+            {
+              "price": "0.04812002746254190",
+              "priceNum": 0.0481200274625419,
+              "baseSatoshis": 48524,
+              "quoteSatoshis": 2335,
+              "created": "2026-10-27T11:14:51"
+            },
+            {
+              "price": "0.04811009885636752",
+              "priceNum": 0.04811009885636752,
+              "baseSatoshis": 51590,
+              "quoteSatoshis": 2482,
+              "created": "2026-10-27T10:58:18"
+            },
+            {
+              "price": "0.04810686772660220",
+              "priceNum": 0.0481068677266022,
+              "baseSatoshis": 12202,
+              "quoteSatoshis": 587,
+              "created": "2026-10-27T13:01:33"
+            },
+            {
+              "price": "0.04810638159181279",
+              "priceNum": 0.04810638159181279,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 738,
+              "created": "2026-10-27T12:26:36"
+            },
+            {
+              "price": "0.04810000000000000",
+              "priceNum": 0.0481,
+              "baseSatoshis": 100000,
+              "quoteSatoshis": 4810,
+              "created": "2026-10-27T10:49:15"
+            },
+            {
+              "price": "0.04802368584193762",
+              "priceNum": 0.04802368584193762,
+              "baseSatoshis": 93558,
+              "quoteSatoshis": 4493,
+              "created": "2026-10-27T13:03:24"
+            },
+            {
+              "price": "0.04802357836338419",
+              "priceNum": 0.04802357836338419,
+              "baseSatoshis": 11536,
+              "quoteSatoshis": 554,
+              "created": "2026-10-27T13:02:33"
+            },
+            {
+              "price": "0.04801778436457947",
+              "priceNum": 0.04801778436457947,
+              "baseSatoshis": 13495,
+              "quoteSatoshis": 648,
+              "created": "2026-10-27T13:00:39"
+            },
+            {
+              "price": "0.04800000000000000",
+              "priceNum": 0.048,
+              "baseSatoshis": 100000,
+              "quoteSatoshis": 4800,
+              "created": "2026-10-27T10:49:06"
+            },
+            {
+              "price": "0.04796110308703896",
+              "priceNum": 0.04796110308703896,
+              "baseSatoshis": 35402501,
+              "quoteSatoshis": 1697943,
+              "created": "2026-10-27T12:31:06"
+            },
+            {
+              "price": "0.04794612794612794",
+              "priceNum": 0.04794612794612794,
+              "baseSatoshis": 14850,
+              "quoteSatoshis": 712,
+              "created": "2026-10-27T12:26:30"
+            },
+            {
+              "price": "0.04791082719509810",
+              "priceNum": 0.0479108271950981,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 735,
+              "created": "2026-10-27T10:49:33"
+            },
+            {
+              "price": "0.04790000000000000",
+              "priceNum": 0.0479,
+              "baseSatoshis": 440000,
+              "quoteSatoshis": 21076,
+              "created": "2026-10-27T11:42:15"
+            },
+            {
+              "price": "0.04777002300043458",
+              "priceNum": 0.04777002300043458,
+              "baseSatoshis": 35544111,
+              "quoteSatoshis": 1697943,
+              "created": "2026-10-27T12:31:06"
+            },
+            {
+              "price": "0.04770000000000000",
+              "priceNum": 0.0477,
+              "baseSatoshis": 439014,
+              "quoteSatoshis": 20941,
+              "created": "2026-10-24T23:09:09"
+            },
+            {
+              "price": "0.04765008799947852",
+              "priceNum": 0.04765008799947852,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 731,
+              "created": "2026-10-24T15:59:42"
+            },
+            {
+              "price": "0.04764733840304183",
+              "priceNum": 0.04764733840304183,
+              "baseSatoshis": 16832,
+              "quoteSatoshis": 802,
+              "created": "2026-10-24T17:30:00"
+            },
+            {
+              "price": "0.04759166666666666",
+              "priceNum": 0.04759166666666666,
+              "baseSatoshis": 97769,
+              "quoteSatoshis": 4653,
+              "created": "2026-10-15T13:55:21"
+            },
+            {
+              "price": "0.04757970477567475",
+              "priceNum": 0.04757970477567475,
+              "baseSatoshis": 35686287,
+              "quoteSatoshis": 1697943,
+              "created": "2026-10-27T12:31:06"
+            },
+            {
+              "price": "0.04754208754208755",
+              "priceNum": 0.04754208754208755,
+              "baseSatoshis": 14850,
+              "quoteSatoshis": 706,
+              "created": "2026-10-20T01:44:42"
+            },
+            {
+              "price": "0.04753055535701523",
+              "priceNum": 0.04753055535701523,
+              "baseSatoshis": 13991,
+              "quoteSatoshis": 665,
+              "created": "2026-10-27T02:02:24"
+            },
+            {
+              "price": "0.04750000000000000",
+              "priceNum": 0.0475,
+              "baseSatoshis": 440000,
+              "quoteSatoshis": 20900,
+              "created": "2026-10-20T01:58:06"
+            },
+            {
+              "price": "0.04738934880385894",
+              "priceNum": 0.04738934880385894,
+              "baseSatoshis": 15341,
+              "quoteSatoshis": 727,
+              "created": "2026-10-23T08:13:36"
+            },
+            {
+              "price": "0.04730001171104262",
+              "priceNum": 0.04730001171104262,
+              "baseSatoshis": 1349154,
+              "quoteSatoshis": 63815,
+              "created": "2026-10-27T12:26:48"
+            }
+          ],
+          "fetchedAt": "2026-10-27T13:03:45.742Z",
+          "endpoints": [
+            "https://api.hive.blog",
+            "https://api.deathwing.me",
+            "https://hive-api.arcange.eu"
+          ]
+        }
+      ]
+    },
+    {
+      "corridor": "FIXEDFLOAT_ETH_SOL",
+      "opportunities": [],
+      "gaps": [
+        {
+          "kind": "FIXEDFLOAT_CUSTODY_ABSENT",
+          "corridor": "FIXEDFLOAT:eth->sol",
+          "detail": "no FixedFloat credentials reachable in this runtime — custody is owner-held; quote refused (never fabricated)",
+          "retryAfterMs": 300000,
+          "at": "2026-10-27T13:03:45.743Z"
+        },
+        {
+          "kind": "FIXEDFLOAT_CUSTODY_ABSENT",
+          "corridor": "FIXEDFLOAT:sol->eth",
+          "detail": "no FixedFloat credentials reachable in this runtime — custody is owner-held; quote refused (never fabricated)",
+          "retryAfterMs": 300000,
+          "at": "2026-10-27T13:03:45.743Z"
+        }
+      ],
+      "books": []
+    }
+  ],
+  "measured": [
+    {
+      "corridor": "STEEM_SBD_INTERNAL",
+      "ms": 829
+    },
+    {
+      "corridor": "STEEM_HIVE_BRIDGE",
+      "ms": 659
+    },
+    {
+      "corridor": "FIXEDFLOAT_ETH_SOL",
+      "ms": 0
+    }
+  ]
+}
