@@ -18,6 +18,7 @@
 
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 
@@ -26,7 +27,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { PrivateKey } from "../../crypto/src/index";
 import { openVault } from "../../vault/src/index";
 
-import { createHsmServer, listenOnEphemeralPort } from "../src/server";
+import { closeHsmServer, createHsmServer, listenOnEphemeralPort } from "../src/server";
 import type { HsmConfig } from "../src/config";
 
 const MASTER = "88".repeat(32);
@@ -83,15 +84,19 @@ async function boot(withToken: boolean) {
   base = await listenOnEphemeralPort(server);
 }
 
+// Bounded graceful shutdown (the run-#48 law): a bare server.close() waits
+// for connections with NO bound — on a loaded runner that wait blew the 5s
+// hook budget (CI run 40499124392, afterAll timeout). closeHsmServer bounds
+// the wait deterministically, so the hook can never hang again.
 async function shutdown() {
-  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await closeHsmServer(server, 1000);
   fs.rmSync(dir, { recursive: true, force: true });
   delete process.env.SAOS_VAULT_MASTER_KEY;
 }
 
 describe("hsm-runtime server — armed (token configured)", () => {
-  beforeAll(() => boot(true));
-  afterAll(shutdown);
+  beforeAll(() => boot(true), 20_000);
+  afterAll(shutdown, 20_000);
 
   test("GET /health is bare liveness — zero operational data", async () => {
     const res = await fetch(`${base}/health`);
@@ -219,8 +224,8 @@ describe("hsm-runtime server — armed (token configured)", () => {
 });
 
 describe("hsm-runtime server — token UNSET (fail-closed boot)", () => {
-  beforeAll(() => boot(false));
-  afterAll(shutdown);
+  beforeAll(() => boot(false), 20_000);
+  afterAll(shutdown, 20_000);
 
   test("every gated route answers 503 HSM_E_TOKEN_UNSET — deny-by-default", async () => {
     for (const [method, path] of [
@@ -248,4 +253,32 @@ describe("hsm-runtime server — token UNSET (fail-closed boot)", () => {
     expect(body.mode).toBe("SIGN-ONLY");
     expect(body.broadcast).toBe("DISABLED");
   });
+});
+
+describe("hsm-runtime server — bounded graceful shutdown (run-#48 class cure)", () => {
+  test("closeHsmServer resolves bounded even with idle + active connections held", async () => {
+    await boot(true);
+    try {
+      // idle keep-alive connection (the undici pool class)
+      const idle = await fetch(`${base}/health`);
+      expect(idle.status).toBe(200);
+      await idle.arrayBuffer();
+
+      // ACTIVE connection whose request never completes (the in-flight class
+      // a bare server.close() would wait on forever under Node semantics)
+      const port = Number(new URL(base).port);
+      const sock = net.connect(port, "127.0.0.1");
+      await new Promise<void>((r) => sock.once("connect", r));
+      sock.write("POST /sign/steem HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 100\r\n\r\nhalf");
+
+      const t0 = Date.now();
+      await closeHsmServer(server, 400);
+      const elapsed = Date.now() - t0;
+      // the whole point: bounded — never the unbounded wait run #48 died on
+      expect(elapsed).toBeLessThan(2500);
+      sock.destroy();
+    } finally {
+      await shutdown();
+    }
+  }, 10_000);
 });

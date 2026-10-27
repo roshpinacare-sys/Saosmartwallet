@@ -285,6 +285,44 @@ export async function listenOnEphemeralPort(server: http.Server): Promise<string
   return `http://127.0.0.1:${port}`;
 }
 
+/**
+ * Bounded graceful shutdown (the run-#48 law, CI run 40499124392).
+ * A bare `server.close(cb)` waits for connections with NO bound — under Node
+ * semantics an in-flight/keep-alive connection holds the callback forever,
+ * which blew the 5s test-hook budget on a loaded runner and would equally hang
+ * a systemd `stop` of the production unit. closeHsmServer bounds the wait:
+ *   1. idle connections are dropped immediately (closeIdleConnections),
+ *   2. after `graceMs` any stragglers are force-destroyed (closeAllConnections),
+ *   3. the promise ALWAYS resolves within 2×graceMs — a wedged close callback
+ *      cannot hold the caller.
+ * The server's deny-by-default surface is untouched — this is stop-path law.
+ */
+export function closeHsmServer(server: http.Server, graceMs = 1500): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+    const ext = server as http.Server & {
+      closeIdleConnections?: () => void;
+      closeAllConnections?: () => void;
+    };
+    ext.closeIdleConnections?.();
+    const force = setTimeout(() => ext.closeAllConnections?.(), graceMs);
+    force.unref?.();
+    server.close(() => {
+      clearTimeout(force);
+      done();
+    });
+    // hard bound: even a wedged close callback cannot hold the caller
+    const hard = setTimeout(done, graceMs * 2);
+    hard.unref?.();
+  });
+}
+
 // The tested pure-handler seam (test/hsm-runtime.test.ts drives this contract
 // directly; createHsmServer above is the node:http shell over the same laws).
 export {
